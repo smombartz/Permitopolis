@@ -17,7 +17,7 @@ interface WaitingOnChipsProps extends React.ComponentProps<"div"> {
 function WaitingOnChips({ items, emptyText = "Nothing waiting", className, ...props }: WaitingOnChipsProps) {
   if (items.length === 0) {
     return (
-      <p data-slot="waiting-on-chips" className={cn("text-sm text-fg-tertiary", className)}>
+      <p data-slot="waiting-on-chips" className={cn("text-sm text-fg-secondary", className)}>
         {emptyText}
       </p>
     )

@@ -199,7 +199,7 @@ function DropdownMenuShortcut({
     <span
       data-slot="dropdown-menu-shortcut"
       className={cn(
-        "ml-auto font-mono text-xs tracking-widest text-fg-tertiary group-focus/dropdown-menu-item:text-fg",
+        "ml-auto font-mono text-xs tracking-widest text-fg-secondary group-focus/dropdown-menu-item:text-fg",
         className
       )}
       {...props}

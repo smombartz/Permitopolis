@@ -84,6 +84,21 @@ describe("reviewClock", () => {
     expect(view?.label).toContain("paused");
   });
 
+  it("counts the days elapsed, less the days paused: S3 on May 3 is Day 11 of 14, paused 3 days", () => {
+    const c = makeCase({
+      reviews: [{ dept: "hl", sections: [], status: "needs_info", dueDate: "2027-05-03", decidedOn: null, clock: { startedOn: "2027-04-19", pausedSince: "2027-04-30", pausedDays: 0, allowedDays: 14 }, internalNote: "", messageToApplicant: "" }],
+    });
+    expect(reviewClock(c, "hl", "2027-05-03")).toEqual({ day: 11, of: 14, pausedDays: 3, paused: true, label: "Day 11 of 14 · paused 3 days" });
+  });
+
+  it("stops on the day the review was decided", () => {
+    const c = makeCase({
+      reviews: [{ dept: "pws", sections: [], status: "approved", dueDate: "2027-04-14", decidedOn: "2027-04-10", clock: { startedOn: "2027-03-10", pausedSince: null, pausedDays: 2, allowedDays: 21 }, internalNote: "", messageToApplicant: "" }],
+    });
+    expect(reviewClock(c, "pws", "2027-04-10")?.label).toBe("Day 29 of 21 · paused 2 days");
+    expect(reviewClock(c, "pws", "2027-05-03")?.label).toBe("Day 29 of 21 · paused 2 days");
+  });
+
   it("is null when the department isn't routed", () => {
     expect(reviewClock(makeCase(), "pws", "2027-05-03")).toBeNull();
   });

@@ -122,3 +122,38 @@ describe("estimateFees: line ids", () => {
     expect(estimateFees(a, cls, undefined, { caseId: "PMT-27-0001" }).lines[0].id).toBe("PMT-27-0001:fee:1");
   });
 });
+
+describe("estimateFees: several spaces of one kind", () => {
+  it("F6: Fields 1 and 2 for six hours is 12 field-hours, $240", () => {
+    const a = answers({
+      location: inventoryLocation(["field-1", "field-2"]),
+      schedule: schedule({ date: "2027-05-15", start: "09:00", end: "15:00" }),
+      attendance: 90,
+    });
+    const est = estimateFees(a, classify(a));
+    expect(est.lines).toMatchObject([{ label: "Field reservation", qty: 12, unit: "hour", unitPrice: 20, estimate: 240 }]);
+    expect(est.total).toBe(240);
+  });
+
+  it("two shelters are billed as two", () => {
+    const a = answers({
+      location: inventoryLocation(["shelter-1", "shelter-2"]),
+      schedule: schedule({ date: "2027-05-22", start: "11:00", end: "16:00" }),
+      attendance: 60,
+    });
+    expect(estimateFees(a, classify(a)).lines).toMatchObject([{ label: "Shelter reservation", qty: 10, estimate: 250 }]);
+  });
+});
+
+describe("estimateFees: a late fee on a series", () => {
+  it("is due with the first session, not left for later", () => {
+    const location = inventoryLocation(["field-4"]);
+    const base = schedule({ date: "2027-06-06", start: "08:00", end: "09:00", recurrence: { frequency: "weekly", weekday: 0, until: "2027-06-27" } });
+    const a = answers({ location, schedule: { ...base, occurrences: occurrences(base, location, ctx()) }, attendance: 20 });
+    const est = estimateFees(a, classify(a), undefined, { lateFee: true });
+    // Four $20 sessions, and 25% of that $80.
+    expect(est.total).toBe(100);
+    expect(est.dueNow).toBe(40);
+  });
+});
+

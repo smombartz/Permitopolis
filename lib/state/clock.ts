@@ -8,7 +8,7 @@ import { closeoutCards, dueDate as dueDateRule } from "@/lib/rules";
 import { CITY_TASKS } from "@/lib/rules/catalog";
 import type { RulesConfig, RulesCtx } from "@/lib/rules/types";
 import type { EventCase, ISODate, ISODateTime } from "@/lib/types";
-import { appendActivity, applyUnlockEvent, findTask, heldSessionDates, moveTask, newTask, paidInFull, taskId } from "./core";
+import { appendActivity, applyUnlockEvent, findTask, heldSessionDates, moveTask, newTask, quotePaid, taskId } from "./core";
 import type { TransitionResult } from "./types";
 
 /** Every date the event takes place on. A session skipped for a blackout is not one of them. */
@@ -47,11 +47,11 @@ export function applyTick(c: EventCase, ctx: RulesCtx): TransitionResult {
   if (c.ending) return { ok: false, reason: "This case has an ending; nothing to tick." };
   const today = ctx.today;
 
-  if (c.state === "quote_sent" && c.dateHold.expiresOn && isBefore(c.dateHold.expiresOn, today) && !paidInFull(c)) {
+  if (c.state === "quote_sent" && c.dateHold.expiresOn && isBefore(c.dateHold.expiresOn, today) && !quotePaid(c, ctx.cfg)) {
     let next: EventCase = {
       ...c,
       ending: "hold_expired",
-      endingReason: "The date hold expired before the quote was paid in full.",
+      endingReason: "The date hold expired before the quote was paid.",
       dateHold: { ...c.dateHold, status: "expired" },
     };
     next = appendActivity(next, "system", "The date hold expired. The space and date were released.", ctx);

@@ -59,6 +59,19 @@ describe("accept_complete (S4)", () => {
     expect(vi.mocked(availability)).toHaveBeenCalledWith(location, { date: "2027-06-12", start: "17:00", end: "22:30" }, expect.anything(), "PMT-27-0001");
   });
 
+  it("accepts the applicant's answers to the Clerk's own intake requests along with the application", () => {
+    const intake = makeTask({ id: "PMT-27-0001:intake_check", catalogId: "intake_check", owner: "clerk", kind: "review" });
+    const answered = makeTask({ id: "PMT-27-0001:respond_to_request:1", catalogId: "respond_to_request", kind: "action", reviewer: "clerk", status: "submitted", request: { from: "clerk", message: "Proof of nonprofit status, please.", at: "2027-04-22T09:00", dueDate: "2027-05-06", resolved: true } });
+    // A card another department checks stays with that department.
+    const insurance = makeTask({ id: "PMT-27-0001:insurance_certificate", catalogId: "insurance_certificate", reviewer: "hl", status: "submitted" });
+    const c = makeCase({ state: "submitted", tasks: [intake, answered, insurance] });
+    const result = transition(c, { type: "accept_complete" }, "clerk", makeCtx());
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.case.tasks.find((t) => t.id === answered.id)?.status).toBe("done");
+    expect(result.case.tasks.find((t) => t.id === insurance.id)?.status).toBe("submitted");
+  });
+
   it("fails when an intake request is still open", () => {
     const card = makeTask({ id: "PMT-27-0001:x", catalogId: "vendor_list", request: { from: "clerk", message: "Missing a detail.", at: "2027-04-20T09:00", dueDate: "2027-04-25", resolved: false } });
     const c = makeCase({ state: "submitted", tasks: [card] });
@@ -199,6 +212,33 @@ describe("reconcile_close (S6)", () => {
     const c = makeCase({ state: "closeout", closeout: { cleanup: null, notes: "", hoursLoggedOn: null, balance: null, refund: null, feedback: null } });
     const result = transition(c, { type: "reconcile_close" }, "clerk", makeCtx());
     expect(result.ok).toBe(false);
+  });
+
+  it("an Instant exception with a damage charge gets a final-bill card, which it never had", () => {
+    const exception = makeTask({ id: "PMT-27-0017:instant_exception", catalogId: "instant_exception", owner: "clerk", kind: "review" });
+    const c = makeCase({
+      id: "PMT-27-0017",
+      tier: "instant",
+      state: "closeout",
+      closeout: { cleanup: "issues", notes: "", hoursLoggedOn: "2027-04-17", balance: null, refund: null, feedback: null },
+      feeLines: [
+        { id: "f1", dept: "clerk", label: "Shelter reservation", qty: 6, unit: "hour", unitPrice: 25, estimate: 150, actual: 150, kind: "fee" },
+        { id: "f2", dept: "pws", label: "Broken picnic table repair", qty: 1, unit: "item", unitPrice: 95, estimate: 0, actual: 95, kind: "fee" },
+      ],
+      payments: [{ id: "p1", at: "2027-04-01T09:05", amount: 150, method: "card", kind: "booking" }],
+      tasks: [exception],
+    });
+    const result = transition(c, { type: "reconcile_close" }, "clerk", makeCtx());
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.case.state).toBe("closed");
+    expect(result.case.tasks.find((t) => t.catalogId === "final_bill_or_refund")).toMatchObject({
+      owner: "applicant",
+      kind: "payment",
+      status: "todo",
+      dueDate: "2027-05-17",
+      payload: { amount: 95 },
+    });
   });
 
   it("bills the applicant when costs exceed the deposit", () => {

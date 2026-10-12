@@ -51,15 +51,25 @@ describe("create_board", () => {
   });
 
   it("rebuilding keeps the status, payload and history of cards that still apply", () => {
-    const freshCard = makeTask({ id: "PMT-27-0001:pay_fees", catalogId: "pay_fees", status: "todo" });
+    const freshCard = makeTask({ id: "PMT-27-0001:insurance_certificate", catalogId: "insurance_certificate", status: "todo", history: [] });
     vi.mocked(requirements).mockReturnValue([freshCard]);
-    const existing = makeTask({ id: "PMT-27-0001:pay_fees", catalogId: "pay_fees", status: "done", payload: { amount: 125 }, history: [{ at: "2027-05-03T09:00", actor: "applicant", status: "done" }] });
+    const files = [{ name: "coi.pdf", size: 100, type: "application/pdf" }];
+    const existing = makeTask({ id: freshCard.id, catalogId: "insurance_certificate", status: "submitted", payload: { files }, history: [{ at: "2027-05-03T09:00", actor: "applicant", status: "submitted" }] });
     const c = makeCase({ state: "draft", tasks: [existing] });
     const result = transition(c, { type: "create_board" }, "applicant", makeCtx());
     expect(result.ok).toBe(true);
     if (!result.ok) return;
-    expect(result.case.tasks[0].status).toBe("done");
-    expect(result.case.tasks[0].payload).toEqual({ amount: 125 });
+    expect(result.case.tasks[0].status).toBe("submitted");
+    expect(result.case.tasks[0].payload).toEqual({ files });
+    expect(result.case.tasks[0].history).toHaveLength(1);
+  });
+
+  it("rebuilding takes the payment card from the new plan: its amount and its lock are the plan's", () => {
+    const fresh = makeTask({ id: "PMT-27-0001:pay_fees", catalogId: "pay_fees", kind: "payment", status: "locked", unlocksOn: "quote_sent", payload: { amount: 465 }, history: [] });
+    vi.mocked(requirements).mockReturnValue([fresh]);
+    const existing = makeTask({ id: fresh.id, catalogId: "pay_fees", kind: "payment", title: "Pay and book", status: "todo", payload: { amount: 125 } });
+    const result = transition(makeCase({ state: "draft", tasks: [existing] }), { type: "create_board" }, "applicant", makeCtx());
+    expect(result.ok && result.case.tasks[0]).toMatchObject({ status: "locked", unlocksOn: "quote_sent", payload: { amount: 465 } });
   });
 
   it("fails outside Draft", () => {
@@ -122,6 +132,8 @@ describe("book_and_pay", () => {
     vi.mocked(estimateFees).mockReturnValue({ lines: [], fees: 260, deposit: 0, total: 260, dueNow: 20 } as FeeEstimate);
     const seriesSchedule = {
       ...schedule,
+      date: "2027-06-06",
+      recurrence: { frequency: "weekly" as const, weekday: 0, until: "2027-06-13" },
       occurrences: [
         { date: "2027-06-06", availability: { status: "open" as const }, billing: "upcoming" as const },
         { date: "2027-06-13", availability: { status: "open" as const }, billing: "upcoming" as const },
@@ -148,6 +160,35 @@ describe("book_and_pay", () => {
     expect(result.ok).toBe(false);
   });
 
+  it("fails inside the 10 days an Instant booking needs, unless the applicant took the late fee", () => {
+    // May 22 is 19 days from May 3 and 9 days from May 13.
+    const c = makeCase({ state: "draft", tier: "instant", location, schedule });
+    const late = makeCtx({ today: "2027-05-13", now: "2027-05-13T09:00" });
+    expect(transition(c, { type: "book_and_pay", method: "card" }, "applicant", late)).toEqual({
+      ok: false,
+      reason: "Needs 10 days of notice; pick a later date or add the late fee.",
+    });
+    expect(transition(c, { type: "book_and_pay", method: "card" }, "applicant", makeCtx({ today: "2027-05-12", now: "2027-05-12T09:00" })).ok).toBe(true);
+
+    const withFee = { ...c, flags: { ...c.flags, lateFee: true } };
+    expect(transition(withFee, { type: "book_and_pay", method: "card" }, "applicant", late).ok).toBe(true);
+    expect(vi.mocked(estimateFees).mock.calls.at(-1)?.[3]).toMatchObject({ lateFee: true });
+  });
+
+  it("always rebuilds the board from the answers, whatever cards the Draft already had", () => {
+    const payFees = makeTask({ id: "PMT-27-0001:pay_fees", catalogId: "pay_fees", kind: "payment", history: [] });
+    vi.mocked(requirements).mockReturnValue([payFees]);
+    vi.mocked(estimateFees).mockReturnValue({ lines: [{ id: "f1", dept: "clerk", label: "Shelter reservation", qty: 5, unit: "hour", unitPrice: 25, estimate: 125, actual: null, kind: "fee" }], fees: 125, deposit: 0, total: 125 } as FeeEstimate);
+    const stale = makeTask({ id: "PMT-27-0001:insurance_certificate", catalogId: "insurance_certificate", reviewer: "hl" });
+    const deposit = { id: "old", dept: "clerk" as const, label: "Refundable cleanup deposit", qty: 1, unit: "deposit", unitPrice: 250, estimate: 250, actual: null, kind: "deposit" as const };
+    const c = makeCase({ state: "draft", tier: "instant", location, schedule, tasks: [stale], feeLines: [deposit] });
+    const result = transition(c, { type: "book_and_pay", method: "card" }, "applicant", makeCtx());
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.case.tasks.map((t) => t.catalogId)).toEqual(["pay_fees"]);
+    expect(result.case.feeLines.map((line) => line.label)).toEqual(["Shelter reservation"]);
+  });
+
   it("asks availability() about the window the event occupies: setup start to teardown end", () => {
     const withSetup = { ...schedule, setupStart: "09:30", teardownEnd: "17:00" };
     const c = makeCase({ state: "draft", tier: "instant", location, schedule: withSetup, tasks: [makeTask({ id: "PMT-27-0001:pay_fees", catalogId: "pay_fees" })] });
@@ -172,6 +213,23 @@ describe("book_and_pay", () => {
     const c = makeCase({ state: "draft", tier: "instant", location, schedule: series, tasks: [makeTask({ id: "PMT-27-0001:pay_fees", catalogId: "pay_fees" })] });
     const result = transition(c, { type: "book_and_pay", method: "card" }, "applicant", makeCtx());
     expect(result).toEqual({ ok: false, reason: "Sun, Jun 13, 2027: Little League practice has this date held" });
+  });
+
+  it("checks every session the schedule has now, even when the list stored on the Draft is out of date", () => {
+    vi.mocked(availability).mockImplementation((_location, window) =>
+      window.date === "2027-06-20" ? { status: "booked", reason: "Little League practice has this date held" } : { status: "open" },
+    );
+    // The series was extended to Jun 20 after its sessions were last listed.
+    const series = {
+      date: "2027-06-06",
+      start: "08:00",
+      end: "09:00",
+      recurrence: { frequency: "weekly" as const, weekday: 0, until: "2027-06-20" },
+      occurrences: [{ date: "2027-06-06", availability: { status: "open" as const }, billing: "upcoming" as const }],
+    };
+    const c = makeCase({ state: "draft", tier: "instant", location, schedule: series });
+    const result = transition(c, { type: "book_and_pay", method: "card" }, "applicant", makeCtx());
+    expect(result).toEqual({ ok: false, reason: "Sun, Jun 20, 2027: Little League practice has this date held" });
   });
 
   it("a blackout stops a single event but not a series, which skips that session and pays the next", () => {
@@ -234,15 +292,56 @@ describe("complete_task", () => {
     expect(verify?.owner).toBe("hl");
   });
 
-  it("does not duplicate a verify task when the reviewer already has one open", () => {
-    const card1 = makeTask({ id: "PMT-27-0001:a", catalogId: "insurance_certificate", reviewer: "hl" });
-    const card2 = makeTask({ id: "PMT-27-0001:b", catalogId: "vendor_list", reviewer: "hl" });
-    const existingVerify = makeTask({ id: "PMT-27-0001:verify:a", catalogId: "verify:a", owner: "hl", kind: "review" });
-    const c = makeCase({ state: "in_review", tasks: [card1, card2, existingVerify] });
+  it("creates no verify task while the department's own review is open: the review covers the card", () => {
+    const card = makeTask({ id: "PMT-27-0001:vendor_list", catalogId: "vendor_list", reviewer: "hl" });
+    const review = makeTask({ id: "PMT-27-0001:review:hl", catalogId: "review:hl", owner: "hl", kind: "review" });
+    const c = makeCase({ state: "in_review", tasks: [card, review] });
+    const result = transition(c, { type: "complete_task", taskId: card.id }, "applicant", makeCtx());
+    expect(result.ok && result.case.tasks.filter((t) => t.kind === "review")).toHaveLength(1);
+  });
+
+  it("another card's verify task does not stand in for this card's: each one gets its own", () => {
+    const card1 = makeTask({ id: "PMT-27-0001:vendor_health_permit:1", catalogId: "vendor_health_permit", reviewer: "hl", status: "submitted" });
+    const card2 = makeTask({ id: "PMT-27-0001:vendor_health_permit:2", catalogId: "vendor_health_permit", reviewer: "hl" });
+    const verify1 = makeTask({ id: "PMT-27-0001:verify:vendor_health_permit:1", catalogId: "verify:vendor_health_permit:1", owner: "hl", kind: "review" });
+    const c = makeCase({ state: "in_review", tasks: [card1, card2, verify1] });
     const result = transition(c, { type: "complete_task", taskId: card2.id }, "applicant", makeCtx());
     expect(result.ok).toBe(true);
     if (!result.ok) return;
-    expect(result.case.tasks.filter((t) => t.kind === "review")).toHaveLength(1);
+    expect(result.case.tasks.filter((t) => t.kind === "review").map((t) => t.catalogId)).toEqual(["verify:vendor_health_permit:1", "verify:vendor_health_permit:2"]);
+  });
+
+  it("a card uploaded after the permit is issued still gets a verify task", () => {
+    const card = makeTask({ id: "PMT-27-0001:vendor_health_permit:1", catalogId: "vendor_health_permit", reviewer: "hl" });
+    for (const state of ["permitted", "event_day"] as const) {
+      const result = transition(makeCase({ state, tasks: [card] }), { type: "complete_task", taskId: card.id }, "applicant", makeCtx());
+      expect(result.ok && result.case.tasks.find((t) => t.catalogId === "verify:vendor_health_permit:1")).toMatchObject({ owner: "hl", status: "todo" });
+    }
+  });
+
+  it("a second upload reopens the card's verify task instead of adding another", () => {
+    const card = makeTask({ id: "PMT-27-0001:insurance_certificate", catalogId: "insurance_certificate", reviewer: "hl", status: "changes_requested" });
+    const finished = makeTask({ id: "PMT-27-0001:verify:insurance_certificate", catalogId: "verify:insurance_certificate", owner: "hl", kind: "review", status: "done" });
+    const c = makeCase({ state: "quote_sent", tasks: [card, finished] });
+    const result = transition(c, { type: "complete_task", taskId: card.id }, "applicant", makeCtx());
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    const verifyTasks = result.case.tasks.filter((t) => t.catalogId === "verify:insurance_certificate");
+    expect(verifyTasks).toHaveLength(1);
+    expect(verifyTasks[0].status).toBe("todo");
+  });
+
+  it("re-uploading verified insurance takes Issue permit back out of the Clerk's queue until it is checked again", () => {
+    const insurance = makeTask({ id: "PMT-27-0001:insurance_certificate", catalogId: "insurance_certificate", reviewer: "hl", status: "done" });
+    const issue = makeTask({ id: "PMT-27-0001:issue_permit", catalogId: "issue_permit", owner: "clerk", kind: "action", status: "todo" });
+    const c = makeCase({ state: "quote_sent", flags: { sentToCommission: false, lateFee: false, signed: true, acceptedComplete: true, amendmentPending: false }, tasks: [insurance, issue] });
+    const uploaded = transition(c, { type: "complete_task", taskId: insurance.id, files: [{ name: "coi-v2.pdf", size: 100, type: "application/pdf" }] }, "applicant", makeCtx());
+    expect(uploaded.ok).toBe(true);
+    if (!uploaded.ok) return;
+    expect(uploaded.case.tasks.find((t) => t.id === issue.id)?.status).toBe("locked");
+
+    const verified = transition(uploaded.case, { type: "verify_document", taskId: insurance.id }, "hl", makeCtx());
+    expect(verified.ok && verified.case.tasks.find((t) => t.id === issue.id)?.status).toBe("todo");
   });
 
   it("raises presubmit_done and unlocks submit_application once every preSubmit card is in", () => {
@@ -276,6 +375,23 @@ describe("simulate_signoff", () => {
     expect(result.case.tasks[0].status).toBe("done");
   });
 
+  it("the last sign-off after submitting gives the Clerk its intake check, due from that day", () => {
+    const signoff = makeTask({ id: "PMT-27-0001:neighbor_signoff", catalogId: "neighbor_signoff", kind: "sign_off", payload: { progress: { done: 11, total: 12 } } });
+    const intake = makeTask({ id: "PMT-27-0001:intake_check", catalogId: "intake_check", owner: "clerk", kind: "review", status: "locked", payload: { awaitingSignoffs: true } });
+    const c = makeCase({ state: "submitted", tasks: [signoff, intake] });
+    const result = transition(c, { type: "simulate_signoff" }, "neighbor", makeCtx());
+    expect(result.ok && result.case.tasks.find((t) => t.id === intake.id)).toMatchObject({ status: "todo", dueDate: "2027-05-06", payload: { awaitingSignoffs: false } });
+  });
+
+  it("...unless the Clerk is itself waiting on an answer, when the check stays parked", () => {
+    const signoff = makeTask({ id: "PMT-27-0001:neighbor_signoff", catalogId: "neighbor_signoff", kind: "sign_off", payload: { progress: { done: 11, total: 12 } } });
+    const intake = makeTask({ id: "PMT-27-0001:intake_check", catalogId: "intake_check", owner: "clerk", kind: "review", status: "locked", payload: { awaitingSignoffs: true } });
+    const asked = makeTask({ id: "PMT-27-0001:respond_to_request:1", catalogId: "respond_to_request", kind: "action", reviewer: "clerk", request: { from: "clerk", message: "Which households?", at: "2027-05-01T09:00", dueDate: "2027-05-06", resolved: false } });
+    const c = makeCase({ state: "needs_info", tasks: [signoff, intake, asked] });
+    const result = transition(c, { type: "simulate_signoff" }, "neighbor", makeCtx());
+    expect(result.ok && result.case.tasks.find((t) => t.id === intake.id)).toMatchObject({ status: "locked", payload: { awaitingAnswer: true } });
+  });
+
   it("fails once everyone has signed off", () => {
     const task = makeTask({ id: "PMT-27-0001:neighbor_signoff", catalogId: "neighbor_signoff", status: "done", payload: { progress: { done: 12, total: 12 } } });
     const c = makeCase({ state: "submitted", tasks: [task] });
@@ -302,6 +418,31 @@ describe("submit", () => {
     const c = makeCase({ state: "draft", tier: "reviewed", tasks: [submitApp] });
     const result = transition(c, { type: "submit" }, "applicant", makeCtx());
     expect(result.ok).toBe(false);
+  });
+
+  it("checks the cards themselves, not only the Submit card's lock", () => {
+    const submitApp = makeTask({ id: "PMT-27-0001:submit_application", catalogId: "submit_application", status: "todo" });
+    const alcohol = makeTask({ id: "PMT-27-0001:alcohol_details", catalogId: "alcohol_details", kind: "form", reviewer: "clerk", status: "todo" });
+    const c = makeCase({ state: "draft", tier: "reviewed", tasks: [alcohol, submitApp] });
+    expect(transition(c, { type: "submit" }, "applicant", makeCtx())).toEqual({ ok: false, reason: "Unlocks when every card before submitting is done" });
+  });
+
+  it("fails inside the tier's lead time, unless the applicant took the late fee", () => {
+    const submitApp = makeTask({ id: "PMT-27-0001:submit_application", catalogId: "submit_application", status: "todo" });
+    // May 22 is 19 days from May 3; a Reviewed event needs 30.
+    const schedule = { date: "2027-05-22", start: "11:00", end: "16:00", occurrences: [{ date: "2027-05-22", availability: { status: "open" as const }, billing: "upcoming" as const }] };
+    const c = makeCase({ state: "draft", tier: "reviewed", schedule, tasks: [submitApp] });
+    expect(transition(c, { type: "submit" }, "applicant", makeCtx())).toEqual({ ok: false, reason: "Needs 30 days of notice; pick a later date or add the late fee." });
+    expect(transition(c, { type: "submit" }, "applicant", makeCtx({ today: "2027-04-22", now: "2027-04-22T09:00" })).ok).toBe(true);
+    expect(transition({ ...c, flags: { ...c.flags, lateFee: true } }, { type: "submit" }, "applicant", makeCtx()).ok).toBe(true);
+  });
+
+  it("with neighbor sign-offs still out, the intake check waits: locked, with no due date yet", () => {
+    const submitApp = makeTask({ id: "PMT-27-0001:submit_application", catalogId: "submit_application", status: "todo" });
+    const signoff = makeTask({ id: "PMT-27-0001:neighbor_signoff", catalogId: "neighbor_signoff", kind: "sign_off", payload: { progress: { done: 9, total: 12 } } });
+    const c = makeCase({ state: "draft", tier: "reviewed", tasks: [signoff, submitApp] });
+    const result = transition(c, { type: "submit" }, "applicant", makeCtx());
+    expect(result.ok && result.case.tasks.find((t) => t.catalogId === "intake_check")).toMatchObject({ status: "locked", dueDate: null, payload: { awaitingSignoffs: true } });
   });
 });
 
@@ -373,6 +514,21 @@ describe("withdraw and cancel", () => {
     if (!result.ok) return;
     expect(result.case.ending).toBe("withdrawn");
     expect(result.case.dateHold.status).toBe("released");
+  });
+
+  it("withdraw after paying the quote refunds everything paid: no fees are owed or kept", () => {
+    const c = makeCase({
+      state: "quote_sent",
+      dateHold: { status: "held", placedOn: "2027-04-19", expiresOn: "2027-05-14" },
+      feeLines: [{ id: "f1", dept: "clerk", label: "Application fee", qty: 1, unit: "application", unitPrice: 400, estimate: 400, actual: null, kind: "fee" }],
+      payments: [{ id: "p1", at: "2027-04-11T09:05", amount: 400, method: "card", kind: "quote" }],
+    });
+    const result = transition(c, { type: "withdraw" }, "applicant", makeCtx());
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.case.ending).toBe("withdrawn");
+    expect(result.case.payments.at(-1)).toMatchObject({ kind: "refund", amount: -400 });
+    expect(result.case.activity.at(-1)?.text).toBe("Withdrew the application. Refunded $400.");
   });
 
   it("withdraw fails once a permit exists", () => {

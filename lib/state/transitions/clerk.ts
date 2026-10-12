@@ -1,12 +1,14 @@
 /** Transitions only the City Clerk raises. */
 import { addDaysISO } from "@/lib/dates";
 import { fmtMoney } from "@/lib/format";
+import { dueDate } from "@/lib/rules";
+import { CARD_BY_ID } from "@/lib/rules/catalog";
 import type { RulesCtx } from "@/lib/rules/types";
 import type { Actor, Condition, EventCase, FeeLine, Review } from "@/lib/types";
 import type { Action } from "../actions";
 import { checkAcceptComplete, checkConfirmRouting, checkDeny, checkIssuePermit, checkReconcileClose, checkSendQuote } from "../checks";
 import { lastSessionDate } from "../clock";
-import { addTask, addTasks, appendActivity, applyUnlockEvent, caseTotal, findTask, moveTask, newTask, nowOf, patchTask, taskId } from "../core";
+import { addTask, addTasks, appendActivity, applyUnlockEvent, dueAtQuote, findTask, moveTask, newTask, nowOf, patchTask, taskId } from "../core";
 import type { TransitionResult } from "../types";
 
 type Extract_<T extends Action["type"]> = Extract<Action, { type: T }>;
@@ -21,6 +23,12 @@ export function acceptComplete(c: EventCase, _action: Extract_<"accept_complete"
   };
   const intakeId = taskId(next.id, "intake_check");
   if (findTask(next, intakeId)) next = moveTask(next, intakeId, "done", ctx, actor);
+  // Accepting the application accepts the answers to the Clerk's own intake requests with it;
+  // nobody else is tasked with them, so they would sit "With the city" for good.
+  for (const t of next.tasks) {
+    const answeredForClerk = t.owner === "applicant" && t.status === "submitted" && t.reviewer === "clerk" && t.request?.from === "clerk" && t.request.resolved;
+    if (answeredForClerk) next = moveTask(next, t.id, "done", ctx, actor);
+  }
 
   const confirmRoutingTask = newTask(
     { id: taskId(next.id, "confirm_routing"), catalogId: "confirm_routing", owner: "clerk", kind: "action", title: "Confirm reviewers and due dates", phase: "review" },
@@ -127,14 +135,15 @@ export function sendQuote(c: EventCase, action: Extract_<"send_quote">, actor: A
   next = applyUnlockEvent(next, "quote_sent", ctx);
   const payFees = findTask(next, taskId(next.id, "pay_fees"));
   if (payFees) {
-    next = patchTask(next, payFees.id, { payload: { ...payFees.payload, amount: caseTotal(next) } });
+    // Everything for a single event; for a series, the one-off lines and the first session.
+    next = patchTask(next, payFees.id, { payload: { ...payFees.payload, amount: dueAtQuote(next, ctx.cfg) } });
   }
   next = appendActivity(next, actor, "Sent the quote.", ctx);
   return { ok: true, case: next };
 }
 
 export function issuePermit(c: EventCase, _action: Extract_<"issue_permit">, actor: Actor, ctx: RulesCtx): TransitionResult {
-  const check = checkIssuePermit(c);
+  const check = checkIssuePermit(c, ctx);
   if (!check.ok) return check;
   let next: EventCase = {
     ...c,
@@ -187,6 +196,29 @@ export function reconcileClose(c: EventCase, _action: Extract_<"reconcile_close"
     } else {
       next = patchTask(next, billId, { payload: { ...billTask.payload, amount: owed ?? undefined } });
     }
+  } else if (owed !== null && owed > 0) {
+    // An Instant event has no deposit to reconcile and so no final-bill card. A charge from its
+    // closeout exception (a broken table) still has to reach the applicant, so it gets one now.
+    const spec = CARD_BY_ID.final_bill_or_refund;
+    next = addTask(
+      next,
+      newTask(
+        {
+          id: billId,
+          catalogId: spec.id,
+          owner: "applicant",
+          kind: spec.kind,
+          title: spec.title,
+          why: spec.why,
+          reviewer: spec.reviewer,
+          dueDate: dueDate(ctx.today, ctx.cfg.sla.finalBillDaysAfterInvoice, ctx.cfg),
+          phase: spec.phase,
+          payload: { amount: owed },
+        },
+        ctx,
+        "system",
+      ),
+    );
   }
   const exceptionId = taskId(next.id, "instant_exception");
   if (findTask(next, exceptionId)) next = moveTask(next, exceptionId, "done", ctx, actor);

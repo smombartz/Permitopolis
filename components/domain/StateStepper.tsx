@@ -73,7 +73,7 @@ function StateStepper({ state, ending, compact = false, className }: StateSteppe
                 <span
                   className={cn(
                     "text-[11px] font-medium whitespace-nowrap",
-                    done || isCurrent ? "text-fg" : "text-fg-tertiary",
+                    done || isCurrent ? "text-fg" : "text-fg-secondary",
                     isCurrent && "font-bold"
                   )}
                 >

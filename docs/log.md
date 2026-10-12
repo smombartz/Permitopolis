@@ -1,5 +1,43 @@
 # Change log
 
+## 2026-10-12 - Phase 1 review fixes
+
+**What Changed:**
+- Who's up (S4): `submit` creates the Clerk's intake check locked (`payload.awaitingSignoffs`, no due date) while a block party's neighbor sign-offs are out; the last sign-off opens it. The Clerk reads "Waiting on 3 neighbor sign-offs" and S4 is no longer in its queue
+- Date gate: `book_and_pay` and `submit` refuse a date inside the tier's lead time ("Needs 10 days of notice; pick a later date or add the late fee."). `updateDraft` takes `lateFee` and writes `flags.lateFee`; `create_board`, `book_and_pay` and `submit` then add the "Late fee" line, charged only while the date is inside the lead time. A series' late fee is due with its first session
+- Series sessions: the store runs `syncDraft()` (sessions, then tier and triggers) on `createDraft` and every `updateDraft`, so a new weekly series is 13 sessions and $260 without the wizard listing dates; the slot check reads the sessions the schedule has now, not the stored list; "Book again" drafts are prepared the same way
+- Verification: a card uploaded after its department has decided gets its own verify task (one per card, reopened by a second upload), through Permitted and Event day; `accept_complete` accepts answers to the Clerk's own intake requests
+- Reviewer denial: `review_decide` deny finishes the department's review task and gives the Clerk a "Decide: a reviewer denied" task; `send_quote` names the department that denied
+- Issue permit: re-uploading verified insurance locks an unlocked Issue permit again until it is re-verified (B11 loads with Health & Legal up and the Clerk waiting)
+- Stale board: `book_and_pay` always rebuilds the board and fee lines from the answers; `create_board` takes the payment card from the new plan and re-locks Submit application when an edit added a card; `submit` checks the cards themselves
+- Payments: a part payment of a quote leaves `pay_fees` open for the balance; `pay` refuses $0 or less, a final invoice outside Closeout or Closed, a session on a non-series, and booking or refund kinds
+- Reviewed series quote: `dueAtQuote()` is the one-off lines plus the first session (F2: $2,120 of $5,320); it sets the pay card, unlocks Issue permit, stops the hold expiring, and paying it marks the first session paid. Follows the PRD's quote section; awaiting the owner's confirmation
+- `useHydrated()` starts false on the server and the client alike, so a skeleton-until-hydrated page no longer mismatches
+- Review clock: stops on the day the department decides; a second request keeps the first pause's start. Left as days elapsed (not 1-based), so the due date reads "Day 14 of 14"
+- `LocationPicker` reads its selection from `value` and emits the tab's own selection on a tab switch; an unchosen area is shown as a dashed suggestion with "No area chosen yet"
+- Tertiary text replaced with `fg-secondary` or `fg-label` in ten places, the chip suffix is no longer dimmed, and `tests/guards.test.ts` fails on `text-fg-tertiary` outside a placeholder
+- Fees: every space booked is billed (Fields 1 and 2 for six hours is $240), the kind read from the inventory
+- `request_info` refuses an unknown card ("Card not found.") and a department that has already decided
+- `withdraw` after a payment records the refund; `reconcile_close` gives an Instant exception with a charge a final-bill card (F7's $95)
+- Seed scripts: B03 to Fri, May 28, B04 to Sat, Jun 5, B16 booked Feb 18 and B19 submitted Jan 4 (all were inside their lead times); B05 to Thu, May 13 so the overdue Public Works & Safety review is also at lead-time risk; `newCase()` writes "Started a draft.", which is B01's one activity entry
+- Contract changes: `DemoActions.updateDraft` takes `lateFee?: boolean` (`lib/state/types.ts`); comments in `lib/rules/catalog.ts` on the intake, verify, consolidate and Issue permit tasks now say what the engine does
+- Tests: 61 new (381 in all). `tests/replay.ts` replays seed scripts through both engines for `tests/engines.test.ts`, which now checks that all 38 scripts replay with no refused step; new render tests for the picker and for hydration
+
+**Why:**
+- The Phase 1 review found 3 high and 15 medium defects where the engine disagreed with the PRD's transitions table, seed table or quote section, or left a case with nobody up. Fixing them before Phase 2 means the seed replay and the first screens are built on the behavior the PRD describes
+
+**Files Modified:**
+- `lib/state/{checks,core,clock,newCase,selectors,store,waitingOn,availableActions,index}.ts`, `lib/state/transitions/{applicant,city,clerk,payment,shared}.ts` and their tests
+- `lib/state/types.ts`, `lib/rules/catalog.ts` (contracts: one additive field, comments)
+- `lib/rules/fees.ts`, `lib/rules/fees.test.ts`
+- `lib/state/seed/background/{b01-b04,b05-b09,b10-b16,b17-b21}.ts`
+- `components/map/LocationPicker.tsx`
+- `components/domain/{HoldStatus,StateStepper,WaitingOnChips,PartyChip}.tsx`, `components/ui/{file-drop,table,dropdown-menu,command}.tsx`, `components/calendar/DayStrip.tsx`, `components/kit/KitScreen.tsx`
+- `tests/engines.test.ts`, `tests/guards.test.ts`, `tests/replay.ts` (new), `tests/render/{location-picker,hydration}.test.tsx` (new)
+- `docs/log.md`, `docs/readme.md`, `docs/plans/2026-10-12-permitopolis-prototype.md`
+
+---
+
 ## 2026-10-12 - Phase 1 merge: the rules engine and the state machine wired together
 
 **What Changed:**

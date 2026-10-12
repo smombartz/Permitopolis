@@ -4,9 +4,9 @@
  */
 import { addDaysISO, daysBetween } from "@/lib/dates";
 import { fmtMoney } from "@/lib/format";
-import { cancellationRefund, classify, dueDate, estimateFees, occurrences, requirements } from "@/lib/rules";
+import { cancellationRefund, classify, dueDate, estimateFees, requirements } from "@/lib/rules";
 import { CARD_BY_ID, type CardSpec } from "@/lib/rules/catalog";
-import type { RulesCtx } from "@/lib/rules/types";
+import type { FeeEstimate, RulesCtx } from "@/lib/rules/types";
 import type { Actor, DateHold, EventCase, Task } from "@/lib/types";
 import type { Action } from "../actions";
 import {
@@ -22,20 +22,25 @@ import {
   checkSubmit,
   checkSubmitFeedback,
   checkWithdraw,
+  lateFeeApplies,
 } from "../checks";
 import { lastSessionDate } from "../clock";
-import { classifyDraft } from "../newCase";
+import { syncDraft, withSessions } from "../newCase";
 import {
   addTasks,
   appendActivity,
   applyUnlockEvent,
   findTask,
+  idSuffix,
   isCatalogId,
   moveTask,
   newTask,
   nowOf,
+  parkTasksAwaitingAnswer,
   patchTask,
+  preSubmitCardsIn,
   resumeTasksAwaitingAnswer,
+  signoffsLeft,
   taskId,
   totalPaid,
 } from "../core";
@@ -46,34 +51,33 @@ import { maybeUnlockIssuePermit } from "./shared";
 type Extract_<T extends Action["type"]> = Extract<Action, { type: T }>;
 
 /**
- * Lists every session of the schedule with its availability, from the rules engine: a session
- * on a blackout date is 'skipped', so it is neither billed nor held. Whoever built the schedule
- * (the wizard, a seed script, "Book again") does not have to get this right. A session already
- * paid or due keeps its billing.
+ * The board the answers call for now, and the fee estimate it was priced from. Always worked
+ * out afresh, so an edit made after an earlier board cannot leave another tier's cards or fees
+ * behind. A card the applicant has already worked on keeps its progress.
  */
-export function withSessions(c: EventCase, ctx: RulesCtx): EventCase {
-  if (!c.location || !c.schedule) return c;
-  const billed = new Map(c.schedule.occurrences.map((o) => [o.date, o.billing]));
-  const sessions = occurrences(c.schedule, c.location, ctx, c.id).map((o) => {
-    const before = billed.get(o.date);
-    return o.billing !== "skipped" && (before === "paid" || before === "due") ? { ...o, billing: before } : o;
-  });
-  return { ...c, schedule: { ...c.schedule, occurrences: sessions } };
-}
-
-/** Shared by create_board and the create_board-if-empty step inside book_and_pay. */
-export function buildBoard(draft: EventCase, ctx: RulesCtx): EventCase {
+function planBoard(draft: EventCase, ctx: RulesCtx): { board: EventCase; estimate: FeeEstimate } {
   // Sessions first: fees count the sessions that are held, and the first payment is for one of them.
   const c = withSessions(draft, ctx);
   const cls = classify(c, ctx.cfg);
   const freshTasks = requirements(c, cls, { caseId: c.id, today: ctx.today, cfg: ctx.cfg });
   const mergedTasks = freshTasks.map((fresh) => {
     const existing = c.tasks.find((t) => t.id === fresh.id);
-    if (!existing) return fresh;
+    // The payment card is the plan's own: its amount, and whether it waits for a quote.
+    if (!existing || fresh.catalogId === "pay_fees") return fresh;
     return { ...fresh, status: existing.status, payload: existing.payload, history: existing.history, request: existing.request };
   });
-  const estimate = estimateFees(c, cls, ctx.cfg, { caseId: c.id });
-  return { ...c, tier: cls.tier, triggers: cls.triggers, tasks: mergedTasks, feeLines: estimate.lines };
+  // Submit application is open exactly when every card before it is in, whatever it was before.
+  const ready = preSubmitCardsIn({ ...c, tasks: mergedTasks });
+  const tasks = mergedTasks.map((t) =>
+    t.catalogId === "submit_application" ? { ...t, status: ready ? ("todo" as const) : ("locked" as const), unlocksOn: ready ? null : ("presubmit_done" as const) } : t,
+  );
+  const estimate = estimateFees(c, cls, ctx.cfg, { caseId: c.id, lateFee: lateFeeApplies(c, ctx) });
+  return { board: { ...c, tier: cls.tier, triggers: cls.triggers, tasks, feeLines: estimate.lines }, estimate };
+}
+
+/** Shared by create_board and book_and_pay. */
+export function buildBoard(draft: EventCase, ctx: RulesCtx): EventCase {
+  return planBoard(draft, ctx).board;
 }
 
 export function createBoard(c: EventCase, _action: Extract_<"create_board">, actor: Actor, ctx: RulesCtx): TransitionResult {
@@ -87,18 +91,16 @@ export function createBoard(c: EventCase, _action: Extract_<"create_board">, act
 export function bookAndPay(c: EventCase, action: Extract_<"book_and_pay">, actor: Actor, ctx: RulesCtx): TransitionResult {
   const check = checkBookAndPay(c, ctx);
   if (!check.ok) return check;
-  let next = c.tasks.length === 0 ? buildBoard(c, ctx) : c;
-  const cls = classify(next, ctx.cfg);
-  const estimate = estimateFees(next, cls, ctx.cfg, { caseId: next.id });
+  // Never the board as it stands: the Draft may have been edited since it was built.
+  const { board, estimate } = planBoard(c, ctx);
   const amount = estimate.dueNow ?? estimate.total;
 
-  next = {
-    ...next,
-    feeLines: next.feeLines.length > 0 ? next.feeLines : estimate.lines,
+  let next: EventCase = {
+    ...board,
     dateHold: { status: "held", placedOn: ctx.today, expiresOn: null },
     permit: { issuedOn: ctx.today, signature: null },
     state: "permitted",
-    payments: [...next.payments, { id: taskId(next.id, "pay", next.payments.length + 1), at: nowOf(ctx), amount, method: action.method, kind: "booking" }],
+    payments: [...board.payments, { id: taskId(board.id, "pay", board.payments.length + 1), at: nowOf(ctx), amount, method: action.method, kind: "booking" }],
   };
   const payFeesId = taskId(next.id, "pay_fees");
   const payFeesTask = findTask(next, payFeesId);
@@ -140,31 +142,50 @@ export function completeTask(c: EventCase, action: Extract_<"complete_task">, ac
     next = maybeCreateVerifyTask(next, task, ctx);
   }
 
-  const preSubmitCards = next.tasks.filter((t) => isCatalogId(t.catalogId) && (CARD_BY_ID as Record<string, CardSpec>)[t.catalogId]?.preSubmit);
-  const allPreSubmitDone = preSubmitCards.length > 0 && preSubmitCards.every((t) => t.status === "submitted" || t.status === "done");
-  if (allPreSubmitDone) next = applyUnlockEvent(next, "presubmit_done", ctx);
+  // A fresh certificate has to be checked again before the permit can issue, so an unlocked
+  // Issue permit goes back to waiting. Verifying the certificate reopens it.
+  if (task.catalogId === "insurance_certificate" && newStatus !== "done") {
+    const issuePermit = findTask(next, taskId(next.id, "issue_permit"));
+    if (issuePermit?.status === "todo") next = moveTask(next, issuePermit.id, "locked", ctx, "system", {}, "Waiting on the insurance check");
+  }
+
+  const hasPreSubmitCards = next.tasks.some((t) => isCatalogId(t.catalogId) && (CARD_BY_ID as Record<string, CardSpec>)[t.catalogId]?.preSubmit);
+  if (hasPreSubmitCards && preSubmitCardsIn(next)) next = applyUnlockEvent(next, "presubmit_done", ctx);
 
   next = appendActivity(next, actor, `Completed "${task.title}".`, ctx);
   return { ok: true, case: next };
 }
 
-/** Shared with respond_to_request: creates a verify task only when the reviewer has none open. */
+/**
+ * Gives the card's reviewer a task to check it, so a card "With the city" always has someone
+ * tasked. Shared with respond_to_request. Nothing is added while the department's own review is
+ * open (deciding the review accepts every card sent to it), or before the case is routed.
+ */
 export function maybeCreateVerifyTask(c: EventCase, card: Task, ctx: RulesCtx): EventCase {
   const dept = card.reviewer;
   if (!dept) return c;
-  const routed = c.state === "in_review" || c.state === "needs_info" || c.state === "quote_sent";
-  const hasOpen = c.tasks.some((t) => t.owner === dept && t.kind === "review" && (t.status === "todo" || t.status === "changes_requested"));
-  if (!routed || hasOpen) return c;
-  const suffix = card.id.slice(c.id.length + 1);
+  // From routing to the event: these cards keep arriving after the permit (a vendor's health
+  // permit is due 14 days before the day), when the review that covered them is long decided.
+  const routed = c.state === "in_review" || c.state === "needs_info" || c.state === "quote_sent" || c.state === "permitted" || c.state === "event_day";
+  if (!routed) return c;
+  const isOpen = (t: Task | undefined) => t?.status === "todo" || t?.status === "changes_requested";
+  if (isOpen(findTask(c, taskId(c.id, `review:${dept}`)))) return c;
+
+  const suffix = idSuffix(c, card.id);
+  const verifyId = taskId(c.id, `verify:${suffix}`);
+  const due = dueDate(ctx.today, ctx.cfg.sla.verificationDays, ctx.cfg);
+  // One verify task per card. A second upload reopens it, so ids stay unique.
+  const existing = findTask(c, verifyId);
+  if (existing) return isOpen(existing) ? c : moveTask(c, verifyId, "todo", ctx, "system", { dueDate: due });
   const verifyTask = newTask(
     {
-      id: taskId(c.id, `verify:${suffix}`),
+      id: verifyId,
       catalogId: `verify:${suffix}`,
       owner: dept,
       kind: "review",
       title: `Verify ${card.title}`,
       reviewer: null,
-      dueDate: dueDate(ctx.today, ctx.cfg.sla.verificationDays, ctx.cfg),
+      dueDate: due,
       phase: "review",
     },
     ctx,
@@ -183,16 +204,39 @@ export function simulateSignoff(c: EventCase, _action: Extract_<"simulate_signof
   let next = patchTask(c, id, { payload: { ...task.payload, progress: { done, total: progress.total } } });
   if (done >= progress.total) {
     next = moveTask(next, id, "done", ctx, actor);
+    next = releaseIntakeCheck(next, ctx);
   }
   next = appendActivity(next, actor, `A neighbor signed off (${done} of ${progress.total}).`, ctx);
   return { ok: true, case: next };
 }
 
+/**
+ * The last sign-off is what lets the Clerk act on a block party, so that is when its intake
+ * check opens and its three days start. If the Clerk is meanwhile waiting on an answer of its
+ * own, the check stays parked for that instead.
+ */
+function releaseIntakeCheck(c: EventCase, ctx: RulesCtx): EventCase {
+  const intake = findTask(c, taskId(c.id, "intake_check"));
+  if (!intake || intake.status !== "locked" || intake.payload.awaitingSignoffs !== true) return c;
+  const next = moveTask(c, intake.id, "todo", ctx, "system", {
+    dueDate: dueDate(ctx.today, ctx.cfg.sla.intakeDays, ctx.cfg),
+    payload: { ...intake.payload, awaitingSignoffs: false },
+  });
+  const clerkIsAsking = next.tasks.some((t) => t.request && !t.request.resolved && t.request.from === "clerk");
+  return clerkIsAsking ? parkTasksAwaitingAnswer(next, "clerk", ctx) : next;
+}
+
 export function submit(c: EventCase, _action: Extract_<"submit">, actor: Actor, ctx: RulesCtx): TransitionResult {
-  const check = checkSubmit(c);
+  const check = checkSubmit(c, ctx);
   if (!check.ok) return check;
-  let next: EventCase = { ...c, state: "submitted", submittedAt: nowOf(ctx) };
+  // The fee lines the Clerk quotes from are priced as the application goes in: this is the
+  // moment the lead time is measured, so it is also when a late fee joins them.
+  const estimate = estimateFees(c, classify(c, ctx.cfg), ctx.cfg, { caseId: c.id, lateFee: lateFeeApplies(c, ctx) });
+  let next: EventCase = { ...c, feeLines: estimate.lines, state: "submitted", submittedAt: nowOf(ctx) };
   next = moveTask(next, taskId(next.id, "submit_application"), "done", ctx, actor);
+  // A block party still collecting sign-offs is the neighbors' move, not the Clerk's: the intake
+  // check waits, locked, until the last one is in (see releaseIntakeCheck).
+  const awaitingSignoffs = signoffsLeft(next) > 0;
   const intakeTask = newTask(
     {
       id: taskId(next.id, "intake_check"),
@@ -200,7 +244,9 @@ export function submit(c: EventCase, _action: Extract_<"submit">, actor: Actor, 
       owner: "clerk",
       kind: "review",
       title: "Check the application is complete",
-      dueDate: dueDate(ctx.today, ctx.cfg.sla.intakeDays, ctx.cfg),
+      dueDate: awaitingSignoffs ? null : dueDate(ctx.today, ctx.cfg.sla.intakeDays, ctx.cfg),
+      status: awaitingSignoffs ? "locked" : "todo",
+      payload: awaitingSignoffs ? { awaitingSignoffs: true } : {},
       phase: "review",
     },
     ctx,
@@ -262,12 +308,16 @@ export function acceptAndSign(c: EventCase, action: Extract_<"accept_and_sign">,
 export function withdraw(c: EventCase, _action: Extract_<"withdraw">, actor: Actor, ctx: RulesCtx): TransitionResult {
   const check = checkWithdraw(c);
   if (!check.ok) return check;
-  const next = appendActivity(
-    { ...c, ending: "withdrawn", endingReason: "Withdrawn by the applicant.", dateHold: releaseHold(c) },
-    actor,
-    "Withdrew the application.",
-    ctx,
-  );
+  // Withdrawing leaves no fees owed, so anything paid toward the quote goes back.
+  const paid = totalPaid(c);
+  let next: EventCase = { ...c, ending: "withdrawn", endingReason: "Withdrawn by the applicant.", dateHold: releaseHold(c) };
+  if (paid > 0) {
+    next = {
+      ...next,
+      payments: [...c.payments, { id: taskId(c.id, "pay", c.payments.length + 1), at: nowOf(ctx), amount: -paid, method: "card", kind: "refund" }],
+    };
+  }
+  next = appendActivity(next, actor, paid > 0 ? `Withdrew the application. Refunded ${fmtMoney(paid)}.` : "Withdrew the application.", ctx);
   return { ok: true, case: next };
 }
 
@@ -345,8 +395,9 @@ export function bookAgain(c: EventCase, _action: Extract_<"book_again">, actor: 
   };
   let next = moveTask(c, taskId(c.id, "book_again"), "done", ctx, actor);
   next = appendActivity(next, actor, `Started next year's application (${newId}).`, ctx);
-  // The new Draft carries the tier of the plan it copies, like any Draft the store creates.
-  return { ok: true, case: next, spawned: [classifyDraft(spawned, ctx.cfg)] };
+  // The new Draft is prepared like any Draft the store creates: next year's sessions listed
+  // against next year's calendar, and the tier of the plan it copies.
+  return { ok: true, case: next, spawned: [syncDraft(spawned, ctx)] };
 }
 
 export function amend(c: EventCase, action: Extract_<"amend">, actor: Actor, ctx: RulesCtx): TransitionResult {

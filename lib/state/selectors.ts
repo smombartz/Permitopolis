@@ -70,9 +70,12 @@ export const waitingOnOthers: StateApi["waitingOnOthers"] = (cases: EventCase[],
 export const reviewClock: StateApi["reviewClock"] = (c: EventCase, dept: Dept, today: ISODate): ReviewClockView | null => {
   const review = c.reviews.find((r) => r.dept === dept);
   if (!review || !review.clock.startedOn) return null;
-  const currentPause = review.clock.pausedSince ? daysBetween(review.clock.pausedSince, today) : 0;
+  // The clock counts days elapsed since routing, so the due date (routing plus the allowance)
+  // reads "Day 14 of 14". It stops for good on the day the department decides.
+  const end = review.decidedOn ?? today;
+  const currentPause = review.clock.pausedSince ? Math.max(0, daysBetween(review.clock.pausedSince, end)) : 0;
   const pausedDays = review.clock.pausedDays + currentPause;
-  const elapsed = Math.max(0, daysBetween(review.clock.startedOn, today) - pausedDays);
+  const elapsed = Math.max(0, daysBetween(review.clock.startedOn, end) - pausedDays);
   const paused = review.clock.pausedSince !== null;
   const label = `Day ${elapsed} of ${review.clock.allowedDays}${pausedDays > 0 ? ` · paused ${plural(pausedDays, "day")}` : ""}`;
   return { day: elapsed, of: review.clock.allowedDays, pausedDays, paused, label };

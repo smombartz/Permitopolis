@@ -327,11 +327,12 @@ export const B16: SeedScript = {
   id: CASE16,
   key: "B16",
   applicantId: "riverside-tai-chi-circle",
-  createdAt: "2027-02-20T09:00",
+  // Booked 11 days before the first session: an Instant booking needs 10.
+  createdAt: "2027-02-18T09:00",
   answers: b16Answers,
   steps: [
-    step("2027-02-20T09:00", "applicant", { type: "create_board" }),
-    step("2027-02-20T09:05", "applicant", { type: "book_and_pay", method: "card" }),
+    step("2027-02-18T09:00", "applicant", { type: "create_board" }),
+    step("2027-02-18T09:05", "applicant", { type: "book_and_pay", method: "card" }),
   ],
   expect: { tier: "instant", state: "event_day" },
   notes: "Today, May 3, is one of its Monday sessions. May 31 is skipped for the Memorial Day blackout.",

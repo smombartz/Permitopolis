@@ -48,7 +48,7 @@ function applicantActions(c: EventCase, ctx: RulesCtx): ActionAvailability[] {
       items.push(row("book_and_pay", "Pay and book", checkBookAndPay(c, ctx), true));
     } else {
       items.push(row("create_board", "Confirm the plan", checkCreateBoard(c), c.tasks.length === 0));
-      items.push(row("submit", "Submit application", checkSubmit(c), c.tasks.length > 0));
+      items.push(row("submit", "Submit application", checkSubmit(c, ctx), c.tasks.length > 0));
     }
     items.push(row("withdraw", "Withdraw", checkWithdraw(c)));
   } else if (c.state === "submitted" || c.state === "in_review" || c.state === "needs_info") {
@@ -83,7 +83,7 @@ function clerkActions(c: EventCase, ctx: RulesCtx): ActionAvailability[] {
     items.push(remindRow());
     items.push(addNoteRow());
   } else if (c.state === "quote_sent") {
-    items.push(row("issue_permit", "Issue permit", checkIssuePermit(c), true));
+    items.push(row("issue_permit", "Issue permit", checkIssuePermit(c, ctx), true));
     items.push({ type: "pay", label: "Record an in-person payment", enabled: true });
     items.push(remindRow());
     items.push(addNoteRow());

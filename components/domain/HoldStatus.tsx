@@ -16,7 +16,8 @@ function HoldStatus({ hold, className, ...props }: HoldStatusProps) {
       data-status={hold.status}
       className={cn(
         "inline-flex items-center gap-1.5 text-sm",
-        tone === "danger" ? "text-danger-fg" : tone === "muted" ? "text-fg-tertiary" : "text-fg-secondary",
+        // "No date hold yet" and "Hold released" are facts to read, so they are not dimmed below AA.
+        tone === "danger" ? "text-danger-fg" : "text-fg-secondary",
         className
       )}
       {...props}
@@ -27,17 +28,17 @@ function HoldStatus({ hold, className, ...props }: HoldStatusProps) {
   );
 }
 
-function describe(hold: DateHold): { Icon: typeof CalendarIcon; text: string; tone: "default" | "muted" | "danger" } {
+function describe(hold: DateHold): { Icon: typeof CalendarIcon; text: string; tone: "default" | "danger" } {
   switch (hold.status) {
     case "held":
       return { Icon: CalendarIcon, text: hold.expiresOn ? `Date held until ${fmtDate(hold.expiresOn)}` : "Date held", tone: "default" };
     case "expired":
       return { Icon: CalendarXIcon, text: "Hold expired", tone: "danger" };
     case "released":
-      return { Icon: CalendarOffIcon, text: "Hold released", tone: "muted" };
+      return { Icon: CalendarOffIcon, text: "Hold released", tone: "default" };
     case "none":
     default:
-      return { Icon: CalendarOffIcon, text: "No date hold yet", tone: "muted" };
+      return { Icon: CalendarOffIcon, text: "No date hold yet", tone: "default" };
   }
 }
 

@@ -2,9 +2,10 @@
  * Low-level helpers shared by every transition handler. Nothing here is part of
  * StateApi; it is implementation detail for lib/state/transitions/*.
  */
-import { dueDate as dueDateRule } from "@/lib/rules";
+import { classify, dueDate as dueDateRule, estimateFees } from "@/lib/rules";
 import { CARD_BY_ID, type CardSpec, type CatalogId } from "@/lib/rules/catalog";
-import type { RulesCtx } from "@/lib/rules/types";
+import { round2 } from "@/lib/rules/shared";
+import type { RulesConfig, RulesCtx } from "@/lib/rules/types";
 import type {
   Actor,
   Dept,
@@ -209,6 +210,19 @@ export function isCatalogId(id: string): id is CatalogId {
   return id in CARD_BY_ID;
 }
 
+/** Every card that has to be in before Submit application is 'submitted' or 'done'. */
+export function preSubmitCardsIn(c: EventCase): boolean {
+  return c.tasks.filter((t) => catalogSpecFor(t.catalogId)?.preSubmit).every((t) => t.status === "submitted" || t.status === "done");
+}
+
+/** Neighbor sign-offs a block party still needs; 0 when it has them all or needs none. */
+export function signoffsLeft(c: EventCase): number {
+  const signoff = findTask(c, taskId(c.id, "neighbor_signoff"));
+  if (!signoff || signoff.status === "done") return 0;
+  const progress = signoff.payload.progress;
+  return progress ? Math.max(0, progress.total - progress.done) : 0;
+}
+
 /** Every open (actionable) task owned by this party, optionally narrowed further. */
 export function openTasksFor(c: EventCase, owner: Party, extra?: (t: Task) => boolean): Task[] {
   return c.tasks.filter(
@@ -239,6 +253,22 @@ export function caseTotal(c: EventCase): number {
   return sumFeeLines(c, ["fee", "late_fee", "deposit"]);
 }
 
-export function paidInFull(c: EventCase): boolean {
-  return totalPaid(c) >= caseTotal(c);
+/**
+ * What the quote asks for now. A single event pays everything on it. A series pays its one-off
+ * lines (application fee, permits, inspections, deposit, late fee) and its first session; the
+ * later sessions are billed on schedule (PRD, the quote: "A series shows the first session now
+ * and the rest on schedule"). The later sessions are taken off at the fee schedule's own
+ * per-session price, so lines a reviewer or the Clerk added stay due now.
+ */
+export function dueAtQuote(c: EventCase, cfg: RulesConfig): number {
+  const total = caseTotal(c);
+  if (!c.schedule?.recurrence) return total;
+  const estimate = estimateFees(c, classify(c, cfg), cfg);
+  const laterSessions = Math.max(0, (estimate.sessions ?? 1) - 1);
+  return Math.max(0, round2(total - laterSessions * (estimate.perSession ?? 0)));
+}
+
+/** The applicant has paid what the quote asks for now. Issue permit and the date hold both turn on it. */
+export function quotePaid(c: EventCase, cfg: RulesConfig): boolean {
+  return totalPaid(c) >= dueAtQuote(c, cfg);
 }

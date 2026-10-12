@@ -3,9 +3,10 @@
  * reviews. waitingOn() and nextMove() share one pass over the four parties.
  */
 import { daysBetween } from "@/lib/dates";
+import { plural } from "@/lib/format";
 import { ENDING_LABEL, PARTIES, PARTY_LABEL } from "@/lib/types";
 import type { EventCase, ISODate, Party, Task } from "@/lib/types";
-import { taskDueDate } from "./core";
+import { signoffsLeft, taskDueDate } from "./core";
 import type { PartyStanding, PartyStatus, StateApi } from "./types";
 
 const DEFAULT_SCOPE: Record<Party, string> = {
@@ -44,8 +45,9 @@ function daysActionable(tasks: Task[], today: ISODate): number {
   return Math.max(0, max);
 }
 
-function lockedNote(tasks: Task[]): string | undefined {
+function lockedNote(c: EventCase, tasks: Task[]): string | undefined {
   if (tasks.some((t) => t.payload.awaitingAnswer === true)) return "Waiting on the applicant's response";
+  if (tasks.some((t) => t.payload.awaitingSignoffs === true)) return `Waiting on ${plural(signoffsLeft(c), "neighbor sign-off")}`;
   for (const t of tasks) {
     const hint = CITY_UNLOCK_HINT[t.catalogId];
     if (hint) return hint;
@@ -102,7 +104,7 @@ export const waitingOn: StateApi["waitingOn"] = (c: EventCase, today: ISODate): 
     if (status === "up_now") {
       note = open[0]?.title ? `Up: ${open[0].title}` : "Working on the plan";
     } else if (status === "waiting") {
-      note = lockedNote(locked) ?? "Waiting on an earlier step";
+      note = lockedNote(c, locked) ?? "Waiting on an earlier step";
     } else if (status === "done_for_now") {
       note = decisionNote(c, party) ?? "Nothing due right now";
     } else {
@@ -148,6 +150,8 @@ function lowerFirst(text: string): string {
 }
 
 function verbPhrase(task: Task): string {
+  // After a department denies its section the Clerk's task is to deny the application, not to quote it.
+  if (task.catalogId === "consolidate" && task.payload.denied === true) return "acts on a reviewer's denial";
   const known = PHRASE[task.catalogId];
   if (known) return known;
   if (task.catalogId.startsWith("review:")) return "reviews its sections";

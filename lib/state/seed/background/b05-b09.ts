@@ -1,6 +1,7 @@
 /**
  * Background cases, In review and Needs info (plan 6.2). B05 carries the 90+ character event
- * name and an overdue Public Works & Safety review; B06 is flagged sent to commission; B07's
+ * name and an overdue Public Works & Safety review that has run the case short of lead time
+ * (the red risk flag); B06 is flagged sent to commission; B07's
  * Health & Legal review is overdue; B08 is an applicant overdue on a request; B09 carries the
  * 60+ character organization name and was asked by the Clerk at intake.
  */
@@ -19,8 +20,10 @@ const b05Answers: EventAnswers = {
   name: LONG_NAME,
   description: "A parish-wide heritage festival with craft tables and a potluck.",
   location: areaLocation("great-lawn", { x: 20, y: 20, w: 50, h: 40 }, 4000),
-  // A Sunday: the Great Lawn is the farmers market's (F2) every Saturday morning.
-  schedule: singleSchedule("2027-07-18", "11:00", "17:00"),
+  // Thu, May 13: 10 days from the demo date, and an In review case needs 14 to reach a permit,
+  // so the overdue review shows as lead-time risk. A weekday: the Great Lawn is the farmers
+  // market's (F2) on Saturday mornings.
+  schedule: singleSchedule("2027-05-13", "11:00", "17:00"),
   attendance: 300,
   addOns: addOns({ tentsStages: { count: 3 }, foodVending: { vendors: 5, vendorNames: b05Vendors } }),
 };
@@ -60,7 +63,7 @@ export const B05: SeedScript = {
     step("2027-03-20T09:00", "hl", { type: "review_decide", decision: "approve", conditions: [], feeLines: [] }),
   ],
   expect: { tier: "reviewed", state: "in_review" },
-  notes: "Stress row: a 90+ character event name. Public Works & Safety's review is overdue (due Mar 29).",
+  notes: "Stress row: a 90+ character event name. Public Works & Safety's review is overdue (due Mar 29), and with the event 10 days away the case is at lead-time risk.",
 };
 
 /** B06 · Permitopolis Rotary Club: In review, flagged sent to commission. */

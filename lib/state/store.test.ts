@@ -1,6 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { createElement } from "react";
+import { renderToString } from "react-dom/server";
+import { classify, estimateFees } from "@/lib/rules";
 import { DEFAULT_DEMO_TODAY } from "@/lib/rules/config";
-import { resetDemoStoreForTests, useDemo } from "./store";
+import { resetDemoStoreForTests, useDemo, useHydrated } from "./store";
 
 vi.mock("./seed", () => ({ buildSeed: () => [] }));
 
@@ -52,6 +55,42 @@ describe("useDemo", () => {
     expect(draft()?.tier).toBe("instant");
   });
 
+  it("a Draft lists its own sessions, so a new weekly series is billed for every one of them", () => {
+    // What the wizard stores when "repeat weekly" is switched on: the rule, and no list of dates.
+    const yoga = {
+      eventType: "class_meetup" as const,
+      attendance: 20,
+      location: { mode: "inventory" as const, inventoryIds: ["field-4"], segmentIds: [], label: "Field 4, Riverside Park" },
+      schedule: { date: "2027-06-06", start: "08:00", end: "09:00", recurrence: { frequency: "weekly" as const, weekday: 0, until: "2027-08-29" }, occurrences: [] },
+    };
+    const id = useDemo.getState().createDraft("sunrise-yoga-club", yoga);
+    const draft = () => useDemo.getState().cases.find((c) => c.id === id)!;
+    const estimate = () => estimateFees(draft(), classify(draft()));
+
+    expect(draft().schedule?.occurrences).toHaveLength(13);
+    expect(draft().schedule?.occurrences.find((o) => o.date === "2027-07-11")?.availability.status).toBe("impacted");
+    expect(estimate()).toMatchObject({ sessions: 13, perSession: 20, total: 260, dueNow: 20 });
+
+    // Ending the series a month in: the stored list follows, and so does the price.
+    useDemo.getState().updateDraft(id, { schedule: { ...yoga.schedule, recurrence: { ...yoga.schedule.recurrence, until: "2027-06-27" } } });
+    expect(draft().schedule?.occurrences.map((o) => o.date)).toEqual(["2027-06-06", "2027-06-13", "2027-06-20", "2027-06-27"]);
+    expect(estimate()).toMatchObject({ sessions: 4, total: 80 });
+  });
+
+  it("updateDraft records the late fee the applicant chose at the date gate", () => {
+    const id = useDemo.getState().createDraft("maya", { name: "Birthday picnic" });
+    const draft = () => useDemo.getState().cases.find((c) => c.id === id)!;
+    expect(draft().flags.lateFee).toBe(false);
+    useDemo.getState().updateDraft(id, { lateFee: true });
+    expect(draft().flags.lateFee).toBe(true);
+    expect(draft()).not.toHaveProperty("lateFee");
+    // A later autosave of the answers leaves the choice alone.
+    useDemo.getState().updateDraft(id, { attendance: 45 });
+    expect(draft().flags.lateFee).toBe(true);
+    useDemo.getState().updateDraft(id, { lateFee: false });
+    expect(draft().flags.lateFee).toBe(false);
+  });
+
   it("dispatch reports a case-not-found error without throwing", () => {
     const result = useDemo.getState().dispatch("PMT-27-9999", { type: "add_note", text: "hi" });
     expect(result.ok).toBe(false);
@@ -62,8 +101,7 @@ describe("useDemo", () => {
     const result = useDemo.getState().dispatch(id, { type: "add_note", text: "Called to confirm." }, "applicant");
     expect(result.ok).toBe(true);
     const draft = useDemo.getState().cases.find((c) => c.id === id);
-    expect(draft?.activity).toHaveLength(1);
-    expect(draft?.activity[0].text).toBe("Called to confirm.");
+    expect(draft?.activity.map((a) => a.text)).toEqual(["Started a draft.", "Called to confirm."]);
   });
 
   it("setRole, setPersona and toggleHints update the store", () => {
@@ -106,5 +144,13 @@ describe("useDemo", () => {
     expect(state.cases).toEqual([]);
     expect(state.role).toBe("applicant");
     expect(state.demoToday).toBe(DEFAULT_DEMO_TODAY);
+  });
+});
+
+describe("useHydrated", () => {
+  it("is false in server-rendered HTML, like the first render in the browser, so the two match", () => {
+    // This file runs in node, where there is no window: exactly what the server sees.
+    const Probe = () => createElement("p", null, useHydrated() ? "content" : "skeleton");
+    expect(renderToString(createElement(Probe))).toBe("<p>skeleton</p>");
   });
 });

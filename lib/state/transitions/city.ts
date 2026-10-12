@@ -20,7 +20,7 @@ import { maybeUnlockIssuePermit } from "./shared";
 type Extract_<T extends Action["type"]> = Extract<Action, { type: T }>;
 
 export function requestInfo(c: EventCase, action: Extract_<"request_info">, actor: Actor, ctx: RulesCtx): TransitionResult {
-  const check = checkRequestInfo(c, actor);
+  const check = checkRequestInfo(c, actor, action.taskId);
   if (!check.ok) return check;
   const askerDept = actor as Dept;
   const due = action.dueDate ?? dueDate(ctx.today, ctx.cfg.sla.requestResponseDays, ctx.cfg);
@@ -51,7 +51,8 @@ export function requestInfo(c: EventCase, action: Extract_<"request_info">, acto
 
   const review = next.reviews.find((r) => r.dept === askerDept);
   if (review) {
-    next = { ...next, reviews: next.reviews.map((r) => (r.dept === askerDept ? { ...r, status: "needs_info", clock: { ...r.clock, pausedSince: ctx.today } } : r)) };
+    // A second request while the clock is already paused keeps the day the pause began.
+    next = { ...next, reviews: next.reviews.map((r) => (r.dept === askerDept ? { ...r, status: "needs_info", clock: { ...r.clock, pausedSince: r.clock.pausedSince ?? ctx.today } } : r)) };
   }
   next = parkTasksAwaitingAnswer(next, askerDept, ctx);
   next = { ...next, state: "needs_info" };
@@ -103,6 +104,16 @@ export function reviewDecide(c: EventCase, action: Extract_<"review_decide">, ac
         r.dept === dept ? { ...r, status: "denied", decidedOn: ctx.today, internalNote: action.internalNote ?? r.internalNote, messageToApplicant: action.message ?? r.messageToApplicant } : r,
       ),
     };
+    // The department has decided, so its review task is done. Denying the application is now
+    // the Clerk's only move (a denial is final), and the Clerk gets a task that says so.
+    const deniedReviewId = taskId(next.id, `review:${dept}`);
+    if (findTask(next, deniedReviewId)) next = moveTask(next, deniedReviewId, "done", ctx, actor);
+    if (!findTask(next, taskId(next.id, "consolidate"))) {
+      next = addTask(
+        next,
+        newTask({ id: taskId(next.id, "consolidate"), catalogId: "consolidate", owner: "clerk", kind: "action", title: "Decide: a reviewer denied", phase: "permit", payload: { denied: true } }, ctx, "system"),
+      );
+    }
     next = appendActivity(next, actor, "Denied its section.", ctx);
     return { ok: true, case: next };
   }

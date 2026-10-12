@@ -11,7 +11,7 @@ import { DEFAULT_CONFIG, DEFAULT_DEMO_TODAY, STORAGE_KEY } from "@/lib/rules";
 import type { Actor, EventAnswers, EventCase, ISODate, Party, WizardStep } from "@/lib/types";
 import { advanceClock, computeNow } from "./clock";
 import { nextCaseId } from "./selectors";
-import { classifyDraft, newCase } from "./newCase";
+import { newCase, syncDraft } from "./newCase";
 import { buildSeed } from "./seed";
 import { safeGet, safeRemove, safeSet, storageAvailable } from "./storage";
 import { transition } from "./transition";
@@ -62,14 +62,22 @@ export const useDemo = create<DemoStore>()(
       createDraft(applicantId: string, answers?: Partial<EventAnswers>) {
         const state = get();
         const id = nextCaseId(state.cases);
-        const draft = classifyDraft(newCase({ id, applicantId, createdAt: `${state.demoToday}T09:00`, answers }), state.cfg);
+        const blank = newCase({ id, applicantId, createdAt: `${state.demoToday}T09:00`, answers });
+        const draft = syncDraft(blank, { today: state.demoToday, cases: state.cases, cfg: state.cfg });
         set({ cases: [...state.cases, draft] });
         return id;
       },
 
-      updateDraft(caseId: string, patch: Partial<EventAnswers> & { wizardStep?: WizardStep }) {
+      updateDraft(caseId: string, patch: Partial<EventAnswers> & { wizardStep?: WizardStep; lateFee?: boolean }) {
         set((state: DemoStore) => ({
-          cases: state.cases.map((c: EventCase) => (c.id === caseId && c.state === "draft" ? classifyDraft({ ...c, ...patch }, state.cfg) : c)),
+          cases: state.cases.map((c: EventCase) => {
+            if (c.id !== caseId || c.state !== "draft") return c;
+            // `lateFee` is the applicant's choice at the date gate; it lives in flags, not in the answers.
+            const { lateFee, ...answers } = patch;
+            const flags = lateFee === undefined ? c.flags : { ...c.flags, lateFee };
+            // Sessions, tier and triggers follow every edit (see syncDraft).
+            return syncDraft({ ...c, ...answers, flags }, { today: state.demoToday, cases: state.cases, cfg: state.cfg });
+          }),
         }));
       },
 
@@ -124,13 +132,19 @@ export const useDemo = create<DemoStore>()(
   ),
 );
 
-/** Rehydrates from localStorage once on the client; true immediately when storage is unavailable. */
+/**
+ * True once the stored demo has been read on the client. Always false on the server and on the
+ * first client render, so the two agree: a page that shows a skeleton until this is true never
+ * hydrates against different HTML. (Starting from `storageAvailable()` would not do: the server
+ * has no window, so it would render content where the browser's first render shows a skeleton.)
+ * With storage blocked there is nothing to read and it turns true right after mount. Anything
+ * that differs between server and client, `storageOk` included, belongs behind this gate.
+ */
 export function useHydrated(): boolean {
-  const [hydrated, setHydrated] = useState(() => !storageAvailable());
+  const [hydrated, setHydrated] = useState(false);
   useEffect(() => {
-    if (!storageAvailable()) return;
     let active = true;
-    Promise.resolve(useDemo.persist.rehydrate()).then(() => {
+    Promise.resolve(storageAvailable() ? useDemo.persist.rehydrate() : undefined).then(() => {
       if (active) setHydrated(true);
     });
     return () => {

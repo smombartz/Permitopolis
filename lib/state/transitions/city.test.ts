@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { makeCase, makeCtx, makeTask } from "../testSupport";
 import { transition } from "../transition";
+import { nextMove, waitingOn } from "../waitingOn";
 
 vi.mock("@/lib/rules", async () => {
   const actual = await vi.importActual<typeof import("@/lib/rules")>("@/lib/rules");
@@ -66,6 +67,30 @@ describe("request_info (Jazz in the Plaza style)", () => {
     expect(answered.case.tasks.find((t) => t.id === intake.id)?.status).toBe("todo");
   });
 
+  it("a second request while the clock is already paused keeps the day the pause began", () => {
+    const review = { dept: "hl" as const, sections: ["Vendor list"], status: "pending" as const, dueDate: "2027-05-03", decidedOn: null, clock: { startedOn: "2027-04-19", pausedSince: null, pausedDays: 0, allowedDays: 14 }, internalNote: "", messageToApplicant: "" };
+    const c = makeCase({ state: "in_review", reviews: [review] });
+    const first = transition(c, { type: "request_info", item: "Health permit", message: "Please upload it." }, "hl", makeCtx({ today: "2027-04-26", now: "2027-04-26T09:00" }));
+    expect(first.ok).toBe(true);
+    if (!first.ok) return;
+    const second = transition(first.case, { type: "request_info", item: "Vendor menu", message: "And the menu, please." }, "hl", makeCtx({ today: "2027-04-30", now: "2027-04-30T09:00" }));
+    expect(second.ok && second.case.reviews[0].clock.pausedSince).toBe("2027-04-26");
+  });
+
+  it("refuses a card that does not exist, or is not the applicant's, instead of throwing", () => {
+    const review = { dept: "hl" as const, sections: ["Vendor list"], status: "pending" as const, dueDate: "2027-05-03", decidedOn: null, clock: { startedOn: "2027-04-19", pausedSince: null, pausedDays: 0, allowedDays: 14 }, internalNote: "", messageToApplicant: "" };
+    const reviewTask = makeTask({ id: "PMT-27-0001:review:hl", catalogId: "review:hl", owner: "hl", kind: "review" });
+    const c = makeCase({ state: "in_review", reviews: [review], tasks: [reviewTask] });
+    expect(transition(c, { type: "request_info", taskId: "PMT-27-0001:no_such_card", message: "?" }, "hl", makeCtx())).toEqual({ ok: false, reason: "Card not found." });
+    expect(transition(c, { type: "request_info", taskId: reviewTask.id, message: "?" }, "hl", makeCtx())).toEqual({ ok: false, reason: "Card not found." });
+  });
+
+  it("refuses a department that has already decided its review", () => {
+    const review = { dept: "pws" as const, sections: ["Sound"], status: "approved" as const, dueDate: "2027-05-03", decidedOn: "2027-04-28", clock: { startedOn: "2027-04-19", pausedSince: null, pausedDays: 0, allowedDays: 14 }, internalNote: "", messageToApplicant: "" };
+    const c = makeCase({ state: "in_review", reviews: [review] });
+    expect(transition(c, { type: "request_info", item: "Sound plan", message: "One more thing." }, "pws", makeCtx())).toEqual({ ok: false, reason: "Review is already approved." });
+  });
+
   it("with no taskId creates a respond_to_request card", () => {
     const c = makeCase({ state: "submitted" });
     const result = transition(c, { type: "request_info", item: "Proof of nonprofit status", message: "Please attach your 501(c)(3) letter." }, "clerk", makeCtx());
@@ -123,6 +148,23 @@ describe("review_decide", () => {
     expect(result.case.ending).toBeNull();
     expect(result.case.state).toBe("in_review");
     expect(result.case.reviews[0].status).toBe("denied");
+  });
+
+  it("deny finishes the department's review task and hands the Clerk the decision", () => {
+    const review = { dept: "hl" as const, sections: ["Insurance"], status: "pending" as const, dueDate: "2027-05-17", decidedOn: null, clock: { startedOn: "2027-04-19", pausedSince: null, pausedDays: 0, allowedDays: 30 }, internalNote: "", messageToApplicant: "" };
+    const reviewTask = makeTask({ id: "PMT-27-0001:review:hl", catalogId: "review:hl", owner: "hl", kind: "review" });
+    const c = makeCase({ state: "in_review", reviews: [review], tasks: [reviewTask] });
+    const result = transition(c, { type: "review_decide", decision: "deny", conditions: [], feeLines: [] }, "hl", makeCtx());
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.case.tasks.find((t) => t.id === reviewTask.id)?.status).toBe("done");
+    expect(result.case.tasks.find((t) => t.catalogId === "consolidate")).toMatchObject({ owner: "clerk", status: "todo", title: "Decide: a reviewer denied" });
+
+    const standing = Object.fromEntries(waitingOn(result.case, "2027-05-03").map((p) => [p.party, p.status]));
+    expect(standing).toMatchObject({ clerk: "up_now", hl: "done_for_now" });
+    expect(nextMove(result.case, "2027-05-03")).toBe("Next: City Clerk acts on a reviewer's denial.");
+    expect(transition(result.case, { type: "send_quote", conditions: [], feeLines: [] }, "clerk", makeCtx())).toEqual({ ok: false, reason: "Health & Legal denied its section." });
+    expect(transition(result.case, { type: "deny", reason: "Health & Legal could not approve the insurance." }, "clerk", makeCtx()).ok).toBe(true);
   });
 
   it("fails when the department isn't routed", () => {

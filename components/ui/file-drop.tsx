@@ -66,7 +66,7 @@ function FileDrop({ onFiles, sample, accept, multiple, className, label, hint }:
         className="sr-only"
         onChange={(e) => onFiles(toFileRefs(e.target.files))}
       />
-      <div className="flex items-center gap-2 text-xs text-fg-tertiary">
+      <div className="flex items-center gap-2 text-xs text-fg-secondary">
         <span className="h-px w-8 bg-line-subtle" aria-hidden="true" />
         or
         <span className="h-px w-8 bg-line-subtle" aria-hidden="true" />
@@ -75,7 +75,7 @@ function FileDrop({ onFiles, sample, accept, multiple, className, label, hint }:
         <FileIcon data-icon="inline-start" />
         Use sample file
       </Button>
-      <p className="font-mono text-[11px] text-fg-tertiary">
+      <p className="font-mono text-[11px] text-fg-label">
         {sample.name} · {fmtFileSize(sample.size)}
       </p>
     </div>

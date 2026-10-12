@@ -33,7 +33,7 @@ function PartyChip({ party, label, suffix, className, ...props }: PartyChipProps
     >
       <Icon className="size-3.5 shrink-0" aria-hidden="true" />
       <span className="truncate">{label ?? PARTY_LABEL[party]}</span>
-      {suffix ? <span className="shrink-0 opacity-70">· {suffix}</span> : null}
+      {suffix ? <span className="shrink-0">· {suffix}</span> : null}
     </span>
   )
 }

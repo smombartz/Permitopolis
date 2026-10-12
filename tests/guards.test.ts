@@ -44,6 +44,29 @@ describe("design tokens", () => {
   });
 });
 
+describe("text contrast", () => {
+  // fg-tertiary is 2.6 to 2.7:1 on the page: fine for a placeholder or an ornament, not for
+  // words someone has to read (plan 3.2). Use text-fg-secondary, or text-fg-label for metadata.
+  const TERTIARY_TEXT = /(?<![\w:-])(?:[\w-]+:)*text-fg-tertiary\b/g;
+  const PLACEHOLDER = /(?:^|:)(?:placeholder|data-placeholder):/;
+
+  it("fg-tertiary carries placeholders and decoration only", () => {
+    const offenders: string[] = [];
+    for (const file of UI_FILES) {
+      readFileSync(file, "utf8")
+        .split("\n")
+        .forEach((line, index) => {
+          // A purely decorative use (a dot, a rule) says so on its line.
+          if (line.includes("guard-allow-tertiary")) return;
+          for (const match of line.matchAll(TERTIARY_TEXT)) {
+            if (!PLACEHOLDER.test(match[0])) offenders.push(`${relative(ROOT, file)}:${index + 1}  ${match[0]}`);
+          }
+        });
+    }
+    expect(offenders, `Tertiary text fails AA; use text-fg-secondary or text-fg-label:\n${offenders.join("\n")}`).toEqual([]);
+  });
+});
+
 describe("integration rule", () => {
   // A surface may import shared folders only, never another surface.
   const SHARED = new Set(["ui", "domain", "map", "calendar", "shell"]);

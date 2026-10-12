@@ -22,7 +22,13 @@ describe("pay", () => {
   it("kind session, by the Clerk in person, marks that occurrence paid", () => {
     const c = makeCase({
       state: "permitted",
-      schedule: { date: "2027-06-06", start: "08:00", end: "09:00", occurrences: [{ date: "2027-06-06", availability: { status: "open" }, billing: "paid" }, { date: "2027-06-13", availability: { status: "open" }, billing: "upcoming" }] },
+      schedule: {
+        date: "2027-06-06",
+        start: "08:00",
+        end: "09:00",
+        recurrence: { frequency: "weekly", weekday: 0, until: "2027-06-13" },
+        occurrences: [{ date: "2027-06-06", availability: { status: "open" }, billing: "paid" }, { date: "2027-06-13", availability: { status: "open" }, billing: "upcoming" }],
+      },
     });
     const result = transition(c, { type: "pay", amount: 20, method: "in_person", kind: "session", occurrenceDate: "2027-06-13" }, "clerk", makeCtx());
     expect(result.ok).toBe(true);
@@ -31,8 +37,79 @@ describe("pay", () => {
   });
 
   it("fails kind session for a date with no occurrence", () => {
-    const c = makeCase({ state: "permitted", schedule: { date: "2027-06-06", start: "08:00", end: "09:00", occurrences: [{ date: "2027-06-06", availability: { status: "open" }, billing: "paid" }] } });
+    const c = makeCase({ state: "permitted", schedule: { date: "2027-06-06", start: "08:00", end: "09:00", recurrence: { frequency: "weekly", weekday: 0, until: "2027-06-06" }, occurrences: [{ date: "2027-06-06", availability: { status: "open" }, billing: "paid" }] } });
     const result = transition(c, { type: "pay", amount: 20, method: "card", kind: "session", occurrenceDate: "2027-07-01" }, "applicant", makeCtx());
     expect(result.ok).toBe(false);
+  });
+
+  it("fails kind session for an event that is not a series, and for a session the series skips", () => {
+    const single = makeCase({ state: "permitted", schedule: { date: "2027-06-06", start: "08:00", end: "09:00", occurrences: [{ date: "2027-06-06", availability: { status: "open" }, billing: "upcoming" }] } });
+    expect(transition(single, { type: "pay", amount: 20, method: "card", kind: "session", occurrenceDate: "2027-06-06" }, "applicant", makeCtx())).toEqual({ ok: false, reason: "Only a series is paid by session." });
+
+    const series = makeCase({
+      state: "permitted",
+      schedule: {
+        date: "2027-05-24",
+        start: "07:00",
+        end: "08:00",
+        recurrence: { frequency: "weekly", weekday: 1, until: "2027-05-31" },
+        occurrences: [{ date: "2027-05-24", availability: { status: "open" }, billing: "paid" }, { date: "2027-05-31", availability: { status: "blackout" }, billing: "skipped" }],
+      },
+    });
+    expect(transition(series, { type: "pay", amount: 20, method: "card", kind: "session", occurrenceDate: "2027-05-31" }, "applicant", makeCtx()).ok).toBe(false);
+  });
+
+  describe("a quote paid in parts (S3's $715)", () => {
+    const line = { id: "f1", dept: "clerk" as const, label: "Fees and deposit", qty: 1, unit: "flat", unitPrice: 715, estimate: 715, actual: null, kind: "fee" as const };
+    const quoted = () =>
+      makeCase({
+        state: "quote_sent",
+        flags: { sentToCommission: false, lateFee: false, signed: true, acceptedComplete: true, amendmentPending: false },
+        feeLines: [line],
+        tasks: [
+          makeTask({ id: "PMT-27-0001:pay_fees", catalogId: "pay_fees", kind: "payment", payload: { amount: 715 } }),
+          makeTask({ id: "PMT-27-0001:issue_permit", catalogId: "issue_permit", owner: "clerk", kind: "action", status: "locked" }),
+        ],
+      });
+
+    it("a part payment leaves the card open for the balance, and Issue permit locked", () => {
+      const result = transition(quoted(), { type: "pay", amount: 300, method: "in_person", kind: "quote" }, "clerk", makeCtx());
+      expect(result.ok).toBe(true);
+      if (!result.ok) return;
+      expect(result.case.tasks.find((t) => t.catalogId === "pay_fees")).toMatchObject({ status: "todo", payload: { amount: 415 } });
+      expect(result.case.tasks.find((t) => t.catalogId === "issue_permit")?.status).toBe("locked");
+    });
+
+    it("the payment that covers the balance finishes the card and unlocks Issue permit", () => {
+      const part = transition(quoted(), { type: "pay", amount: 300, method: "in_person", kind: "quote" }, "clerk", makeCtx());
+      expect(part.ok).toBe(true);
+      if (!part.ok) return;
+      const rest = transition(part.case, { type: "pay", amount: 415, method: "card", kind: "quote" }, "applicant", makeCtx());
+      expect(rest.ok).toBe(true);
+      if (!rest.ok) return;
+      expect(rest.case.tasks.find((t) => t.catalogId === "pay_fees")).toMatchObject({ status: "done", payload: { amount: 715 } });
+      expect(rest.case.tasks.find((t) => t.catalogId === "issue_permit")?.status).toBe("todo");
+    });
+  });
+
+  it("refuses an amount of zero or less", () => {
+    const c = makeCase({ state: "quote_sent" });
+    for (const amount of [0, -50]) {
+      expect(transition(c, { type: "pay", amount, method: "in_person", kind: "quote" }, "clerk", makeCtx())).toEqual({ ok: false, reason: "Enter an amount above $0." });
+    }
+  });
+
+  it("takes a final-invoice payment only in Closeout or once Closed", () => {
+    const pay = { type: "pay", amount: 50, method: "card", kind: "final_invoice" } as const;
+    expect(transition(makeCase({ state: "in_review" }), pay, "applicant", makeCtx())).toEqual({ ok: false, reason: "There is no final bill yet." });
+    const bill = makeTask({ id: "PMT-27-0001:final_bill_or_refund", catalogId: "final_bill_or_refund", kind: "payment", payload: { amount: 50 } });
+    const closed = transition(makeCase({ state: "closed", tasks: [bill] }), pay, "applicant", makeCtx());
+    expect(closed.ok && closed.case.tasks[0].status).toBe("done");
+  });
+
+  it("does not take a booking or a refund: those are recorded by the actions that cause them", () => {
+    const c = makeCase({ state: "permitted" });
+    expect(transition(c, { type: "pay", amount: 125, method: "card", kind: "booking" }, "applicant", makeCtx()).ok).toBe(false);
+    expect(transition(c, { type: "pay", amount: 125, method: "card", kind: "refund" }, "clerk", makeCtx()).ok).toBe(false);
   });
 });

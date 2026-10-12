@@ -485,7 +485,8 @@ export const CARD_CATALOG: CardSpec[] = [
     reviewer: "clerk",
     phase: "after",
     stage: "closeout",
-    // Events with a deposit or city costs to reconcile. Instant events skip it.
+    // Events with a deposit or city costs to reconcile. Instant events skip it, except that
+    // reconcile_close adds one when an Instant closeout exception carries a charge.
     when: reviewedOrSpecial,
     unlocksOn: "invoice_issued",
     unlockHint: "Unlocks when the City Clerk finishes reconciling costs",
@@ -535,7 +536,11 @@ export const CARD_BY_ID: Record<CatalogId, CardSpec> = Object.fromEntries(
  * (`:verify:insurance_certificate`, `:verify:vendor_health_permit:1`).
  */
 export const CITY_TASKS = {
-  /** Clerk. Created by submit. Done by accept_complete. A request at intake leaves it open. */
+  /**
+   * Clerk. Created by submit: 'todo', or 'locked' with payload.awaitingSignoffs while a block
+   * party's neighbor sign-offs are still out (the last sign-off opens it). Done by
+   * accept_complete. A request at intake parks it until the applicant answers.
+   */
   intake_check: { owner: "clerk", kind: "review", title: "Check the application is complete" },
   /** Clerk. Created by accept_complete. Done by confirm_routing. */
   confirm_routing: { owner: "clerk", kind: "action", title: "Confirm reviewers and due dates" },
@@ -543,11 +548,22 @@ export const CITY_TASKS = {
   schedule_pre_application_meeting: { owner: "clerk", kind: "meeting", title: "Schedule the pre-application meeting" },
   /** One per routed department. Created by confirm_routing. Done by review_decide. */
   review: { owner: null, kind: "review", title: "Review your sections" },
-  /** The card's reviewer. Created when an applicant card with needsCheck becomes 'submitted'. Done by verify_document or reject_document. */
+  /**
+   * The card's reviewer. Created when an applicant card with needsCheck becomes 'submitted' and
+   * the department's own review task is no longer open to cover it, from routing through Event
+   * day. One per card; a second upload reopens it. Done by verify_document or reject_document.
+   */
   verify: { owner: null, kind: "review", title: "Verify" },
-  /** Clerk. Created when every routed review is approved. Done by send_quote. */
+  /**
+   * Clerk. Created when every routed review is approved; done by send_quote. Also created when
+   * a department denies its section, titled "Decide: a reviewer denied" (payload.denied): the
+   * Clerk's move is then deny.
+   */
   consolidate: { owner: "clerk", kind: "action", title: "Consolidate reviews and send the quote" },
-  /** Clerk. Created by send_quote, locked until the applicant has signed and paid and insurance is verified. Done by issue_permit. */
+  /**
+   * Clerk. Created by send_quote, locked until the applicant has signed and paid the quote and
+   * insurance is verified; locked again if verified insurance is re-uploaded. Done by issue_permit.
+   */
   issue_permit: { owner: "clerk", kind: "action", title: "Issue permit" },
   /** Public Works & Safety. Created by issue_permit, one per approved service: `:work_order:barricades`, `:work_order:police`, `:work_order:closure`, `:work_order:trash`, `:work_order:power`. Done by complete_city_task. */
   work_order: { owner: "pws", kind: "action", title: "Work order" },

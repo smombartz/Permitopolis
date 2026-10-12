@@ -13,7 +13,8 @@ describe("newCase", () => {
     expect(c.conditions).toEqual([]);
     expect(c.feeLines).toEqual([]);
     expect(c.payments).toEqual([]);
-    expect(c.activity).toEqual([]);
+    // The case's first activity entry: plan 6.2's "one activity entry" row is a Draft and nothing else.
+    expect(c.activity).toEqual([{ at: "2027-05-03T09:00", actor: "applicant", text: "Started a draft." }]);
     expect(c.addOns).toEqual(EMPTY_ADDONS);
     expect(c.dateHold).toEqual({ status: "none", placedOn: null, expiresOn: null });
     expect(c.ending).toBeNull();

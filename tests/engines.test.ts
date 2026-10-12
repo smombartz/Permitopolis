@@ -8,9 +8,24 @@
  */
 import { describe, expect, it } from "vitest";
 import { CARD_BY_ID, DEFAULT_CONFIG, availability, classify, routing, type CatalogId, type RulesCtx } from "@/lib/rules";
-import { advanceClock, boardColumn, caseTotals, classifyDraft, newCase, queueFor, transition, waitingOn, type Action } from "@/lib/state";
+import {
+  advanceClock,
+  boardColumn,
+  caseTotals,
+  leadTimeRisk,
+  newCase,
+  nextMove,
+  queueFor,
+  reviewClock,
+  syncDraft,
+  transition,
+  waitingOn,
+  type Action,
+} from "@/lib/state";
 import { F5, S1, S2, S3, S6 } from "@/lib/state/seed/scenarios";
+import { SEED_SCRIPTS } from "@/lib/state/seed/scripts";
 import type { Actor, EventAnswers, EventCase, ISODate } from "@/lib/types";
+import { replay } from "./replay";
 
 const FILE = { name: "sample.pdf", size: 240_000, type: "application/pdf" };
 
@@ -18,8 +33,14 @@ function ctx(today: ISODate, cases: EventCase[] = []): RulesCtx {
   return { today, now: `${today}T09:00`, cases, cfg: DEFAULT_CONFIG };
 }
 
+/** A Draft as the store's createDraft makes one: sessions listed, tier and triggers set. */
 function draft(id: string, answers: EventAnswers, createdOn: ISODate): EventCase {
-  return classifyDraft(newCase({ id, applicantId: "test", createdAt: `${createdOn}T09:00`, answers }), DEFAULT_CONFIG);
+  return syncDraft(newCase({ id, applicantId: "test", createdAt: `${createdOn}T09:00`, answers }), ctx(createdOn));
+}
+
+/** What the store's updateDraft does with an edit to a Draft's answers. */
+function edit(c: EventCase, patch: Partial<EventAnswers>, today: ISODate): EventCase {
+  return syncDraft({ ...c, ...patch }, ctx(today, [c]));
 }
 
 /** Applies one action and fails the test with the engine's own reason when it is refused. */
@@ -246,5 +267,253 @@ describe("closeout (S6)", () => {
     // "Book again next year" drafts the same weekday a year on: Sat, Apr 22, 2028.
     const again = transition(c, { type: "book_again" }, "applicant", ctx("2027-05-03", [c]));
     expect(again.ok && again.spawned?.[0]).toMatchObject({ state: "draft", tier: "special", clonedFrom: "PMT-27-0031", schedule: { date: "2028-04-22" } });
+  });
+});
+
+/* ---------- from here on: the seed scripts, and the Phase 1 review findings ---------- */
+
+const TODAY = "2027-05-03";
+const APPROVE: Action = { type: "review_decide", decision: "approve", conditions: [], feeLines: [] };
+const seed = replay(SEED_SCRIPTS);
+
+function seeded(key: string): EventCase {
+  const script = SEED_SCRIPTS.find((s) => s.key === key)!;
+  return seed.cases.find((c) => c.id === script.id)!;
+}
+
+/** Every other seeded case, for the transitions that look at who holds which date. */
+const othersOf = (c: EventCase) => seed.cases.filter((other) => other.id !== c.id);
+const standing = (c: EventCase, today: ISODate = TODAY) => Object.fromEntries(waitingOn(c, today).map((p) => [p.party, p.status]));
+
+describe("the seed scripts, replayed through both engines", () => {
+  it("every script reaches its expected tier, state and ending, and no step is refused", () => {
+    expect(seed.refused).toEqual([]);
+    for (const script of SEED_SCRIPTS) {
+      const c = seeded(script.key);
+      expect([script.key, c.tier, c.state, c.ending]).toEqual([script.key, script.expect.tier, script.expect.state, script.expect.ending ?? null]);
+    }
+  });
+
+  it("S4: the next move is the neighbors', not the Clerk's, until all 12 have signed", () => {
+    let s4 = seeded("S4");
+    expect(standing(s4)).toMatchObject({ applicant: "up_now", clerk: "waiting" });
+    expect(waitingOn(s4, TODAY).find((p) => p.party === "clerk")?.note).toBe("Waiting on 3 neighbor sign-offs");
+    expect(queueFor(seed.cases, "clerk", TODAY).filter((q) => q.case.id === s4.id)).toEqual([]);
+    expect(nextMove(s4, TODAY, "Maple Street block captain")).toBe(
+      "Next: Maple Street block captain collects the neighbor sign-offs, then City Clerk checks the application is complete.",
+    );
+
+    for (let i = 0; i < 3; i++) s4 = run(s4, { type: "simulate_signoff" }, "neighbor", TODAY, othersOf(s4));
+    expect(task(s4, "intake_check")).toMatchObject({ status: "todo", dueDate: "2027-05-06" });
+    expect(standing(s4).clerk).toBe("up_now");
+    expect(reasonFor(s4, { type: "accept_complete" }, "clerk", TODAY, othersOf(s4))).toBeNull();
+  });
+
+  it("a block party with every sign-off in before it is submitted goes straight to the Clerk (F4's history)", () => {
+    const f4 = replay(SEED_SCRIPTS, "2027-04-09").cases.find((c) => c.id === "PMT-27-0080")!;
+    expect(f4.state).toBe("submitted");
+    expect(task(f4, "intake_check")).toMatchObject({ status: "todo", dueDate: "2027-04-12" });
+  });
+
+  it("B11: paid and waiting on insurance, so Health & Legal is up and the Clerk waits", () => {
+    const b11 = seeded("B11");
+    expect(standing(b11)).toMatchObject({ applicant: "done_for_now", clerk: "waiting", hl: "up_now" });
+    expect(task(b11, "issue_permit")?.status).toBe("locked");
+    expect(queueFor(seed.cases, "clerk", TODAY).filter((q) => q.case.id === b11.id)).toEqual([]);
+
+    const verified = run(b11, { type: "verify_document", taskId: `${b11.id}:insurance_certificate` }, "hl", TODAY);
+    expect(task(verified, "issue_permit")?.status).toBe("todo");
+    expect(standing(verified)).toMatchObject({ clerk: "up_now", hl: "done_for_now" });
+  });
+
+  it("plan 6.2: B05 is overdue with Public Works & Safety and short on lead time; B01 has one activity entry", () => {
+    const b05 = seeded("B05");
+    expect(b05.state).toBe("in_review");
+    expect(leadTimeRisk(b05, TODAY, DEFAULT_CONFIG)).toBe("at_risk");
+    expect(queueFor(seed.cases, "pws", TODAY).find((q) => q.case.id === b05.id)).toMatchObject({ group: "overdue", task: { catalogId: "review:pws" } });
+    expect(seeded("B01").activity).toEqual([{ at: "2027-05-01T10:00", actor: "applicant", text: "Started a draft." }]);
+  });
+
+  it("F6: two fields for six hours is $240", () => {
+    expect(seeded("F6").payments).toMatchObject([{ kind: "booking", amount: 240 }]);
+  });
+
+  it("S5: a decided review's clock stops on the day it was decided", () => {
+    // Routed Mar 10, approved Apr 10: 31 days, whatever the demo date is.
+    expect(reviewClock(seeded("S5"), "pws", TODAY)).toMatchObject({ day: 31, of: 21, paused: false });
+    expect(reviewClock(seeded("S5"), "pws", "2027-06-01")?.day).toBe(31);
+  });
+
+  it("F7: closing the Instant exception puts the $95 repair on a final-bill card", () => {
+    let f7 = seeded("F7");
+    f7 = run(f7, { type: "reconcile_close" }, "clerk", TODAY);
+    expect(f7.state).toBe("closed");
+    expect(task(f7, "final_bill_or_refund")).toMatchObject({ owner: "applicant", status: "todo", dueDate: "2027-05-17", payload: { amount: 95 } });
+    expect(caseTotals(f7).due).toBe(95);
+
+    f7 = run(f7, { type: "pay", amount: 95, method: "card", kind: "final_invoice" }, "applicant", TODAY);
+    expect(task(f7, "final_bill_or_refund")?.status).toBe("done");
+    expect(caseTotals(f7).due).toBe(0);
+  });
+
+  it("B09: an answer to the Clerk's request at intake is accepted with the application", () => {
+    let b09 = seeded("B09");
+    b09 = run(b09, { type: "respond_to_request", taskId: `${b09.id}:respond_to_request:1`, files: [FILE] }, "applicant", TODAY);
+    expect(boardColumn(task(b09, "respond_to_request:1")!)).toBe("with_city");
+    b09 = run(b09, { type: "accept_complete" }, "clerk", TODAY, othersOf(b09));
+    expect(task(b09, "respond_to_request:1")?.status).toBe("done");
+  });
+});
+
+describe("a Reviewed series (F2): quote, verification and permit", () => {
+  const quoted = () => {
+    let f2 = seeded("F2");
+    f2 = run(f2, APPROVE, "pws", TODAY);
+    f2 = run(f2, APPROVE, "hl", TODAY);
+    return run(f2, { type: "send_quote", conditions: [], feeLines: [] }, "clerk", TODAY);
+  };
+
+  it("the quote asks for the one-off lines and the first Saturday; the rest is billed on schedule", () => {
+    let f2 = quoted();
+    expect(caseTotals(f2).total).toBe(5320);
+    // Application $50, 12 vendors $900, 12 tent inspections $720, deposit $250, and one $200 Saturday.
+    expect(task(f2, "pay_fees")?.payload.amount).toBe(2120);
+
+    f2 = run(f2, { type: "accept_and_sign", signature: "Riverside Farmers Market" }, "applicant", TODAY);
+    f2 = run(f2, { type: "pay", amount: 2120, method: "card", kind: "quote" }, "applicant", TODAY);
+    expect(task(f2, "pay_fees")?.status).toBe("done");
+    expect(f2.schedule!.occurrences.map((o) => o.billing)).toEqual(["paid", ...Array(16).fill("upcoming")]);
+    expect(task(f2, "issue_permit")?.status).toBe("todo");
+
+    f2 = run(f2, { type: "issue_permit" }, "clerk", TODAY);
+    expect(f2.state).toBe("permitted");
+    expect(caseTotals(f2)).toMatchObject({ paid: 2120, due: 3200 });
+  });
+
+  it("an unpaid quote still loses its hold, and a paid first session keeps it", () => {
+    const unpaid = advanceClock([quoted()], TODAY, "2027-05-18", DEFAULT_CONFIG)[0];
+    expect(unpaid.ending).toBe("hold_expired");
+
+    const paid = run(quoted(), { type: "pay", amount: 2120, method: "card", kind: "quote" }, "applicant", TODAY);
+    expect(advanceClock([paid], TODAY, "2027-05-18", DEFAULT_CONFIG)[0].ending).toBeNull();
+  });
+
+  it("once Health & Legal has decided, every vendor permit uploaded gets its own check, before and after the permit", () => {
+    let f2 = run(seeded("F2"), APPROVE, "hl", TODAY);
+    const upload = (c: EventCase, n: number) => run(c, { type: "complete_task", taskId: `${c.id}:vendor_health_permit:${n}`, files: [FILE] }, "applicant", TODAY);
+    const hlQueue = (c: EventCase) => queueFor([c], "hl", TODAY).map((q) => q.task.catalogId);
+
+    f2 = upload(upload(f2, 1), 2);
+    expect(hlQueue(f2)).toEqual(["verify:vendor_health_permit:1", "verify:vendor_health_permit:2"]);
+    // A second upload to the same card does not add a second check.
+    f2 = run(f2, { type: "reject_document", taskId: `${f2.id}:vendor_health_permit:2`, reason: "This permit expired in March" }, "hl", TODAY);
+    f2 = upload(f2, 2);
+    expect(hlQueue(f2)).toEqual(["verify:vendor_health_permit:1", "verify:vendor_health_permit:2"]);
+    expect(f2.tasks.filter((t) => t.catalogId === "verify:vendor_health_permit:2")).toHaveLength(1);
+    f2 = run(f2, { type: "verify_document", taskId: `${f2.id}:vendor_health_permit:1` }, "hl", TODAY);
+    f2 = run(f2, { type: "verify_document", taskId: `${f2.id}:vendor_health_permit:2` }, "hl", TODAY);
+    expect(hlQueue(f2)).toEqual([]);
+
+    f2 = run(f2, APPROVE, "pws", TODAY);
+    f2 = run(f2, { type: "send_quote", conditions: [], feeLines: [] }, "clerk", TODAY);
+    f2 = run(f2, { type: "accept_and_sign", signature: "Riverside Farmers Market" }, "applicant", TODAY);
+    f2 = run(f2, { type: "pay", amount: 2120, method: "card", kind: "quote" }, "applicant", TODAY);
+    f2 = run(f2, { type: "issue_permit" }, "clerk", TODAY);
+    // These cards are due 14 days before the event, so most arrive after the permit.
+    f2 = upload(f2, 3);
+    expect(boardColumn(task(f2, "vendor_health_permit:3")!)).toBe("with_city");
+    expect(hlQueue(f2)).toEqual(["verify:vendor_health_permit:3"]);
+  });
+});
+
+describe("the date gate's lead time", () => {
+  const reviewedPicnic: EventAnswers = { ...S1.answers, name: "Picnic with a DJ", addOns: { ...S1.answers.addOns, amplifiedSound: true } };
+  const NOTICE_30 = "Needs 30 days of notice; pick a later date or add the late fee.";
+
+  it("an Instant booking nine days out is refused; ten days out, or with the late fee, it goes through", () => {
+    // Shelter 3 on Wed, May 12 is nine days from May 3. Instant needs ten.
+    const answers: EventAnswers = { ...S1.answers, name: "Picnic at short notice", schedule: { ...S1.answers.schedule!, date: "2027-05-12", occurrences: [] } };
+    const c = draft("PMT-27-0150", answers, "2027-05-02");
+    expect(reasonFor(c, { type: "book_and_pay", method: "card" }, "applicant", TODAY)).toBe("Needs 10 days of notice; pick a later date or add the late fee.");
+    expect(reasonFor(c, { type: "book_and_pay", method: "card" }, "applicant", "2027-05-02")).toBeNull();
+
+    const late = run({ ...c, flags: { ...c.flags, lateFee: true } }, { type: "book_and_pay", method: "card" }, "applicant", TODAY);
+    expect(late.feeLines.map((line) => [line.label, line.estimate])).toEqual([
+      ["Shelter reservation", 125],
+      ["Late fee", 31.25],
+    ]);
+    expect(late.payments).toMatchObject([{ kind: "booking", amount: 156.25 }]);
+  });
+
+  it("S1 with a DJ on May 3 is 19 days out of 30: Submit is refused until the applicant takes the late fee", () => {
+    let c = run(draft("PMT-27-0151", reviewedPicnic, TODAY), { type: "create_board" }, "applicant", TODAY);
+    c = completePreSubmitCards(c, TODAY);
+    expect(reasonFor(c, { type: "submit" }, "applicant", TODAY)).toBe(NOTICE_30);
+
+    // The applicant picks "pay a late fee" at the gate; the application then carries its line.
+    c = run({ ...c, flags: { ...c.flags, lateFee: true } }, { type: "submit" }, "applicant", TODAY);
+    expect(c.state).toBe("submitted");
+    expect(c.feeLines.find((line) => line.kind === "late_fee")).toMatchObject({ label: "Late fee", estimate: 53.75 });
+    expect(caseTotals(c).total).toBe(518.75);
+  });
+
+  it("the late fee is charged only while the date is inside the lead time", () => {
+    const later: EventAnswers = { ...reviewedPicnic, schedule: { ...S1.answers.schedule!, date: "2027-06-19", occurrences: [] } };
+    const flagged = { ...draft("PMT-27-0152", later, TODAY), flags: { sentToCommission: false, lateFee: true, signed: false, acceptedComplete: false, amendmentPending: false } };
+    const board = run(flagged, { type: "create_board" }, "applicant", TODAY);
+    expect(board.feeLines.some((line) => line.kind === "late_fee")).toBe(false);
+  });
+});
+
+describe("a board built before the last edit", () => {
+  // Shelter 3 on Sat, Jun 19: far enough out for a Reviewed event.
+  const withSound: EventAnswers = {
+    ...S1.answers,
+    name: "Picnic with a DJ",
+    schedule: { ...S1.answers.schedule!, date: "2027-06-19", occurrences: [] },
+    addOns: { ...S1.answers.addOns, amplifiedSound: true },
+  };
+
+  it("dropping the add-on that made it Reviewed books as Instant, with Instant cards and fees only", () => {
+    let c = run(draft("PMT-27-0160", withSound, TODAY), { type: "create_board" }, "applicant", TODAY);
+    expect(c.tier).toBe("reviewed");
+    expect(caseTotals(c).total).toBe(465);
+
+    c = edit(c, { addOns: { ...c.addOns, amplifiedSound: false } }, TODAY);
+    expect(c.tier).toBe("instant");
+    c = run(c, { type: "book_and_pay", method: "card" }, "applicant", TODAY);
+    expect(c.tasks.map((t) => [t.catalogId, t.status])).toEqual([
+      ["pay_fees", "done"],
+      ["carry_permit", "locked"],
+    ]);
+    expect(c.feeLines.map((line) => line.label)).toEqual(["Shelter reservation"]);
+    expect(caseTotals(c)).toMatchObject({ total: 125, paid: 125, due: 0 });
+  });
+
+  it("adding alcohol after every card is in re-locks Submit until the new card is done", () => {
+    let c = run(draft("PMT-27-0161", withSound, TODAY), { type: "create_board" }, "applicant", TODAY);
+    c = completePreSubmitCards(c, TODAY);
+    expect(task(c, "submit_application")?.status).toBe("todo");
+
+    c = edit(c, { addOns: { ...c.addOns, alcohol: true } }, TODAY);
+    c = run(c, { type: "create_board" }, "applicant", TODAY);
+    expect(task(c, "alcohol_details")?.status).toBe("todo");
+    expect(task(c, "insurance_certificate")?.status).toBe("submitted");
+    expect(task(c, "submit_application")?.status).toBe("locked");
+    expect(reasonFor(c, { type: "submit" }, "applicant", TODAY)).toBe("Unlocks when every card before submitting is done");
+
+    c = completePreSubmitCards(c, TODAY);
+    expect(task(c, "submit_application")?.status).toBe("todo");
+    expect(reasonFor(c, { type: "submit" }, "applicant", TODAY)).toBeNull();
+  });
+
+  it("the payment card follows the plan when the tier changes after the board exists", () => {
+    const instant: EventAnswers = { ...withSound, addOns: S1.answers.addOns };
+    let c = run(draft("PMT-27-0162", instant, TODAY), { type: "create_board" }, "applicant", TODAY);
+    expect(task(c, "pay_fees")).toMatchObject({ title: "Pay and book", status: "todo", payload: { amount: 125 } });
+
+    c = edit(c, { addOns: { ...c.addOns, amplifiedSound: true } }, TODAY);
+    c = run(c, { type: "create_board" }, "applicant", TODAY);
+    expect(task(c, "pay_fees")).toMatchObject({ title: "Pay fees and deposit", status: "locked", unlocksOn: "quote_sent", payload: { amount: 465 } });
   });
 });

@@ -64,7 +64,7 @@ export function DayStrip({ items, today, onSelectItem, onSelectDay, className }:
                   </li>
                 ))}
                 {dayItems.length > 3 && (
-                  <li className="px-1 text-[11px] text-fg-tertiary">+{dayItems.length - 3} more</li>
+                  <li className="px-1 text-[11px] text-fg-secondary">+{dayItems.length - 3} more</li>
                 )}
               </ul>
             )}

@@ -60,7 +60,8 @@ const b03Answers: EventAnswers = {
   name: "Maple Grove Preschool spring fair",
   description: "A spring carnival with a bounce house tent.",
   location: inventoryLocation(["field-1"]),
-  schedule: singleSchedule("2027-05-20", "10:00", "14:00"),
+  // Fri, May 28: 31 days after it was submitted. A Reviewed event needs 30.
+  schedule: singleSchedule("2027-05-28", "10:00", "14:00"),
   attendance: 120,
   addOns: addOns({ tentsStages: { count: 2 } }),
 };
@@ -95,7 +96,8 @@ const b04Answers: EventAnswers = {
   eventType: "performance_rally",
   name: "North Side Chess Club open tournament",
   location: inventoryLocation(["field-2"]),
-  schedule: singleSchedule("2027-05-10", "09:00", "17:00"),
+  // Sat, Jun 5: 36 days after it was submitted. A Reviewed event needs 30.
+  schedule: singleSchedule("2027-06-05", "09:00", "17:00"),
   attendance: 150,
   addOns: addOns({}),
 };

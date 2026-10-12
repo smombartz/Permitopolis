@@ -536,7 +536,7 @@ function KitScreen() {
           </Row>
           <Row>
             <Chip>
-              <ChipDot className="text-fg-tertiary" />
+              <ChipDot className="text-fg-tertiary" />{/* guard-allow-tertiary: a dot, not text */}
               Neutral chip
             </Chip>
             <Chip variant="success">

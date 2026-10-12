@@ -2,6 +2,7 @@
  * estimateFees(): fee lines, deposit and total from the fee schedule in
  * lib/rules/config.ts. Never hardcodes a rate.
  */
+import { SPACE_BY_ID } from "@/lib/data/inventory";
 import { hoursOf, round2 } from "./shared";
 import { DEFAULT_CONFIG } from "./config";
 import type { Classification, FeeEstimate } from "./types";
@@ -35,10 +36,17 @@ export const estimateFees = (
   const perSession: LineSpec[] = [];
   if (loc && sched) {
     if (loc.mode === "inventory") {
-      const kind = loc.inventoryIds[0]?.startsWith("field") ? "field" : "shelter";
-      const rate = kind === "field" ? fees.fieldPerHour : fees.shelterPerHour;
+      // Every space booked is billed: two fields for six hours is twelve field-hours. One line
+      // per kind of space, the kind read from the inventory.
       const hours = hoursOf(sched);
-      if (hours > 0) perSession.push({ dept: "clerk", label: kind === "field" ? "Field reservation" : "Shelter reservation", qty: hours, unit: "hour", unitPrice: rate, kind: "fee" });
+      const bookable = [
+        { kind: "shelter", label: "Shelter reservation", rate: fees.shelterPerHour },
+        { kind: "field", label: "Field reservation", rate: fees.fieldPerHour },
+      ];
+      for (const { kind, label, rate } of bookable) {
+        const count = loc.inventoryIds.filter((id) => SPACE_BY_ID[id]?.kind === kind).length;
+        if (count > 0 && hours > 0) perSession.push({ dept: "clerk", label, qty: hours * count, unit: "hour", unitPrice: rate, kind: "fee" });
+      }
     } else if (loc.mode === "area") {
       const rate = loc.areaId === "great-lawn" ? fees.greatLawnPerDay : fees.cityHallPlazaPerDay;
       const label = loc.areaId === "great-lawn" ? "Great Lawn reservation" : "City Hall Plaza reservation";
@@ -88,9 +96,10 @@ export const estimateFees = (
     lines.push({ id: idFor(), ...round2Line(spec) });
   }
 
+  let lateFeeAmount = 0;
   if (options?.lateFee) {
     const feesExclDeposit = lines.filter((l) => l.kind === "fee").reduce((sum, l) => sum + l.estimate, 0);
-    const lateFeeAmount = round2(feesExclDeposit * cfg.lateFee.rate);
+    lateFeeAmount = round2(feesExclDeposit * cfg.lateFee.rate);
     if (lateFeeAmount > 0) {
       lines.push({ id: idFor(), dept: "clerk", label: "Late fee", qty: 1, unit: "fee", unitPrice: lateFeeAmount, estimate: lateFeeAmount, actual: null, kind: "late_fee" });
     }
@@ -106,7 +115,8 @@ export const estimateFees = (
     result.perSession = perSessionTotal;
     result.sessions = sessions;
     const oneOffForTierDueNow = cls.tier === "instant" ? 0 : round2(oneOff.reduce((sum, l) => sum + l.qty * l.unitPrice, 0));
-    result.dueNow = round2(perSessionTotal + oneOffForTierDueNow);
+    // The late fee is charged once, for taking the booking at short notice, so it is due now.
+    result.dueNow = round2(perSessionTotal + oneOffForTierDueNow + lateFeeAmount);
   }
   return result;
 };

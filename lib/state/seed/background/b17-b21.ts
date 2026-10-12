@@ -165,46 +165,47 @@ export const B19: SeedScript = {
   id: CASE19,
   key: "B19",
   applicantId: "summit-ridge-running-club",
-  createdAt: "2027-01-05T09:00",
+  // Submitted Mon, Jan 4: 60 days before the race, which is what a Special event needs.
+  createdAt: "2027-01-04T09:00",
   answers: b19Answers,
   steps: [
-    step("2027-01-05T09:00", "applicant", { type: "create_board" }),
-    step("2027-01-05T09:05", "applicant", {
+    step("2027-01-04T09:00", "applicant", { type: "create_board" }),
+    step("2027-01-04T09:05", "applicant", {
       type: "complete_task",
       taskId: taskId(CASE19, "insurance_certificate"),
       files: [sampleFile("summit-ridge-insurance-certificate.pdf")],
     }),
-    step("2027-01-05T09:10", "applicant", {
+    step("2027-01-04T09:10", "applicant", {
       type: "complete_task",
       taskId: taskId(CASE19, "traffic_control_plan"),
       files: [sampleFile("downtown-dash-traffic-control-plan.pdf")],
     }),
-    step("2027-01-05T09:15", "applicant", {
+    step("2027-01-04T09:15", "applicant", {
       type: "complete_task",
       taskId: taskId(CASE19, "security_medical_plan"),
       files: [sampleFile("downtown-dash-security-medical-plan.pdf")],
     }),
-    step("2027-01-05T09:20", "applicant", {
+    step("2027-01-04T09:20", "applicant", {
       type: "complete_task",
       taskId: taskId(CASE19, "emergency_plan"),
       files: [sampleFile("downtown-dash-emergency-plan.pdf")],
     }),
-    step("2027-01-05T09:25", "applicant", {
+    step("2027-01-04T09:25", "applicant", {
       type: "complete_task",
       taskId: taskId(CASE19, "cleanup_plan"),
       form: { crew: 2, sweepStartsAt: "09:00" },
     }),
-    step("2027-01-05T09:30", "applicant", {
+    step("2027-01-04T09:30", "applicant", {
       type: "complete_task",
       taskId: taskId(CASE19, "site_plan"),
       form: { drawnOn: "step 2 map", notes: "Start and finish at 1st Avenue" },
     }),
-    step("2027-01-05T09:35", "applicant", {
+    step("2027-01-04T09:35", "applicant", {
       type: "complete_task",
       taskId: taskId(CASE19, "accessibility_plan"),
       form: { accessibleRoute: true, restrooms: 2 },
     }),
-    step("2027-01-05T10:00", "applicant", { type: "submit" }),
+    step("2027-01-04T10:00", "applicant", { type: "submit" }),
     step("2027-01-07T09:00", "clerk", { type: "accept_complete" }),
     step("2027-01-07T09:05", "clerk", {
       type: "confirm_routing",

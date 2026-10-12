@@ -65,6 +65,47 @@ function defaultAreaRect(areaId: AreaId): Rect {
   return { x: area.x, y: area.y, w: Math.round(area.w / 2), h: Math.round(area.h / 2) };
 }
 
+/** What is chosen on each of the four tabs. */
+interface Selections {
+  inventoryIds: string[];
+  streetIds: string[];
+  routeIds: string[];
+  areaId: AreaId;
+  areaRect: Rect;
+}
+
+const NOTHING_CHOSEN: Selections = {
+  inventoryIds: [],
+  streetIds: [],
+  routeIds: [],
+  areaId: "city-hall-plaza",
+  areaRect: defaultAreaRect("city-hall-plaza"),
+};
+
+/** The part of the selections a location stands for: its own tab's. */
+function selectionsOf(location: Location | null): Partial<Selections> {
+  if (!location) return {};
+  if (location.mode === "inventory") return { inventoryIds: location.inventoryIds };
+  if (location.mode === "streets") return { streetIds: location.segmentIds };
+  if (location.mode === "route") return { routeIds: location.segmentIds };
+  const areaId = location.areaId ?? NOTHING_CHOSEN.areaId;
+  return { areaId, areaRect: location.areaRect ?? defaultAreaRect(areaId) };
+}
+
+/** The location a tab stands for, or null when nothing is chosen on it. An area always has its rectangle. */
+function locationFor(mode: LocationPickerMode, selections: Selections): Location | null {
+  switch (mode) {
+    case "inventory":
+      return selections.inventoryIds.length > 0 ? buildInventoryLocation(selections.inventoryIds) : null;
+    case "streets":
+      return selections.streetIds.length > 0 ? buildStreetsLocation(selections.streetIds) : null;
+    case "route":
+      return selections.routeIds.length > 0 ? buildRouteLocation(selections.routeIds) : null;
+    case "area":
+      return buildAreaLocation(selections.areaId, selections.areaRect);
+  }
+}
+
 const STATUS_TEXT: Record<Availability["status"], string> = {
   open: "Open",
   impacted: "Impacted",
@@ -98,62 +139,64 @@ function AvailabilityNote({
  * Four ways to describe where an event happens. Every selection is available from the
  * keyboard-operable list beside the map; clicking the map shapes does the same thing.
  * The map itself is decorative (`aria-hidden`): the list is the accessible path.
+ *
+ * Controlled: what is pressed, drawn or numbered is read from `value`, so a Draft that arrives
+ * after the first render, or changes from outside, is what the picker shows. Switching tabs
+ * hands over that tab's own selection through `onChange` (null when it has none), so the tab in
+ * view and the value never disagree. Each tab remembers what was last chosen on it.
  */
 export function LocationPicker({ value, onChange, eventType, availabilityOf, className }: LocationPickerProps) {
-  const [mode, setMode] = React.useState<LocationPickerMode>(
-    () => modeOfLocation(value) ?? (eventType ? STARTING_MODE[eventType] : undefined) ?? "inventory",
+  // The tab in view while nothing is chosen. With a value, the tab is the value's own.
+  const [emptyMode, setEmptyMode] = React.useState<LocationPickerMode>(
+    () => (eventType ? STARTING_MODE[eventType] : undefined) ?? "inventory",
   );
+  const mode = modeOfLocation(value) ?? emptyMode;
 
-  const [inventoryIds, setInventoryIds] = React.useState<string[]>(value?.mode === "inventory" ? value.inventoryIds : []);
-  const [streetIds, setStreetIds] = React.useState<string[]>(value?.mode === "streets" ? value.segmentIds : []);
-  const [routeIds, setRouteIds] = React.useState<string[]>(value?.mode === "route" ? value.segmentIds : []);
+  // What the other tabs held when the applicant left them, with the value's own tab on top.
+  const [remembered, setRemembered] = React.useState<Selections>(NOTHING_CHOSEN);
+  const selections: Selections = { ...remembered, ...selectionsOf(value) };
 
-  const [areaId, setAreaId] = React.useState<AreaId>(
-    value?.mode === "area" && value.areaId ? value.areaId : "city-hall-plaza",
-  );
-  const [areaRect, setAreaRectState] = React.useState<Rect>(() =>
-    value?.mode === "area" && value.areaRect ? value.areaRect : defaultAreaRect(areaId),
-  );
+  const inventoryIds = value?.mode === "inventory" ? value.inventoryIds : NOTHING_CHOSEN.inventoryIds;
+  const streetIds = value?.mode === "streets" ? value.segmentIds : NOTHING_CHOSEN.streetIds;
+  const routeIds = value?.mode === "route" ? value.segmentIds : NOTHING_CHOSEN.routeIds;
+  const { areaId, areaRect } = selections;
+
   const [dragStart, setDragStart] = React.useState<{ x: number; y: number } | null>(null);
   const svgRef = React.useRef<SVGSVGElement>(null);
 
   const area = DRAWABLE_AREA_RECT[areaId];
 
+  /** Every change goes out the same way: remember it, stay on its tab, and emit that tab's location. */
+  function choose(nextMode: LocationPickerMode, change: Partial<Selections> = {}) {
+    const next = { ...selections, ...change };
+    setRemembered(next);
+    setEmptyMode(nextMode);
+    onChange(locationFor(nextMode, next));
+  }
+
   function selectInventory(id: string) {
-    const next = toggleInventorySelection(inventoryIds, id);
-    setInventoryIds(next);
-    onChange(next.length > 0 ? buildInventoryLocation(next) : null);
+    choose("inventory", { inventoryIds: toggleInventorySelection(inventoryIds, id) });
   }
 
   function selectStreet(id: string) {
-    const next = toggleStreetSelection(streetIds, id);
-    setStreetIds(next);
-    onChange(next.length > 0 ? buildStreetsLocation(next) : null);
+    choose("streets", { streetIds: toggleStreetSelection(streetIds, id) });
   }
 
   function selectRouteSegment(id: string) {
     if (!canAppendSegment(routeIds, id)) return;
-    const next = [...routeIds, id];
-    setRouteIds(next);
-    onChange(buildRouteLocation(next));
+    choose("route", { routeIds: [...routeIds, id] });
   }
 
   function undoLastSegment() {
-    const next = routeIds.slice(0, -1);
-    setRouteIds(next);
-    onChange(next.length > 0 ? buildRouteLocation(next) : null);
+    choose("route", { routeIds: routeIds.slice(0, -1) });
   }
 
   function setAreaRect(nextRect: Rect, forArea: AreaId = areaId) {
-    const clamped = clampRectToArea(nextRect, DRAWABLE_AREA_RECT[forArea]);
-    setAreaRectState(clamped);
-    onChange(buildAreaLocation(forArea, clamped));
+    choose("area", { areaId: forArea, areaRect: clampRectToArea(nextRect, DRAWABLE_AREA_RECT[forArea]) });
   }
 
   function handleAreaIdChange(next: AreaId) {
-    setAreaId(next);
-    const rect = defaultAreaRect(next);
-    setAreaRect(rect, next);
+    setAreaRect(defaultAreaRect(next), next);
   }
 
   function pointToSvg(clientX: number, clientY: number): { x: number; y: number } {
@@ -180,10 +223,13 @@ export function LocationPicker({ value, onChange, eventType, availabilityOf, cla
   }
 
   const currentAreaLocation = buildAreaLocation(areaId, areaRect);
+  // A picker that opens on this tab with no value shows a starting rectangle. It is only a
+  // suggestion until the applicant drags or sizes it, and it is drawn and described as one.
+  const areaChosen = value?.mode === "area";
   const routeLocation = buildRouteLocation(routeIds);
 
   return (
-    <Tabs value={mode} onValueChange={(next) => setMode(next as LocationPickerMode)} className={cn("w-full", className)}>
+    <Tabs value={mode} onValueChange={(next) => choose(next as LocationPickerMode)} className={cn("w-full", className)}>
       <TabsList className="h-auto w-full flex-wrap justify-start gap-1">
         {(Object.keys(MODE_LABEL) as LocationPickerMode[]).map((key) => (
           <TabsTrigger key={key} value={key}>
@@ -236,7 +282,7 @@ export function LocationPicker({ value, onChange, eventType, availabilityOf, cla
                   >
                     <p className="font-medium text-fg">{space.name}</p>
                     <p className="text-xs text-fg-secondary">{`${fmtNumber(space.capacity ?? 0)} people · ${fmtMoney(space.rate.amount)}/${space.rate.per}`}</p>
-                    <p className="text-xs text-fg-tertiary">{space.amenities.join(", ")}</p>
+                    <p className="text-xs text-fg-secondary">{space.amenities.join(", ")}</p>
                     <AvailabilityNote location={buildInventoryLocation([space.id])} availabilityOf={availabilityOf} />
                   </button>
                 </li>
@@ -280,8 +326,9 @@ export function LocationPicker({ value, onChange, eventType, availabilityOf, cla
               y={areaRect.y}
               width={areaRect.w}
               height={areaRect.h}
-              className="pointer-events-none fill-pill stroke-indigo-650"
+              className={cn("pointer-events-none stroke-indigo-650", areaChosen ? "fill-pill" : "fill-none")}
               strokeWidth={2}
+              strokeDasharray={areaChosen ? undefined : "8 6"}
             />
           </svg>
           <div className="flex flex-1 flex-col gap-3 md:w-1/3">
@@ -321,7 +368,11 @@ export function LocationPicker({ value, onChange, eventType, availabilityOf, cla
                 />
               </div>
             </div>
-            <p className="text-sm text-fg-secondary">{`${fmtNumber(currentAreaLocation.squareFeet ?? 0)} sq ft · up to ${fmtNumber(currentAreaLocation.capacity ?? 0)} people at 10 sq ft a person`}</p>
+            {areaChosen ? (
+              <p className="text-sm text-fg-secondary">{`${fmtNumber(currentAreaLocation.squareFeet ?? 0)} sq ft · up to ${fmtNumber(currentAreaLocation.capacity ?? 0)} people at 10 sq ft a person`}</p>
+            ) : (
+              <p className="text-sm text-fg-secondary">No area chosen yet. Drag on the map, or set a width and length.</p>
+            )}
             <AvailabilityNote location={currentAreaLocation} availabilityOf={availabilityOf} />
           </div>
         </div>

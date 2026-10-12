@@ -4,13 +4,14 @@
  * them here is what makes "disabled, with the reason transition() would give" true by
  * construction instead of by convention.
  */
-import { fmtDate } from "@/lib/format";
-import { availability as availabilityRule, occupiedWindow } from "@/lib/rules";
+import { daysBetween } from "@/lib/dates";
+import { fmtDate, plural } from "@/lib/format";
+import { availability as availabilityRule, occupiedWindow, occurrences } from "@/lib/rules";
 import { CARD_BY_ID, type CardSpec } from "@/lib/rules/catalog";
-import type { Availability, Dept } from "@/lib/types";
+import { PARTY_LABEL, type Availability, type Dept } from "@/lib/types";
 import type { EventCase } from "@/lib/types";
 import type { RulesCtx } from "@/lib/rules/types";
-import { findTask, heldSessionDates, paidInFull, reviewFor, taskId } from "./core";
+import { findTask, preSubmitCardsIn, quotePaid, reviewFor, signoffsLeft, taskId } from "./core";
 
 function unlockHintFor(catalogId: string): string | undefined {
   return (CARD_BY_ID as Record<string, CardSpec>)[catalogId]?.unlockHint;
@@ -41,16 +42,17 @@ export function checkCreateBoard(c: EventCase): CheckResult {
 }
 
 /**
- * The first session of this case that cannot be held, or null. Each session is checked over
- * the window the event occupies its place (setup start to teardown end), which is what
- * availability() compares against the other cases. Another case's booking always blocks. A
- * blackout blocks a single event only: a series skips the session instead.
+ * The first session of this case that cannot be held, or null. The sessions are the ones the
+ * schedule has now (occurrences()), not the list stored on the case, which an edit may have
+ * left behind. Each is checked over the window the event occupies its place (setup start to
+ * teardown end), which is what availability() compares against the other cases. Another case's
+ * booking always blocks. A blackout blocks a single event only: a series skips the session.
  */
 function slotConflict(c: EventCase, ctx: RulesCtx, blackoutBlocks: boolean): { date: string; availability: Availability } | null {
   if (!c.location || !c.schedule) return null;
   const window = occupiedWindow(c.schedule);
   const isSeries = !!c.schedule.recurrence;
-  for (const date of heldSessionDates(c)) {
+  for (const { date } of occurrences(c.schedule, c.location, ctx, c.id)) {
     const result = availabilityRule(c.location, { date, start: window.start, end: window.end }, ctx, c.id);
     if (result.status === "booked" || (result.status === "blackout" && blackoutBlocks && !isSeries)) {
       return { date, availability: result };
@@ -65,6 +67,26 @@ function conflictReason(c: EventCase, conflict: { date: string; availability: Av
   return c.schedule?.recurrence ? `${fmtDate(conflict.date)}: ${reason}` : reason;
 }
 
+/** The date is inside the tier's lead time, counted to the event (the first session of a series). */
+export function insideLeadTime(c: EventCase, ctx: RulesCtx): boolean {
+  return !!c.schedule && daysBetween(ctx.today, c.schedule.date) < ctx.cfg.leadTimeDays[c.tier];
+}
+
+/** The applicant chose the late fee and it is what gets this date through: only then is it charged. */
+export function lateFeeApplies(c: EventCase, ctx: RulesCtx): boolean {
+  return c.flags.lateFee && insideLeadTime(c, ctx) && daysBetween(ctx.today, c.schedule!.date) >= ctx.cfg.lateFee.minDaysBeforeEvent;
+}
+
+/**
+ * The lead-time half of the date gate. The PRD's transitions table has an Instant date "at
+ * least 10 days out"; the wizard's gate offers three fixes when a date is too close, and the
+ * late fee (`flags.lateFee`, set through updateDraft) is the only one that lets it stand.
+ */
+function checkLeadTime(c: EventCase, ctx: RulesCtx): CheckResult {
+  if (!insideLeadTime(c, ctx) || lateFeeApplies(c, ctx)) return OK;
+  return fail(`Needs ${plural(ctx.cfg.leadTimeDays[c.tier], "day")} of notice; pick a later date or add the late fee.`);
+}
+
 export function checkBookAndPay(c: EventCase, ctx: RulesCtx): CheckResult {
   const state = requireState(c, "draft");
   if (!state.ok) return state;
@@ -72,31 +94,27 @@ export function checkBookAndPay(c: EventCase, ctx: RulesCtx): CheckResult {
   if (!c.location || !c.schedule) return fail("The event needs a place and a date first.");
   const conflict = slotConflict(c, ctx, true);
   if (conflict) return fail(conflictReason(c, conflict, "This date is not available."));
-  return OK;
+  return checkLeadTime(c, ctx);
 }
 
-export function checkSubmit(c: EventCase): CheckResult {
+export function checkSubmit(c: EventCase, ctx: RulesCtx): CheckResult {
   const state = requireState(c, "draft");
   if (!state.ok) return state;
   if (c.tier === "instant") return fail("Instant events book and pay instead of submitting.");
   const submitTask = findTask(c, taskId(c.id, "submit_application"));
   if (!submitTask) return fail("There is nothing to submit yet.");
-  if (submitTask.status === "locked") return fail(unlockHintFor(submitTask.catalogId) ?? "Finish every card before submitting.");
   if (submitTask.status === "done") return fail("Already submitted.");
-  return OK;
+  // The cards themselves, not only the lock: a board rebuilt after an edit can gain a card.
+  if (submitTask.status === "locked" || !preSubmitCardsIn(c)) return fail(unlockHintFor(submitTask.catalogId) ?? "Finish every card before submitting.");
+  return checkLeadTime(c, ctx);
 }
 
 export function checkAcceptComplete(c: EventCase, ctx: RulesCtx): CheckResult {
   const state = requireState(c, "submitted");
   if (!state.ok) return state;
   if (c.flags.acceptedComplete) return fail("Already accepted as complete.");
-  const signoff = findTask(c, taskId(c.id, "neighbor_signoff"));
-  if (signoff) {
-    const progress = signoff.payload.progress as { done: number; total: number } | undefined;
-    if (progress && progress.done < progress.total) {
-      return fail(`Waiting on ${progress.total - progress.done} neighbor sign-offs`);
-    }
-  }
+  const signoffs = signoffsLeft(c);
+  if (signoffs > 0) return fail(`Waiting on ${plural(signoffs, "neighbor sign-off")}`);
   const openIntakeRequest = c.tasks.some((t) => t.request && !t.request.resolved && t.request.from === "clerk");
   if (openIntakeRequest) return fail("Waiting on the applicant's response to your request");
   const conflict = slotConflict(c, ctx, false);
@@ -113,12 +131,22 @@ export function checkConfirmRouting(c: EventCase): CheckResult {
   return OK;
 }
 
-export function checkRequestInfo(c: EventCase, actor: string): CheckResult {
+/**
+ * The Clerk asks at intake; a routed department asks while its own review is still open. A
+ * department that has decided has nothing left to ask for: its review task is done, so an
+ * answer would come back to nobody. With `taskIdArg`, the request must pin an applicant card.
+ */
+export function checkRequestInfo(c: EventCase, actor: string, taskIdArg?: string): CheckResult {
   const open = requireOpen(c);
   if (!open.ok) return open;
-  if (c.state === "submitted" && actor === "clerk") return OK;
-  if ((c.state === "in_review" || c.state === "needs_info") && c.reviews.some((r) => r.dept === actor)) return OK;
-  return fail("Can't request information in this state.");
+  const atIntake = c.state === "submitted" && actor === "clerk";
+  if (!atIntake) {
+    const review = c.state === "in_review" || c.state === "needs_info" ? c.reviews.find((r) => r.dept === actor) : undefined;
+    if (!review) return fail("Can't request information in this state.");
+    if (review.status !== "pending" && review.status !== "needs_info") return fail(`Review is already ${review.status.replace(/_/g, " ")}.`);
+  }
+  if (taskIdArg !== undefined && !c.tasks.some((t) => t.id === taskIdArg && t.owner === "applicant")) return fail("Card not found.");
+  return OK;
 }
 
 export function checkRespondToRequest(c: EventCase, taskIdArg: string): CheckResult {
@@ -152,6 +180,8 @@ export function checkReviewDecide(c: EventCase, dept: Dept): CheckResult {
 export function checkSendQuote(c: EventCase): CheckResult {
   const state = requireState(c, "in_review");
   if (!state.ok) return state;
+  const denied = c.reviews.find((r) => r.status === "denied");
+  if (denied) return fail(`${PARTY_LABEL[denied.dept]} denied its section.`);
   const allApproved = c.reviews.every((r) => r.status === "approved" || r.status === "approved_with_conditions");
   if (!allApproved) return fail("Waiting on every reviewer to approve.");
   return OK;
@@ -169,12 +199,12 @@ export function checkPayQuote(c: EventCase): CheckResult {
   return requireState(c, "quote_sent");
 }
 
-export function checkIssuePermit(c: EventCase): CheckResult {
+export function checkIssuePermit(c: EventCase, ctx: RulesCtx): CheckResult {
   const state = requireState(c, "quote_sent");
   if (!state.ok) return state;
   const missing: string[] = [];
   if (!c.flags.signed) missing.push("signature (applicant)");
-  if (!paidInFull(c)) missing.push("payment (applicant)");
+  if (!quotePaid(c, ctx.cfg)) missing.push("payment (applicant)");
   const insurance = findTask(c, taskId(c.id, "insurance_certificate"));
   if (insurance && insurance.status !== "done") missing.push("insurance (Health & Legal)");
   if (missing.length > 0) return fail(`Needs: ${missing.join(", ")}`);

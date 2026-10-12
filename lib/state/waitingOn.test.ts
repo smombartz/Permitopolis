@@ -17,6 +17,18 @@ describe("waitingOn", () => {
     expect(rows.find((r) => r.party === "clerk")?.status).not.toBe("up_now");
   });
 
+  it("S4 after Submit: the Clerk's intake check waits on the sign-offs still out, and says how many", () => {
+    const signoff = makeTask({ id: "PMT-27-0126:neighbor_signoff", catalogId: "neighbor_signoff", kind: "sign_off", title: "Neighbor sign-off", payload: { progress: { done: 9, total: 12 } } });
+    const intake = makeTask({ id: "PMT-27-0126:intake_check", catalogId: "intake_check", owner: "clerk", kind: "review", status: "locked", payload: { awaitingSignoffs: true } });
+    const c = makeCase({ id: "PMT-27-0126", state: "submitted", tasks: [signoff, intake] });
+    const clerk = waitingOn(c, "2027-05-03").find((r) => r.party === "clerk");
+    expect(clerk).toMatchObject({ status: "waiting", openTasks: [], note: "Waiting on 3 neighbor sign-offs" });
+    expect(isStalled(c, "2027-05-03")).toBe(false);
+
+    const oneLeft = { ...c, tasks: [{ ...signoff, payload: { progress: { done: 11, total: 12 } } }, intake] };
+    expect(waitingOn(oneLeft, "2027-05-03").find((r) => r.party === "clerk")?.note).toBe("Waiting on 1 neighbor sign-off");
+  });
+
   it("S5 (Quote sent): both the applicant and Health & Legal are up", () => {
     const acceptSign = makeTask({ id: "PMT-27-0097:accept_and_sign", catalogId: "accept_and_sign", kind: "sign_off" });
     const insurance = makeTask({ id: "PMT-27-0097:insurance_certificate", catalogId: "insurance_certificate", owner: "applicant", reviewer: "hl", status: "submitted" });

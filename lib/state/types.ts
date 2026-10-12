@@ -92,7 +92,7 @@ export interface DemoState {
   personaId: string;
   hints: boolean;
   lastPathByRole: Partial<Record<Party, string>>;
-  /** False when localStorage is blocked; the app then runs in memory. */
+  /** False when localStorage is blocked; the app then runs in memory. Read it only once useHydrated() is true: the server has no storage. */
   storageOk: boolean;
 }
 
@@ -101,8 +101,13 @@ export interface DemoActions {
   dispatch(caseId: string, action: Action, actor?: Actor): { ok: boolean; reason?: string; spawnedIds?: string[] };
   /** Creates a Draft and returns its id. */
   createDraft(applicantId: string, answers?: Partial<EventAnswers>): string;
-  /** Autosave from the wizard. Only Drafts can be patched. */
-  updateDraft(caseId: string, patch: Partial<EventAnswers> & { wizardStep?: WizardStep }): void;
+  /**
+   * Autosave from the wizard. Only Drafts can be patched. The Draft's sessions, tier and triggers
+   * are brought in step with the answers on every call. `lateFee` records the applicant's choice
+   * at the date gate ("pay a late fee") in `flags.lateFee`: a date inside the lead time can then
+   * be booked or submitted, and carries a "Late fee" line.
+   */
+  updateDraft(caseId: string, patch: Partial<EventAnswers> & { wizardStep?: WizardStep; lateFee?: boolean }): void;
   setRole(role: Party): void;
   setPersona(personaId: string): void;
   /** Moves the demo date and runs advanceClock() over every case. */
