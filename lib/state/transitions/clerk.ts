@@ -1,0 +1,189 @@
+/** Transitions only the City Clerk raises. */
+import { addDaysISO } from "@/lib/dates";
+import type { RulesCtx } from "@/lib/rules/types";
+import type { Actor, Condition, EventCase, FeeLine, Review } from "@/lib/types";
+import type { Action } from "../actions";
+import { checkAcceptComplete, checkConfirmRouting, checkDeny, checkIssuePermit, checkReconcileClose, checkSendQuote } from "../checks";
+import { lastSessionDate } from "../clock";
+import { addTask, addTasks, appendActivity, applyUnlockEvent, caseTotal, findTask, moveTask, newTask, nowOf, patchTask, taskId } from "../core";
+import type { TransitionResult } from "../types";
+
+type Extract_<T extends Action["type"]> = Extract<Action, { type: T }>;
+
+export function acceptComplete(c: EventCase, _action: Extract_<"accept_complete">, actor: Actor, ctx: RulesCtx): TransitionResult {
+  const check = checkAcceptComplete(c, ctx);
+  if (!check.ok) return check;
+  let next: EventCase = {
+    ...c,
+    flags: { ...c.flags, acceptedComplete: true },
+    dateHold: { status: "held", placedOn: ctx.today, expiresOn: null },
+  };
+  const intakeId = taskId(next.id, "intake_check");
+  if (findTask(next, intakeId)) next = moveTask(next, intakeId, "done", ctx, actor);
+
+  const confirmRoutingTask = newTask(
+    { id: taskId(next.id, "confirm_routing"), catalogId: "confirm_routing", owner: "clerk", kind: "action", title: "Confirm reviewers and due dates", phase: "review" },
+    ctx,
+    "system",
+  );
+  const newTasks = [confirmRoutingTask];
+  if (next.tier === "special") {
+    newTasks.push(
+      newTask(
+        { id: taskId(next.id, "schedule_pre_application_meeting"), catalogId: "schedule_pre_application_meeting", owner: "clerk", kind: "meeting", title: "Schedule the pre-application meeting", phase: "review" },
+        ctx,
+        "system",
+      ),
+    );
+  }
+  next = addTasks(next, newTasks);
+  next = applyUnlockEvent(next, "accepted", ctx);
+  next = appendActivity(next, actor, "Accepted the application as complete; the date is held.", ctx);
+  return { ok: true, case: next };
+}
+
+export function confirmRouting(c: EventCase, action: Extract_<"confirm_routing">, actor: Actor, ctx: RulesCtx): TransitionResult {
+  const check = checkConfirmRouting(c);
+  if (!check.ok) return check;
+  const reviews: Review[] = action.reviewers.map((r) => ({
+    dept: r.dept,
+    sections: r.sections,
+    status: "pending",
+    dueDate: r.dueDate,
+    decidedOn: null,
+    clock: { startedOn: ctx.today, pausedSince: null, pausedDays: 0, allowedDays: ctx.cfg.sla.reviewDays[c.tier] },
+    internalNote: "",
+    messageToApplicant: "",
+  }));
+  const reviewTasks = action.reviewers.map((r) =>
+    newTask(
+      { id: taskId(c.id, `review:${r.dept}`), catalogId: `review:${r.dept}`, owner: r.dept, kind: "review", title: "Review your sections", dueDate: r.dueDate, phase: "review" },
+      ctx,
+      "system",
+    ),
+  );
+  let next: EventCase = { ...c, reviews: [...c.reviews, ...reviews], state: "in_review" };
+  next = addTasks(next, reviewTasks);
+  next = moveTask(next, taskId(next.id, "confirm_routing"), "done", ctx, actor);
+  next = applyUnlockEvent(next, "routed", ctx);
+  next = appendActivity(next, actor, "Confirmed routing; the case moved to In review.", ctx);
+  return { ok: true, case: next };
+}
+
+export function deny(c: EventCase, action: Extract_<"deny">, actor: Actor, ctx: RulesCtx): TransitionResult {
+  const check = checkDeny(c);
+  if (!check.ok) return check;
+  const next = appendActivity(
+    { ...c, ending: "denied", endingReason: action.reason, dateHold: c.dateHold.status === "held" ? { ...c.dateHold, status: "released" } : c.dateHold },
+    actor,
+    `Denied: ${action.reason}`,
+    ctx,
+  );
+  return { ok: true, case: next };
+}
+
+export function sendQuote(c: EventCase, action: Extract_<"send_quote">, actor: Actor, ctx: RulesCtx): TransitionResult {
+  const check = checkSendQuote(c);
+  if (!check.ok) return check;
+
+  let conditions: Condition[];
+  if (action.conditions.length > 0) {
+    conditions = action.conditions.map((cd, i) => ({ id: taskId(c.id, "cond", i + 1), dept: cd.dept, text: cd.text, mergedByClerk: true, acceptedByApplicant: false }));
+  } else {
+    conditions = c.conditions.map((cond) => ({ ...cond, mergedByClerk: true }));
+  }
+
+  let feeLines: FeeLine[];
+  if (action.feeLines.length > 0) {
+    feeLines = action.feeLines.map((fl, i) => ({
+      id: taskId(c.id, "fee", i + 1),
+      dept: fl.dept,
+      label: fl.label,
+      qty: fl.qty,
+      unit: fl.unit,
+      unitPrice: fl.unitPrice,
+      estimate: fl.qty * fl.unitPrice,
+      actual: null,
+      kind: fl.kind ?? "fee",
+    }));
+  } else {
+    feeLines = c.feeLines;
+  }
+
+  let next: EventCase = {
+    ...c,
+    conditions,
+    feeLines,
+    state: "quote_sent",
+    dateHold: { ...c.dateHold, expiresOn: addDaysISO(ctx.today, ctx.cfg.hold.daysAfterQuote) },
+  };
+  const consolidateId = taskId(next.id, "consolidate");
+  if (findTask(next, consolidateId)) next = moveTask(next, consolidateId, "done", ctx, actor);
+  next = addTask(
+    next,
+    newTask({ id: taskId(next.id, "issue_permit"), catalogId: "issue_permit", owner: "clerk", kind: "action", title: "Issue permit", status: "locked", phase: "permit" }, ctx, "system"),
+  );
+  next = applyUnlockEvent(next, "quote_sent", ctx);
+  const payFees = findTask(next, taskId(next.id, "pay_fees"));
+  if (payFees) {
+    next = patchTask(next, payFees.id, { payload: { ...payFees.payload, amount: caseTotal(next) } });
+  }
+  next = appendActivity(next, actor, "Sent the quote.", ctx);
+  return { ok: true, case: next };
+}
+
+export function issuePermit(c: EventCase, _action: Extract_<"issue_permit">, actor: Actor, ctx: RulesCtx): TransitionResult {
+  const check = checkIssuePermit(c);
+  if (!check.ok) return check;
+  let next: EventCase = { ...c, state: "permitted", permit: { issuedOn: ctx.today, signature: findTask(c, taskId(c.id, "accept_and_sign"))?.payload.signature as string | null } };
+  next = applyUnlockEvent(next, "permitted", ctx);
+  next = addTasks(next, workOrdersFor(next, ctx));
+  next = appendActivity(next, actor, "Issued the permit.", ctx);
+  return { ok: true, case: next };
+}
+
+function workOrdersFor(c: EventCase, ctx: RulesCtx) {
+  const last = lastSessionDate(c);
+  const due = last ? addDaysISO(last, -2) : ctx.today;
+  const services = c.addOns.cityServices;
+  const usesStreet = c.location?.mode === "streets" || c.location?.mode === "route";
+  const orders: { key: string; title: string }[] = [];
+  if (usesStreet || (services?.barricades ?? 0) > 0) orders.push({ key: "barricades", title: "Deliver barricades" });
+  if ((services?.policeOfficers ?? 0) > 0 || c.addOns.alcohol) orders.push({ key: "police", title: "Staff police officers" });
+  if (usesStreet) orders.push({ key: "closure", title: "Close the street" });
+  if (services?.trash) orders.push({ key: "trash", title: "Arrange trash service" });
+  if (services?.power) orders.push({ key: "power", title: "Arrange power" });
+  return orders.map((o) =>
+    newTask({ id: taskId(c.id, `work_order:${o.key}`), catalogId: `work_order:${o.key}`, owner: "pws", kind: "action", title: o.title, dueDate: due, phase: "before_event" }, ctx, "system"),
+  );
+}
+
+export function reconcileClose(c: EventCase, _action: Extract_<"reconcile_close">, actor: Actor, ctx: RulesCtx): TransitionResult {
+  const check = checkReconcileClose(c);
+  if (!check.ok) return check;
+  const balance = c.feeLines.filter((f) => f.kind !== "deposit").reduce((s, f) => s + ((f.actual ?? f.estimate) - f.estimate), 0);
+  const depositPaid = c.feeLines.filter((f) => f.kind === "deposit").reduce((s, f) => s + f.estimate, 0);
+  const refund = balance <= depositPaid ? depositPaid - balance : null;
+  const owed = refund === null ? balance - depositPaid : null;
+
+  let next: EventCase = { ...c, closeout: { ...c.closeout, balance, refund } };
+  const billId = taskId(next.id, "final_bill_or_refund");
+  const billTask = findTask(next, billId);
+  if (billTask) {
+    if (refund !== null) {
+      next = moveTask(next, billId, "done", ctx, actor, { payload: { ...billTask.payload, amount: -refund }, unlocksOn: null });
+      next = { ...next, payments: [...next.payments, { id: taskId(next.id, "pay", next.payments.length + 1), at: nowOf(ctx), amount: -refund, method: "in_person", kind: "refund" }] };
+    } else {
+      next = patchTask(next, billId, { payload: { ...billTask.payload, amount: owed ?? undefined } });
+    }
+  }
+  const exceptionId = taskId(next.id, "instant_exception");
+  if (findTask(next, exceptionId)) next = moveTask(next, exceptionId, "done", ctx, actor);
+
+  next = { ...next, state: "closed" };
+  next = applyUnlockEvent(next, "invoice_issued", ctx);
+  next = applyUnlockEvent(next, "closed", ctx);
+  next = appendActivity(next, actor, refund !== null ? `Closed. Refunded ${refund} from the deposit.` : `Closed. Final bill: ${owed}.`, ctx);
+  return { ok: true, case: next };
+}
+

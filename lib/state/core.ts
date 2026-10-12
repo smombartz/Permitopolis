@@ -1,0 +1,187 @@
+/**
+ * Low-level helpers shared by every transition handler. Nothing here is part of
+ * StateApi; it is implementation detail for lib/state/transitions/*.
+ */
+import { dueDate as dueDateRule } from "@/lib/rules";
+import { CARD_BY_ID, type CardSpec, type CatalogId } from "@/lib/rules/catalog";
+import type { RulesCtx } from "@/lib/rules/types";
+import type {
+  Actor,
+  Dept,
+  EventCase,
+  ISODate,
+  ISODateTime,
+  Party,
+  Task,
+  TaskKind,
+  TaskPayload,
+  TaskPhase,
+  TaskStatus,
+  UnlockEvent,
+} from "@/lib/types";
+
+/** `${caseId}:${catalogId}`, plus `:${n}` for a repeated (per-vendor) card. */
+export function taskId(caseId: string, catalogId: string, n?: number): string {
+  return n === undefined ? `${caseId}:${catalogId}` : `${caseId}:${catalogId}:${n}`;
+}
+
+/** The part of a task id after `${caseId}:`, e.g. `vendor_health_permit:1`. */
+export function idSuffix(c: EventCase, id: string): string {
+  return id.slice(c.id.length + 1);
+}
+
+export function cloneCase(c: EventCase): EventCase {
+  return structuredClone(c);
+}
+
+/** `ctx.now`, defaulting to 9am on `ctx.today`. transition() never reads the real clock. */
+export function nowOf(ctx: RulesCtx): ISODateTime {
+  return ctx.now ?? `${ctx.today}T09:00`;
+}
+
+export function appendActivity(c: EventCase, actor: Actor, text: string, ctx: RulesCtx): EventCase {
+  return { ...c, activity: [...c.activity, { at: nowOf(ctx), actor, text }] };
+}
+
+export function findTask(c: EventCase, id: string): Task | undefined {
+  return c.tasks.find((t) => t.id === id);
+}
+
+function catalogSpecFor(catalogId: string): CardSpec | undefined {
+  return (CARD_BY_ID as Record<string, CardSpec>)[catalogId];
+}
+
+/** Patches fields on one task without touching history (payload-only edits). */
+export function patchTask(c: EventCase, id: string, patch: Partial<Task>): EventCase {
+  return { ...c, tasks: c.tasks.map((t) => (t.id === id ? { ...t, ...patch } : t)) };
+}
+
+/** Moves a task to a new status, appending the history entry the status change needs. */
+export function moveTask(
+  c: EventCase,
+  id: string,
+  status: TaskStatus,
+  ctx: RulesCtx,
+  actor: Actor,
+  extra: Partial<Task> = {},
+  note?: string,
+): EventCase {
+  return {
+    ...c,
+    tasks: c.tasks.map((t) =>
+      t.id === id
+        ? { ...t, ...extra, status, history: [...t.history, { at: nowOf(ctx), actor, status, note }] }
+        : t,
+    ),
+  };
+}
+
+export function addTask(c: EventCase, task: Task): EventCase {
+  return { ...c, tasks: [...c.tasks, task] };
+}
+
+export function addTasks(c: EventCase, tasks: Task[]): EventCase {
+  return { ...c, tasks: [...c.tasks, ...tasks] };
+}
+
+export interface NewTaskArgs {
+  id: string;
+  catalogId: string;
+  owner: Party;
+  kind: TaskKind;
+  title: string;
+  why?: string;
+  reviewer?: Dept | null;
+  dueDate?: ISODate | null;
+  status?: TaskStatus;
+  unlocksOn?: UnlockEvent | null;
+  phase?: TaskPhase;
+  payload?: TaskPayload;
+}
+
+/** Builds one task with the defaults the rest of the engine relies on (payload, history, tags). */
+export function newTask(args: NewTaskArgs, ctx: RulesCtx, actor: Actor): Task {
+  const status = args.status ?? "todo";
+  return {
+    id: args.id,
+    catalogId: args.catalogId,
+    owner: args.owner,
+    kind: args.kind,
+    title: args.title,
+    why: args.why ?? "",
+    reviewer: args.reviewer ?? null,
+    dueDate: args.dueDate ?? null,
+    status,
+    unlocksOn: args.unlocksOn ?? null,
+    phase: args.phase ?? "review",
+    payload: args.payload ?? {},
+    history: [{ at: nowOf(ctx), actor, status }],
+    tags: [],
+  };
+}
+
+/**
+ * Flips every locked task with `unlocksOn === event` to "todo", recording it in task.history,
+ * and sets the due date for due rules `after_unlock` and `hold_expiry`. A no-op when nothing
+ * matches.
+ */
+export function applyUnlockEvent(c: EventCase, event: UnlockEvent, ctx: RulesCtx): EventCase {
+  let changed = false;
+  const tasks = c.tasks.map((t) => {
+    if (t.status !== "locked" || t.unlocksOn !== event) return t;
+    changed = true;
+    const spec = catalogSpecFor(t.catalogId);
+    let dueDate = t.dueDate;
+    if (spec?.due.type === "after_unlock") {
+      dueDate = dueDateRule(ctx.today, ctx.cfg.sla[spec.due.sla] as number, ctx.cfg);
+    } else if (spec?.due.type === "hold_expiry") {
+      dueDate = c.dateHold.expiresOn;
+    }
+    return {
+      ...t,
+      status: "todo" as const,
+      unlocksOn: null,
+      dueDate,
+      history: [...t.history, { at: nowOf(ctx), actor: "system" as const, status: "todo" as const }],
+    };
+  });
+  return changed ? { ...c, tasks } : c;
+}
+
+export function isCatalogId(id: string): id is CatalogId {
+  return id in CARD_BY_ID;
+}
+
+/** Every open (actionable) task owned by this party, optionally narrowed further. */
+export function openTasksFor(c: EventCase, owner: Party, extra?: (t: Task) => boolean): Task[] {
+  return c.tasks.filter(
+    (t) => t.owner === owner && (t.status === "todo" || t.status === "changes_requested") && (!extra || extra(t)),
+  );
+}
+
+export function hasOpenReviewTask(c: EventCase, dept: Dept): boolean {
+  return c.tasks.some(
+    (t) => t.owner === dept && t.kind === "review" && (t.status === "todo" || t.status === "changes_requested"),
+  );
+}
+
+export function reviewFor(c: EventCase, dept: Dept) {
+  return c.reviews.find((r) => r.dept === dept);
+}
+
+/** Sum of fee-line estimates (or actuals once closeout has filled them in), by kind. */
+export function sumFeeLines(c: EventCase, kinds: Array<"fee" | "deposit" | "late_fee">): number {
+  return c.feeLines.filter((f) => kinds.includes(f.kind)).reduce((s, f) => s + (f.actual ?? f.estimate), 0);
+}
+
+export function totalPaid(c: EventCase): number {
+  return c.payments.reduce((s, p) => s + p.amount, 0);
+}
+
+export function caseTotal(c: EventCase): number {
+  return sumFeeLines(c, ["fee", "late_fee", "deposit"]);
+}
+
+export function paidInFull(c: EventCase): boolean {
+  return totalPaid(c) >= caseTotal(c);
+}
