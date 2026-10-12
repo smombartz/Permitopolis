@@ -1,36 +1,53 @@
 /**
- * Public surface of the state machine. Phase 0 ships stubs with the final signatures;
- * workstream 1B replaces each one and adds the store in ./store. Keep the
- * `satisfies StateApi` check.
+ * Public surface of the state machine: every function of StateApi, plus the store.
  */
 import type { StateApi } from "./types";
 
 export * from "./types";
 export * from "./actions";
 
-function todo(name: string): never {
-  throw new Error(`lib/state: ${name}() is not implemented yet`);
-}
+export { availableActions } from "./availableActions";
+export { advanceClock, isSessionDate, lastSessionDate, sessionDates } from "./clock";
+export { newCase } from "./newCase";
+export {
+  applicantCases,
+  boardColumn,
+  caseTotals,
+  daysUntilEvent,
+  eventDate,
+  involves,
+  isOpen,
+  isVisibleToCity,
+  leadTimeRisk,
+  nextCaseId,
+  queueFor,
+  reviewClock,
+  waitingOnOthers,
+} from "./selectors";
+export { demoToday, resetDemoStoreForTests, useDemo, useHydrated } from "./store";
+export { transition } from "./transition";
+export { isStalled, nextMove, waitingOn } from "./waitingOn";
 
-export const newCase: StateApi["newCase"] = () => todo("newCase");
-export const transition: StateApi["transition"] = () => todo("transition");
-export const availableActions: StateApi["availableActions"] = () => todo("availableActions");
-export const waitingOn: StateApi["waitingOn"] = () => todo("waitingOn");
-export const nextMove: StateApi["nextMove"] = () => todo("nextMove");
-export const boardColumn: StateApi["boardColumn"] = () => todo("boardColumn");
-export const advanceClock: StateApi["advanceClock"] = () => todo("advanceClock");
-export const isOpen: StateApi["isOpen"] = () => todo("isOpen");
-export const isVisibleToCity: StateApi["isVisibleToCity"] = () => todo("isVisibleToCity");
-export const involves: StateApi["involves"] = () => todo("involves");
-export const applicantCases: StateApi["applicantCases"] = () => todo("applicantCases");
-export const queueFor: StateApi["queueFor"] = () => todo("queueFor");
-export const waitingOnOthers: StateApi["waitingOnOthers"] = () => todo("waitingOnOthers");
-export const reviewClock: StateApi["reviewClock"] = () => todo("reviewClock");
-export const daysUntilEvent: StateApi["daysUntilEvent"] = () => todo("daysUntilEvent");
-export const eventDate: StateApi["eventDate"] = () => todo("eventDate");
-export const caseTotals: StateApi["caseTotals"] = () => todo("caseTotals");
-export const leadTimeRisk: StateApi["leadTimeRisk"] = () => todo("leadTimeRisk");
-export const nextCaseId: StateApi["nextCaseId"] = () => todo("nextCaseId");
+import { availableActions } from "./availableActions";
+import { advanceClock } from "./clock";
+import { newCase } from "./newCase";
+import {
+  applicantCases,
+  boardColumn,
+  caseTotals,
+  daysUntilEvent,
+  eventDate,
+  involves,
+  isOpen,
+  isVisibleToCity,
+  leadTimeRisk,
+  nextCaseId,
+  queueFor,
+  reviewClock,
+  waitingOnOthers,
+} from "./selectors";
+import { transition } from "./transition";
+import { nextMove, waitingOn } from "./waitingOn";
 
 export const state = {
   newCase,
