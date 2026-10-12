@@ -35,6 +35,23 @@ describe("useDemo", () => {
     expect(draft?.wizardStep).toBe("size");
   });
 
+  it("a Draft carries the tier its answers classify to, before the plan is confirmed", () => {
+    const id = useDemo.getState().createDraft("maya", { eventType: "picnic_party", attendance: 40 });
+    const draft = () => useDemo.getState().cases.find((c) => c.id === id);
+    expect(draft()?.tier).toBe("instant");
+    expect(draft()?.triggers).toEqual([]);
+
+    useDemo.getState().updateDraft(id, { attendance: 150 });
+    expect(draft()?.tier).toBe("reviewed");
+    expect(draft()?.triggers.map((t) => t.id)).toContain("attendance_100");
+
+    useDemo.getState().updateDraft(id, { attendance: 1200 });
+    expect(draft()?.tier).toBe("special");
+
+    useDemo.getState().updateDraft(id, { attendance: 40 });
+    expect(draft()?.tier).toBe("instant");
+  });
+
   it("dispatch reports a case-not-found error without throwing", () => {
     const result = useDemo.getState().dispatch("PMT-27-9999", { type: "add_note", text: "hi" });
     expect(result.ok).toBe(false);

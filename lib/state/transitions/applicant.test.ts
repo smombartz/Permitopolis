@@ -67,6 +67,35 @@ describe("create_board", () => {
     const result = transition(c, { type: "create_board" }, "applicant", makeCtx());
     expect(result.ok).toBe(false);
   });
+
+  it("lists the sessions from the rules engine, so a blackout session is skipped whoever built the schedule", () => {
+    // Mondays at Field 3 across Memorial Day (all parks closed), built with every session "open".
+    const c = makeCase({
+      state: "draft",
+      location: { mode: "inventory", inventoryIds: ["field-3"], segmentIds: [], label: "Field 3" },
+      schedule: {
+        date: "2027-05-24",
+        start: "07:00",
+        end: "08:00",
+        recurrence: { frequency: "weekly", weekday: 1, until: "2027-06-07" },
+        occurrences: [
+          { date: "2027-05-24", availability: { status: "open" }, billing: "upcoming" },
+          { date: "2027-05-31", availability: { status: "open" }, billing: "upcoming" },
+          { date: "2027-06-07", availability: { status: "open" }, billing: "upcoming" },
+        ],
+      },
+    });
+    const result = transition(c, { type: "create_board" }, "applicant", makeCtx());
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.case.schedule?.occurrences.map((o) => [o.date, o.availability.status, o.billing])).toEqual([
+      ["2027-05-24", "open", "upcoming"],
+      ["2027-05-31", "blackout", "skipped"],
+      ["2027-06-07", "open", "upcoming"],
+    ]);
+    // Fees are estimated from the case with its sessions already listed.
+    expect(vi.mocked(estimateFees).mock.calls.at(-1)?.[0].schedule?.occurrences[1].billing).toBe("skipped");
+  });
 });
 
 describe("book_and_pay", () => {
@@ -117,6 +146,61 @@ describe("book_and_pay", () => {
     const c = makeCase({ state: "draft", tier: "reviewed", location, schedule });
     const result = transition(c, { type: "book_and_pay", method: "card" }, "applicant", makeCtx());
     expect(result.ok).toBe(false);
+  });
+
+  it("asks availability() about the window the event occupies: setup start to teardown end", () => {
+    const withSetup = { ...schedule, setupStart: "09:30", teardownEnd: "17:00" };
+    const c = makeCase({ state: "draft", tier: "instant", location, schedule: withSetup, tasks: [makeTask({ id: "PMT-27-0001:pay_fees", catalogId: "pay_fees" })] });
+    transition(c, { type: "book_and_pay", method: "card" }, "applicant", makeCtx());
+    expect(vi.mocked(availability)).toHaveBeenCalledWith(location, { date: "2027-05-22", start: "09:30", end: "17:00" }, expect.anything(), "PMT-27-0001");
+  });
+
+  it("a series fails when any session it would hold is booked, and says which", () => {
+    vi.mocked(availability).mockImplementation((_location, window) =>
+      window.date === "2027-06-13" ? { status: "booked", reason: "Little League practice has this date held" } : { status: "open" },
+    );
+    const series = {
+      date: "2027-06-06",
+      start: "08:00",
+      end: "09:00",
+      recurrence: { frequency: "weekly" as const, weekday: 0, until: "2027-06-13" },
+      occurrences: [
+        { date: "2027-06-06", availability: { status: "open" as const }, billing: "upcoming" as const },
+        { date: "2027-06-13", availability: { status: "open" as const }, billing: "upcoming" as const },
+      ],
+    };
+    const c = makeCase({ state: "draft", tier: "instant", location, schedule: series, tasks: [makeTask({ id: "PMT-27-0001:pay_fees", catalogId: "pay_fees" })] });
+    const result = transition(c, { type: "book_and_pay", method: "card" }, "applicant", makeCtx());
+    expect(result).toEqual({ ok: false, reason: "Sun, Jun 13, 2027: Little League practice has this date held" });
+  });
+
+  it("a blackout stops a single event but not a series, which skips that session and pays the next", () => {
+    vi.mocked(availability).mockImplementation((_location, window) =>
+      window.date === "2027-05-31" ? { status: "blackout", reason: "Memorial Day: all parks are closed to bookings" } : { status: "open" },
+    );
+    vi.mocked(estimateFees).mockReturnValue({ lines: [], fees: 40, deposit: 0, total: 40, dueNow: 20 } as FeeEstimate);
+    const payFees = () => makeTask({ id: "PMT-27-0001:pay_fees", catalogId: "pay_fees" });
+
+    const single = { date: "2027-05-31", start: "08:00", end: "09:00", occurrences: [{ date: "2027-05-31", availability: { status: "open" as const }, billing: "upcoming" as const }] };
+    const blocked = transition(makeCase({ state: "draft", tier: "instant", location, schedule: single, tasks: [payFees()] }), { type: "book_and_pay", method: "card" }, "applicant", makeCtx());
+    expect(blocked).toEqual({ ok: false, reason: "Memorial Day: all parks are closed to bookings" });
+
+    const series = {
+      date: "2027-05-31",
+      start: "08:00",
+      end: "09:00",
+      recurrence: { frequency: "weekly" as const, weekday: 1, until: "2027-06-14" },
+      occurrences: [
+        { date: "2027-05-31", availability: { status: "blackout" as const }, billing: "skipped" as const },
+        { date: "2027-06-07", availability: { status: "open" as const }, billing: "upcoming" as const },
+        { date: "2027-06-14", availability: { status: "open" as const }, billing: "upcoming" as const },
+      ],
+    };
+    const booked = transition(makeCase({ state: "draft", tier: "instant", location, schedule: series, tasks: [payFees()] }), { type: "book_and_pay", method: "card" }, "applicant", makeCtx());
+    expect(booked.ok).toBe(true);
+    if (!booked.ok) return;
+    expect(booked.case.schedule?.occurrences.map((o) => o.billing)).toEqual(["skipped", "paid", "upcoming"]);
+    expect(booked.case.activity.at(-1)?.text).toContain("Paid $20");
   });
 });
 
@@ -298,18 +382,53 @@ describe("withdraw and cancel", () => {
   });
 
   it("cancel on S1's own day refunds $62.50", () => {
-    vi.mocked(cancellationRefund).mockReturnValue({ refund: 62.5, kept: 62.5, rule: "Under 10 days: no refund of fees" });
+    vi.mocked(cancellationRefund).mockReturnValue({ refund: 62.5, kept: 62.5, rule: "10 to 29 days before: 50% of space and permit fees; the application fee is kept" });
     const c = makeCase({
       state: "permitted",
       permit: { issuedOn: "2027-04-20", signature: null },
+      dateHold: { status: "held", placedOn: "2027-04-20", expiresOn: null },
       schedule: { date: "2027-05-22", start: "11:00", end: "16:00", occurrences: [{ date: "2027-05-22", availability: { status: "open" }, billing: "paid" }] },
       feeLines: [{ id: "f1", dept: "clerk", label: "Shelter", qty: 5, unit: "hour", unitPrice: 25, estimate: 125, actual: null, kind: "fee" }],
+      payments: [{ id: "p1", at: "2027-04-20T09:00", amount: 125, method: "card", kind: "booking" }],
     });
     const result = transition(c, { type: "cancel" }, "applicant", makeCtx());
     expect(result.ok).toBe(true);
     if (!result.ok) return;
     expect(result.case.ending).toBe("cancelled");
-    expect(result.case.payments[0].amount).toBe(-62.5);
+    expect(result.case.dateHold.status).toBe("released");
+    expect(result.case.payments.at(-1)).toMatchObject({ kind: "refund", amount: -62.5 });
+    expect(result.case.activity.at(-1)?.text).toContain("Refunded $62.50");
+  });
+
+  it("cancel never refunds more than was paid (a series pays one session at a time)", () => {
+    // The schedule works from the fee lines: 13 sessions, $260. Only the first $20 was paid.
+    vi.mocked(cancellationRefund).mockReturnValue({ refund: 250, kept: 10, rule: "30 or more days before: full refund minus a $10 processing fee" });
+    const c = makeCase({
+      state: "permitted",
+      permit: { issuedOn: "2027-05-03", signature: null },
+      schedule: { date: "2027-06-06", start: "08:00", end: "09:00", occurrences: [{ date: "2027-06-06", availability: { status: "open" }, billing: "paid" }] },
+      feeLines: [{ id: "f1", dept: "clerk", label: "Field reservation", qty: 13, unit: "hour", unitPrice: 20, estimate: 260, actual: null, kind: "fee" }],
+      payments: [{ id: "p1", at: "2027-05-03T09:00", amount: 20, method: "card", kind: "booking" }],
+    });
+    const result = transition(c, { type: "cancel" }, "applicant", makeCtx());
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.case.payments.at(-1)).toMatchObject({ kind: "refund", amount: -20 });
+  });
+
+  it("cancel with nothing to refund records no payment", () => {
+    vi.mocked(cancellationRefund).mockReturnValue({ refund: 0, kept: 125, rule: "Under 10 days: no refund of fees" });
+    const c = makeCase({
+      state: "permitted",
+      permit: { issuedOn: "2027-04-20", signature: null },
+      schedule: { date: "2027-05-08", start: "11:00", end: "16:00", occurrences: [{ date: "2027-05-08", availability: { status: "open" }, billing: "paid" }] },
+      payments: [{ id: "p1", at: "2027-04-20T09:00", amount: 125, method: "card", kind: "booking" }],
+    });
+    const result = transition(c, { type: "cancel" }, "applicant", makeCtx());
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.case.payments).toHaveLength(1);
+    expect(result.case.activity.at(-1)?.text).toContain("Nothing to refund");
   });
 
   it("cancel fails once the last session has passed", () => {

@@ -3,10 +3,9 @@
  * has an applicantId here, even the 32 that never appear in the persona picker: they still
  * need a name to show in city lists.
  *
- * Contract note: `Persona` (lib/state/types.ts, frozen) has no "pickable" flag, so the
- * picker can't be told apart from the roster by the type alone. `PICKABLE_PERSONA_IDS`
- * below is the workaround; see contractChangeRequests in this workstream's result for the
- * field this should become.
+ * The persona picker offers the personas that open a scenario (`scenario` is set) plus "new".
+ * `PICKABLE_PERSONA_IDS` and `isPickablePersona()` below read that off the data, so the
+ * `Persona` type needs no separate "pickable" flag.
  */
 import type { Dept } from "@/lib/types";
 import type { CityStaff, Persona } from "../state/types";
@@ -300,20 +299,17 @@ export const PERSONAS: Persona[] = [
 
 export const PERSONA_BY_ID: Record<string, Persona> = Object.fromEntries(PERSONAS.map((p) => [p.id, p]));
 
+/** The id of the blank persona: a new applicant with no case yet. */
+export const NEW_PERSONA_ID = "new";
+
 /**
- * The applicant persona picker offers exactly these: the six scenario organizers plus
- * "new". Every other persona above still shows up in city lists, just not in the picker.
- * Workaround for the frozen `Persona` type having no `pickable` flag (see module doc).
+ * The applicant persona picker offers exactly these, in this order: the six scenario
+ * organizers (S1 to S6), then "new". Every other persona still shows up in city lists, just
+ * not in the picker.
  */
-export const PICKABLE_PERSONA_IDS: readonly string[] = [
-  "maya-chen",
-  "sunrise-yoga-club",
-  "downtown-arts-collective",
-  "maple-street-block-captain",
-  "riverfront-running-club",
-  "main-street-business-alliance",
-  "new",
-];
+export const PICKABLE_PERSONA_IDS: readonly string[] = PERSONAS.filter(
+  (p) => p.scenario !== undefined || p.id === NEW_PERSONA_ID,
+).map((p) => p.id);
 
 export function isPickablePersona(id: string): boolean {
   return PICKABLE_PERSONA_IDS.includes(id);

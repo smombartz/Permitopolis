@@ -19,7 +19,8 @@ const b05Answers: EventAnswers = {
   name: LONG_NAME,
   description: "A parish-wide heritage festival with craft tables and a potluck.",
   location: areaLocation("great-lawn", { x: 20, y: 20, w: 50, h: 40 }, 4000),
-  schedule: singleSchedule("2027-07-17", "11:00", "17:00"),
+  // A Sunday: the Great Lawn is the farmers market's (F2) every Saturday morning.
+  schedule: singleSchedule("2027-07-18", "11:00", "17:00"),
   attendance: 300,
   addOns: addOns({ tentsStages: { count: 3 }, foodVending: { vendors: 5, vendorNames: b05Vendors } }),
 };

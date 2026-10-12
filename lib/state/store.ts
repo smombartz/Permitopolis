@@ -11,7 +11,7 @@ import { DEFAULT_CONFIG, DEFAULT_DEMO_TODAY, STORAGE_KEY } from "@/lib/rules";
 import type { Actor, EventAnswers, EventCase, ISODate, Party, WizardStep } from "@/lib/types";
 import { advanceClock, computeNow } from "./clock";
 import { nextCaseId } from "./selectors";
-import { newCase } from "./newCase";
+import { classifyDraft, newCase } from "./newCase";
 import { buildSeed } from "./seed";
 import { safeGet, safeRemove, safeSet, storageAvailable } from "./storage";
 import { transition } from "./transition";
@@ -62,14 +62,14 @@ export const useDemo = create<DemoStore>()(
       createDraft(applicantId: string, answers?: Partial<EventAnswers>) {
         const state = get();
         const id = nextCaseId(state.cases);
-        const draft = newCase({ id, applicantId, createdAt: `${state.demoToday}T09:00`, answers });
+        const draft = classifyDraft(newCase({ id, applicantId, createdAt: `${state.demoToday}T09:00`, answers }), state.cfg);
         set({ cases: [...state.cases, draft] });
         return id;
       },
 
       updateDraft(caseId: string, patch: Partial<EventAnswers> & { wizardStep?: WizardStep }) {
         set((state: DemoStore) => ({
-          cases: state.cases.map((c: EventCase) => (c.id === caseId && c.state === "draft" ? { ...c, ...patch } : c)),
+          cases: state.cases.map((c: EventCase) => (c.id === caseId && c.state === "draft" ? classifyDraft({ ...c, ...patch }, state.cfg) : c)),
         }));
       },
 

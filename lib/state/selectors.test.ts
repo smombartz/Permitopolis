@@ -119,6 +119,51 @@ describe("caseTotals", () => {
     });
     expect(caseTotals(c)).toEqual({ fees: 50, deposit: 250, total: 300, paid: 50, due: 250 });
   });
+
+  it("after reconciling, the deposit is settled: a refunded case owes nothing (S6)", () => {
+    const c = makeCase({
+      state: "closed",
+      closeout: { cleanup: "pass", notes: "", hoursLoggedOn: "2027-05-03", balance: 750, refund: 250, feedback: null },
+      feeLines: [
+        { id: "f1", dept: "pws", label: "Police", qty: 66, unit: "officer-hour", unitPrice: 85, estimate: 5610, actual: 6120, kind: "fee" },
+        { id: "f2", dept: "pws", label: "Cleanup crew", qty: 4, unit: "worker-hour", unitPrice: 60, estimate: 0, actual: 240, kind: "fee" },
+        { id: "f3", dept: "clerk", label: "Refundable cleanup deposit", qty: 1, unit: "deposit", unitPrice: 1000, estimate: 1000, actual: 1000, kind: "deposit" },
+      ],
+      payments: [
+        { id: "p1", at: "2027-03-13T09:05", amount: 6610, method: "card", kind: "quote" },
+        { id: "p2", at: "2027-05-03T09:00", amount: -250, method: "in_person", kind: "refund" },
+      ],
+    });
+    expect(caseTotals(c)).toEqual({ fees: 6360, deposit: 0, total: 6360, paid: 6360, due: 0 });
+  });
+
+  it("after reconciling, an overage beyond the deposit is what is due", () => {
+    const c = makeCase({
+      state: "closed",
+      closeout: { cleanup: "issues", notes: "", hoursLoggedOn: "2027-03-16", balance: 300, refund: null, feedback: null },
+      feeLines: [
+        { id: "f1", dept: "clerk", label: "Field reservation", qty: 4, unit: "hour", unitPrice: 20, estimate: 80, actual: 80, kind: "fee" },
+        { id: "f2", dept: "clerk", label: "Application fee", qty: 1, unit: "application", unitPrice: 50, estimate: 50, actual: 50, kind: "fee" },
+        { id: "f3", dept: "clerk", label: "Refundable cleanup deposit", qty: 1, unit: "deposit", unitPrice: 250, estimate: 250, actual: 250, kind: "deposit" },
+        { id: "f4", dept: "pws", label: "Extra cleanup crew", qty: 5, unit: "worker-hour", unitPrice: 60, estimate: 0, actual: 300, kind: "fee" },
+      ],
+      payments: [{ id: "p1", at: "2027-01-21T09:05", amount: 380, method: "card", kind: "quote" }],
+    });
+    expect(caseTotals(c)).toMatchObject({ fees: 430, total: 430, paid: 380, due: 50 });
+  });
+
+  it("a cancelled case owes nothing more", () => {
+    const c = makeCase({
+      state: "permitted",
+      ending: "cancelled",
+      feeLines: [{ id: "f1", dept: "clerk", label: "Shelter reservation", qty: 5, unit: "hour", unitPrice: 25, estimate: 125, actual: null, kind: "fee" }],
+      payments: [
+        { id: "p1", at: "2027-04-26T09:05", amount: 125, method: "card", kind: "booking" },
+        { id: "p2", at: "2027-05-03T09:00", amount: -62.5, method: "card", kind: "refund" },
+      ],
+    });
+    expect(caseTotals(c)).toMatchObject({ paid: 62.5, due: 0 });
+  });
 });
 
 describe("leadTimeRisk", () => {

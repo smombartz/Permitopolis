@@ -347,8 +347,16 @@ export interface Closeout {
   cleanup: "pass" | "issues" | null;
   notes: string;
   hoursLoggedOn: ISODate | null;
-  /** Positive: the applicant owes this. Negative: refund beyond the deposit never happens. */
+  /**
+   * Set by reconcile_close: actual minus estimate across the fee lines, deposit excluded.
+   * Positive is what the event ran over. Null until the Clerk reconciles.
+   */
   balance: number | null;
+  /**
+   * What goes back to the applicant: the deposit less the overage. Null when the overage is
+   * more than the deposit; the amount still owed is then on the final_bill_or_refund card
+   * (`payload.amount`) and in caseTotals().due.
+   */
   refund: number | null;
   feedback: { rating: number; comment?: string } | null;
 }

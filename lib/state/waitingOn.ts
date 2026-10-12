@@ -5,6 +5,7 @@
 import { daysBetween } from "@/lib/dates";
 import { ENDING_LABEL, PARTIES, PARTY_LABEL } from "@/lib/types";
 import type { EventCase, ISODate, Party, Task } from "@/lib/types";
+import { taskDueDate } from "./core";
 import type { PartyStanding, PartyStatus, StateApi } from "./types";
 
 const DEFAULT_SCOPE: Record<Party, string> = {
@@ -44,6 +45,7 @@ function daysActionable(tasks: Task[], today: ISODate): number {
 }
 
 function lockedNote(tasks: Task[]): string | undefined {
+  if (tasks.some((t) => t.payload.awaitingAnswer === true)) return "Waiting on the applicant's response";
   for (const t of tasks) {
     const hint = CITY_UNLOCK_HINT[t.catalogId];
     if (hint) return hint;
@@ -92,7 +94,7 @@ export const waitingOn: StateApi["waitingOn"] = (c: EventCase, today: ISODate): 
       status = "done_for_now";
     }
 
-    const dueDates = open.map((t) => t.dueDate).filter((d): d is ISODate => d !== null).sort();
+    const dueDates = open.map(taskDueDate).filter((d): d is ISODate => d !== null).sort();
     const oldestDue = dueDates[0] ?? null;
     const daysHolding = status === "up_now" ? daysActionable(open, today) : 0;
 
@@ -111,33 +113,72 @@ export const waitingOn: StateApi["waitingOn"] = (c: EventCase, today: ISODate): 
   });
 };
 
+/**
+ * What a party does next, read as "<party> <phrase>". Cards and city tasks whose titles are
+ * commands ("Accept conditions and sign", "Issue permit") get their own wording; the rest are
+ * built from the task's kind and title.
+ */
+const PHRASE: Record<string, string> = {
+  // applicant cards
+  neighbor_signoff: "collects the neighbor sign-offs",
+  submit_application: "submits the application",
+  community_notification: "posts the community notice",
+  respond_to_request: "responds to the request",
+  accept_and_sign: "accepts the conditions and signs",
+  pay_fees: "pays the fees and deposit",
+  vendor_food_permits: "downloads the vendors' food permits",
+  carry_permit: "carries the permit on the day",
+  final_bill_or_refund: "pays the final bill",
+  feedback: "sends feedback",
+  book_again: "can book again for next year",
+  // city tasks
+  intake_check: "checks the application is complete",
+  confirm_routing: "confirms reviewers and due dates",
+  schedule_pre_application_meeting: "schedules the pre-application meeting",
+  consolidate: "consolidates the reviews and sends the quote",
+  issue_permit: "issues the permit",
+  cleanup_inspection: "inspects the cleanup",
+  log_actual_hours: "logs the actual hours",
+  reconcile: "reconciles the costs and closes",
+  instant_exception: "resolves the exception",
+};
+
+function lowerFirst(text: string): string {
+  return text.charAt(0).toLowerCase() + text.slice(1);
+}
+
 function verbPhrase(task: Task): string {
-  const title = task.title.charAt(0).toLowerCase() + task.title.slice(1);
+  const known = PHRASE[task.catalogId];
+  if (known) return known;
+  if (task.catalogId.startsWith("review:")) return "reviews its sections";
+  if (task.catalogId.startsWith("verify:")) return `verifies the ${lowerFirst(task.title.replace(/^Verify /, ""))}`;
+  if (task.catalogId.startsWith("work_order:")) return "completes its work orders";
+  const title = lowerFirst(task.title);
   switch (task.kind) {
     case "document":
-      return `uploads ${title}`;
+      return `uploads the ${title}`;
     case "form":
-      return `fills out ${title}`;
+      return `fills out the ${title}`;
     case "payment":
-      return `pays ${title}`;
+      return `pays the ${title}`;
     case "sign_off":
-      return `signs off on ${title}`;
+      return `signs off on the ${title}`;
     case "meeting":
-      return `schedules ${title}`;
+      return `attends the ${title}`;
     case "review":
-      return `reviews ${title}`;
+      return `reviews the ${title}`;
     case "inspection":
-      return `inspects for ${title}`;
+      return `carries out the ${title}`;
     default:
-      return `completes ${title}`;
+      return `completes "${task.title}"`;
   }
 }
 
-function partyName(party: Party): string {
-  return party === "applicant" ? "The applicant" : PARTY_LABEL[party];
+function partyName(party: Party, applicantName?: string): string {
+  return party === "applicant" ? applicantName || "The applicant" : PARTY_LABEL[party];
 }
 
-export const nextMove: StateApi["nextMove"] = (c: EventCase, today: ISODate): string => {
+export const nextMove: StateApi["nextMove"] = (c: EventCase, today: ISODate, applicantName?: string): string => {
   if (c.ending) return `Next: nothing further; this case is ${ENDING_LABEL[c.ending].toLowerCase()}.`;
   if (c.state === "closed") return "Next: nothing further; this case is closed.";
 
@@ -145,11 +186,17 @@ export const nextMove: StateApi["nextMove"] = (c: EventCase, today: ISODate): st
   const upNow = statuses.filter((s) => s.status === "up_now");
   if (upNow.length === 0) return "Next: nothing is actionable right now.";
 
-  const parts = upNow.map((s) => `${partyName(s.party)} ${s.openTasks[0] ? verbPhrase(s.openTasks[0]) : "acts"}`);
+  const parts = upNow.map((s) => `${partyName(s.party, applicantName)} ${s.openTasks[0] ? verbPhrase(s.openTasks[0]) : "acts"}`);
   let sentence = `Next: ${parts.join(", and ")}`;
 
-  const waitingParty = statuses.find((s) => s.status === "waiting");
-  if (waitingParty) sentence += `, then ${PARTY_LABEL[waitingParty.party]} ${waitingParty.party === "applicant" ? "acts" : "reviews again"}`;
+  // A department parked on the applicant's answer goes next; otherwise whoever is waiting on an earlier step.
+  const reReviewer = statuses.find((s) => s.status === "waiting" && c.tasks.some((t) => t.owner === s.party && t.payload.awaitingAnswer === true));
+  const waitingParty = reReviewer ?? statuses.find((s) => s.status === "waiting");
+  if (waitingParty) {
+    const lockedTask = c.tasks.find((t) => t.owner === waitingParty.party && t.status === "locked");
+    const then = reReviewer ? "re-reviews" : lockedTask ? verbPhrase(lockedTask) : "acts";
+    sentence += `, then ${partyName(waitingParty.party, applicantName)} ${then}`;
+  }
 
   return `${sentence}.`;
 };

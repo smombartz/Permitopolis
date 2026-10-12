@@ -52,6 +52,13 @@ describe("accept_complete (S4)", () => {
     expect(result).toEqual({ ok: false, reason: "Riverside Farmers Market holds this space and date and was complete first" });
   });
 
+  it("checks the slot from setup start to teardown end", () => {
+    const location = { mode: "area" as const, inventoryIds: [], areaId: "great-lawn" as const, segmentIds: [], label: "Great Lawn" };
+    const c = makeCase({ state: "submitted", location, schedule: { date: "2027-06-12", start: "19:00", end: "22:30", setupStart: "17:00", occurrences: [{ date: "2027-06-12", availability: { status: "open" }, billing: "upcoming" }] } });
+    transition(c, { type: "accept_complete" }, "clerk", makeCtx());
+    expect(vi.mocked(availability)).toHaveBeenCalledWith(location, { date: "2027-06-12", start: "17:00", end: "22:30" }, expect.anything(), "PMT-27-0001");
+  });
+
   it("fails when an intake request is still open", () => {
     const card = makeTask({ id: "PMT-27-0001:x", catalogId: "vendor_list", request: { from: "clerk", message: "Missing a detail.", at: "2027-04-20T09:00", dueDate: "2027-04-25", resolved: false } });
     const c = makeCase({ state: "submitted", tasks: [card] });
@@ -115,16 +122,24 @@ describe("send_quote and issue_permit (S5)", () => {
 
     const stillWaitingOnInsurance = transition(paid.case, { type: "issue_permit" }, "clerk", makeCtx());
     expect(stillWaitingOnInsurance).toEqual({ ok: false, reason: "Needs: insurance (Health & Legal)" });
+    expect(paid.case.tasks.find((t) => t.catalogId === "issue_permit")?.status).toBe("locked");
 
     const verified = transition(paid.case, { type: "verify_document", taskId: insurance.id }, "hl", makeCtx());
     expect(verified.ok).toBe(true);
     if (!verified.ok) return;
+    // Insurance was the last thing missing, so verifying it puts Issue permit in the Clerk's queue.
+    expect(verified.case.tasks.find((t) => t.catalogId === "issue_permit")?.status).toBe("todo");
 
     const issued = transition(verified.case, { type: "issue_permit" }, "clerk", makeCtx());
     expect(issued.ok).toBe(true);
     if (!issued.ok) return;
     expect(issued.case.state).toBe("permitted");
     expect(issued.case.permit?.issuedOn).toBe("2027-05-03");
+    // ...and issuing it takes the task back out.
+    expect(issued.case.tasks.find((t) => t.catalogId === "issue_permit")?.status).toBe("done");
+    // The pay-by deadline is gone: the date is held, with no expiry left to show.
+    expect(verified.case.dateHold.expiresOn).not.toBeNull();
+    expect(issued.case.dateHold).toMatchObject({ status: "held", expiresOn: null });
   });
 });
 
@@ -163,6 +178,21 @@ describe("reconcile_close (S6)", () => {
     expect(result.case.state).toBe("closed");
     expect(result.case.payments.find((p) => p.kind === "refund")?.amount).toBe(-250);
     expect(result.case.tasks.find((t) => t.catalogId === "final_bill_or_refund")?.status).toBe("done");
+    expect(result.case.activity.at(-1)?.text).toBe("Closed. Refunded $250 from the deposit.");
+  });
+
+  it("closing finishes the Clerk's own reconcile task", () => {
+    const reconcile = makeTask({ id: "PMT-27-0200:reconcile", catalogId: "reconcile", owner: "clerk", kind: "action", status: "todo" });
+    const c = makeCase({
+      id: "PMT-27-0200",
+      state: "closeout",
+      closeout: { cleanup: "pass", notes: "", hoursLoggedOn: "2027-04-25", balance: null, refund: null, feedback: null },
+      tasks: [reconcile],
+    });
+    const result = transition(c, { type: "reconcile_close" }, "clerk", makeCtx());
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.case.tasks.find((t) => t.catalogId === "reconcile")?.status).toBe("done");
   });
 
   it("fails before hours are logged", () => {

@@ -3,7 +3,8 @@
  * it too, for an in-person payment.
  */
 import { addDaysISO, daysBetween } from "@/lib/dates";
-import { cancellationRefund, classify, dueDate, estimateFees, requirements } from "@/lib/rules";
+import { fmtMoney } from "@/lib/format";
+import { cancellationRefund, classify, dueDate, estimateFees, occurrences, requirements } from "@/lib/rules";
 import { CARD_BY_ID, type CardSpec } from "@/lib/rules/catalog";
 import type { RulesCtx } from "@/lib/rules/types";
 import type { Actor, DateHold, EventCase, Task } from "@/lib/types";
@@ -23,15 +24,47 @@ import {
   checkWithdraw,
 } from "../checks";
 import { lastSessionDate } from "../clock";
-import { addTasks, appendActivity, applyUnlockEvent, findTask, isCatalogId, moveTask, newTask, nowOf, patchTask, taskId } from "../core";
+import { classifyDraft } from "../newCase";
+import {
+  addTasks,
+  appendActivity,
+  applyUnlockEvent,
+  findTask,
+  isCatalogId,
+  moveTask,
+  newTask,
+  nowOf,
+  patchTask,
+  resumeTasksAwaitingAnswer,
+  taskId,
+  totalPaid,
+} from "../core";
 import { eventDate, nextCaseId } from "../selectors";
 import type { TransitionResult } from "../types";
 import { maybeUnlockIssuePermit } from "./shared";
 
 type Extract_<T extends Action["type"]> = Extract<Action, { type: T }>;
 
+/**
+ * Lists every session of the schedule with its availability, from the rules engine: a session
+ * on a blackout date is 'skipped', so it is neither billed nor held. Whoever built the schedule
+ * (the wizard, a seed script, "Book again") does not have to get this right. A session already
+ * paid or due keeps its billing.
+ */
+export function withSessions(c: EventCase, ctx: RulesCtx): EventCase {
+  if (!c.location || !c.schedule) return c;
+  const billed = new Map(c.schedule.occurrences.map((o) => [o.date, o.billing]));
+  const sessions = occurrences(c.schedule, c.location, ctx, c.id).map((o) => {
+    const before = billed.get(o.date);
+    return o.billing !== "skipped" && (before === "paid" || before === "due") ? { ...o, billing: before } : o;
+  });
+  return { ...c, schedule: { ...c.schedule, occurrences: sessions } };
+}
+
 /** Shared by create_board and the create_board-if-empty step inside book_and_pay. */
-export function buildBoard(c: EventCase, ctx: RulesCtx): EventCase {
+export function buildBoard(draft: EventCase, ctx: RulesCtx): EventCase {
+  // Sessions first: fees count the sessions that are held, and the first payment is for one of them.
+  const c = withSessions(draft, ctx);
   const cls = classify(c, ctx.cfg);
   const freshTasks = requirements(c, cls, { caseId: c.id, today: ctx.today, cfg: ctx.cfg });
   const mergedTasks = freshTasks.map((fresh) => {
@@ -73,15 +106,22 @@ export function bookAndPay(c: EventCase, action: Extract_<"book_and_pay">, actor
     next = moveTask(next, payFeesId, "done", ctx, actor, { payload: { ...payFeesTask.payload, amount } });
   }
   if (next.schedule && next.schedule.occurrences.length > 0) {
+    // The booking pays the first session that is held; a skipped (blackout) session stays skipped.
+    let firstPaid = false;
     next = {
       ...next,
       schedule: {
         ...next.schedule,
-        occurrences: next.schedule.occurrences.map((o, i) => ({ ...o, billing: i === 0 ? ("paid" as const) : ("upcoming" as const) })),
+        occurrences: next.schedule.occurrences.map((o) => {
+          if (o.billing === "skipped") return o;
+          if (firstPaid) return { ...o, billing: "upcoming" as const };
+          firstPaid = true;
+          return { ...o, billing: "paid" as const };
+        }),
       },
     };
   }
-  next = appendActivity(next, actor, `Paid ${amount} and booked the date. The permit is issued.`, ctx);
+  next = appendActivity(next, actor, `Paid ${fmtMoney(amount)} and booked the date. The permit is issued.`, ctx);
   return { ok: true, case: next };
 }
 
@@ -182,7 +222,8 @@ export function respondToRequest(c: EventCase, action: Extract_<"respond_to_requ
     payload: { ...task.payload, files: action.files ?? task.payload.files, message: action.message },
   });
   const review = next.reviews.find((r) => r.dept === dept);
-  if (review) {
+  const deptStillWaiting = next.tasks.some((t) => t.request && !t.request.resolved && t.request.from === dept);
+  if (review && !deptStillWaiting) {
     const pausedDays = review.clock.pausedSince ? daysBetween(review.clock.pausedSince, ctx.today) : 0;
     next = {
       ...next,
@@ -197,6 +238,8 @@ export function respondToRequest(c: EventCase, action: Extract_<"respond_to_requ
   if (!anyOpenRequest) {
     next = { ...next, state: next.reviews.length > 0 ? "in_review" : "submitted" };
   }
+  // The asker gets its parked review (or intake check) back; failing that, a task to check the answer.
+  next = resumeTasksAwaitingAnswer(next, dept, ctx);
   const hasOpenAskerTask = next.tasks.some((t) => t.owner === dept && t.kind === "review" && (t.status === "todo" || t.status === "changes_requested"));
   if (!hasOpenAskerTask) {
     next = maybeCreateVerifyTask(next, { ...task, reviewer: dept }, ctx);
@@ -234,15 +277,17 @@ export function cancel(c: EventCase, _action: Extract_<"cancel">, actor: Actor, 
   if (!check.ok) return check;
   const result = cancellationRefund(c, ctx.today, ctx.cfg);
   const depositPaid = c.feeLines.filter((f) => f.kind === "deposit").reduce((s, f) => s + f.estimate, 0);
-  const amount = -(result.refund + depositPaid);
-  let next: EventCase = {
-    ...c,
-    ending: "cancelled",
-    endingReason: result.rule,
-    dateHold: releaseHold(c),
-    payments: [...c.payments, { id: taskId(c.id, "pay", c.payments.length + 1), at: nowOf(ctx), amount, method: "card", kind: "refund" }],
-  };
-  next = appendActivity(next, actor, `Cancelled. ${result.rule}`, ctx);
+  // The schedule works from the fee lines, which for a series cover sessions not yet paid for.
+  // A refund never exceeds what the applicant has paid.
+  const refund = Math.min(result.refund + depositPaid, Math.max(0, totalPaid(c)));
+  let next: EventCase = { ...c, ending: "cancelled", endingReason: result.rule, dateHold: releaseHold(c) };
+  if (refund > 0) {
+    next = {
+      ...next,
+      payments: [...c.payments, { id: taskId(c.id, "pay", c.payments.length + 1), at: nowOf(ctx), amount: -refund, method: "card", kind: "refund" }],
+    };
+  }
+  next = appendActivity(next, actor, `Cancelled. ${result.rule}. ${refund > 0 ? `Refunded ${fmtMoney(refund)}.` : "Nothing to refund."}`, ctx);
   return { ok: true, case: next };
 }
 
@@ -300,7 +345,8 @@ export function bookAgain(c: EventCase, _action: Extract_<"book_again">, actor: 
   };
   let next = moveTask(c, taskId(c.id, "book_again"), "done", ctx, actor);
   next = appendActivity(next, actor, `Started next year's application (${newId}).`, ctx);
-  return { ok: true, case: next, spawned: [spawned] };
+  // The new Draft carries the tier of the plan it copies, like any Draft the store creates.
+  return { ok: true, case: next, spawned: [classifyDraft(spawned, ctx.cfg)] };
 }
 
 export function amend(c: EventCase, action: Extract_<"amend">, actor: Actor, ctx: RulesCtx): TransitionResult {

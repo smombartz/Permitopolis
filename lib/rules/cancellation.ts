@@ -9,7 +9,12 @@ import { round2 } from "./shared";
 import type { CancellationResult, RulesConfig } from "./types";
 
 function nextSessionDate(c: EventCase, today: ISODate): ISODate {
-  const upcoming = c.schedule?.occurrences.map((o) => o.date).filter((d) => d >= today) ?? [];
+  // A session skipped for a blackout is not held, so it is never "the next session".
+  const upcoming =
+    c.schedule?.occurrences
+      .filter((o) => o.billing !== "skipped")
+      .map((o) => o.date)
+      .filter((d) => d >= today) ?? [];
   if (upcoming.length > 0) return upcoming.sort()[0];
   return c.schedule?.date ?? today;
 }

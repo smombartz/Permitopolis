@@ -25,7 +25,8 @@ const CASE10 = "PMT-27-0022";
 const b10Answers: EventAnswers = {
   eventType: "picnic_party",
   name: "Oakhill Homeowners Association spring cleanup day",
-  location: inventoryLocation(["field-2"]),
+  // Field 3: Fields 1 and 2 are Little League Opening Day's (F6) that morning.
+  location: inventoryLocation(["field-3"]),
   schedule: singleSchedule("2027-05-15", "09:00", "13:00"),
   attendance: 150,
   addOns: addOns({ cityServices: cityServices({ barricades: 3 }) }),
@@ -108,7 +109,8 @@ export const B11: SeedScript = {
     step("2027-04-01T09:05", "hl", { type: "review_decide", decision: "approve", conditions: [], feeLines: [] }),
     step("2027-04-10T09:00", "clerk", { type: "send_quote", conditions: [], feeLines: [] }),
     step("2027-04-11T09:00", "applicant", { type: "accept_and_sign", signature: "Edith Vance" }),
-    step("2027-04-11T09:05", "applicant", { type: "pay", amount: 395, method: "card", kind: "quote" }),
+    // Field 3 for 3 hours $60, amplified sound $40, application $50, deposit $250.
+    step("2027-04-11T09:05", "applicant", { type: "pay", amount: 400, method: "card", kind: "quote" }),
     step("2027-04-30T09:00", "applicant", {
       type: "complete_task",
       taskId: taskId(CASE11, "insurance_certificate"),
@@ -228,6 +230,11 @@ export const B14: SeedScript = {
       taskId: taskId(CASE14, "cleanup_plan"),
       form: { crew: 4, sweepStartsAt: "14:00" },
     }),
+    step("2027-02-10T09:40", "applicant", {
+      type: "complete_task",
+      taskId: taskId(CASE14, "accessibility_plan"),
+      form: { accessibleRoute: true, restrooms: 4, viewingArea: "Finish line, north side" },
+    }),
     step("2027-02-10T10:00", "applicant", { type: "submit" }),
     step("2027-02-12T09:00", "clerk", { type: "accept_complete" }),
     step("2027-02-12T09:05", "clerk", {
@@ -245,7 +252,7 @@ export const B14: SeedScript = {
           ],
           dueDate: "2027-03-05",
         },
-        { dept: "hl", sections: ["Certificate of insurance"], dueDate: "2027-03-05" },
+        { dept: "hl", sections: ["Certificate of insurance", "Accessibility plan"], dueDate: "2027-03-05" },
       ],
     }),
     b14Notes("pws", "Coordinating with Police traffic unit on lap-start staggering", "2027-02-15T09:00"),
@@ -261,7 +268,8 @@ export const B14: SeedScript = {
     b14Notes("clerk", "Consolidated conditions, preparing the quote", "2027-02-26T09:00"),
     step("2027-02-27T09:00", "clerk", { type: "send_quote", conditions: [], feeLines: [] }),
     step("2027-02-28T09:00", "applicant", { type: "accept_and_sign", signature: "Kit Fennimore" }),
-    step("2027-02-28T09:05", "applicant", { type: "pay", amount: 3680, method: "card", kind: "quote" }),
+    // Route 12.4 miles $4,960, application $250, police 24 officer-hours $2,040, 30 barricades $450, deposit $1,000.
+    step("2027-02-28T09:05", "applicant", { type: "pay", amount: 8700, method: "card", kind: "quote" }),
     step("2027-03-01T09:00", "clerk", { type: "issue_permit" }),
     b14Notes("pws", "Work order: 30 barricades staged at the start/finish", "2027-03-02T09:00"),
     b14Notes("pws", "Work order: 6 officers confirmed for lap crossings", "2027-03-02T09:05"),

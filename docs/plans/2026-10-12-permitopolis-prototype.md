@@ -19,8 +19,8 @@ Seven phases. Phase 0 is done inline by the orchestrating session; every later p
 | Phase | Builds | Builders in parallel | Demo paths | Stop point |
 |---|---|---|---|---|
 | 0 Bootstrap and contracts | Scaffold, spec conversion, types, action list, rules config, reference data, tokens, guards | none (inline) | none | You review three contract files |
-| 1 Engine and design system | Rules engine, state machine and store, scenario scripts, Rime & Ink primitives | 4 | none | Kit page |
-| 2 Skeleton | Seed replay (38 cases), app shell and demo controls, SVG map and calendar | 3 | 1 to 6 pass as store-level tests | Shell, map |
+| 1 Engine and design system | Rules engine, state machine and store, scenario scripts, Rime & Ink primitives, SVG map and calendar | 5 | none | Kit page, map |
+| 2 Skeleton | Seed replay (38 cases), app shell and demo controls | 2 | 1 to 6 pass as store-level tests | Shell |
 | 3 P0 surfaces | Landing, wizard, board, quote and permit, city lists, case detail, active permits | 7 | 1 to 4 clickable | First full walkthrough |
 | 4 Role tools and money | Clerk hand-offs, Clerk money and closeout, reviewer panel, verification, after-event, edge states | 6 | 5 and 6 clickable | **P0 complete** |
 | 5 P1 depth | Amendment, payments, closures map, work orders, verifications page, hints, accessibility pass | 5, then 1 | 7 | P1 complete |
@@ -333,7 +333,8 @@ availableActions(c: EventCase, role: Party, ctx: RulesCtx):
 waitingOn(c: EventCase, today: ISODate): PartyStatus[]       // always four rows: applicant, clerk, pws, hl
 // PartyStatus { party, status: 'up_now' | 'done_for_now' | 'waiting' | 'not_involved',
 //               openTasks: Task[], oldestDue: ISODate | null, daysHolding: number, note: string }
-nextMove(c: EventCase, today: ISODate): string               // 'Next: ... uploads ..., then Health & Legal re-reviews.'
+nextMove(c: EventCase, today: ISODate, applicantName?: string): string
+// 'Next: Downtown Arts Collective uploads ..., then Health & Legal re-reviews.' Without a name: 'The applicant'.
 boardColumn(t: Task): 'do_now' | 'with_city' | 'coming_up' | 'done'
 advanceClock(cases: EventCase[], from: ISODate, to: ISODate, cfg: RulesConfig): EventCase[]
 buildSeed(): EventCase[]                                     // lib/state/seed, deterministic
@@ -493,7 +494,7 @@ Each workstream lists what it owns, what it reads first, its tasks and how it is
 
 **Done 2026-10-12.** Gate: type-check, lint, 24 tests and build pass. Installed: Next.js 16.4.0, React 19.3, Tailwind 4.3, Vitest 5. For the hand-off: `lib/types.ts`, `lib/state/actions.ts` and `lib/rules/config.ts` shape everything after them.
 
-### Phase 1: Engine and design system (4 builders)
+### Phase 1: Engine and design system (5 builders: 1A to 1D, plus 2C from Phase 2)
 
 | | Owns | Reads first |
 |---|---|---|
@@ -503,42 +504,44 @@ Each workstream lists what it owns, what it reads first, its tasks and how it is
 | **1D Design system** | `app/globals.css`, `styles/**`, `components/ui/**`, `components/domain/**`, `app/dev/kit/**`, `lib/contrast.ts` | `docs/rime-and-ink-design-system.md`; sections 3.2, 5.5 |
 
 **1A tasks** (test first, one test file per function)
-- [ ] `classify` with the block-party exception; every row and boundary in section 6.1.
-- [ ] `whatIf`, `routing` and the permit components list.
-- [ ] `requirements`: all 29 catalogue cards with `why`, reviewer, phase, `unlocksOn` and due date; one health-permit card per vendor; the block-party substitution.
-- [ ] `estimateFees`, including series per session and the late fee.
-- [ ] `availability` and `occurrences`: time-window overlap, blackout, impacted, next open dates.
-- [ ] `dateGate`, `cancellationRefund`, `planTimeline`.
+- [x] `classify` with the block-party exception; every row and boundary in section 6.1.
+- [x] `whatIf`, `routing` and the permit components list.
+- [x] `requirements`: all 29 catalogue cards with `why`, reviewer, phase, `unlocksOn` and due date; one health-permit card per vendor; the block-party substitution.
+- [x] `estimateFees`, including series per session and the late fee.
+- [x] `availability` and `occurrences`: time-window overlap, blackout, impacted, next open dates.
+- [x] `dateGate`, `cancellationRefund`, `planTimeline`.
 
 **1B tasks** (test first)
-- [ ] `transition` for every action in section 5.4: one passing test per row of the PRD's transitions table and one failing-precondition test with its reason. Mock `@/lib/rules` in these tests.
-- [ ] Task unlocking by `UnlockEvent`; review clock pause, resume and "Day 9 of 21 · paused 2 days".
-- [ ] `waitingOn`, `nextMove`, `boardColumn`, and `availableActions` with a reason for every disabled action.
-- [ ] `advanceClock`: hold expiry, Event day, Closeout, Instant straight to Closed, series occurrences.
-- [ ] The store with `persist`, `skipHydration`, `useHydrated`, guarded storage and `reset`.
+- [x] `transition` for every action in section 5.4: one passing test per row of the PRD's transitions table and one failing-precondition test with its reason. Mock `@/lib/rules` in these tests.
+- [x] Task unlocking by `UnlockEvent`; review clock pause, resume and "Day 9 of 21 · paused 2 days".
+- [x] `waitingOn`, `nextMove`, `boardColumn`, and `availableActions` with a reason for every disabled action.
+- [x] `advanceClock`: hold expiry, Event day, Closeout, Instant straight to Closed, series occurrences.
+- [x] The store with `persist`, `skipHydration`, `useHydrated`, guarded storage and `reset`.
 
 **1C tasks**
-- [ ] Personas and organizations; condition and request templates.
-- [ ] One script per PRD case (13): wizard answers plus a dated list of actions that reaches the seeded state.
-- [ ] 25 background specs that satisfy the counts, stress rows and reserved slots in section 6.2.
-- [ ] A test that every script is well formed and no reserved slot is used.
+- [x] Personas and organizations; condition and request templates.
+- [x] One script per PRD case (13): wizard answers plus a dated list of actions that reaches the seeded state.
+- [x] 25 background specs that satisfy the counts, stress rows and reserved slots in section 6.2.
+- [x] A test that every script is well formed and no reserved slot is used.
 
 **1D tasks**
-- [ ] Tailwind v4 theme from `styles/tokens.css`; page chrome layers on `body`; the app's quieter variant behind a class.
-- [ ] Every primitive in section 5.5 with hover, active, focus-visible and disabled states at the Rime & Ink timings.
-- [ ] Every domain component in section 5.5.
-- [ ] `lib/contrast.ts` and a test that each allowed text and surface pair reaches 4.5:1.
-- [ ] `/dev/kit`: one page showing every primitive and domain component in every state.
+- [x] Tailwind v4 theme from `styles/tokens.css`; page chrome layers on `body`; the app's quieter variant behind a class.
+- [x] Every primitive in section 5.5 with hover, active, focus-visible and disabled states at the Rime & Ink timings.
+- [x] Every domain component in section 5.5.
+- [x] `lib/contrast.ts` and a test that each allowed text and surface pair reaches 4.5:1.
+- [x] `/dev/kit`: one page showing every primitive and domain component in every state.
 
 **Gate:** all rules and state tests pass. **Checkpoint:** you open `/dev/kit` and judge the glass, the party tints and the tier badges.
 
-### Phase 2: Skeleton (3 builders)
+**Done 2026-10-12.** Gate: type-check, lint, 320 tests in 31 files and build pass on the merged tree. Workstream 2C (map and calendar, listed under Phase 2) was built here as a fifth builder, since it needs only Phase 0. The integrator also ran all 38 seed scripts through the two real engines as a one-off check: every script now reaches its expected tier, state and ending with no refused step, so workstream 2A starts from scripts that replay. What the merge changed is in the Changes section.
+
+### Phase 2: Skeleton (2 builders; 2C is done)
 
 | | Owns | Reads first |
 |---|---|---|
 | **2A Seed and demo paths** | `lib/state/seed/**`, `tests/seed.test.ts`, `tests/demo-paths.test.ts`; may fix bugs in `lib/rules/**` and `lib/state/**` | PRD "Seed data", "Demo script"; sections 6.2, 6.3 |
 | **2B App shell** | `app/layout.tsx`, `app/city/layout.tsx`, `app/not-found.tsx`, `components/shell/**`, a placeholder page for every P0 route | PRD "App shell, routes and demo controls" |
-| **2C Map and calendar** | `components/map/**`, `components/calendar/**`, `lib/data/mapGeometry.ts`, `lib/view/map.ts`, `app/dev/map/**` | PRD wizard step 2, "Map and inventory", "Active permits" |
+| **2C Map and calendar** (built in Phase 1) | `components/map/**`, `components/calendar/**`, `lib/data/mapGeometry.ts`, `lib/view/map.ts`, `app/dev/map/**` | PRD wizard step 2, "Map and inventory", "Active permits" |
 
 **2A tasks**
 - [ ] `replay`: build each case by running its script through `classify`, `requirements` and `transition` at each step's date.
@@ -552,11 +555,11 @@ Each workstream lists what it owns, what it reads first, its tasks and how it is
 - [ ] Remember the last role and the last page per role. Render a skeleton until `useHydrated()` is true.
 - [ ] Not-found and storage-blocked states.
 
-**2C tasks**
-- [ ] The Permitopolis SVG: Riverside Park with four shelters and four fields, Great Lawn, City Hall Plaza, Main Street, River Road, Maple, Elm and Oak.
-- [ ] `LocationPicker`: bookable spaces, draw an area (drag a rectangle; square feet and capacity at 10 sq ft a person), street segments (residential marked), draw a route (connected segments in order, miles, undo). A list beside the map does the same by keyboard.
-- [ ] `PermitopolisMap` display mode, `MapThumbnail`, `MonthGrid`, `WeekGrid`, `DayStrip`.
-- [ ] Geometry tests in `lib/view/map.ts`. `/dev/map` shows all four modes.
+**2C tasks** (done in Phase 1)
+- [x] The Permitopolis SVG: Riverside Park with four shelters and four fields, Great Lawn, City Hall Plaza, Main Street, River Road, Maple, Elm and Oak.
+- [x] `LocationPicker`: bookable spaces, draw an area (drag a rectangle; square feet and capacity at 10 sq ft a person), street segments (residential marked), draw a route (connected segments in order, miles, undo). A list beside the map does the same by keyboard.
+- [x] `PermitopolisMap` display mode, `MapThumbnail`, `MonthGrid`, `WeekGrid`, `DayStrip`.
+- [x] Geometry tests in `lib/view/map.ts`. `/dev/map` shows all four modes.
 
 **Gate:** seed and demo-path tests pass, so the engine is proven on all six paths before any screen exists. **Checkpoint:** you try the shell, the Demo menu and the four map modes.
 
@@ -670,6 +673,7 @@ For the Loom's "what I chose not to build":
 
 ## Changes
 
+- 2026-10-12: Phase 1 done, with workstream 2C (map and calendar) moved into it from Phase 2. Built: the rules engine (1A), the state machine and store (1B), 38 seed scripts with personas and templates (1C), the Rime & Ink design system with `/dev/kit` (1D), and the SVG map, location picker and calendar views with `/dev/map` (2C). Gate on the merged tree: type-check, lint, 320 tests in 31 files and build all pass. What the merge changed, and why: (1) an ended case no longer books its slot, and a series skips a blackout session everywhere (not billed, not held, not an event day); (2) `create_board` lists the sessions through `occurrences()`, and `book_and_pay` and `accept_complete` check every held session from setup to teardown; (3) a request for information parks the asking department's own review until the applicant answers, which is what makes "Who's up" show only the applicant for S3; (4) the Clerk's Issue permit and Reconcile tasks unlock and finish when they should, "Carry your permit" is done after the event, and `caseTotals()` settles the deposit at reconciliation; (5) a Draft keeps the tier its answers classify to (`classifyDraft()`), so lists and `availableActions()` can trust `case.tier` before the plan is confirmed; (6) contract: `nextMove` takes an optional applicant name (section 5.3), and `Closeout.balance` is documented as the amount over the estimate; a `pickable` flag on `Persona` was declined because `scenario` already identifies the picker's personas; (7) nine seed scripts were corrected against the real engines (payment totals, missing Special-event plans, two slot collisions with PRD cases, an expired hold) and S6's history was completed to match the PRD's board. Not done here, by design: the seed replay, `buildSeed()` and the demo-path tests stay with workstream 2A.
 - 2026-10-12: Phase 0 done. What changed from the plan as written: (1) Next.js 16.4 ships with Cache Components on, so every page is a thin server component rendering one client screen in `<Suspense>` (rule and example in `CLAUDE.md`); (2) the contracts also cover `lib/dates.ts`, `lib/rules/types.ts` and `lib/state/types.ts`, which define `RulesApi` and `StateApi` interfaces that the barrels must satisfy; (3) `transition()` takes a `now` on its context for activity timestamps and may return `spawned` cases (for "Book again"); (4) actions gained `complete_city_task`, and `accept_and_sign` no longer lists condition ids (it accepts all); (5) computed due dates that land on a weekend move to the Friday before, which reproduces the PRD's Fri, May 7 closeout date; (6) the guard test also enforces the no-imports-between-surfaces rule; (7) `components/shell` counts as shared.
 - 2026-10-12: Approved. Build runs through Phase 6 without visual checkpoints; no deploy; Playwright replaced by jsdom render tests (`tests/render/`), so `@testing-library/react` and `jsdom` join the Phase 0 dependencies. The "Checkpoint" lines in section 8 are now notes for the final hand-off, not stops.
 - 2026-10-12: Plan created. Phase boundaries differ from the PRD's five milestones so that work can run in parallel: the PRD's milestone 1 is phases 0 to 2, milestones 2 and 3 are Phase 3, milestone 4 is Phase 4, and milestone 5 is phases 5 and 6.

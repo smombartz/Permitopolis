@@ -4,12 +4,13 @@
  * them here is what makes "disabled, with the reason transition() would give" true by
  * construction instead of by convention.
  */
-import { availability as availabilityRule } from "@/lib/rules";
+import { fmtDate } from "@/lib/format";
+import { availability as availabilityRule, occupiedWindow } from "@/lib/rules";
 import { CARD_BY_ID, type CardSpec } from "@/lib/rules/catalog";
-import type { Dept } from "@/lib/types";
+import type { Availability, Dept } from "@/lib/types";
 import type { EventCase } from "@/lib/types";
 import type { RulesCtx } from "@/lib/rules/types";
-import { findTask, paidInFull, reviewFor, taskId } from "./core";
+import { findTask, heldSessionDates, paidInFull, reviewFor, taskId } from "./core";
 
 function unlockHintFor(catalogId: string): string | undefined {
   return (CARD_BY_ID as Record<string, CardSpec>)[catalogId]?.unlockHint;
@@ -39,15 +40,38 @@ export function checkCreateBoard(c: EventCase): CheckResult {
   return requireState(c, "draft");
 }
 
+/**
+ * The first session of this case that cannot be held, or null. Each session is checked over
+ * the window the event occupies its place (setup start to teardown end), which is what
+ * availability() compares against the other cases. Another case's booking always blocks. A
+ * blackout blocks a single event only: a series skips the session instead.
+ */
+function slotConflict(c: EventCase, ctx: RulesCtx, blackoutBlocks: boolean): { date: string; availability: Availability } | null {
+  if (!c.location || !c.schedule) return null;
+  const window = occupiedWindow(c.schedule);
+  const isSeries = !!c.schedule.recurrence;
+  for (const date of heldSessionDates(c)) {
+    const result = availabilityRule(c.location, { date, start: window.start, end: window.end }, ctx, c.id);
+    if (result.status === "booked" || (result.status === "blackout" && blackoutBlocks && !isSeries)) {
+      return { date, availability: result };
+    }
+  }
+  return null;
+}
+
+/** A single event's reason reads as is; a series names the session it applies to. */
+function conflictReason(c: EventCase, conflict: { date: string; availability: Availability }, fallback: string): string {
+  const reason = conflict.availability.reason ?? fallback;
+  return c.schedule?.recurrence ? `${fmtDate(conflict.date)}: ${reason}` : reason;
+}
+
 export function checkBookAndPay(c: EventCase, ctx: RulesCtx): CheckResult {
   const state = requireState(c, "draft");
   if (!state.ok) return state;
   if (c.tier !== "instant") return fail("Only Instant events book and pay directly.");
   if (!c.location || !c.schedule) return fail("The event needs a place and a date first.");
-  const avail = availabilityRule(c.location, { date: c.schedule.date, start: c.schedule.start, end: c.schedule.end }, ctx, c.id);
-  if (avail.status === "booked" || avail.status === "blackout") {
-    return fail(avail.reason ?? "This date is not available.");
-  }
+  const conflict = slotConflict(c, ctx, true);
+  if (conflict) return fail(conflictReason(c, conflict, "This date is not available."));
   return OK;
 }
 
@@ -75,12 +99,8 @@ export function checkAcceptComplete(c: EventCase, ctx: RulesCtx): CheckResult {
   }
   const openIntakeRequest = c.tasks.some((t) => t.request && !t.request.resolved && t.request.from === "clerk");
   if (openIntakeRequest) return fail("Waiting on the applicant's response to your request");
-  if (c.location && c.schedule) {
-    const avail = availabilityRule(c.location, { date: c.schedule.date, start: c.schedule.start, end: c.schedule.end }, ctx, c.id);
-    if (avail.status === "booked") {
-      return fail(avail.reason ?? "Another case holds this space and date and was complete first");
-    }
-  }
+  const conflict = slotConflict(c, ctx, false);
+  if (conflict) return fail(conflictReason(c, conflict, "Another case holds this space and date and was complete first"));
   return OK;
 }
 

@@ -1,7 +1,8 @@
 /** Transitions any city role (Clerk, Public Works & Safety, Health & Legal) can raise. */
+import { fmtDate } from "@/lib/format";
 import { dueDate } from "@/lib/rules";
 import type { RulesCtx } from "@/lib/rules/types";
-import type { Actor, Condition, Dept, EventCase, FeeLine, Task } from "@/lib/types";
+import { PARTY_LABEL, type Actor, type Condition, type Dept, type EventCase, type FeeLine, type Task } from "@/lib/types";
 import type { Action } from "../actions";
 import {
   checkCompleteCityTask,
@@ -12,8 +13,9 @@ import {
   checkSendToCommission,
   checkVerifyOrReject,
 } from "../checks";
-import { addTask, appendActivity, applyUnlockEvent, findTask, moveTask, newTask, patchTask, taskId } from "../core";
+import { addTask, appendActivity, applyUnlockEvent, findTask, moveTask, newTask, parkTasksAwaitingAnswer, patchTask, taskId } from "../core";
 import type { TransitionResult } from "../types";
+import { maybeUnlockIssuePermit } from "./shared";
 
 type Extract_<T extends Action["type"]> = Extract<Action, { type: T }>;
 
@@ -51,6 +53,7 @@ export function requestInfo(c: EventCase, action: Extract_<"request_info">, acto
   if (review) {
     next = { ...next, reviews: next.reviews.map((r) => (r.dept === askerDept ? { ...r, status: "needs_info", clock: { ...r.clock, pausedSince: ctx.today } } : r)) };
   }
+  next = parkTasksAwaitingAnswer(next, askerDept, ctx);
   next = { ...next, state: "needs_info" };
   next = appendActivity(next, actor, `Requested information: ${action.message}`, ctx);
   return { ok: true, case: next };
@@ -62,6 +65,8 @@ export function verifyDocument(c: EventCase, action: Extract_<"verify_document">
   const card = findTask(c, action.taskId) as Task;
   let next = moveTask(c, card.id, "done", ctx, actor);
   next = finishVerifyTaskFor(next, card, ctx, actor);
+  // Verifying the insurance can be the last of the three things Issue permit waits for.
+  next = maybeUnlockIssuePermit(next, ctx);
   next = appendActivity(next, actor, `Verified "${card.title}".`, ctx);
   return { ok: true, case: next };
 }
@@ -175,7 +180,7 @@ export function scheduleMeeting(c: EventCase, action: Extract_<"schedule_meeting
     const schedulerId = taskId(next.id, "schedule_pre_application_meeting");
     if (findTask(next, schedulerId)) next = moveTask(next, schedulerId, "done", ctx, actor);
   }
-  next = appendActivity(next, actor, `Scheduled "${task.title}" for ${action.date}.`, ctx);
+  next = appendActivity(next, actor, `Scheduled "${task.title}" for ${fmtDate(action.date)}.`, ctx);
   return { ok: true, case: next };
 }
 
@@ -226,6 +231,6 @@ export function addNote(c: EventCase, action: Extract_<"add_note">, actor: Actor
 }
 
 export function remind(c: EventCase, action: Extract_<"remind">, actor: Actor, ctx: RulesCtx): TransitionResult {
-  const next = appendActivity(c, actor, `Sent a reminder to ${action.party}.`, ctx);
+  const next = appendActivity(c, actor, `Sent a reminder to ${PARTY_LABEL[action.party]}.`, ctx);
   return { ok: true, case: next };
 }

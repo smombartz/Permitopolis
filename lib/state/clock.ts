@@ -8,13 +8,19 @@ import { closeoutCards, dueDate as dueDateRule } from "@/lib/rules";
 import { CITY_TASKS } from "@/lib/rules/catalog";
 import type { RulesConfig, RulesCtx } from "@/lib/rules/types";
 import type { EventCase, ISODate, ISODateTime } from "@/lib/types";
-import { appendActivity, applyUnlockEvent, newTask, paidInFull, taskId } from "./core";
+import { appendActivity, applyUnlockEvent, findTask, heldSessionDates, moveTask, newTask, paidInFull, taskId } from "./core";
 import type { TransitionResult } from "./types";
 
+/** Every date the event takes place on. A session skipped for a blackout is not one of them. */
 export function sessionDates(c: EventCase): ISODate[] {
-  const occurrences = c.schedule?.occurrences ?? [];
-  if (occurrences.length > 0) return occurrences.map((o) => o.date);
-  return c.schedule ? [c.schedule.date] : [];
+  return heldSessionDates(c);
+}
+
+/** "Carry your permit" is for the day itself; once the last session has passed it is done. */
+function finishEventDayCards(c: EventCase, ctx: RulesCtx): EventCase {
+  const carry = findTask(c, taskId(c.id, "carry_permit"));
+  if (!carry || carry.status === "done") return c;
+  return moveTask(c, carry.id, "done", ctx, "system", { unlocksOn: null });
 }
 
 export function lastSessionDate(c: EventCase): ISODate | null {
@@ -67,6 +73,7 @@ export function applyTick(c: EventCase, ctx: RulesCtx): TransitionResult {
     }
 
     const last = lastSessionDate(c) ?? today;
+    c = finishEventDayCards(c, ctx);
 
     if (c.tier === "instant" && c.closeout.cleanup !== "issues") {
       let next: EventCase = { ...c, tasks: [...c.tasks, ...closeoutCards(c, ctx.cfg)], state: "closed" };
@@ -99,7 +106,7 @@ export function applyTick(c: EventCase, ctx: RulesCtx): TransitionResult {
       "system",
     );
     const reconcile = newTask(
-      { id: taskId(c.id, "reconcile"), catalogId: "reconcile", owner: "clerk", kind: "action", title: CITY_TASKS.reconcile.title, status: "locked", phase: "after" },
+      { id: taskId(c.id, "reconcile"), catalogId: "reconcile", owner: "clerk", kind: "action", title: CITY_TASKS.reconcile.title, status: "locked", unlocksOn: "hours_logged", phase: "after" },
       ctx,
       "system",
     );

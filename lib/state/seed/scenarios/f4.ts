@@ -39,18 +39,19 @@ export const F4: SeedScript = {
     ...Array.from({ length: 8 }, (_, i) =>
       step(`2027-03-${String(21 + i).padStart(2, "0")}T18:00`, "neighbor", { type: "simulate_signoff" }),
     ),
-    step("2027-03-29T09:00", "applicant", { type: "submit" }),
-    step("2027-03-31T09:00", "clerk", { type: "accept_complete" }),
-    step("2027-03-31T09:05", "clerk", {
+    step("2027-04-09T09:00", "applicant", { type: "submit" }),
+    step("2027-04-12T09:00", "clerk", { type: "accept_complete" }),
+    step("2027-04-12T09:05", "clerk", {
       type: "confirm_routing",
       reviewers: [
-        { dept: "pws", sections: ["City services request"], dueDate: "2027-04-14" },
-        { dept: "hl", sections: ["Certificate of insurance"], dueDate: "2027-04-14" },
+        { dept: "pws", sections: ["City services request"], dueDate: "2027-04-26" },
+        { dept: "hl", sections: ["Certificate of insurance"], dueDate: "2027-04-26" },
       ],
     }),
-    step("2027-04-05T09:00", "pws", { type: "review_decide", decision: "approve", conditions: [], feeLines: [] }),
-    step("2027-04-05T09:05", "hl", { type: "review_decide", decision: "approve", conditions: [], feeLines: [] }),
-    step("2027-04-07T09:00", "clerk", { type: "send_quote", conditions: [], feeLines: [] }),
+    step("2027-04-19T09:00", "pws", { type: "review_decide", decision: "approve", conditions: [], feeLines: [] }),
+    step("2027-04-19T09:05", "hl", { type: "review_decide", decision: "approve", conditions: [], feeLines: [] }),
+    step("2027-04-22T09:00", "clerk", { type: "send_quote", conditions: [], feeLines: [] }),
   ],
   expect: { tier: "reviewed", state: "quote_sent" },
+  notes: "Quote sent Thu, Apr 22: the hold runs 14 days, to May 6, so it is still held on the demo date.",
 };

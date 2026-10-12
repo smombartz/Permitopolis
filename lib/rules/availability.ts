@@ -24,6 +24,8 @@ function blackoutFor(location: Location, window: Window): Availability | null {
 }
 
 function scheduleHasDate(schedule: Schedule, date: ISODate): boolean {
+  // A session the series skips (a blackout date) does not take the slot.
+  if (schedule.occurrences.some((o) => o.date === date && o.billing === "skipped")) return false;
   if (!schedule.recurrence) return schedule.date === date;
   if (date < schedule.date || date > schedule.recurrence.until) return false;
   if (weekdayOf(date) !== schedule.recurrence.weekday) return false;
@@ -34,8 +36,7 @@ function scheduleHasDate(schedule: Schedule, date: ISODate): boolean {
 function bookedFor(location: Location, window: Window, ctx: RulesCtx, ignoreCaseId?: string): Availability | null {
   for (const other of ctx.cases) {
     if (other.id === ignoreCaseId) continue;
-    const holds = other.dateHold.status === "held" || other.state === "permitted" || other.state === "event_day" || other.state === "closeout";
-    if (!holds) continue;
+    if (!isBooked(other)) continue;
     if (!other.location || !other.schedule) continue;
     if (!locationsOverlap(location, other.location)) continue;
     if (!scheduleHasDate(other.schedule, window.date)) continue;
@@ -102,7 +103,12 @@ export const occurrences = (schedule: Schedule, location: Location, ctx: RulesCt
   });
 };
 
-/** Exposed for tests and dateGate(); not part of RulesApi. */
+/**
+ * Does this case take its slot? A date hold, or a permit that is still live. A case with an
+ * ending (cancelled, denied, withdrawn, hold expired) keeps the state it ended in, so the
+ * ending is checked first: a cancelled permit frees its date. Not part of RulesApi.
+ */
 export function isBooked(c: EventCase): boolean {
+  if (c.ending) return false;
   return c.dateHold.status === "held" || c.state === "permitted" || c.state === "event_day" || c.state === "closeout";
 }

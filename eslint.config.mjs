@@ -41,6 +41,8 @@ const eslintConfig = defineConfig([
     "build/**",
     "next-env.d.ts",
     "docs/**",
+    // Agent worktrees are full copies of the repo (with their own .next); lint the main tree only.
+    ".claude/**",
   ]),
 ]);
 

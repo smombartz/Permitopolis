@@ -49,7 +49,8 @@ export const B17: SeedScript = {
     step("2027-03-10T09:05", "hl", { type: "review_decide", decision: "approve", conditions: [], feeLines: [] }),
     step("2027-03-12T09:00", "clerk", { type: "send_quote", conditions: [], feeLines: [] }),
     step("2027-03-13T09:00", "applicant", { type: "accept_and_sign", signature: "Spencer Quigley" }),
-    step("2027-03-13T09:05", "applicant", { type: "pay", amount: 440, method: "card", kind: "quote" }),
+    // Shelter 4 for 7 hours $175, amplified sound $40, application $50, deposit $250.
+    step("2027-03-13T09:05", "applicant", { type: "pay", amount: 515, method: "card", kind: "quote" }),
     step("2027-03-14T09:00", "clerk", { type: "issue_permit" }),
     step("2027-04-21T09:00", "pws", {
       type: "log_closeout",
@@ -108,6 +109,16 @@ export const B18: SeedScript = {
       taskId: taskId(CASE18, "cleanup_plan"),
       form: { crew: 2, sweepStartsAt: "13:00" },
     }),
+    step("2027-02-05T09:30", "applicant", {
+      type: "complete_task",
+      taskId: taskId(CASE18, "site_plan"),
+      form: { drawnOn: "step 2 map", notes: "Staging in the 100 block of Elm Street" },
+    }),
+    step("2027-02-05T09:35", "applicant", {
+      type: "complete_task",
+      taskId: taskId(CASE18, "accessibility_plan"),
+      form: { accessibleRoute: true, restrooms: 2 },
+    }),
     step("2027-02-05T10:00", "applicant", { type: "submit" }),
     step("2027-02-07T09:00", "clerk", { type: "accept_complete" }),
     step("2027-02-07T09:05", "clerk", {
@@ -115,17 +126,18 @@ export const B18: SeedScript = {
       reviewers: [
         {
           dept: "pws",
-          sections: ["Traffic control plan", "Security and medical plan", "Emergency plan", "Cleanup plan"],
+          sections: ["Site plan", "Traffic control plan", "Security and medical plan", "Emergency plan", "Cleanup plan"],
           dueDate: "2027-02-28",
         },
-        { dept: "hl", sections: ["Certificate of insurance"], dueDate: "2027-02-28" },
+        { dept: "hl", sections: ["Certificate of insurance", "Accessibility plan"], dueDate: "2027-02-28" },
       ],
     }),
     step("2027-02-15T09:00", "pws", { type: "review_decide", decision: "approve", conditions: [], feeLines: [] }),
     step("2027-02-15T09:05", "hl", { type: "review_decide", decision: "approve", conditions: [], feeLines: [] }),
     step("2027-02-17T09:00", "clerk", { type: "send_quote", conditions: [], feeLines: [] }),
     step("2027-02-18T09:00", "applicant", { type: "accept_and_sign", signature: "Rosa Beaumont" }),
-    step("2027-02-18T09:05", "applicant", { type: "pay", amount: 400, method: "card", kind: "quote" }),
+    // One block closed $150, application $250, deposit $1,000.
+    step("2027-02-18T09:05", "applicant", { type: "pay", amount: 1400, method: "card", kind: "quote" }),
     step("2027-02-19T09:00", "clerk", { type: "issue_permit" }),
     step("2027-04-11T09:00", "pws", {
       type: "log_closeout",
@@ -182,6 +194,16 @@ export const B19: SeedScript = {
       taskId: taskId(CASE19, "cleanup_plan"),
       form: { crew: 2, sweepStartsAt: "09:00" },
     }),
+    step("2027-01-05T09:30", "applicant", {
+      type: "complete_task",
+      taskId: taskId(CASE19, "site_plan"),
+      form: { drawnOn: "step 2 map", notes: "Start and finish at 1st Avenue" },
+    }),
+    step("2027-01-05T09:35", "applicant", {
+      type: "complete_task",
+      taskId: taskId(CASE19, "accessibility_plan"),
+      form: { accessibleRoute: true, restrooms: 2 },
+    }),
     step("2027-01-05T10:00", "applicant", { type: "submit" }),
     step("2027-01-07T09:00", "clerk", { type: "accept_complete" }),
     step("2027-01-07T09:05", "clerk", {
@@ -189,17 +211,18 @@ export const B19: SeedScript = {
       reviewers: [
         {
           dept: "pws",
-          sections: ["Traffic control plan", "Security and medical plan", "Emergency plan", "Cleanup plan"],
+          sections: ["Site plan", "Traffic control plan", "Security and medical plan", "Emergency plan", "Cleanup plan"],
           dueDate: "2027-01-21",
         },
-        { dept: "hl", sections: ["Certificate of insurance"], dueDate: "2027-01-21" },
+        { dept: "hl", sections: ["Certificate of insurance", "Accessibility plan"], dueDate: "2027-01-21" },
       ],
     }),
     step("2027-01-15T09:00", "pws", { type: "review_decide", decision: "approve", conditions: [], feeLines: [] }),
     step("2027-01-15T09:05", "hl", { type: "review_decide", decision: "approve", conditions: [], feeLines: [] }),
     step("2027-01-17T09:00", "clerk", { type: "send_quote", conditions: [], feeLines: [] }),
     step("2027-01-18T09:00", "applicant", { type: "accept_and_sign", signature: "Niko Alexopoulos" }),
-    step("2027-01-18T09:05", "applicant", { type: "pay", amount: 530, method: "card", kind: "quote" }),
+    // Route 0.2 miles $80, application $250, deposit $1,000.
+    step("2027-01-18T09:05", "applicant", { type: "pay", amount: 1330, method: "card", kind: "quote" }),
     step("2027-01-19T09:00", "clerk", { type: "issue_permit" }),
     step("2027-03-06T09:00", "pws", {
       type: "log_closeout",
@@ -248,19 +271,21 @@ export const B20: SeedScript = {
     step("2027-01-18T09:00", "hl", { type: "review_decide", decision: "approve", conditions: [], feeLines: [] }),
     step("2027-01-20T09:00", "clerk", { type: "send_quote", conditions: [], feeLines: [] }),
     step("2027-01-21T09:00", "applicant", { type: "accept_and_sign", signature: "Bernadette Flores" }),
-    step("2027-01-21T09:05", "applicant", { type: "pay", amount: 300, method: "card", kind: "quote" }),
+    // Field 2 for 4 hours $80, application $50, deposit $250.
+    step("2027-01-21T09:05", "applicant", { type: "pay", amount: 380, method: "card", kind: "quote" }),
     step("2027-01-22T09:00", "clerk", { type: "issue_permit" }),
     step("2027-03-16T09:00", "pws", {
       type: "log_closeout",
       cleanup: "issues",
       notes: "Extra crew was needed to clear food waste after the carnival ran long.",
       actuals: [],
-      extraLines: [{ dept: "pws", label: "Extra cleanup crew", qty: 3, unit: "worker-hour", unitPrice: 60, kind: "fee" }],
+      // 5 worker-hours at $60 is $300: $50 more than the $250 deposit covers.
+      extraLines: [{ dept: "pws", label: "Extra cleanup crew", qty: 5, unit: "worker-hour", unitPrice: 60, kind: "fee" }],
     }),
     step("2027-03-17T09:00", "clerk", { type: "reconcile_close" }),
   ],
   expect: { tier: "reviewed", state: "closed" },
-  notes: "The extra cleanup crew exceeds the deposit, so the final bill asks for more.",
+  notes: "The extra cleanup crew ($300) exceeds the $250 deposit, so the final bill asks for $50 more.",
 };
 
 /** B21 · Maple Ridge Scouts Troop 214: Closed, an Instant event closed automatically. */

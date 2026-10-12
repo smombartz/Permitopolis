@@ -7,10 +7,14 @@ import { describe, expect, it } from "vitest";
 import { getSpace } from "@/lib/data/inventory";
 import { MAIN_1ST_TO_4TH, RIVERFRONT_5K_ROUTE, getSegment } from "@/lib/data/streets";
 import { PERSONAS } from "@/lib/data/people";
-import { weekdayOf } from "@/lib/dates";
+import { timesOverlap, weekdayOf } from "@/lib/dates";
+import { CARD_BY_ID, CITY_TASKS } from "@/lib/rules/catalog";
+import { locationsOverlap, occupiedWindow } from "@/lib/rules";
 import type { CaseState, Ending, Location } from "@/lib/types";
+import { ACTION_TYPES } from "../actions";
 import type { SeedScript } from "../types";
 import { BACKGROUND_SCRIPTS } from "./background";
+import { SCENARIO_SCRIPTS } from "./scenarios";
 import { SEED_SCRIPTS } from "./scripts";
 import { SEED_CUTOFF } from "./helpers";
 
@@ -70,6 +74,38 @@ describe("every seed script", () => {
       if (!loc) continue;
       for (const id of loc.inventoryIds) expect(getSpace(id), `${s.key}: unknown space ${id}`).toBeDefined();
       for (const id of loc.segmentIds) expect(getSegment(id), `${s.key}: unknown segment ${id}`).toBeDefined();
+    }
+  });
+
+  it("uses only action types from the Action union", () => {
+    for (const s of SEED_SCRIPTS) {
+      for (const step of s.steps) expect(ACTION_TYPES, `${s.key}: ${step.action.type}`).toContain(step.action.type);
+    }
+  });
+
+  it("refers only to cards in the catalogue and to city tasks the engine creates", () => {
+    // `${caseId}:${catalogId}`, plus `:${n}` for a per-vendor card; city tasks use the ids in
+    // CITY_TASKS, with the kind of work order after `work_order:`.
+    const WORK_ORDERS = ["barricades", "police", "closure", "trash", "power"];
+    for (const s of SEED_SCRIPTS) {
+      for (const step of s.steps) {
+        if (!("taskId" in step.action) || step.action.taskId === undefined) continue;
+        const taskId = step.action.taskId;
+        expect(taskId.startsWith(`${s.id}:`), `${s.key}: ${taskId} is not a task of ${s.id}`).toBe(true);
+        const [base, detail] = taskId.slice(s.id.length + 1).split(":");
+        const where = `${s.key} ${step.action.type}: ${taskId}`;
+        if (base === "work_order") {
+          expect(WORK_ORDERS, where).toContain(detail);
+        } else if (base in CARD_BY_ID) {
+          const spec = CARD_BY_ID[base as keyof typeof CARD_BY_ID];
+          const numbered = spec.perVendor === true || base === "respond_to_request";
+          if (numbered) expect(detail, where).toMatch(/^[1-9]\d*$/);
+          else expect(detail, where).toBeUndefined();
+          if (spec.perVendor) expect(Number(detail), where).toBeLessThanOrEqual(s.answers.addOns.foodVending?.vendors ?? 0);
+        } else {
+          expect(Object.keys(CITY_TASKS), where).toContain(base);
+        }
+      }
     }
   });
 
@@ -178,5 +214,26 @@ describe("background cases (plan 6.2)", () => {
         for (const d of dates) expect(d >= "2027-05-13").toBe(false);
       }
     }
+  });
+
+  it("leaves every slot of the 13 PRD cases alone: same place, same date, overlapping hours", () => {
+    // Plan 6.2: "every slot used by the 13 PRD cases". A background case that holds one of
+    // them first makes the PRD case fail its own booking or intake when the seed is replayed.
+    const datesOf = (s: SeedScript) => s.answers.schedule?.occurrences.map((o) => o.date) ?? [];
+    const clashes: string[] = [];
+    for (const background of BACKGROUND_SCRIPTS) {
+      for (const prd of SCENARIO_SCRIPTS) {
+        const a = background.answers;
+        const b = prd.answers;
+        if (!a.location || !b.location || !a.schedule || !b.schedule) continue;
+        if (!locationsOverlap(a.location, b.location)) continue;
+        const wa = occupiedWindow(a.schedule);
+        const wb = occupiedWindow(b.schedule);
+        if (!timesOverlap(wa.start, wa.end, wb.start, wb.end)) continue;
+        const shared = datesOf(background).filter((d) => datesOf(prd).includes(d));
+        if (shared.length > 0) clashes.push(`${background.key} takes ${prd.key}'s ${b.location.label} on ${shared.join(", ")}`);
+      }
+    }
+    expect(clashes).toEqual([]);
   });
 });

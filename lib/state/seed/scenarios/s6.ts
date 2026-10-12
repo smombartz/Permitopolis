@@ -1,7 +1,11 @@
 /**
  * S6 · Main Street Food Truck Festival. Special event, the whole history through permit, paid
- * $9,645 Apr 23. The event (Apr 24) has already happened by the demo date, so the engine opens
+ * $9,645 Mar 13. The event (Apr 24) has already happened by the demo date, so the engine opens
  * Closeout on its own (Apr 25) as the clock advances during replay; no log_closeout is scripted.
+ *
+ * The PRD's board on load is "Coming up: final bill or refund, feedback. Everything else Done",
+ * so the history also holds the meetings, the community notice, the vendors' food permits and
+ * the work orders. "Carry your permit" is finished by the engine when the event day passes.
  */
 import type { EventAnswers } from "@/lib/types";
 import type { SeedScript } from "../../types";
@@ -26,6 +30,9 @@ const answers: EventAnswers = {
     cityServices: cityServices({ barricades: 20, policeOfficers: 11, policeHours: 6, trash: true, power: true }),
   }),
 };
+
+/** The work orders issue_permit creates for this plan: a closed street, police, barricades, trash and power. */
+const WORK_ORDERS = ["barricades", "police", "closure", "trash", "power"];
 
 const preSubmitDocs: Array<[string, string]> = [
   ["insurance_certificate", "main-street-alliance-insurance-certificate.pdf"],
@@ -101,6 +108,18 @@ export const S6: SeedScript = {
         { dept: "clerk", sections: ["Alcohol details and liquor liability insurance"], dueDate: "2027-03-17" },
       ],
     }),
+    step("2027-02-08T10:00", "clerk", {
+      type: "schedule_meeting",
+      taskId: taskId(CASE_ID, "pre_application_meeting"),
+      date: "2027-02-08",
+    }),
+    step("2027-02-08T10:05", "clerk", { type: "complete_city_task", taskId: taskId(CASE_ID, "pre_application_meeting") }),
+    step("2027-02-12T09:00", "applicant", {
+      type: "complete_task",
+      taskId: taskId(CASE_ID, "community_notification"),
+      files: [sampleFile("main-street-festival-posted-notice.jpg", { type: "image/jpeg", size: 1_040_000 })],
+    }),
+    step("2027-02-15T09:00", "clerk", { type: "verify_document", taskId: taskId(CASE_ID, "community_notification") }),
     step("2027-03-10T09:00", "pws", { type: "review_decide", decision: "approve", conditions: [], feeLines: [] }),
     step("2027-03-10T09:05", "hl", { type: "review_decide", decision: "approve", conditions: [], feeLines: [] }),
     step("2027-03-10T09:10", "clerk", { type: "review_decide", decision: "approve", conditions: [], feeLines: [] }),
@@ -108,6 +127,25 @@ export const S6: SeedScript = {
     step("2027-03-13T09:00", "applicant", { type: "accept_and_sign", signature: "Harold Petrov" }),
     step("2027-03-13T09:05", "applicant", { type: "pay", amount: 9645, method: "card", kind: "quote" }),
     step("2027-03-13T09:10", "clerk", { type: "issue_permit" }),
+    step("2027-03-15T09:00", "clerk", {
+      type: "schedule_meeting",
+      taskId: taskId(CASE_ID, "coordination_meeting"),
+      date: "2027-04-02",
+    }),
+    step("2027-03-15T09:05", "pws", {
+      type: "schedule_meeting",
+      taskId: taskId(CASE_ID, "site_walkthrough"),
+      date: "2027-04-16",
+    }),
+    step("2027-04-02T11:00", "clerk", { type: "complete_city_task", taskId: taskId(CASE_ID, "coordination_meeting") }),
+    step("2027-04-16T10:00", "pws", { type: "complete_city_task", taskId: taskId(CASE_ID, "site_walkthrough") }),
+    step("2027-04-16T14:00", "applicant", { type: "complete_task", taskId: taskId(CASE_ID, "vendor_food_permits") }),
+    ...WORK_ORDERS.map((key, i) =>
+      step(`2027-04-23T${String(9 + i).padStart(2, "0")}:00`, "pws", {
+        type: "complete_city_task",
+        taskId: taskId(CASE_ID, `work_order:${key}`),
+      }),
+    ),
   ],
   expect: { tier: "special", state: "closeout" },
   notes: "Closeout opens automatically when replay's clock passes Apr 24; no log_closeout yet.",

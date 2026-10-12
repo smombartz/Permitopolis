@@ -25,6 +25,47 @@ describe("request_info (Jazz in the Plaza style)", () => {
     expect(result.case.tasks.find((t) => t.id === card.id)?.request?.resolved).toBe(false);
   });
 
+  it("parks the asker's own review task until the applicant answers, then gives it back", () => {
+    const review = { dept: "hl" as const, sections: ["Vendor list"], status: "pending" as const, dueDate: "2027-05-03", decidedOn: null, clock: { startedOn: "2027-04-19", pausedSince: null, pausedDays: 0, allowedDays: 14 }, internalNote: "", messageToApplicant: "" };
+    const pwsReview = { ...review, dept: "pws" as const, sections: ["Sound details"] };
+    const card = makeTask({ id: "PMT-27-0118:vendor_health_permit:1", catalogId: "vendor_health_permit", reviewer: "hl" });
+    const hlTask = makeTask({ id: "PMT-27-0118:review:hl", catalogId: "review:hl", owner: "hl", kind: "review" });
+    const pwsTask = makeTask({ id: "PMT-27-0118:review:pws", catalogId: "review:pws", owner: "pws", kind: "review" });
+    const c = makeCase({ id: "PMT-27-0118", state: "in_review", reviews: [pwsReview, review], tasks: [card, hlTask, pwsTask] });
+
+    const asked = transition(c, { type: "request_info", taskId: card.id, message: "Please upload the current health permit", dueDate: "2027-05-05" }, "hl", makeCtx());
+    expect(asked.ok).toBe(true);
+    if (!asked.ok) return;
+    const parked = asked.case.tasks.find((t) => t.id === hlTask.id);
+    expect(parked?.status).toBe("locked");
+    expect(parked?.payload.awaitingAnswer).toBe(true);
+    // Another department's review is not touched.
+    expect(asked.case.tasks.find((t) => t.id === pwsTask.id)?.status).toBe("todo");
+
+    const answered = transition(asked.case, { type: "respond_to_request", taskId: card.id, files: [{ name: "permit.pdf", size: 10, type: "application/pdf" }] }, "applicant", makeCtx({ today: "2027-05-04", now: "2027-05-04T09:00" }));
+    expect(answered.ok).toBe(true);
+    if (!answered.ok) return;
+    expect(answered.case.state).toBe("in_review");
+    expect(answered.case.tasks.find((t) => t.id === hlTask.id)?.status).toBe("todo");
+    // The review it got back is the re-review task: no second task is created for the same answer.
+    expect(answered.case.tasks.filter((t) => t.owner === "hl")).toHaveLength(1);
+  });
+
+  it("a Clerk's request at intake parks the intake check, and the answer returns the case to Submitted", () => {
+    const intake = makeTask({ id: "PMT-27-0001:intake_check", catalogId: "intake_check", owner: "clerk", kind: "review" });
+    const c = makeCase({ state: "submitted", tasks: [intake] });
+    const asked = transition(c, { type: "request_info", item: "Certificate of insurance", message: "The certificate is missing." }, "clerk", makeCtx());
+    expect(asked.ok).toBe(true);
+    if (!asked.ok) return;
+    expect(asked.case.tasks.find((t) => t.id === intake.id)?.status).toBe("locked");
+    const requestCard = asked.case.tasks.find((t) => t.catalogId === "respond_to_request");
+    const answered = transition(asked.case, { type: "respond_to_request", taskId: requestCard!.id, message: "Attached." }, "applicant", makeCtx());
+    expect(answered.ok).toBe(true);
+    if (!answered.ok) return;
+    expect(answered.case.state).toBe("submitted");
+    expect(answered.case.tasks.find((t) => t.id === intake.id)?.status).toBe("todo");
+  });
+
   it("with no taskId creates a respond_to_request card", () => {
     const c = makeCase({ state: "submitted" });
     const result = transition(c, { type: "request_info", item: "Proof of nonprofit status", message: "Please attach your 501(c)(3) letter." }, "clerk", makeCtx());

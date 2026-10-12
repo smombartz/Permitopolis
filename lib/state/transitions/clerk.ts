@@ -1,5 +1,6 @@
 /** Transitions only the City Clerk raises. */
 import { addDaysISO } from "@/lib/dates";
+import { fmtMoney } from "@/lib/format";
 import type { RulesCtx } from "@/lib/rules/types";
 import type { Actor, Condition, EventCase, FeeLine, Review } from "@/lib/types";
 import type { Action } from "../actions";
@@ -135,7 +136,17 @@ export function sendQuote(c: EventCase, action: Extract_<"send_quote">, actor: A
 export function issuePermit(c: EventCase, _action: Extract_<"issue_permit">, actor: Actor, ctx: RulesCtx): TransitionResult {
   const check = checkIssuePermit(c);
   if (!check.ok) return check;
-  let next: EventCase = { ...c, state: "permitted", permit: { issuedOn: ctx.today, signature: findTask(c, taskId(c.id, "accept_and_sign"))?.payload.signature as string | null } };
+  let next: EventCase = {
+    ...c,
+    state: "permitted",
+    permit: { issuedOn: ctx.today, signature: (findTask(c, taskId(c.id, "accept_and_sign"))?.payload.signature as string | undefined) ?? null },
+    // The hold's expiry was the deadline for paying the quote. With the permit issued the date
+    // is simply held, so nothing downstream reads "held until" a date that no longer applies.
+    dateHold: { ...c.dateHold, expiresOn: null },
+  };
+  // The Clerk's own "Issue permit" task is done by issuing it; it must not stay in the queue.
+  const issueTaskId = taskId(next.id, "issue_permit");
+  if (findTask(next, issueTaskId)) next = moveTask(next, issueTaskId, "done", ctx, actor, { unlocksOn: null });
   next = applyUnlockEvent(next, "permitted", ctx);
   next = addTasks(next, workOrdersFor(next, ctx));
   next = appendActivity(next, actor, "Issued the permit.", ctx);
@@ -179,11 +190,13 @@ export function reconcileClose(c: EventCase, _action: Extract_<"reconcile_close"
   }
   const exceptionId = taskId(next.id, "instant_exception");
   if (findTask(next, exceptionId)) next = moveTask(next, exceptionId, "done", ctx, actor);
+  const reconcileId = taskId(next.id, "reconcile");
+  if (findTask(next, reconcileId)) next = moveTask(next, reconcileId, "done", ctx, actor, { unlocksOn: null });
 
   next = { ...next, state: "closed" };
   next = applyUnlockEvent(next, "invoice_issued", ctx);
   next = applyUnlockEvent(next, "closed", ctx);
-  next = appendActivity(next, actor, refund !== null ? `Closed. Refunded ${refund} from the deposit.` : `Closed. Final bill: ${owed}.`, ctx);
+  next = appendActivity(next, actor, refund !== null ? `Closed. Refunded ${fmtMoney(refund)} from the deposit.` : `Closed. Final bill: ${fmtMoney(owed ?? 0)}.`, ctx);
   return { ok: true, case: next };
 }
 

@@ -65,6 +65,41 @@ describe("availability: booked", () => {
     expect(result.status).toBe("open");
   });
 
+  it("a cancelled permit frees its date: a case with an ending never books a slot", () => {
+    const cancelled = eventCase({
+      id: "PMT-27-0001",
+      state: "permitted",
+      ending: "cancelled",
+      dateHold: { status: "released", placedOn: "2027-04-26", expiresOn: null },
+      location: inventoryLocation(["shelter-3"]),
+      schedule: { date: "2027-05-22", start: "11:00", end: "16:00", occurrences: [] },
+    });
+    const result = availability(inventoryLocation(["shelter-3"]), { date: "2027-05-22", start: "11:00", end: "16:00" }, ctx({ cases: [cancelled] }));
+    expect(result.status).toBe("open");
+  });
+
+  it("a session a series skips does not book the slot", () => {
+    const series = eventCase({
+      id: "PMT-27-0003",
+      state: "permitted",
+      location: areaLocation("city-hall-plaza"),
+      schedule: {
+        date: "2027-06-07",
+        start: "10:00",
+        end: "12:00",
+        recurrence: { frequency: "weekly", weekday: 1, until: "2027-06-21" },
+        occurrences: [
+          { date: "2027-06-07", availability: { status: "open" }, billing: "paid" },
+          { date: "2027-06-14", availability: { status: "blackout" }, billing: "skipped" },
+          { date: "2027-06-21", availability: { status: "open" }, billing: "upcoming" },
+        ],
+      },
+    });
+    const window = { start: "10:00", end: "12:00" };
+    expect(availability(areaLocation("city-hall-plaza"), { date: "2027-06-14", ...window }, ctx({ cases: [series] })).status).toBe("open");
+    expect(availability(areaLocation("city-hall-plaza"), { date: "2027-06-21", ...window }, ctx({ cases: [series] })).status).toBe("booked");
+  });
+
   it("the Great Lawn market (8 to 1) and movie night (5 to 10:30, setup from 5 pm) do not conflict on the same day", () => {
     const market = eventCase({
       id: "PMT-27-0010",

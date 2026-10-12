@@ -1,4 +1,5 @@
 /** `pay`: the applicant pays by card, or the Clerk records an in-person payment. */
+import { fmtMoney } from "@/lib/format";
 import type { RulesCtx } from "@/lib/rules/types";
 import type { Actor, EventCase } from "@/lib/types";
 import type { Action } from "../actions";
@@ -50,6 +51,6 @@ export function pay(c: EventCase, action: PayAction, actor: Actor, ctx: RulesCtx
     }
   }
 
-  next = appendActivity(next, actor, `Recorded a payment of ${action.amount} (${action.method}).`, ctx);
+  next = appendActivity(next, actor, `Recorded a payment of ${fmtMoney(action.amount)} (${action.method === "card" ? "card" : "in person"}).`, ctx);
   return { ok: true, case: next };
 }

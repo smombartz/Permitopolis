@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { DEFAULT_CONFIG } from "@/lib/rules/config";
 import { makeCase, makeCtx, makeTask } from "./testSupport";
-import { advanceClock, applyTick } from "./clock";
+import { advanceClock, applyTick, sessionDates } from "./clock";
 
 vi.mock("@/lib/rules", async () => {
   const actual = await vi.importActual<typeof import("@/lib/rules")>("@/lib/rules");
@@ -67,6 +67,27 @@ describe("applyTick: event day and returning to Permitted", () => {
     if (!result.ok) return;
     expect(result.case.state).toBe("permitted");
   });
+
+  it("a session skipped for a blackout is not an event day", () => {
+    const c = makeCase({
+      state: "permitted",
+      schedule: {
+        date: "2027-05-24",
+        start: "07:00",
+        end: "08:00",
+        recurrence: { frequency: "weekly", weekday: 1, until: "2027-06-07" },
+        occurrences: [
+          { date: "2027-05-24", availability: { status: "open" }, billing: "paid" },
+          { date: "2027-05-31", availability: { status: "blackout" }, billing: "skipped" },
+          { date: "2027-06-07", availability: { status: "open" }, billing: "upcoming" },
+        ],
+      },
+    });
+    expect(sessionDates(c)).toEqual(["2027-05-24", "2027-06-07"]);
+    expect(applyTick(c, makeCtx({ today: "2027-05-31" })).ok).toBe(false);
+    const next = applyTick(c, makeCtx({ today: "2027-06-07" }));
+    expect(next.ok && next.case.state).toBe("event_day");
+  });
 });
 
 describe("applyTick: Closeout and Instant closing itself", () => {
@@ -81,7 +102,22 @@ describe("applyTick: Closeout and Instant closing itself", () => {
     if (!result.ok) return;
     expect(result.case.state).toBe("closeout");
     expect(result.case.tasks.map((t) => t.catalogId)).toEqual(expect.arrayContaining(["cleanup_inspection", "log_actual_hours", "reconcile"]));
-    expect(result.case.tasks.find((t) => t.catalogId === "reconcile")?.status).toBe("locked");
+    const reconcile = result.case.tasks.find((t) => t.catalogId === "reconcile");
+    expect(reconcile?.status).toBe("locked");
+    // Without this the Clerk's reconciliation would never leave "locked" once hours are logged.
+    expect(reconcile?.unlocksOn).toBe("hours_logged");
+  });
+
+  it("\"Carry your permit\" is done once the last session has passed, in Closeout and in Closed", () => {
+    const carry = () => makeTask({ id: "PMT-27-0001:carry_permit", catalogId: "carry_permit", kind: "action", status: "todo" });
+    const schedule = { date: "2027-04-24", start: "12:00", end: "21:00", occurrences: [{ date: "2027-04-24", availability: { status: "open" as const }, billing: "paid" as const }] };
+    for (const tier of ["special", "instant"] as const) {
+      const result = applyTick(makeCase({ state: "event_day", tier, schedule, tasks: [carry()] }), makeCtx({ today: "2027-04-25" }));
+      expect(result.ok).toBe(true);
+      if (!result.ok) return;
+      expect(result.case.state).toBe(tier === "instant" ? "closed" : "closeout");
+      expect(result.case.tasks.find((t) => t.catalogId === "carry_permit")?.status).toBe("done");
+    }
   });
 
   it("an Instant event with no issues closes itself straight to Closed", () => {

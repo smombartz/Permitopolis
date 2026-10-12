@@ -94,10 +94,15 @@ export const daysUntilEvent: StateApi["daysUntilEvent"] = (c: EventCase, today: 
 
 export const caseTotals: StateApi["caseTotals"] = (c: EventCase): CaseTotals => {
   const fees = c.feeLines.filter((f) => f.kind === "fee" || f.kind === "late_fee").reduce((s, f) => s + (f.actual ?? f.estimate), 0);
-  const deposit = c.feeLines.filter((f) => f.kind === "deposit").reduce((s, f) => s + (f.actual ?? f.estimate), 0);
+  // Reconciling settles the deposit: it has covered any overage and the rest has gone back, so
+  // it is no longer part of what the event costs or of what is owed.
+  const settled = c.closeout.balance !== null;
+  const deposit = settled ? 0 : c.feeLines.filter((f) => f.kind === "deposit").reduce((s, f) => s + (f.actual ?? f.estimate), 0);
   const total = fees + deposit;
   const paid = c.payments.reduce((s, p) => s + p.amount, 0);
-  return { fees, deposit, total, paid, due: total - paid };
+  // A case that ended early owes nothing more; its refund, if any, is already among the payments.
+  const due = c.ending ? 0 : Math.max(0, total - paid);
+  return { fees, deposit, total, paid, due };
 };
 
 export const leadTimeRisk: StateApi["leadTimeRisk"] = (c: EventCase, today: ISODate, cfg: RulesConfig): "ok" | "at_risk" => {

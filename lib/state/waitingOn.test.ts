@@ -43,10 +43,54 @@ describe("waitingOn", () => {
   });
 });
 
+describe("Needs info (S3): the applicant is up and the asker waits", () => {
+  const card = makeTask({
+    id: "PMT-27-0118:vendor_health_permit:1",
+    catalogId: "vendor_health_permit",
+    title: "Health permit: Rolling Dumpling Co.",
+    reviewer: "hl",
+    request: { from: "hl", message: "Please upload the current health permit", at: "2027-04-30T09:05", dueDate: "2027-05-05", resolved: false },
+  });
+  const parkedReview = makeTask({ id: "PMT-27-0118:review:hl", catalogId: "review:hl", owner: "hl", kind: "review", status: "locked", payload: { awaitingAnswer: true } });
+  const hl = { dept: "hl" as const, sections: ["Vendor list"], status: "needs_info" as const, dueDate: "2027-05-03", decidedOn: null, clock: { startedOn: "2027-04-19", pausedSince: "2027-04-30", pausedDays: 0, allowedDays: 14 }, internalNote: "", messageToApplicant: "" };
+  const c = makeCase({ id: "PMT-27-0118", state: "needs_info", reviews: [hl], tasks: [card, parkedReview] });
+
+  it("Health & Legal is Waiting, with the reason, not Up now", () => {
+    const rows = waitingOn(c, "2027-05-03");
+    expect(rows.find((r) => r.party === "applicant")?.status).toBe("up_now");
+    const row = rows.find((r) => r.party === "hl");
+    expect(row?.status).toBe("waiting");
+    expect(row?.note).toBe("Waiting on the applicant's response");
+    expect(row?.openTasks).toEqual([]);
+  });
+
+  it("the applicant's row is due on the request's date, not the card's own", () => {
+    const withCardDate = { ...c, tasks: [{ ...card, dueDate: "2027-06-04" }, parkedReview] };
+    expect(waitingOn(withCardDate, "2027-05-03").find((r) => r.party === "applicant")?.oldestDue).toBe("2027-05-05");
+  });
+
+  it("the sentence names the applicant when given a name, and who re-reviews", () => {
+    expect(nextMove(c, "2027-05-03", "Downtown Arts Collective")).toBe(
+      "Next: Downtown Arts Collective uploads the health permit: Rolling Dumpling Co., then Health & Legal re-reviews.",
+    );
+    expect(nextMove(c, "2027-05-03")).toBe("Next: The applicant uploads the health permit: Rolling Dumpling Co., then Health & Legal re-reviews.");
+  });
+});
+
 describe("nextMove", () => {
   it("starts with 'Next:' and names an open task", () => {
     const sentence = nextMove(makeCase({ state: "draft" }), "2027-05-03");
     expect(sentence.startsWith("Next:")).toBe(true);
+  });
+
+  it("words command-titled tasks as what the party does (S5: two up, then the Clerk)", () => {
+    const acceptSign = makeTask({ id: "PMT-27-0097:accept_and_sign", catalogId: "accept_and_sign", kind: "sign_off", title: "Accept conditions and sign" });
+    const verify = makeTask({ id: "PMT-27-0097:verify:insurance_certificate", catalogId: "verify:insurance_certificate", owner: "hl", kind: "review", title: "Verify Certificate of insurance" });
+    const issue = makeTask({ id: "PMT-27-0097:issue_permit", catalogId: "issue_permit", owner: "clerk", kind: "action", title: "Issue permit", status: "locked" });
+    const c = makeCase({ id: "PMT-27-0097", state: "quote_sent", tasks: [acceptSign, verify, issue] });
+    expect(nextMove(c, "2027-05-03", "Riverfront Running Club")).toBe(
+      "Next: Riverfront Running Club accepts the conditions and signs, and Health & Legal verifies the certificate of insurance, then City Clerk issues the permit.",
+    );
   });
 });
 

@@ -185,8 +185,12 @@ export interface StateApi {
   availableActions(c: EventCase, role: Party, ctx: RulesCtx): ActionAvailability[];
   /** Who's up. Always four rows: applicant, clerk, pws, hl. */
   waitingOn(c: EventCase, today: ISODate): PartyStatus[];
-  /** One sentence naming the next move, starting with "Next:". */
-  nextMove(c: EventCase, today: ISODate): string;
+  /**
+   * One sentence naming the next move, starting with "Next:". Pass the applicant's name (the
+   * persona's `name`) to get "Next: Downtown Arts Collective uploads ..."; without it the
+   * sentence says "The applicant".
+   */
+  nextMove(c: EventCase, today: ISODate, applicantName?: string): string;
   boardColumn(task: Task): BoardColumn;
   /** Applies the system transitions for every day from `from` (exclusive) to `to` (inclusive). */
   advanceClock(cases: EventCase[], from: ISODate, to: ISODate, cfg: RulesConfig): EventCase[];

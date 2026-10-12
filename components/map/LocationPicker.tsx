@@ -449,7 +449,7 @@ export function LocationPicker({ value, onChange, eventType, availabilityOf, cla
             </ul>
             <div className="flex items-center justify-between gap-2">
               <p className="text-sm text-fg-secondary">{fmtNumber(routeLocation.miles ?? 0)} miles</p>
-              <Button type="button" variant="outline" size="sm" onClick={undoLastSegment} disabled={routeIds.length === 0}>
+              <Button type="button" variant="secondary" size="sm" onClick={undoLastSegment} disabled={routeIds.length === 0}>
                 Undo last segment
               </Button>
             </div>

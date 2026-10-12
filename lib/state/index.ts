@@ -8,7 +8,8 @@ export * from "./actions";
 
 export { availableActions } from "./availableActions";
 export { advanceClock, isSessionDate, lastSessionDate, sessionDates } from "./clock";
-export { newCase } from "./newCase";
+export { taskDueDate } from "./core";
+export { classifyDraft, newCase } from "./newCase";
 export {
   applicantCases,
   boardColumn,

@@ -67,4 +67,24 @@ describe("cancellationRefund", () => {
     const result = cancellationRefund(c, "2027-06-10");
     expect(result.rule).toMatch(/Under 10 days/i);
   });
+
+  it("a session skipped for a blackout is never the next session", () => {
+    const c = eventCase({
+      id: "PMT-27-0006",
+      feeLines: [{ id: "f1", dept: "clerk", label: "Field reservation", qty: 2, unit: "hour", unitPrice: 20, estimate: 40, actual: null, kind: "fee" }],
+      schedule: {
+        date: "2027-05-24",
+        start: "08:00",
+        end: "09:00",
+        recurrence: { frequency: "weekly", weekday: 1, until: "2027-06-14" },
+        occurrences: [
+          { date: "2027-05-24", availability: { status: "open" }, billing: "paid" },
+          { date: "2027-05-31", availability: { status: "blackout" }, billing: "skipped" },
+          { date: "2027-06-14", availability: { status: "open" }, billing: "upcoming" },
+        ],
+      },
+    });
+    // On May 26 the next held session is Jun 14 (19 days away), not the skipped May 31 (5 days away).
+    expect(cancellationRefund(c, "2027-05-26").rule).toMatch(/10 to 29 days/i);
+  });
 });

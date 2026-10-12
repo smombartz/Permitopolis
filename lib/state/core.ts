@@ -34,6 +34,25 @@ export function cloneCase(c: EventCase): EventCase {
   return structuredClone(c);
 }
 
+/**
+ * The dates this case actually takes place on: every session except the ones a series skips
+ * for a blackout. Falls back to the schedule's own date when no session is listed (or every
+ * one is skipped), so a case with a schedule always has at least one date.
+ */
+export function heldSessionDates(c: EventCase): ISODate[] {
+  if (!c.schedule) return [];
+  const held = c.schedule.occurrences.filter((o) => o.billing !== "skipped").map((o) => o.date);
+  return held.length > 0 ? held : [c.schedule.date];
+}
+
+/**
+ * When a task is due. A reviewer's open request carries its own, sooner date ("due Wed,
+ * May 5"), which wins over the card's own date for as long as the request is open.
+ */
+export function taskDueDate(task: Task): ISODate | null {
+  return task.request && !task.request.resolved ? task.request.dueDate : task.dueDate;
+}
+
 /** `ctx.now`, defaulting to 9am on `ctx.today`. transition() never reads the real clock. */
 export function nowOf(ctx: RulesCtx): ISODateTime {
   return ctx.now ?? `${ctx.today}T09:00`;
@@ -146,6 +165,44 @@ export function applyUnlockEvent(c: EventCase, event: UnlockEvent, ctx: RulesCtx
     };
   });
   return changed ? { ...c, tasks } : c;
+}
+
+/**
+ * While a department waits on the applicant's answer, its own open review (or the Clerk's
+ * intake check) cannot move, so it is parked: 'locked', out of the queue and out of "Up now".
+ * The PRD's transitions table has the asker get its task back when the applicant responds.
+ */
+export function parkTasksAwaitingAnswer(c: EventCase, dept: Dept, ctx: RulesCtx): EventCase {
+  return {
+    ...c,
+    tasks: c.tasks.map((t) => {
+      const parkable = t.owner === dept && t.kind === "review" && !t.catalogId.startsWith("verify:");
+      if (!parkable || (t.status !== "todo" && t.status !== "changes_requested")) return t;
+      return {
+        ...t,
+        status: "locked" as const,
+        payload: { ...t.payload, awaitingAnswer: true },
+        history: [...t.history, { at: nowOf(ctx), actor: "system" as const, status: "locked" as const, note: "Waiting on the applicant's response" }],
+      };
+    }),
+  };
+}
+
+/** The reverse of parkTasksAwaitingAnswer(), once the department has no request left open. */
+export function resumeTasksAwaitingAnswer(c: EventCase, dept: Dept, ctx: RulesCtx): EventCase {
+  if (c.tasks.some((t) => t.request && !t.request.resolved && t.request.from === dept)) return c;
+  return {
+    ...c,
+    tasks: c.tasks.map((t) => {
+      if (t.owner !== dept || t.status !== "locked" || t.payload.awaitingAnswer !== true) return t;
+      return {
+        ...t,
+        status: "todo" as const,
+        payload: { ...t.payload, awaitingAnswer: false },
+        history: [...t.history, { at: nowOf(ctx), actor: "system" as const, status: "todo" as const, note: "The applicant responded" }],
+      };
+    }),
+  };
 }
 
 export function isCatalogId(id: string): id is CatalogId {
