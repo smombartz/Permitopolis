@@ -5,6 +5,7 @@
 import type { RulesApi } from "./types";
 
 export * from "./types";
+export * from "./catalog";
 export { DEFAULT_CONFIG, DEFAULT_DEMO_TODAY, STORAGE_KEY } from "./config";
 
 function todo(name: string): never {
@@ -24,6 +25,8 @@ export const planTimeline: RulesApi["planTimeline"] = () => todo("planTimeline")
 export const occupiedWindow: RulesApi["occupiedWindow"] = () => todo("occupiedWindow");
 export const locationsOverlap: RulesApi["locationsOverlap"] = () => todo("locationsOverlap");
 export const dueDate: RulesApi["dueDate"] = () => todo("dueDate");
+export const closeoutCards: RulesApi["closeoutCards"] = () => todo("closeoutCards");
+export const capacityWarning: RulesApi["capacityWarning"] = () => todo("capacityWarning");
 
 export const rules = {
   classify,
@@ -39,4 +42,6 @@ export const rules = {
   occupiedWindow,
   locationsOverlap,
   dueDate,
+  closeoutCards,
+  capacityWarning,
 } satisfies RulesApi;

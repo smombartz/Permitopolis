@@ -55,7 +55,7 @@ every change to a case goes through `transition()` in `lib/state`, dispatched wi
 view-models for a screen go in `lib/view/<surface>.ts` with tests.
 
 **Frozen contracts.** `lib/types.ts`, `lib/rules/types.ts`, `lib/rules/config.ts`,
-`lib/state/actions.ts`, `lib/state/types.ts`, `lib/routes.ts`, `lib/format.ts`, `lib/dates.ts`,
+`lib/rules/catalog.ts`, `lib/state/actions.ts`, `lib/state/types.ts`, `lib/routes.ts`, `lib/format.ts`, `lib/dates.ts`,
 `lib/data/{inventory,streets,calendar,fees}.ts` and `styles/tokens.css` are shared by every
 workstream. Do not edit them from a workstream; report the change you need instead.
 

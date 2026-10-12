@@ -240,4 +240,21 @@ export interface RulesApi {
   locationsOverlap(a: Location, b: Location): boolean;
   /** `base` plus `offsetDays`, moved to the Friday before when it lands on a weekend and the config says so. */
   dueDate(base: ISODate, offsetDays: number, cfg?: RulesConfig): ISODate;
+  /**
+   * The after-event cards from the catalogue (stage 'closeout'), all 'locked'. transition()
+   * calls this when a case enters Closeout, or Closed for an Instant event that skips Closeout.
+   */
+  closeoutCards(c: EventCase, cfg?: RulesConfig): Task[];
+  /** Set when attendance exceeds a bookable space's capacity. Never changes the tier. */
+  capacityWarning(answers: EventAnswers): CapacityWarning | null;
+}
+
+export interface CapacityWarning {
+  capacity: number;
+  /** How many people over capacity. */
+  over: number;
+  /** A larger bookable space that fits, by id, or null when none does. */
+  suggestionId: string | null;
+  /** e.g. "Shelter 2 holds 40 people. Shelter 3 holds 60." */
+  text: string;
 }
