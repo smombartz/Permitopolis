@@ -92,3 +92,164 @@
     }
   }
 }
+
+/*
+ * Page chrome (Rime & Ink "Implementation Notes" and plan 3.2's "quiet glass in
+ * the app"). Two treatments, applied to whatever wraps a route's content:
+ *
+ * - .page-atmosphere: the full landing-page treatment. Stacked gradients, a
+ *   56px grid masked to fade out by 72% of the viewport height, and
+ *   fractal-noise grain at .2 opacity multiplied over everything. All three
+ *   layers are `position: fixed`, so they cover the viewport regardless of
+ *   where the class is mounted, and sit behind normal-flow content without an
+ *   explicit stacking context on the page itself.
+ * - .app-ground: the quieter app variant. Frost ground, the same grid at a
+ *   fraction of the opacity, no grain, no mask (app screens scroll past 72%
+ *   of the viewport constantly, so a fading grid would look like it ran out).
+ */
+.page-atmosphere {
+  background-color: var(--bg-page);
+  background-image: var(--page-atmosphere);
+  background-repeat: no-repeat;
+}
+.page-atmosphere::before,
+.page-atmosphere::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: -2;
+  pointer-events: none;
+}
+.page-atmosphere::before {
+  background-image:
+    linear-gradient(to right, var(--grid-line) 1px, transparent 1px),
+    linear-gradient(to bottom, var(--grid-line) 1px, transparent 1px);
+  background-size: var(--grid-size) var(--grid-size);
+  mask-image: linear-gradient(to bottom, black, transparent 72%);
+  -webkit-mask-image: linear-gradient(to bottom, black, transparent 72%);
+}
+.page-atmosphere::after {
+  z-index: -1;
+  background-image: var(--grain-image);
+  background-size: 180px 180px;
+  opacity: var(--grain-opacity);
+  mix-blend-mode: multiply;
+}
+
+.app-ground {
+  background-color: var(--bg-page);
+  position: relative;
+}
+.app-ground::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background-image:
+    linear-gradient(to right, var(--grid-line) 1px, transparent 1px),
+    linear-gradient(to bottom, var(--grid-line) 1px, transparent 1px);
+  background-size: var(--grid-size) var(--grid-size);
+  opacity: var(--grid-opacity-app);
+}
+
+/* Container utility: width: min(1180px, 100vw - 40px), centered. */
+.page-container {
+  width: min(var(--container-max), calc(100vw - 2 * var(--container-gutter)));
+  margin-inline: auto;
+}
+
+/*
+ * Motion (Rime & Ink "Motion" section). Durations use the --dur-* tokens where
+ * one exists; ambient loops (idle float, surface sweep, breathing selection,
+ * caret) are long and don't correspond to an interaction-duration token, so
+ * their seconds are written directly, matching the design doc. The global
+ * prefers-reduced-motion rule above already forces every animation here to a
+ * single 0.01ms frame, so no per-keyframe override is needed.
+ */
+@keyframes material-settle {
+  from {
+    opacity: 0;
+    transform: translateY(18px) scale(0.985);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+.anim-material-settle {
+  animation: material-settle var(--dur-settle) var(--ease-settle) both;
+  animation-delay: 120ms;
+}
+
+@keyframes idle-float {
+  0%,
+  100% {
+    transform: rotate(-2.6deg) translateY(0);
+  }
+  50% {
+    transform: rotate(-2.1deg) translateY(-5px);
+  }
+}
+.anim-idle-float {
+  animation: idle-float 7s ease-in-out infinite;
+}
+
+@keyframes surface-sweep {
+  0% {
+    transform: translate3d(-120%, -60%, 0) rotate(20deg);
+    opacity: 0;
+  }
+  8%,
+  22% {
+    opacity: 0.5;
+  }
+  38% {
+    opacity: 0;
+  }
+  100% {
+    transform: translate3d(120%, 60%, 0) rotate(20deg);
+    opacity: 0;
+  }
+}
+.anim-surface-sweep {
+  position: relative;
+  overflow: hidden;
+}
+.anim-surface-sweep::after {
+  content: "";
+  position: absolute;
+  inset: -50%;
+  background: linear-gradient(115deg, transparent 42%, var(--surface-hover) 50%, transparent 58%);
+  animation: surface-sweep 5.8s ease-in-out infinite;
+  pointer-events: none;
+}
+
+@keyframes breathing-selection {
+  0%,
+  100% {
+    box-shadow: var(--shadow-row-selected);
+  }
+  50% {
+    box-shadow:
+      0 22px 54px -26px rgba(81, 87, 216, 0.95),
+      0 0 0 1px rgba(81, 87, 216, 0.25);
+  }
+}
+.anim-breathing-selection {
+  animation: breathing-selection 3.6s var(--ease-frost) infinite;
+}
+
+@keyframes caret-blink {
+  0%,
+  49% {
+    opacity: 1;
+  }
+  50%,
+  100% {
+    opacity: 0;
+  }
+}
+.anim-caret-blink {
+  animation: caret-blink 1s step-end infinite;
+}

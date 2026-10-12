@@ -1,0 +1,101 @@
+import { Fragment } from "react"
+import { cn } from "cn"
+import { CheckIcon, TriangleAlertIcon } from "lucide-react"
+import { ENDING_ICON } from "@/components/domain/icons"
+import { ENDING_LABEL, MAIN_PATH, STATE_LABEL, type CaseState, type Ending } from "@/lib/types"
+
+interface StateStepperProps {
+  state: CaseState
+  ending?: Ending | null
+  /** Small markers with no labels, for a card. */
+  compact?: boolean
+  className?: string
+}
+
+/**
+ * The eight MAIN_PATH states with the current one marked. `needs_info` shows
+ * as a warning marker on top of "In review" rather than its own step, since
+ * MAIN_PATH treats it as a variant of in_review. An ending stops the line at
+ * the state it ended in, with its own marker and label.
+ */
+function StateStepper({ state, ending, compact = false, className }: StateStepperProps) {
+  const effective: CaseState = state === "needs_info" ? "in_review" : state
+  const activeIndex = MAIN_PATH.indexOf(effective)
+  const EndingIcon = ending ? ENDING_ICON[ending] : null
+
+  return (
+    <div
+      data-slot="state-stepper"
+      data-compact={compact || undefined}
+      role="list"
+      aria-label="Case progress"
+      className={cn("flex w-full items-start", className)}
+    >
+      {MAIN_PATH.map((step, index) => {
+        const done = !ending && index < activeIndex
+        const isCurrent = index === activeIndex
+        const stopped = isCurrent && !!ending
+        const showNeedsInfo = isCurrent && !ending && state === "needs_info"
+
+        return (
+          <Fragment key={step}>
+            <div role="listitem" className="relative flex flex-col items-center gap-2">
+              {showNeedsInfo ? (
+                <span
+                  className={cn(
+                    "absolute -top-7 inline-flex items-center gap-1 rounded-full border border-warning-border bg-warning-surface px-2 py-0.5 text-[10px] font-bold whitespace-nowrap text-warning-fg uppercase",
+                    compact && "hidden"
+                  )}
+                >
+                  <TriangleAlertIcon className="size-3" aria-hidden="true" />
+                  Needs info
+                </span>
+              ) : null}
+              <span
+                aria-current={isCurrent ? "step" : undefined}
+                className={cn(
+                  "flex shrink-0 items-center justify-center rounded-full border-2 transition-colors",
+                  compact ? "size-2.5" : "size-4",
+                  done && "border-indigo-650 bg-indigo-650 text-fg-on-accent",
+                  isCurrent &&
+                    !stopped &&
+                    "border-indigo-650 bg-surface-solid text-indigo-650 shadow-step-lit",
+                  stopped && "border-danger bg-danger-surface text-danger-fg",
+                  !done && !isCurrent && "border-line-magnetic bg-surface-solid"
+                )}
+              >
+                {!compact && done ? <CheckIcon className="size-2.5 stroke-[3px]" aria-hidden="true" /> : null}
+                {!compact && stopped && EndingIcon ? (
+                  <EndingIcon className="size-2.5 stroke-[3px]" aria-hidden="true" />
+                ) : null}
+              </span>
+              {!compact ? (
+                <span
+                  className={cn(
+                    "text-[11px] font-medium whitespace-nowrap",
+                    done || isCurrent ? "text-fg" : "text-fg-tertiary",
+                    isCurrent && "font-bold"
+                  )}
+                >
+                  {stopped ? ENDING_LABEL[ending as Ending] : STATE_LABEL[step]}
+                </span>
+              ) : null}
+            </div>
+            {index < MAIN_PATH.length - 1 ? (
+              <span
+                aria-hidden="true"
+                className={cn(
+                  "mt-2 h-px flex-1",
+                  compact ? "mt-[5px]" : "mt-2",
+                  done ? "bg-indigo-650" : "bg-line-subtle"
+                )}
+              />
+            ) : null}
+          </Fragment>
+        )
+      })}
+    </div>
+  )
+}
+
+export { StateStepper }
