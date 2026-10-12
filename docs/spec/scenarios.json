@@ -1,0 +1,133 @@
+{
+  "demoToday": "2027-05-03",
+  "scenarios": [
+    {
+      "id": "S1",
+      "scenario": "Maya Chen's 40th birthday picnic",
+      "tier": "Instant",
+      "recurring": false,
+      "location": "Shelter 3, Riverside Park",
+      "eventDate": "2027-05-22",
+      "time": "11 am–4 pm",
+      "sessions": 1,
+      "attendance": 45,
+      "addOns": "None",
+      "reviewers": "None",
+      "demoState": "Permitted",
+      "stateDetails": "Booked and paid; the Applicant sees the permit and the cancellation schedule",
+      "daysUntilEvent": 19
+    },
+    {
+      "id": "S2",
+      "scenario": "Sunrise Yoga Club weekly class",
+      "tier": "Instant",
+      "recurring": true,
+      "location": "Field 4, Riverside Park",
+      "eventDate": "2027-06-06",
+      "time": "8–9 am",
+      "sessions": 13,
+      "attendance": 20,
+      "addOns": "None",
+      "reviewers": "None",
+      "demoState": "Draft",
+      "stateDetails": "The Applicant is in the wizard and has just turned on the repeat option (Sundays Jun 6–Aug 29, 2027)",
+      "daysUntilEvent": 34
+    },
+    {
+      "id": "S3",
+      "scenario": "Jazz in the Plaza",
+      "tier": "Reviewed",
+      "recurring": false,
+      "location": "City Hall Plaza",
+      "eventDate": "2027-06-18",
+      "time": "6–9 pm",
+      "sessions": 1,
+      "attendance": 150,
+      "addOns": "Amplified sound; one food truck",
+      "reviewers": "Public Works & Safety (sound); Health & Legal (food truck, insurance)",
+      "demoState": "Needs info",
+      "stateDetails": "Public Works & Safety approved with sound-hour conditions; Health & Legal asked for the food truck's health permit",
+      "daysUntilEvent": 46
+    },
+    {
+      "id": "S4",
+      "scenario": "Maple Street block party",
+      "tier": "Reviewed (block party exception)",
+      "recurring": false,
+      "location": "400 block of Maple Street",
+      "eventDate": "2027-06-26",
+      "time": "2–8 pm",
+      "sessions": 1,
+      "attendance": 120,
+      "addOns": "One-block closure; no vendors",
+      "reviewers": "Public Works & Safety (closure, barricades); Health & Legal (insurance)",
+      "demoState": "Submitted",
+      "stateDetails": "Waiting on 3 of 12 neighbor sign-offs, so no date hold yet",
+      "daysUntilEvent": 54
+    },
+    {
+      "id": "S5",
+      "scenario": "Riverfront Summer 5K",
+      "tier": "Special event",
+      "recurring": false,
+      "location": "Downtown loop from City Hall Plaza along Main Street and River Road",
+      "eventDate": "2027-07-11",
+      "time": "7–11 am",
+      "sessions": 1,
+      "attendance": 1200,
+      "addOns": "Street closures; amplified sound at the finish; water stations",
+      "reviewers": "Public Works & Safety (route, traffic control, police); Health & Legal (insurance, accessibility)",
+      "demoState": "Quote sent",
+      "stateDetails": "Conditions merged by the Clerk; the Applicant must accept, sign and pay",
+      "daysUntilEvent": 69
+    },
+    {
+      "id": "S6",
+      "scenario": "Main Street Food Truck Festival",
+      "tier": "Special event",
+      "recurring": false,
+      "location": "Main Street, 1st to 4th Avenue",
+      "eventDate": "2027-04-24",
+      "time": "noon–9 pm",
+      "sessions": 1,
+      "attendance": 3000,
+      "addOns": "25 food trucks; beer garden; stage",
+      "reviewers": "City Clerk (alcohol license); Public Works & Safety (closure, police, fire); Health & Legal (vendor permits, insurance, accessibility)",
+      "demoState": "Closeout",
+      "stateDetails": "Public Works & Safety logs actual hours after the cleanup check; the Clerk reconciles costs before the final invoice",
+      "daysUntilEvent": -9
+    }
+  ],
+  "decisions": [
+    {
+      "question": "Block parties",
+      "decision": "Exception: one residential block, no vendors, under 250 people → Reviewed, with neighbor sign-off required",
+      "status": "Decided"
+    },
+    {
+      "question": "Date holds",
+      "decision": "The first complete application wins the hold; Instant bookings hold the date on payment",
+      "status": "Decided"
+    },
+    {
+      "question": "Recurring events",
+      "decision": "Supported: one series permit, one review, each occurrence billed separately",
+      "status": "Decided"
+    },
+    {
+      "question": "Denials",
+      "decision": "Final; no appeal step in the prototype",
+      "status": "Decided"
+    },
+    {
+      "question": "Demo scenarios",
+      "decision": "Two per tier; see the Demo scenarios sheet",
+      "status": "Decided"
+    },
+    {
+      "question": "Date hold length",
+      "decision": "How long does a date hold last before it expires?",
+      "status": "Open"
+    }
+  ]
+}

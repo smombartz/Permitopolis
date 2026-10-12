@@ -1,0 +1,369 @@
+/*
+ * Rime & Ink tokens (docs/rime-and-ink-design-system.md).
+ * The only place colors, shadows, radii and motion values are written down.
+ * Components use the utilities these generate (bg-surface-1, text-fg-secondary,
+ * border-line-subtle, shadow-card, rounded-panel, ease-frost) and never raw values.
+ */
+
+:root {
+  /* ---- primitives ---- */
+  --frost-000: #fbfdff;
+  --frost-050: #f5f8fc;
+  --frost-100: #edf3f8;
+  --frost-200: #d9e4ee;
+
+  --ink-950: #0d1420;
+  --ink-800: #1d2a3b;
+  --ink-650: #435066;
+  --ink-500: #667288;
+
+  --indigo-500: #5157d8;
+  --indigo-650: #32389f;
+  --teal-500: #0f9f9a;
+  --aubergine-500: #7c4d8f;
+  --amber-500: #d88a1d;
+  --mint-300: #94e2d5eb;
+
+  /* ---- page ---- */
+  --bg-page: var(--frost-100);
+  --page-atmosphere:
+    linear-gradient(135deg, #ffffffcc, transparent 34%),
+    radial-gradient(940px 560px at 16% -4%, #ffffffe6, transparent 60%),
+    radial-gradient(780px 520px at 92% 14%, #c4dae97a, transparent 62%),
+    radial-gradient(520px 360px at 66% 18%, #0f9f9a14, transparent 66%),
+    radial-gradient(700px 520px at 52% 110%, #5157d81a, transparent 58%);
+  --grid-line: rgba(21, 32, 48, 0.043);
+  --grid-size: 56px;
+  --grain-opacity: 0.2;
+
+  /* ---- surfaces (white glass) ---- */
+  --surface-hover: #ffffffe6;
+  --surface-strong: #ffffffd1;
+  --surface-1: #ffffff9e;
+  --surface-2: #ffffff85;
+  --surface-3: #ffffff6b;
+  --surface-soft: #ffffff42;
+  --glass-tinted: #f8fbffbd;
+  /* Opaque stand-in for popovers and menus that sit over busy content. */
+  --surface-solid: #f8fbff;
+
+  /* ---- text ---- */
+  --fg-primary: #0d1420f0;
+  --fg-secondary: #1d2a3bad;
+  /* Decoration and placeholders only: 2.6:1 on the page, below AA for text. */
+  --fg-tertiary: #4350668f;
+  /* Labels, table headers and metadata in the app: 7.3:1 or better. */
+  --fg-label: var(--ink-650);
+  --fg-accent: var(--indigo-650);
+  --fg-pill: #30368f;
+  --fg-on-accent: #ffffff;
+
+  /* ---- pills, focus, glows ---- */
+  --pill-fill: #5157d817;
+  --pill-border: #5157d838;
+  --focus-ring: #5157d8b3;
+  --focus-halo: #5157d829;
+  --selection-glow: #5157d85c;
+  --accent-glow: #5157d847;
+  --row-selected: linear-gradient(90deg, #5b5ef7fa, #454bd8fa);
+  --teal-soft: #0f9f9a1f;
+
+  /* ---- borders ---- */
+  --line-glass: #ffffffe0;
+  --line-subtle: #3d4d6321;
+  --line-magnetic: #54658029;
+  --line-inverse: #ffffff1f;
+
+  /* ---- semantic ---- */
+  --success: #16815f;
+  --success-fg: #0c6a4d;
+  --success-surface: #16815f1a;
+  --success-surface-strong: #16815f24;
+  --success-border: #16815f47;
+  --success-glow: 0 0 12px #16815f8c;
+
+  --warning: #d88a1d;
+  --warning-fg: #8a5208;
+  --warning-surface: #d88a1d1f;
+  --warning-border: #d88a1d4d;
+
+  --danger: #b91c3b;
+  --danger-fg: #8a1530;
+  --danger-surface: #b91c3b1a;
+  --danger-border: #b91c3b47;
+
+  /*
+   * ---- identity tints (an extension for this app) ----
+   * Each party and tier has a hue used on a small avatar tile, a chip's leading dot
+   * or an outline badge, always next to an icon and a label. Never used for actions.
+   */
+  --party-applicant: var(--ink-650);
+  --party-applicant-surface: #4350661a;
+  --party-applicant-border: #43506647;
+  --party-applicant-fg: var(--ink-800);
+
+  --party-clerk: var(--indigo-500);
+  --party-clerk-surface: #5157d81a;
+  --party-clerk-border: #5157d847;
+  --party-clerk-fg: var(--fg-pill);
+
+  --party-pws: var(--amber-500);
+  --party-pws-surface: #d88a1d1f;
+  --party-pws-border: #d88a1d4d;
+  --party-pws-fg: #8a5208;
+
+  --party-hl: var(--teal-500);
+  --party-hl-surface: #0f9f9a1f;
+  --party-hl-border: #0f9f9a4d;
+  --party-hl-fg: #0a6b68;
+
+  --tier-instant: var(--success);
+  --tier-instant-surface: #16815f1a;
+  --tier-instant-border: #16815f47;
+  --tier-instant-fg: var(--success-fg);
+
+  --tier-reviewed: var(--indigo-500);
+  --tier-reviewed-surface: #5157d817;
+  --tier-reviewed-border: #5157d838;
+  --tier-reviewed-fg: var(--fg-pill);
+
+  --tier-special: var(--aubergine-500);
+  --tier-special-surface: #7c4d8f1a;
+  --tier-special-border: #7c4d8f47;
+  --tier-special-fg: #5e3470;
+
+  /* ---- dark interlude ---- */
+  --night: #0d1420f7;
+  --night-fg: #fafdfff0;
+  --night-fg-secondary: #e2e8f4b8;
+  --night-fg-tertiary: #e2e8f480;
+  --night-accent: var(--mint-300);
+  --night-line: #ffffff1f;
+  --night-divider: rgba(255, 255, 255, 0.08);
+  --night-added: #85e8c9;
+  --night-removed: #ff9aa8;
+  --night-glass: rgba(15, 22, 34, 0.9);
+  --night-glass-border: rgba(255, 255, 255, 0.14);
+
+  /* ---- window chrome dots (mock UI) ---- */
+  --chrome-red: #ff6258;
+  --chrome-amber: #ffbd2e;
+  --chrome-green: #28c840;
+
+  /* ---- elevation ---- */
+  --elev-card: 0 26px 70px -46px #34455c75, inset 0 1px 0 #ffffffdb;
+  --elev-hud: 0 34px 96px -48px #3a4a648c, inset 0 1px 0 #ffffffd1;
+  --elev-nav: 0 24px 60px -42px rgba(37, 50, 72, 0.72), inset 0 1px 0 rgba(255, 255, 255, 0.9);
+  --elev-window: 0 22px 70px -44px rgba(52, 69, 92, 0.58), inset 0 1px 0 rgba(255, 255, 255, 0.92);
+  --elev-stage: 0 54px 150px -86px rgba(19, 29, 45, 0.82), inset 0 1px 0 rgba(255, 255, 255, 0.96);
+  --elev-card-hover: 0 22px 58px -46px rgba(37, 50, 72, 0.62);
+  --elev-button: 0 18px 34px -24px rgba(50, 56, 159, 0.9), inset 0 1px 0 rgba(255, 255, 255, 0.2);
+  --elev-button-pressed: 0 8px 18px -14px rgba(50, 56, 159, 0.9), inset 0 1px 0 rgba(255, 255, 255, 0.2);
+  --elev-button-dark: 0 18px 34px -24px rgba(13, 20, 32, 0.9), inset 0 1px 0 rgba(255, 255, 255, 0.16);
+  --elev-secondary-pressed: 0 10px 28px -24px #34455c75, inset 0 1px 0 #ffffffdb;
+  --elev-row-selected: 0 18px 44px -30px rgba(81, 87, 216, 0.78);
+  --elev-keycap:
+    0 22px 48px -28px rgba(37, 50, 72, 0.64), inset 0 1px 0 rgba(255, 255, 255, 0.94),
+    inset 0 -10px 18px -18px rgba(29, 42, 59, 0.42);
+  --elev-step-lit: 0 0 0 1px rgba(81, 87, 216, 0.32), 0 10px 26px -10px rgba(81, 87, 216, 0.8);
+  --elev-glass-dark: 0 34px 90px -34px rgba(12, 20, 32, 0.72), inset 0 1px 0 rgba(255, 255, 255, 0.14);
+  --elev-focus-halo: 0 0 0 4px rgba(81, 87, 216, 0.12);
+
+  /* ---- motion ---- */
+  --dur-tap: 120ms;
+  --dur-fast: 180ms;
+  --dur-gentle: 240ms;
+  --dur-soft: 320ms;
+  --dur-settle: 820ms;
+  --ease-frost-curve: cubic-bezier(0.2, 0.72, 0.2, 1);
+  --ease-settle-curve: cubic-bezier(0.18, 0.72, 0.16, 1);
+  --ease-nav-curve: cubic-bezier(0.4, 0, 0.2, 1);
+
+  /* ---- layout ---- */
+  --section-space: 104px;
+  --container-max: 1180px;
+  --container-gutter: 20px;
+
+  /* ---- type ---- */
+  --font-system:
+    -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", "Helvetica Neue", Arial, sans-serif;
+  --font-system-display:
+    -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", "Helvetica Neue", Arial, sans-serif;
+}
+
+@theme inline {
+  /* page and frost */
+  --color-page: var(--bg-page);
+  --color-frost-000: var(--frost-000);
+  --color-frost-050: var(--frost-050);
+  --color-frost-100: var(--frost-100);
+  --color-frost-200: var(--frost-200);
+
+  /* surfaces */
+  --color-surface-hover: var(--surface-hover);
+  --color-surface-strong: var(--surface-strong);
+  --color-surface-1: var(--surface-1);
+  --color-surface-2: var(--surface-2);
+  --color-surface-3: var(--surface-3);
+  --color-surface-soft: var(--surface-soft);
+  --color-surface-solid: var(--surface-solid);
+  --color-glass-tinted: var(--glass-tinted);
+
+  /* text */
+  --color-fg: var(--fg-primary);
+  --color-fg-secondary: var(--fg-secondary);
+  --color-fg-tertiary: var(--fg-tertiary);
+  --color-fg-label: var(--fg-label);
+  --color-fg-accent: var(--fg-accent);
+  --color-fg-pill: var(--fg-pill);
+  --color-fg-on-accent: var(--fg-on-accent);
+
+  /* ink, indigo and the rarer accents */
+  --color-ink-950: var(--ink-950);
+  --color-ink-800: var(--ink-800);
+  --color-ink-650: var(--ink-650);
+  --color-ink-500: var(--ink-500);
+  --color-indigo-500: var(--indigo-500);
+  --color-indigo-650: var(--indigo-650);
+  --color-teal-500: var(--teal-500);
+  --color-teal-soft: var(--teal-soft);
+  --color-aubergine-500: var(--aubergine-500);
+
+  /* pills and focus */
+  --color-pill: var(--pill-fill);
+  --color-pill-border: var(--pill-border);
+  --color-focus-ring: var(--focus-ring);
+  --color-focus-halo: var(--focus-halo);
+
+  /* borders */
+  --color-line-glass: var(--line-glass);
+  --color-line-subtle: var(--line-subtle);
+  --color-line-magnetic: var(--line-magnetic);
+  --color-line-inverse: var(--line-inverse);
+
+  /* semantic */
+  --color-success: var(--success);
+  --color-success-fg: var(--success-fg);
+  --color-success-surface: var(--success-surface);
+  --color-success-surface-strong: var(--success-surface-strong);
+  --color-success-border: var(--success-border);
+  --color-warning: var(--warning);
+  --color-warning-fg: var(--warning-fg);
+  --color-warning-surface: var(--warning-surface);
+  --color-warning-border: var(--warning-border);
+  --color-danger: var(--danger);
+  --color-danger-fg: var(--danger-fg);
+  --color-danger-surface: var(--danger-surface);
+  --color-danger-border: var(--danger-border);
+
+  /* identity tints */
+  --color-party-applicant: var(--party-applicant);
+  --color-party-applicant-surface: var(--party-applicant-surface);
+  --color-party-applicant-border: var(--party-applicant-border);
+  --color-party-applicant-fg: var(--party-applicant-fg);
+  --color-party-clerk: var(--party-clerk);
+  --color-party-clerk-surface: var(--party-clerk-surface);
+  --color-party-clerk-border: var(--party-clerk-border);
+  --color-party-clerk-fg: var(--party-clerk-fg);
+  --color-party-pws: var(--party-pws);
+  --color-party-pws-surface: var(--party-pws-surface);
+  --color-party-pws-border: var(--party-pws-border);
+  --color-party-pws-fg: var(--party-pws-fg);
+  --color-party-hl: var(--party-hl);
+  --color-party-hl-surface: var(--party-hl-surface);
+  --color-party-hl-border: var(--party-hl-border);
+  --color-party-hl-fg: var(--party-hl-fg);
+  --color-tier-instant: var(--tier-instant);
+  --color-tier-instant-surface: var(--tier-instant-surface);
+  --color-tier-instant-border: var(--tier-instant-border);
+  --color-tier-instant-fg: var(--tier-instant-fg);
+  --color-tier-reviewed: var(--tier-reviewed);
+  --color-tier-reviewed-surface: var(--tier-reviewed-surface);
+  --color-tier-reviewed-border: var(--tier-reviewed-border);
+  --color-tier-reviewed-fg: var(--tier-reviewed-fg);
+  --color-tier-special: var(--tier-special);
+  --color-tier-special-surface: var(--tier-special-surface);
+  --color-tier-special-border: var(--tier-special-border);
+  --color-tier-special-fg: var(--tier-special-fg);
+
+  /* dark interlude */
+  --color-night: var(--night);
+  --color-night-fg: var(--night-fg);
+  --color-night-fg-secondary: var(--night-fg-secondary);
+  --color-night-fg-tertiary: var(--night-fg-tertiary);
+  --color-night-accent: var(--night-accent);
+  --color-night-line: var(--night-line);
+  --color-night-divider: var(--night-divider);
+  --color-night-added: var(--night-added);
+  --color-night-removed: var(--night-removed);
+  --color-night-glass: var(--night-glass);
+  --color-night-glass-border: var(--night-glass-border);
+
+  --color-chrome-red: var(--chrome-red);
+  --color-chrome-amber: var(--chrome-amber);
+  --color-chrome-green: var(--chrome-green);
+
+  /* elevation: shadow-card, shadow-hud, ... */
+  --shadow-card: var(--elev-card);
+  --shadow-hud: var(--elev-hud);
+  --shadow-nav: var(--elev-nav);
+  --shadow-window: var(--elev-window);
+  --shadow-stage: var(--elev-stage);
+  --shadow-card-hover: var(--elev-card-hover);
+  --shadow-button: var(--elev-button);
+  --shadow-button-pressed: var(--elev-button-pressed);
+  --shadow-button-dark: var(--elev-button-dark);
+  --shadow-secondary-pressed: var(--elev-secondary-pressed);
+  --shadow-row-selected: var(--elev-row-selected);
+  --shadow-keycap: var(--elev-keycap);
+  --shadow-step-lit: var(--elev-step-lit);
+  --shadow-glass-dark: var(--elev-glass-dark);
+  --shadow-focus-halo: var(--elev-focus-halo);
+
+  /* backdrop blur: backdrop-blur-panel, ... */
+  --blur-panel: 28px;
+  --blur-nav: 40px;
+  --blur-hud: 30px;
+  --blur-button: 24px;
+  --blur-backdrop: 8px;
+
+  /* radii: rounded-control, rounded-panel, ... */
+  --radius-kbd: 6px;
+  --radius-control: 8px;
+  --radius-row: 10px;
+  --radius-window: 12px;
+  --radius-panel: 14px;
+  --radius-node: 16px;
+  --radius-stage: 28px;
+
+  /* easing: ease-frost, ease-settle, ease-nav */
+  --ease-frost: var(--ease-frost-curve);
+  --ease-settle: var(--ease-settle-curve);
+  --ease-nav: var(--ease-nav-curve);
+
+  /* type scale: text-hero, text-display, ... (Tailwind's base, sm and xs cover 16, 14 and 12) */
+  --text-hero: 72px;
+  --text-hero--line-height: 0.96;
+  --text-display: 60px;
+  --text-display--line-height: 1;
+  --text-feature: 48px;
+  --text-feature--line-height: 1;
+  --text-price: 36px;
+  --text-price--line-height: 1.1;
+  --text-card: 30px;
+  --text-card--line-height: 1.2;
+  --text-h4: 24px;
+  --text-h4--line-height: 1.33;
+  --text-lead: 20px;
+  --text-lead--line-height: 32px;
+  --text-body-l: 18px;
+  --text-body-l--line-height: 32px;
+  --text-eyebrow: 11px;
+  --text-eyebrow--line-height: 1.5;
+  --text-micro: 10px;
+  --text-micro--line-height: 1.5;
+
+  --font-display: var(--font-system-display);
+
+  --container-page: var(--container-max);
+}
