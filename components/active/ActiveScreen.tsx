@@ -6,10 +6,23 @@ import { Label } from "@/components/ui/label";
 import { PageHeader } from "@/components/ui/page-header";
 import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { addDaysISO } from "@/lib/dates";
 import { activePermits, useDemo } from "@/lib/state";
 import { routes, type ActiveView } from "@/lib/routes";
 import type { Dept, ISODate } from "@/lib/types";
-import { activeCalendarItems, activeListRows, activeMapHighlights, blackoutLabelOn, closeoutRows, todayLine } from "@/lib/view/active";
+import {
+  activeCalendarItems,
+  activeListRows,
+  activeMapHighlights,
+  blackoutLabelOn,
+  closeoutRows,
+  meetingItems,
+  monthAnchorOf,
+  monthGridRange,
+  todayLine,
+  weekGridRange,
+  weekStartOf,
+} from "@/lib/view/active";
 import { ActiveCalendarView, type CalendarSubView } from "./ActiveCalendarView";
 import { ActiveCloseoutView } from "./ActiveCloseoutView";
 import { ActiveListView } from "./ActiveListView";
@@ -48,6 +61,8 @@ export function ActiveScreen() {
   const expandSessions = searchParams.get("sessions") === "1";
   const calSub = asCalSub(searchParams.get("cal"));
   const date = searchParams.get("date") || today;
+  // On by default, PRD "Consultation": meetings and walkthroughs appear on every calendar.
+  const showMeetings = searchParams.get("meetings") !== "0";
 
   const setParams = React.useCallback(
     (patch: Record<string, string | null>) => {
@@ -67,6 +82,7 @@ export function ActiveScreen() {
   const setCalSub = React.useCallback((next: CalendarSubView) => setParams({ cal: next === "month" ? null : next }), [setParams]);
   const setIncludeHolds = React.useCallback((next: boolean) => setParams({ holds: next ? "1" : null }), [setParams]);
   const setExpandSessions = React.useCallback((next: boolean) => setParams({ sessions: next ? "1" : null }), [setParams]);
+  const setShowMeetings = React.useCallback((next: boolean) => setParams({ meetings: next ? null : "0" }), [setParams]);
   // A case opened from here comes back to this view, date and toggles.
   const query = searchParams.toString();
   const here = query ? `${pathname}?${query}` : pathname;
@@ -88,6 +104,16 @@ export function ActiveScreen() {
   // nothing on screen, so there the click would be a dead one.
   const openDay = React.useCallback((next: ISODate) => setParams({ date: next === today ? null : next, view: "map" }), [setParams, today]);
 
+  // Meetings and walkthroughs, apart from the tier-colored items: the strip's own 8 days, and
+  // whichever range the calendar sub-view is currently drawing (PRD "Consultation").
+  const stripMeetings = React.useMemo(() => (showMeetings ? meetingItems(cases, { from: today, to: addDaysISO(today, 7) }) : []), [cases, today, showMeetings]);
+  const calendarRange = calSub === "month" ? monthGridRange(monthAnchorOf(date)) : weekGridRange(weekStartOf(date));
+  const calendarMeetings = React.useMemo(
+    () => (showMeetings ? meetingItems(cases, calendarRange) : []),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [cases, calendarRange.from, calendarRange.to, showMeetings],
+  );
+
   return (
     <div className="flex flex-col gap-6">
       <PageHeader
@@ -95,16 +121,33 @@ export function ActiveScreen() {
         title="Active permits"
         description="Every case that is Permitted, on Event day or in Closeout."
         actions={
-          <div className="flex items-center gap-2">
-            <Switch id="active-include-holds-header" checked={includeHolds} onCheckedChange={setIncludeHolds} />
-            <Label htmlFor="active-include-holds-header" className="normal-case">
-              Include held dates
-            </Label>
+          <div className="flex flex-wrap items-center gap-4">
+            <div className="flex items-center gap-2">
+              <Switch id="active-show-meetings-header" checked={showMeetings} onCheckedChange={setShowMeetings} />
+              <Label htmlFor="active-show-meetings-header" className="normal-case">
+                Show meetings
+              </Label>
+            </div>
+            <div className="flex items-center gap-2">
+              <Switch id="active-include-holds-header" checked={includeHolds} onCheckedChange={setIncludeHolds} />
+              <Label htmlFor="active-include-holds-header" className="normal-case">
+                Include held dates
+              </Label>
+            </div>
           </div>
         }
       />
 
-      <TodayStrip headline={headline} items={calendarItems} today={today} onSelectDay={openDay} selected={view === "list" || view === "closeout" ? undefined : date} onSelectCase={openCase} />
+      <TodayStrip
+        headline={headline}
+        items={calendarItems}
+        today={today}
+        onSelectDay={openDay}
+        selected={view === "list" || view === "closeout" ? undefined : date}
+        onSelectCase={openCase}
+        meetings={stripMeetings}
+        showMeetings={showMeetings}
+      />
 
       <Tabs value={view} onValueChange={(v) => setView(v as ActiveView)}>
         <TabsList>
@@ -137,6 +180,8 @@ export function ActiveScreen() {
             subView={calSub}
             onSubViewChange={setCalSub}
             onSelectCase={openCase}
+            meetings={calendarMeetings}
+            showMeetings={showMeetings}
           />
         </TabsContent>
 

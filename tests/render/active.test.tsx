@@ -10,7 +10,7 @@ import { routes } from "@/lib/routes";
 import { DEFAULT_DEMO_TODAY } from "@/lib/rules/config";
 import { useDemo } from "@/lib/state";
 import { makeCase } from "@/lib/state/testSupport";
-import { navigate, renderScreen, storedCase, switchRole } from "./harness";
+import { lastPush, navigate, renderScreen, storedCase, switchRole } from "./harness";
 import { navState } from "./setup";
 
 const TODAY = DEFAULT_DEMO_TODAY;
@@ -179,6 +179,73 @@ describe("Active permits: a hold expiring tomorrow", () => {
     await renderScreen(<ActiveScreen />, { role: "clerk", path: routes.city.active({}), search: { holds: "1" }, cases: [further] });
 
     expect(screen.queryByText("Expires tomorrow")).not.toBeInTheDocument();
+  });
+});
+
+describe("Active permits: meetings and walkthroughs", () => {
+  const CAL_JUNE = routes.city.active({ view: "calendar", date: "2027-06-15" });
+
+  it("the calendar for June 2027 shows S5's coordination meeting as a meeting item, for each city role", async () => {
+    await renderScreen(<ActiveScreen />, { role: "clerk", path: CAL_JUNE });
+
+    expect(screen.getByText("Meetings this month")).toBeInTheDocument();
+    expect(screen.getByText(/Coordination meeting/)).toBeInTheDocument();
+
+    switchRole("pws");
+    expect(screen.getByText(/Coordination meeting/)).toBeInTheDocument();
+
+    switchRole("hl");
+    expect(screen.getByText(/Coordination meeting/)).toBeInTheDocument();
+  });
+
+  it('"Show meetings" is on by default and hides the list once turned off', async () => {
+    const { user } = await renderScreen(<ActiveScreen />, { role: "clerk", path: CAL_JUNE });
+    expect(screen.getByRole("switch", { name: "Show meetings" })).toBeChecked();
+    expect(screen.getByText(/Coordination meeting/)).toBeInTheDocument();
+
+    await user.click(screen.getByRole("switch", { name: "Show meetings" }));
+
+    expect(navState.search.get("meetings")).toBe("0");
+    expect(screen.queryByText(/Coordination meeting/)).not.toBeInTheDocument();
+  });
+
+  it("clicking a meeting opens its case", async () => {
+    const { user } = await renderScreen(<ActiveScreen />, { role: "clerk", path: CAL_JUNE });
+
+    await user.click(screen.getByText(/Coordination meeting/));
+
+    expect(lastPush()).toBe(routes.city.case("PMT-27-0097", { from: CAL_JUNE }));
+  });
+
+  it("the Today strip lists a meeting within its own 8 days", async () => {
+    await renderScreen(<ActiveScreen />, { role: "clerk", path: routes.city.active(), demoToday: "2027-06-20" });
+
+    expect(screen.getByText("Meetings this week")).toBeInTheDocument();
+    expect(screen.getByText(/Coordination meeting/)).toBeInTheDocument();
+  });
+
+  it("an empty range (the List and Closeout tabs' own week) shows no meetings list", async () => {
+    await renderScreen(<ActiveScreen />, { role: "clerk", path: routes.city.active(), demoToday: "2027-01-01" });
+
+    expect(screen.queryByText(/Meetings this week/)).not.toBeInTheDocument();
+  });
+});
+
+describe("Active permits: the Clerk's day-of contact duty", () => {
+  it("names the event on the chosen day, in the Calendar side panel", async () => {
+    await renderScreen(<ActiveScreen />, { role: "clerk", path: routes.city.active({ view: "calendar" }) });
+
+    const panel = within(document.querySelector('[data-slot="sticky-aside"]') as HTMLElement);
+    expect(panel.getByText(/Day-of contact duty/)).toBeInTheDocument();
+    // Mon, May 3 is a Tai Chi session day (today's own event on the Today strip).
+    expect(panel.getByText(/Tai Chi/)).toBeInTheDocument();
+  });
+
+  it("reads \"No event that day\" for a day with nothing on", async () => {
+    await renderScreen(<ActiveScreen />, { role: "clerk", path: routes.city.active({ view: "calendar", date: "2027-05-20" }) });
+
+    const panel = within(document.querySelector('[data-slot="sticky-aside"]') as HTMLElement);
+    expect(panel.getByText("No event that day.")).toBeInTheDocument();
   });
 });
 

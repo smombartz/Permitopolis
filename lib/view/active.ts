@@ -10,7 +10,7 @@ import { addDaysISO, weekdayOf } from "@/lib/dates";
 import { fmtDateShort, plural } from "@/lib/format";
 import { citywideBlackoutOn } from "@/lib/rules";
 import { CITY_STAFF_BY_DEPT } from "@/lib/data/people";
-import { activePermits, eventDate, holdsDateAtQuote, permitSessions, sessionDates, waitingOn } from "@/lib/state";
+import { activePermits, eventDate, holdsDateAtQuote, isOpen, permitSessions, sessionDates, waitingOn } from "@/lib/state";
 import { isHoldExpiringTomorrow } from "@/lib/view/caseDetail";
 import type { Dept, EventCase, ISODate, Location, Party, Tier } from "@/lib/types";
 
@@ -38,6 +38,17 @@ export function weekStartOf(date: ISODate): ISODate {
 /** `weekStart` moved by `delta` whole weeks. */
 export function shiftWeek(weekStart: ISODate, delta: number): ISODate {
   return addDaysISO(weekStart, delta * 7);
+}
+
+/** The inclusive range `MonthGrid` draws for this month: full weeks, Sunday to Saturday. */
+export function monthGridRange(monthAnchor: ISODate): { from: ISODate; to: ISODate } {
+  const lastDayOfMonth = addDaysISO(shiftMonth(monthAnchor, 1), -1);
+  return { from: weekStartOf(monthAnchor), to: addDaysISO(weekStartOf(lastDayOfMonth), 6) };
+}
+
+/** The inclusive range `WeekGrid` draws: 7 days from `weekStart`. */
+export function weekGridRange(weekStart: ISODate): { from: ISODate; to: ISODate } {
+  return { from: weekStart, to: addDaysISO(weekStart, 6) };
 }
 
 /* ---------- the list ---------- */
@@ -192,6 +203,58 @@ export function closeoutRows(cases: EventCase[], today: ISODate): CloseoutRow[] 
   return rows.sort((a, b) => (eventDate(a.case, today) ?? "").localeCompare(eventDate(b.case, today) ?? "") || a.case.id.localeCompare(b.case.id));
 }
 
+/* ---------- meetings and walkthroughs ---------- */
+
+export interface MeetingItem {
+  /** The task id: unique, and what opens the case (`?task=`, resolved the same way a Who's up row would). */
+  id: string;
+  caseId: string;
+  date: ISODate;
+  /** The meeting's own title: "Pre-application meeting", "Coordination meeting", "Site walkthrough". */
+  label: string;
+  eventName: string;
+  /** Who attends, applicant first: the parties the catalogue's own "why" names for this meeting. */
+  attendees: Party[];
+  held: boolean;
+}
+
+/** Who attends each kind of meeting (the catalogue's "why", as a list of parties). */
+const MEETING_ATTENDEES: Record<string, Party[]> = {
+  pre_application_meeting: ["applicant", "clerk", "pws", "hl"],
+  coordination_meeting: ["applicant", "clerk", "pws"],
+  site_walkthrough: ["applicant", "pws"],
+};
+
+/**
+ * Every meeting card with a scheduled date, on any open case: the pre-application meeting, the
+ * coordination meeting and the site walkthrough, whether or not the card has unlocked yet (a
+ * meeting is scheduled while its card is still locked, see "How the engine behaves"). This is
+ * the readme's "appears on all three calendars": one list, shown by every city role.
+ */
+export function meetingItems(cases: EventCase[], options: { from?: ISODate; to?: ISODate } = {}): MeetingItem[] {
+  const items: MeetingItem[] = [];
+  for (const c of cases) {
+    if (!isOpen(c)) continue;
+    for (const t of c.tasks) {
+      if (t.kind !== "meeting") continue;
+      const date = t.payload.scheduledFor;
+      if (!date) continue;
+      if (options.from !== undefined && date < options.from) continue;
+      if (options.to !== undefined && date > options.to) continue;
+      items.push({
+        id: t.id,
+        caseId: c.id,
+        date,
+        label: t.title,
+        eventName: c.name,
+        attendees: MEETING_ATTENDEES[t.catalogId] ?? ["applicant"],
+        held: t.status === "done",
+      });
+    }
+  }
+  return items.sort((a, b) => a.date.localeCompare(b.date) || a.id.localeCompare(b.id));
+}
+
 /* ---------- role overlays ---------- */
 
 const WORK_ORDER_PREFIX = "work_order:";
@@ -276,6 +339,28 @@ export interface ClerkOverlay {
 export function clerkOverlay(): ClerkOverlay {
   const staff = CITY_STAFF_BY_DEPT.clerk;
   return { contactName: staff.name, contactPhone: staff.phone, complianceLogCount: 0 };
+}
+
+export interface DayOfContactRow {
+  caseId: string;
+  eventName: string;
+  contactName: string;
+  contactPhone: string;
+}
+
+/**
+ * The Clerk's day-of contact duty for one day: the events held that day, each with the
+ * contact's name and phone (the same contact for every event, PRD "Day-of"). Only events with a
+ * place to be reached at count: a quote sent case only holding its date is not "on" that day.
+ */
+export function dayOfContactRows(cases: EventCase[], date: ISODate): DayOfContactRow[] {
+  const staff = CITY_STAFF_BY_DEPT.clerk;
+  return permitSessions(cases, { from: date, to: date }).map((s) => ({
+    caseId: s.case.id,
+    eventName: s.case.name,
+    contactName: staff.name,
+    contactPhone: staff.phone,
+  }));
 }
 
 export type RoleOverlay =
