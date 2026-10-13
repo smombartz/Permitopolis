@@ -67,6 +67,12 @@ function ConfirmRoutingPanel({ caseId, onClose }: ActionPanelProps) {
   const latestDueDate = checkedDueDates.length > 0 ? checkedDueDates.reduce((a, b) => (a > b ? a : b)) : null;
   const leadTimeLeft = latestDueDate ? leadTimeLeftAfterRouting(c, latestDueDate) : null;
 
+  // A card routed without its reviewer leaves it with nobody tasked (readme, "Open items"):
+  // an insurance card exists on the plan but its department, Health & Legal, is unchecked.
+  const hasInsuranceCard = c.tasks.some((t) => t.catalogId === "insurance_certificate");
+  const hlRow = rows.find((r) => r.dept === "hl");
+  const droppingInsuranceReviewer = hasInsuranceCard && hlRow && !hlRow.checked;
+
   return (
     <>
       <PanelHeader title="Confirm routing" description="Suggested from the plan's triggers. Adjust who reviews, what each checks, and the due date for its decision." />
@@ -99,8 +105,17 @@ function ConfirmRoutingPanel({ caseId, onClose }: ActionPanelProps) {
               : `${plural(leadTimeLeft, "day")} of lead time left after the latest due date, for the quote and payment.`}
           </InlineAlert>
         ) : null}
+        {droppingInsuranceReviewer ? (
+          <InlineAlert variant="danger">This plan carries an insurance card; route Health &amp; Legal or nobody checks it.</InlineAlert>
+        ) : null}
       </PanelBody>
-      <PanelActions error={error} onCancel={onClose} submitLabel="Confirm routing" disabled={!check.ok || !anyChecked || !datesOk} onSubmit={submit} />
+      <PanelActions
+        error={error}
+        onCancel={onClose}
+        submitLabel="Confirm routing"
+        disabled={!check.ok || !anyChecked || !datesOk || droppingInsuranceReviewer}
+        onSubmit={submit}
+      />
     </>
   )
 }

@@ -117,6 +117,23 @@ describe("4A: Confirm routing (confirm_routing)", () => {
     expect(routed.state).toBe("in_review");
     expect(routed.reviews.map((r) => r.dept).sort()).toEqual(["hl", "pws"]);
   });
+
+  it("refuses to drop Health & Legal while the plan carries an insurance card", async () => {
+    const { user } = await renderScreen(<CaseDetailScreen />, { path: routes.city.case(S4), role: "clerk" });
+
+    await act(async () => {
+      const dispatch = useDemo.getState().dispatch;
+      for (let i = 0; i < 9; i++) dispatch(S4, { type: "simulate_signoff" }, "applicant");
+      dispatch(S4, { type: "accept_complete" }, "clerk");
+    });
+
+    await user.click(actions().getByRole("button", { name: "Confirm routing" }));
+    const panel = sheet();
+
+    await user.click(within(panel).getByRole("checkbox", { name: "Route to Health & Legal" }));
+    expect(within(panel).getByText(/route Health & Legal or nobody checks it/)).toBeInTheDocument();
+    expect(sheetButton("Confirm routing")).toBeDisabled();
+  });
 });
 
 describe("4A: Issue permit checklist", () => {
