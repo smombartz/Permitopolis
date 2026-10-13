@@ -23,7 +23,7 @@ describe("Payments: Due", () => {
     expect(screen.getByText("Oak Avenue block party")).toBeInTheDocument();
 
     const row = screen.getByText("Riverfront Summer 5K").closest("tr") as HTMLElement;
-    await user.click(within(row).getByRole("link", { name: "Record payment" }));
+    await user.click(within(row).getByRole("link", { name: /^Record payment: / }));
 
     expect(lastPush()).toBe(routes.city.case(S5, { task: "pay", from: routes.city.payments() }));
   });

@@ -106,7 +106,12 @@ function ConfirmRoutingPanel({ caseId, onClose }: ActionPanelProps) {
               : `${plural(leadTimeLeft, "day")} of lead time left after the latest due date, for the quote and payment.`}
           </InlineAlert>
         ) : null}
-        {listProblem ? <InlineAlert variant="danger">{listProblem}</InlineAlert> : null}
+        {/* It appears as departments are ticked and unticked: read out when it does. */}
+        {listProblem ? (
+          <InlineAlert variant="danger" live>
+            {listProblem}
+          </InlineAlert>
+        ) : null}
       </PanelBody>
       <PanelActions
         error={error}

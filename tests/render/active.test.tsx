@@ -127,7 +127,8 @@ describe("Active permits: choosing a day", () => {
     const { user } = await renderScreen(<ActiveScreen />, { role: "clerk", path: routes.city.active({ view: "calendar" }) });
     const grid = screen.getByRole("tabpanel");
 
-    const eleventh = within(grid).getAllByRole("button", { name: "11" })[0];
+    // A day's name is its whole date, not the "11" its cell shows.
+    const eleventh = within(grid).getByRole("button", { name: /^Tue, May 11, 2027/ });
     expect(eleventh).toHaveAttribute("aria-pressed", "false");
     await user.click(eleventh);
 
@@ -190,7 +191,8 @@ describe("Active permits: meetings and walkthroughs", () => {
   /** The calendar grid's own cell for a day: the day's button, then its items. */
   function dayCell(dayOfMonth: string): HTMLElement {
     const grid = document.querySelector('[role="tabpanel"][data-state="active"]') as HTMLElement;
-    const day = within(grid).getAllByRole("button", { name: new RegExp(`^${dayOfMonth}( Today)?$`) })[0];
+    // A day's name is its whole date ("Mon, Jun 21, 2027, 2 events"); these tests are all in June 2027.
+    const day = within(grid).getByRole("button", { name: new RegExp(`^\\w{3}, Jun ${dayOfMonth}, 2027`) });
     return day.parentElement as HTMLElement;
   }
 

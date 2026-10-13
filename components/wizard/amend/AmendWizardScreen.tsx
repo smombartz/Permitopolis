@@ -204,7 +204,7 @@ function AmendWizardScreen() {
         </div>
 
         {!narrow ? (
-          <StickyAside>
+          <StickyAside aria-label="What your change does">
             <AmendResultPanel diff={diff} />
           </StickyAside>
         ) : null}

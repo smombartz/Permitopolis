@@ -287,7 +287,7 @@ function WizardScreen() {
         </div>
 
         {!narrow ? (
-          <StickyAside>
+          <StickyAside aria-label="Your plan so far">
             <ResultPanel panel={panel} onApplyWhatIf={applyWhatIf} highlight={tierHighlight} />
           </StickyAside>
         ) : null}

@@ -5,6 +5,7 @@
  * verify, a work order, a meeting to schedule), then every row availableActions() gives this
  * role, in order. It is on screen on every tab, so it is where the role's next step always is.
  */
+import * as React from "react"
 import { Button } from "@/components/ui/button"
 import { StickyAside } from "@/components/ui/sticky-aside"
 import { PARTY_LABEL, type Party, type Task } from "@/lib/types"
@@ -22,10 +23,11 @@ interface ActionsPanelProps {
 }
 
 function ActionsPanel({ role, stateLabel, tasks = [], actions, whoIsUpNote, onOpen }: ActionsPanelProps) {
+  const reasonBase = React.useId()
   return (
     <StickyAside aria-label="Your actions" className="flex flex-col gap-4">
       <div>
-        <p className="text-sm font-semibold text-fg">Your actions</p>
+        <h2 className="text-sm font-semibold text-fg">Your actions</h2>
         <p className="text-xs text-fg-secondary">
           {PARTY_LABEL[role]} &middot; {stateLabel}
         </p>
@@ -42,20 +44,29 @@ function ActionsPanel({ role, stateLabel, tasks = [], actions, whoIsUpNote, onOp
               {task.title}
             </Button>
           ))}
-          {actions.map((action, index) => (
-            <div key={`${action.type}-${index}`} className="flex flex-col gap-1">
-              <Button
-                type="button"
-                variant={action.primary ? "primary" : "secondary"}
-                className="w-full justify-center"
-                disabled={!action.enabled}
-                onClick={() => onOpen(openKeyForAction(action.type))}
-              >
-                {action.label}
-              </Button>
-              {!action.enabled && action.reason ? <p className="px-1 text-xs text-fg-secondary">{action.reason}</p> : null}
-            </div>
-          ))}
+          {actions.map((action, index) => {
+            // Why a row is off is its description, so it is read with the button, not after it.
+            const reasonId = !action.enabled && action.reason ? `${reasonBase}-${index}` : undefined
+            return (
+              <div key={`${action.type}-${index}`} className="flex flex-col gap-1">
+                <Button
+                  type="button"
+                  variant={action.primary ? "primary" : "secondary"}
+                  className="w-full justify-center"
+                  disabled={!action.enabled}
+                  aria-describedby={reasonId}
+                  onClick={() => onOpen(openKeyForAction(action.type))}
+                >
+                  {action.label}
+                </Button>
+                {reasonId ? (
+                  <p id={reasonId} className="px-1 text-xs text-fg-secondary">
+                    {action.reason}
+                  </p>
+                ) : null}
+              </div>
+            )
+          })}
         </div>
       )}
     </StickyAside>

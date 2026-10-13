@@ -32,17 +32,35 @@ function MeetingRow({ c, dept, role, today, onOpen }: { c: EventCase; dept: Dept
                 <span className="text-xs text-fg-label">{task.payload.scheduledFor ? `Scheduled for ${fmtDate(task.payload.scheduledFor)}` : "Not yet scheduled"}</span>
               </div>
               <div className="flex shrink-0 items-center gap-2">
-                <Button type="button" variant="secondary" size="sm" onClick={() => onOpen(`schedule_meeting:${task.id}`)}>
+                {/* A case can have two meetings: each button says which, and why it cannot be marked held yet. */}
+                <Button
+                  type="button"
+                  variant="secondary"
+                  size="sm"
+                  aria-label={`${task.payload.scheduledFor ? "Reschedule" : "Schedule"}: ${task.title}`}
+                  onClick={() => onOpen(`schedule_meeting:${task.id}`)}
+                >
                   {task.payload.scheduledFor ? "Reschedule" : "Schedule"}
                 </Button>
                 {canHold ? (
-                  <Button type="button" size="sm" disabled={!canHold.ok} onClick={() => onOpen(`complete_city_task:${task.id}`)}>
+                  <Button
+                    type="button"
+                    size="sm"
+                    disabled={!canHold.ok}
+                    aria-label={`Mark held: ${task.title}`}
+                    aria-describedby={!canHold.ok ? `held-reason-${task.id}` : undefined}
+                    onClick={() => onOpen(`complete_city_task:${task.id}`)}
+                  >
                     Mark held
                   </Button>
                 ) : null}
               </div>
             </div>
-            {canHold && !canHold.ok ? <p className="text-right text-xs text-fg-secondary">{canHold.reason}</p> : null}
+            {canHold && !canHold.ok ? (
+              <p id={`held-reason-${task.id}`} className="text-right text-xs text-fg-secondary">
+                {canHold.reason}
+              </p>
+            ) : null}
           </div>
         )
       })}

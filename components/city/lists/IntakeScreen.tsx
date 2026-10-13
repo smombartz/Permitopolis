@@ -149,12 +149,25 @@ function IntakeTabTable({
               </TableCell>
               <TableCell>
                 <div className="flex flex-col items-start gap-1.5">
-                  <Button size="sm" disabled={!row.accept.enabled} onClick={() => onAccept(c.id)} title={row.accept.reason}>
+                  {/* One of each per row: the name says which application, and the reason it cannot be accepted is its description. */}
+                  <Button
+                    size="sm"
+                    disabled={!row.accept.enabled}
+                    aria-label={`Accept as complete: ${c.name}`}
+                    aria-describedby={!row.accept.enabled && row.accept.reason ? `intake-reason-${c.id}` : undefined}
+                    onClick={() => onAccept(c.id)}
+                  >
                     Accept as complete
                   </Button>
-                  {!row.accept.enabled && row.accept.reason ? <p className="max-w-40 text-xs text-danger-fg">{row.accept.reason}</p> : null}
+                  {!row.accept.enabled && row.accept.reason ? (
+                    <p id={`intake-reason-${c.id}`} className="max-w-40 text-xs whitespace-normal text-danger-fg">
+                      {row.accept.reason}
+                    </p>
+                  ) : null}
                   <Button size="sm" variant="ghost" asChild>
-                    <Link href={routes.city.case(c.id, { task: "request_info", from })}>Request information</Link>
+                    <Link href={routes.city.case(c.id, { task: "request_info", from })} aria-label={`Request information: ${c.name}`}>
+                      Request information
+                    </Link>
                   </Button>
                 </div>
               </TableCell>
@@ -206,7 +219,9 @@ function InstantExceptionsTable({ cases, today, from }: { cases: EventCase[]; to
             <TableCell numeric>{plural(daysInCloseout, "day")}</TableCell>
             <TableCell>
               <Button size="sm" variant="secondary" asChild>
-                <Link href={routes.city.case(c.id, { task: task?.id, from })}>{task?.title ?? "Resolve"}</Link>
+                <Link href={routes.city.case(c.id, { task: task?.id, from })} aria-label={`${task?.title ?? "Resolve"}: ${c.name}`}>
+                  {task?.title ?? "Resolve"}
+                </Link>
               </Button>
             </TableCell>
           </TableRow>

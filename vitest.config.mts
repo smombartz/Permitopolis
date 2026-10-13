@@ -23,6 +23,10 @@ export default defineConfig({
           include: ["tests/render/**/*.test.tsx", "components/**/*.test.tsx"],
           setupFiles: ["tests/render/setup.ts"],
           css: false,
+          // A demo path clicked from first step to last takes about four seconds on its own
+          // and several times that beside the route-by-route accessibility audit on a busy
+          // machine: the default five seconds failed tests that had nothing wrong with them.
+          testTimeout: 20_000,
         },
       },
     ],

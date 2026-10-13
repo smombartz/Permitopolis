@@ -87,6 +87,8 @@ function LocationDemo({ title, eventType }: { title: string; eventType: EventTyp
 /** Visual checkpoint for workstream 2C, rendered at /dev/map. Not linked from the app shell. */
 export function MapDevScreen() {
   const [selectedHighlightId, setSelectedHighlightId] = React.useState<string | undefined>(undefined);
+  // A day can be chosen on each calendar here, so the checkpoint shows the day buttons and the chosen day's ring.
+  const [selectedDay, setSelectedDay] = React.useState<string>(TODAY);
 
   return (
     <main className="mx-auto flex max-w-(--container-page) flex-col gap-10 px-5 py-10">
@@ -119,9 +121,9 @@ export function MapDevScreen() {
 
       <section className="flex flex-col gap-6">
         <h2 className="text-lg font-semibold text-fg">Calendar</h2>
-        <MonthGrid items={SAMPLE_CALENDAR_ITEMS} today={TODAY} month={TODAY} />
-        <WeekGrid items={SAMPLE_CALENDAR_ITEMS} today={TODAY} weekStart="2027-06-20" />
-        <DayStrip items={SAMPLE_CALENDAR_ITEMS} today={TODAY} />
+        <MonthGrid items={SAMPLE_CALENDAR_ITEMS} today={TODAY} month={TODAY} onSelectDay={setSelectedDay} selected={selectedDay} />
+        <WeekGrid items={SAMPLE_CALENDAR_ITEMS} today={TODAY} weekStart="2027-06-20" onSelectDay={setSelectedDay} selected={selectedDay} />
+        <DayStrip items={SAMPLE_CALENDAR_ITEMS} today={TODAY} onSelectDay={setSelectedDay} selected={selectedDay} />
       </section>
     </main>
   );

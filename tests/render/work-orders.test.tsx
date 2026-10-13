@@ -116,8 +116,8 @@ describe("/city/work-orders: Walkthroughs and meetings", () => {
 
     const coordination = screen.getByText("Coordination meeting · Scheduled for Fri, Jul 23, 2027");
     const walkthrough = screen.getByText("Site walkthrough · Scheduled for Fri, Aug 6, 2027");
-    expect(within(coordination.closest("li") as HTMLElement).getByRole("link", { name: "Reschedule" })).toBeInTheDocument();
-    expect(within(walkthrough.closest("li") as HTMLElement).getByRole("link", { name: "Reschedule" })).toBeInTheDocument();
+    expect(within(coordination.closest("li") as HTMLElement).getByRole("link", { name: /^Reschedule: / })).toBeInTheDocument();
+    expect(within(walkthrough.closest("li") as HTMLElement).getByRole("link", { name: /^Reschedule: / })).toBeInTheDocument();
   });
 
   it("a meeting with no date yet reads 'Not yet scheduled' and offers Schedule, not Mark held", async () => {
@@ -129,7 +129,7 @@ describe("/city/work-orders: Walkthroughs and meetings", () => {
     });
 
     expect(screen.getByText(/Not yet scheduled/)).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "Schedule" })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /^Schedule: / })).toBeInTheDocument();
     expect(screen.queryByText("Mark held")).not.toBeInTheDocument();
   });
 

@@ -39,7 +39,10 @@ export function ActiveMapView({ highlights, cases, today, role, date, onDateChan
           <Button variant="ghost" size="icon-sm" aria-label="Previous day" onClick={() => onDateChange(addDaysISO(date, -1))}>
             <ChevronLeftIcon />
           </Button>
-          <p className="min-w-40 text-sm font-semibold text-fg">{fmtDate(date)}</p>
+          {/* Polite: Previous day, Next day and the date field change it, and it says which day the map now shows. */}
+          <p aria-live="polite" className="min-w-40 text-sm font-semibold text-fg">
+            {fmtDate(date)}
+          </p>
           <Button variant="ghost" size="icon-sm" aria-label="Next day" onClick={() => onDateChange(addDaysISO(date, 1))}>
             <ChevronRightIcon />
           </Button>
@@ -66,7 +69,7 @@ export function ActiveMapView({ highlights, cases, today, role, date, onDateChan
           <PermitopolisMap highlights={highlights} selectedId={selectedId} onSelect={onSelect} />
         )}
       </div>
-      <StickyAside>
+      <StickyAside aria-label="This day for your role">
         <RoleOverlaySidePanel role={role} cases={cases} today={today} date={date} />
       </StickyAside>
     </div>

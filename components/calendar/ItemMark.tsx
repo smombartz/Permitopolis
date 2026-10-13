@@ -1,6 +1,7 @@
 import { CalendarClockIcon } from "lucide-react";
 import { TIER_ICON } from "@/components/domain/icons";
-import { TIER_LABEL } from "@/lib/types";
+import { fmtDate, plural } from "@/lib/format";
+import { TIER_LABEL, type ISODate } from "@/lib/types";
 import { cn } from "@/lib/utils";
 import { TIER_DOT_CLASS } from "./tierStyles";
 import type { CalendarItem } from "./types";
@@ -32,6 +33,14 @@ export function ItemMark({ item }: { item: CalendarItem }) {
 export function itemTitle(item: CalendarItem): string {
   if (item.detail) return item.detail;
   return item.kind === "meeting" ? `Meeting: ${item.label}` : `${TIER_LABEL[item.tier]}: ${item.label}`;
+}
+
+/**
+ * A day's accessible name in the month and week grids: the whole date (a cell shows only "25" or
+ * "Mon 3"), whether it is today, and how many events are on it.
+ */
+export function dayName(date: ISODate, isToday: boolean, events: number): string {
+  return `${fmtDate(date)}${isToday ? ", today" : ""}${events > 0 ? `, ${plural(events, "event")}` : ""}`;
 }
 
 /** A meeting's own outline, so it reads apart from the events around it without a color of its own. */

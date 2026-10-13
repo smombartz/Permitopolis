@@ -15,7 +15,7 @@ describe("S5, Health & Legal: the insurance checklist", () => {
     const { user } = await renderScreen(<CaseDetailScreen />, { path: routes.city.case(S5, { tab: "documents" }), role: "hl" });
 
     const card = screen.getByTestId(`document-card-${S5}:insurance_certificate`);
-    await user.click(within(card).getByRole("button", { name: "Verify" }));
+    await user.click(within(card).getByRole("button", { name: /^Verify / }));
 
     const panel = within(screen.getByRole("dialog"));
     expect(panel.getByRole("heading", { name: "Verify: Certificate of insurance" })).toBeInTheDocument();
@@ -54,7 +54,7 @@ describe("S3, after the applicant answers the health permit request", () => {
     });
 
     const card = screen.getByTestId(`document-card-${S3}:vendor_health_permit:1`);
-    await user.click(within(card).getByRole("button", { name: "Verify" }));
+    await user.click(within(card).getByRole("button", { name: /^Verify / }));
 
     const panel = within(screen.getByRole("dialog"));
     expect(panel.getByText("Vendor name matches the vendor list")).toBeInTheDocument();
@@ -72,7 +72,7 @@ describe("the wedding-photos insurance (a JPEG, not a certificate)", () => {
     const { user } = await renderScreen(<CaseDetailScreen />, { path: routes.city.case(F5, { tab: "documents" }), role: "hl" });
 
     const card = screen.getByTestId(`document-card-${F5}:insurance_certificate`);
-    await user.click(within(card).getByRole("button", { name: "Verify" }));
+    await user.click(within(card).getByRole("button", { name: /^Verify / }));
 
     const panel = within(screen.getByRole("dialog"));
     expect(panel.getByText("This does not look like a certificate of insurance.")).toBeInTheDocument();
@@ -99,7 +99,7 @@ describe("a department that is not the card's reviewer", () => {
 
     const card = screen.getByTestId(`document-card-${F5}:insurance_certificate`);
     expect(within(card).getByText(/Checked by Health & Legal/)).toBeInTheDocument();
-    expect(within(card).queryByRole("button", { name: "Verify" })).not.toBeInTheDocument();
+    expect(within(card).queryByRole("button", { name: /^Verify / })).not.toBeInTheDocument();
   });
 });
 

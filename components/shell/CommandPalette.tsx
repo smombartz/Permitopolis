@@ -99,7 +99,8 @@ function CommandPalette({ open, onOpenChange }: CommandPaletteProps) {
   return (
     <>
       <CommandDialog open={open} onOpenChange={handleOpenChange} title="Command palette" description="Search cases and jump around the prototype.">
-        <Command shouldFilter={false}>
+        {/* cmdk names its field with a label of its own (`label`), which is empty unless given: a placeholder is not a name. */}
+        <Command shouldFilter={false} label="Search cases, pages and roles">
           <CommandInput aria-label="Search cases, pages and roles" placeholder="Search cases, pages, roles…" value={query} onValueChange={setQuery} />
           <CommandList>
             <CommandEmpty>Nothing matches &ldquo;{query}&rdquo;.</CommandEmpty>

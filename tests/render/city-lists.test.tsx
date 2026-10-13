@@ -253,7 +253,7 @@ describe("Intake queue", () => {
     const row = within(screen.getByText("Maple Street block party").closest("tr")!);
     // A block party's count is its neighbor sign-offs, and the column says so.
     expect(row.getByText("9 of 12 sign-offs")).toBeInTheDocument();
-    const button = row.getByRole("button", { name: "Accept as complete" });
+    const button = row.getByRole("button", { name: /^Accept as complete: / });
     expect(button).toBeDisabled();
     expect(row.getByText("Waiting on 3 neighbor sign-offs")).toBeInTheDocument();
   });
@@ -262,7 +262,7 @@ describe("Intake queue", () => {
     const { user } = await renderScreen(<IntakeScreen />, { role: "clerk", path: routes.city.intake() });
     expect(screen.getByText("Downtown Art Walk")).toBeInTheDocument();
     const row = within(screen.getByText("Downtown Art Walk").closest("tr")!);
-    const button = row.getByRole("button", { name: "Accept as complete" });
+    const button = row.getByRole("button", { name: /^Accept as complete: / });
     expect(button).toBeEnabled();
 
     await user.click(button);
@@ -276,7 +276,7 @@ describe("Intake queue", () => {
     const { user } = await renderScreen(<IntakeScreen />, { role: "clerk", path: routes.city.intake() });
     const row = within(screen.getByText("Downtown Art Walk").closest("tr")!);
 
-    await user.click(row.getByRole("button", { name: "Accept as complete" }));
+    await user.click(row.getByRole("button", { name: /^Accept as complete: / }));
 
     // The script's next beats are "the date hold appears" and "confirm routing": both are there.
     expect(lastPush()).toBe(routes.city.case(F1, { task: "confirm_routing", from: routes.city.intake() }));

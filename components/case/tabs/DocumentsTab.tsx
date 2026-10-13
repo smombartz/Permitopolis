@@ -109,7 +109,8 @@ function DocumentCard({ task, role, today, onOpen }: { task: Task; role: Party; 
       ) : null}
       {canAct ? (
         <div className="flex items-center gap-2 pt-1">
-          <Button type="button" size="sm" onClick={() => onOpen(`verify_document:${task.id}`)}>
+          {/* One per document on the tab: the name says which. */}
+          <Button type="button" size="sm" aria-label={`Verify ${task.title}`} onClick={() => onOpen(`verify_document:${task.id}`)}>
             Verify
           </Button>
         </div>

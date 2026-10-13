@@ -124,7 +124,7 @@ function ClosuresMapScreen() {
             <PermitopolisMap highlights={highlights} />
           )}
         </div>
-        <StickyAside>
+        <StickyAside aria-label="What is on the map">
           <ClosuresSideList items={items} overlaps={overlaps} here={here} />
         </StickyAside>
       </div>

@@ -62,7 +62,10 @@ export function ActiveListView({ rows, today, role, includeHolds, expandSessions
               <TableHead>State</TableHead>
               <TableHead>Day-of contact</TableHead>
               <TableHead>{ROLE_OVERLAY_COLUMN_LABEL[role]}</TableHead>
-              <TableHead className="sr-only">Open</TableHead>
+              {/* The word is hidden, not the cell: a header taken out of the table's grid heads nothing. */}
+              <TableHead>
+                <span className="sr-only">Open</span>
+              </TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -79,7 +82,9 @@ export function ActiveListView({ rows, today, role, includeHolds, expandSessions
                 <TableCell>
                   <TierBadge tier={row.case.tier} />
                 </TableCell>
-                <TableCell className="max-w-48 truncate text-sm text-fg-secondary">{row.case.location?.label ?? "Not provided"}</TableCell>
+                <TableCell className="max-w-48 truncate text-sm text-fg-secondary" title={row.case.location?.label}>
+                  {row.case.location?.label ?? "Not provided"}
+                </TableCell>
                 <TableCell className="whitespace-nowrap">
                   <div className="flex flex-col gap-0.5">
                     <DateText date={row.date} short />

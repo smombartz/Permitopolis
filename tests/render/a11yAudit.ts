@@ -161,6 +161,8 @@ export function auditPage(options: AuditOptions = {}): string[] {
 
   // Focusable without being a control: it needs a role and a name to say what was landed on.
   for (const el of accessible(doc, '[tabindex="0"]')) {
+    // Radix's focus guards: invisible sentinels at the edges of an open dialog or popover that hand focus straight on.
+    if (el.hasAttribute("data-radix-focus-guard")) continue;
     // A table row has a role of its own (the list tables make a row focusable for j and k).
     if (el.matches(CONTROLS) || el.matches('tr, [role="tabpanel"], [role="dialog"], [role="alertdialog"], [role="menu"], [role="listbox"], [role="grid"], [role="group"], [role="region"], [role="img"], [role="tooltip"]')) continue;
     if (!el.getAttribute("role") && !hasName(el)) problems.push(`Focusable with no role and no name: ${describeElement(el)}`);
@@ -184,6 +186,11 @@ export function auditPage(options: AuditOptions = {}): string[] {
     const id = label.getAttribute("for");
     if (id && !doc.getElementById(id)) problems.push(`<label for="${id}"> points at nothing: "${label.textContent?.trim()}".`);
   }
+
+  // Nothing interrupts: an announcement is polite (`role="status"`, `aria-live="polite"`). An
+  // alert on a page as it opens speaks over the page's own title, and one per warning on the
+  // page speaks over the last.
+  for (const el of accessible(doc, '[role="alert"], [aria-live="assertive"]')) problems.push(`An assertive live region: ${describeElement(el)}`);
 
   // A field marked invalid says why: its error is tied to it.
   for (const field of accessible(doc, '[aria-invalid="true"]')) {
@@ -219,6 +226,8 @@ export function auditPage(options: AuditOptions = {}): string[] {
   }
   for (const svg of accessible(doc, "svg")) {
     if (svg.closest('[role="img"]') && svg.getAttribute("role") !== "img") continue;
+    // An icon inside a control that is named by a label is not read out on its own.
+    if (svg.closest("button[aria-label], a[aria-label]")) continue;
     const named = svg.hasAttribute("aria-label") || svg.hasAttribute("aria-labelledby") || svg.querySelector(":scope > title");
     if (!named) problems.push(`SVG neither hidden nor named: ${describeElement(svg)}`);
   }

@@ -506,7 +506,7 @@ describe("(e) the city lists open the case", () => {
 
     // Request information goes to the case with that panel, not the intake task's Accept panel.
     const row = within(screen.getByText("Downtown Art Walk").closest("tr")!);
-    await user.click(row.getByRole("link", { name: "Request information" }));
+    await user.click(row.getByRole("link", { name: /^Request information: / }));
     expect(navState.pathname).toBe(`/city/cases/${F1}`);
     expect(within(screen.getByRole("dialog")).getByRole("heading", { name: "Request information" })).toBeInTheDocument();
 
@@ -742,7 +742,7 @@ describe("the demo paths that cross surfaces have a control for every step", () 
     await user.click(panelButton("Cancel"));
 
     await user.click(screen.getByRole("tab", { name: "Documents" }));
-    await user.click(within(screen.getByTestId(`document-card-${S3}:vendor_health_permit:1`)).getByRole("button", { name: "Verify" }));
+    await user.click(within(screen.getByTestId(`document-card-${S3}:vendor_health_permit:1`)).getByRole("button", { name: /^Verify / }));
     await user.click(panelButton("Verify"));
     expect(storedCase(S3).tasks.find((t) => t.id === `${S3}:vendor_health_permit:1`)!.status).toBe("done");
 
@@ -818,7 +818,7 @@ describe("the demo paths that cross surfaces have a control for every step", () 
     await user.click(screen.getByRole("tab", { name: /^Reviewed/ }));
     const row = within(screen.getByText("Maple Street block party").closest("tr")!);
     expect(row.getByText("20 days")).toBeInTheDocument();
-    await user.click(row.getByRole("button", { name: "Accept as complete" }));
+    await user.click(row.getByRole("button", { name: /^Accept as complete: / }));
     expect(storedCase(S4).dateHold.status).toBe("held");
 
     // Routing is the Clerk's next step, and accepting goes straight on to it: the case, with
@@ -1321,7 +1321,7 @@ describe("(j) every new list opens the case, and the case comes back to that lis
 
     // Due: the 5K's quote.
     const dueRow = within(screen.getByText("Riverfront Summer 5K").closest("tr") as HTMLElement);
-    await user.click(dueRow.getByRole("link", { name: "Record payment" }));
+    await user.click(dueRow.getByRole("link", { name: /^Record payment: / }));
     expect(here()).toBe(routes.city.case(S5, { task: "pay", from: routes.city.payments() }));
     expectRealScreen();
     expect(within(screen.getByRole("dialog")).getByRole("heading", { name: "Record an in-person payment" })).toBeInTheDocument();
@@ -1380,7 +1380,7 @@ describe("(j) every new list opens the case, and the case comes back to that lis
     const barricades = storedCase(ULTRA).tasks.find((t) => t.catalogId === "work_order:barricades")!;
 
     const group = within(screen.getByRole("list", { name: "Four Bridges Ultra's work orders" }));
-    await user.click(group.getAllByRole("link", { name: "Mark done" })[0]);
+    await user.click(group.getAllByRole("link", { name: /^Mark done: / })[0]);
     expect(here()).toBe(routes.city.case(ULTRA, { task: barricades.id, from: routes.city.workOrders() }));
     expectRealScreen();
     const order = within(screen.getByRole("dialog"));
@@ -1394,7 +1394,7 @@ describe("(j) every new list opens the case, and the case comes back to that lis
     expect(here()).toBe(routes.city.workOrders());
     expectRealScreen();
     const after = within(screen.getByRole("list", { name: "Four Bridges Ultra's work orders" }));
-    expect(after.getAllByRole("link", { name: "Mark done" })).toHaveLength(2);
+    expect(after.getAllByRole("link", { name: /^Mark done: / })).toHaveLength(2);
     expect(after.getByText("Done")).toBeInTheDocument();
 
     // The other tab: a walkthrough's Reschedule opens the Schedule panel on the case, and Back keeps the tab.
@@ -1402,7 +1402,7 @@ describe("(j) every new list opens the case, and the case comes back to that lis
     const meetings = `${routes.city.workOrders()}?tab=meetings`;
     expect(here()).toBe(meetings);
     const walkthrough = screen.getByText("Site walkthrough · Scheduled for Fri, Aug 6, 2027").closest("li") as HTMLElement;
-    await user.click(within(walkthrough).getByRole("link", { name: "Reschedule" }));
+    await user.click(within(walkthrough).getByRole("link", { name: /^Reschedule: / }));
     expect(navState.pathname).toBe(`/city/cases/${ULTRA}`);
     expectRealScreen();
     expect(within(screen.getByRole("dialog")).getByLabelText(/Date/)).toHaveValue("2027-08-06");

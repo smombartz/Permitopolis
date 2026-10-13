@@ -205,7 +205,10 @@ function DueTable({ rows, today, from, query }: { rows: DueRow[]; today: ISODate
             <TableHead>For</TableHead>
             <TableHead>Amount</TableHead>
             <TableHead>Due</TableHead>
-            <TableHead className="sr-only">Record payment</TableHead>
+            {/* The words are hidden, not the cell: a header taken out of the table's grid heads nothing. */}
+            <TableHead>
+              <span className="sr-only">Record payment</span>
+            </TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
@@ -227,14 +230,16 @@ function DueTable({ rows, today, from, query }: { rows: DueRow[]; today: ISODate
               <TableCell>{row.dueDate ? <DueDate date={row.dueDate} today={today} /> : <span className="text-xs text-fg-secondary">No due date</span>}</TableCell>
               <TableCell>
                 <Button asChild variant="secondary" size="sm">
-                  <Link href={routes.city.case(row.caseId, { task: "pay", from })}>Record payment</Link>
+                  <Link href={routes.city.case(row.caseId, { task: "pay", from })} aria-label={`Record payment: ${row.eventName}, ${row.label}`}>
+                    Record payment
+                  </Link>
                 </Button>
               </TableCell>
             </TableRow>
           ))}
         </TableBody>
       </Table>
-      <p className="text-xs text-fg-secondary">
+      <p role="status" className="text-xs text-fg-secondary">
         {plural(rows.length, "row")} · {fmtMoney(dueTotal(rows))} total
       </p>
     </div>
@@ -299,6 +304,8 @@ function ReceivedTable({ groups, total, from, query, hasFilters }: { groups: Rec
                       <TableCell colSpan={3} className="text-sm text-fg-secondary">
                         <button
                           type="button"
+                          aria-expanded={false}
+                          aria-label={`${group.seriesSummary}. Show each payment for ${group.eventName}`}
                           onClick={() => toggle(group.caseId)}
                           className="flex items-center gap-1 outline-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring"
                         >
@@ -331,6 +338,8 @@ function ReceivedTable({ groups, total, from, query, hasFilters }: { groups: Rec
                         <TableCell>
                           <button
                             type="button"
+                            aria-expanded={true}
+                            aria-label={`Collapse the payments for ${group.eventName}`}
                             onClick={() => toggle(group.caseId)}
                             className="flex items-center gap-1 pl-4 text-xs text-fg-secondary outline-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring"
                           >
@@ -356,7 +365,7 @@ function ReceivedTable({ groups, total, from, query, hasFilters }: { groups: Rec
           })}
         </TableBody>
       </Table>
-      <p className="text-xs text-fg-secondary">
+      <p role="status" className="text-xs text-fg-secondary">
         {plural(rowCount, "payment")} · {fmtMoney(total)} total
       </p>
     </div>

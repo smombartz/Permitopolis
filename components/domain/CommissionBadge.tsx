@@ -13,6 +13,7 @@ export function CommissionBadge() {
         <TooltipTrigger asChild>
           <span
             data-slot="commission-badge"
+            role="img"
             tabIndex={0}
             aria-label="Sent to commission"
             className="inline-flex size-6 shrink-0 items-center justify-center rounded-full border border-line-subtle bg-surface-2 text-fg-label outline-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring"

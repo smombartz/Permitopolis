@@ -33,8 +33,18 @@ function ClosuresCalendarStrip({ days, selected, onSelectDay }: ClosuresCalendar
           >
             <p className="text-xs font-semibold text-fg-label">{fmtDateShort(day.date)}</p>
             <p className="text-sm text-fg">{day.count === 0 ? "No closures" : plural(day.count, "closure")}</p>
-            {day.blackoutLabel ? <p className="mt-0.5 truncate text-[11px] font-medium text-danger-fg" title={day.blackoutLabel}>Blackout</p> : null}
-            {day.impactedReason ? <p className="mt-0.5 truncate text-[11px] font-medium text-warning-fg" title={day.impactedReason}>Impacted</p> : null}
+            {day.blackoutLabel ? (
+              <p className="mt-0.5 truncate text-[11px] font-medium text-danger-fg" title={day.blackoutLabel}>
+                Blackout
+                <span className="sr-only">: {day.blackoutLabel}</span>
+              </p>
+            ) : null}
+            {day.impactedReason ? (
+              <p className="mt-0.5 truncate text-[11px] font-medium text-warning-fg" title={day.impactedReason}>
+                Impacted
+                <span className="sr-only">: {day.impactedReason}</span>
+              </p>
+            ) : null}
           </button>
         </div>
       ))}

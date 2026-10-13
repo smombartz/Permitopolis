@@ -64,7 +64,7 @@ describe("Inspections", () => {
 
     const booth = screen.getByText("Rolling Dumpling Co.").closest("div")!.parentElement!;
     await user.type(within(booth).getByPlaceholderText("Note (optional)"), "Clean prep surfaces.");
-    await user.click(within(booth).getByRole("button", { name: "Record" }));
+    await user.click(within(booth).getByRole("button", { name: /^Record the result for / }));
 
     expect(screen.getAllByText("Pass").length).toBeGreaterThan(0);
     expect(screen.getByText(/Clean prep surfaces\./)).toBeInTheDocument();

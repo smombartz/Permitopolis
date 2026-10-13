@@ -35,7 +35,8 @@ function TodayCard({ c, here }: TodayCardProps) {
   }
 
   return (
-    <div className="flex flex-col gap-3 rounded-panel border border-line-subtle bg-surface-1 p-4">
+    // A group per closure: "Time" and the two Record buttons are on every card, and the group says whose.
+    <div role="group" aria-label={`${c.name}: today's closure`} className="flex flex-col gap-3 rounded-panel border border-line-subtle bg-surface-1 p-4">
       <div className="flex items-center justify-between gap-3">
         <EventTitle name={c.name} applicantName={applicantNameOf(c)} className="min-w-0" />
         <CaseId id={c.id} />
@@ -48,7 +49,9 @@ function TodayCard({ c, here }: TodayCardProps) {
               <Chip variant={task.status === "done" ? "success" : "neutral"}>{task.status === "done" ? "Done" : "Scheduled"}</Chip>
               {task.status === "done" ? null : (
                 <Button asChild size="sm" variant="secondary">
-                  <Link href={routes.city.case(c.id, { task: task.id, from: here })}>Mark done</Link>
+                  <Link href={routes.city.case(c.id, { task: task.id, from: here })} aria-label={`Mark done: ${task.title}, ${c.name}`}>
+                    Mark done
+                  </Link>
                 </Button>
               )}
             </div>

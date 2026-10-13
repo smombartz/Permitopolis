@@ -218,9 +218,10 @@ function CasesScreen() {
       </FilterBar>
 
       {chips.length > 0 ? (
-        <div className="flex flex-wrap items-center gap-1.5">
+        <div role="group" aria-label="Filters in use" className="flex flex-wrap items-center gap-1.5">
           {chips.map((chip) => (
-            <FilterChip key={chip.key} active onClick={() => removeChip(chip.key)}>
+            // A button that takes the filter off, not a toggle: it says so, and is not "pressed".
+            <FilterChip key={chip.key} active aria-pressed={undefined} aria-label={`Remove filter: ${chip.label}`} onClick={() => removeChip(chip.key)}>
               {chip.label}
               <span aria-hidden="true">&times;</span>
             </FilterChip>
@@ -253,8 +254,11 @@ function CasesScreen() {
             />
           </div>
         ) : (
-          <div className="flex flex-wrap items-center gap-2">
-            <span className="text-xs text-fg-secondary">Columns</span>
+          // A group, so a chip called "Due" is "Columns, Due", apart from the table's own "Due" header.
+          <div role="group" aria-label="Columns" className="flex flex-wrap items-center gap-2">
+            <span aria-hidden="true" className="text-xs text-fg-secondary">
+              Columns
+            </span>
             {TOGGLABLE_TABLE_COLUMNS.map((col) => (
               <FilterChip key={col} active={filters.columns.includes(col)} onClick={() => toggleColumn(col)}>
                 {TABLE_COLUMN_LABEL[col]}

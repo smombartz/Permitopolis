@@ -52,11 +52,14 @@ export function ActiveCalendarView({ items, cases, today, role, date, onDateChan
       <div className="flex min-w-0 flex-col gap-3">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="flex items-center gap-1">
-            <Button variant="ghost" size="icon-sm" aria-label="Previous" onClick={goPrev}>
+            <Button variant="ghost" size="icon-sm" aria-label={subView === "month" ? "Previous month" : "Previous week"} onClick={goPrev}>
               <ChevronLeftIcon />
             </Button>
-            <p className="min-w-40 text-sm font-semibold text-fg">{subView === "month" ? monthLabel(monthAnchor) : `Week of ${fmtDateShort(weekStart)}`}</p>
-            <Button variant="ghost" size="icon-sm" aria-label="Next" onClick={goNext}>
+            {/* Polite: Previous and Next change it, and it is the only thing that says where the calendar now is. */}
+            <p aria-live="polite" className="min-w-40 text-sm font-semibold text-fg">
+              {subView === "month" ? monthLabel(monthAnchor) : `Week of ${fmtDateShort(weekStart)}`}
+            </p>
+            <Button variant="ghost" size="icon-sm" aria-label={subView === "month" ? "Next month" : "Next week"} onClick={goNext}>
               <ChevronRightIcon />
             </Button>
             <Button variant="ghost" size="sm" onClick={() => onDateChange(today)}>
@@ -88,7 +91,7 @@ export function ActiveCalendarView({ items, cases, today, role, date, onDateChan
           <WeekGrid items={items} today={today} weekStart={weekStart} onSelectItem={onSelectItem} onSelectDay={onDateChange} selected={date} />
         )}
       </div>
-      <StickyAside>
+      <StickyAside aria-label="This day for your role">
         <RoleOverlaySidePanel role={role} cases={cases} today={today} date={date} />
       </StickyAside>
     </div>

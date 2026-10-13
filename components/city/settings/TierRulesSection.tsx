@@ -154,7 +154,7 @@ interface WhatThisChangesPanelProps {
 function WhatThisChangesPanel({ draftChanges, scenarioRows }: WhatThisChangesPanelProps) {
   const changedScenarios = scenarioRows.filter((r) => r.before !== r.after).length;
   return (
-    <StickyAside className="w-full lg:w-auto">
+    <StickyAside aria-label="What this changes" className="w-full lg:w-auto">
       <div className="flex flex-col gap-5">
         <div>
           <h3 className="text-sm font-bold text-fg">What this changes</h3>

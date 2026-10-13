@@ -36,7 +36,7 @@ describe("review decide: S3 as Health & Legal, after the applicant answers and t
 
     await user.click(screen.getByRole("tab", { name: "Documents" }));
     const card = screen.getByTestId(`document-card-${S3}:vendor_health_permit:1`);
-    await user.click(within(card).getByRole("button", { name: "Verify" }));
+    await user.click(within(card).getByRole("button", { name: /^Verify / }));
     await user.click(sheet().getByRole("button", { name: "Verify" }));
 
     await user.click(screen.getByRole("tab", { name: "Reviews" }));
@@ -135,7 +135,7 @@ describe("work orders and meetings", () => {
   it("a walkthrough cannot be scheduled after the event", async () => {
     const { user } = await renderScreen(<CaseDetailScreen />, { path: routes.city.case(S5), role: "pws" });
     await user.click(screen.getByRole("tab", { name: "Reviews" }));
-    await user.click(screen.getByRole("button", { name: "Reschedule" }));
+    await user.click(screen.getByRole("button", { name: /^Reschedule: / }));
 
     const dateInput = sheet().getByLabelText("Date");
     fireEvent.change(dateInput, { target: { value: "2027-07-20" } });
@@ -178,10 +178,10 @@ describe("meetings on the Reviews tab: Mark held asks the engine before it is of
       act(() => useDemo.getState().setRole(role));
       const row = meetingRow("Site walkthrough");
       expect(row.getByText("Scheduled for Fri, Jul 2, 2027")).toBeInTheDocument();
-      expect(row.getByRole("button", { name: "Mark held" })).toBeDisabled();
+      expect(row.getByRole("button", { name: /^Mark held: / })).toBeDisabled();
       expect(row.getByText("Unlocks when the permit is issued")).toBeInTheDocument();
       // Moving the date is still open to both.
-      expect(row.getByRole("button", { name: "Reschedule" })).toBeEnabled();
+      expect(row.getByRole("button", { name: /^Reschedule: / })).toBeEnabled();
     }
   });
 
@@ -196,14 +196,14 @@ describe("meetings on the Reviews tab: Mark held asks the engine before it is of
     });
     expect(storedCase(S5).state).toBe("permitted");
     const row = () => meetingRow("Site walkthrough");
-    expect(row().getByRole("button", { name: "Mark held" })).toBeDisabled();
+    expect(row().getByRole("button", { name: /^Mark held: / })).toBeDisabled();
     expect(row().getByText("Scheduled for Fri, Jul 2; mark it held on or after that day.")).toBeInTheDocument();
 
     await act(async () => {
       useDemo.getState().setDemoToday("2027-07-02");
     });
-    expect(row().getByRole("button", { name: "Mark held" })).toBeEnabled();
-    await user.click(row().getByRole("button", { name: "Mark held" }));
+    expect(row().getByRole("button", { name: /^Mark held: / })).toBeEnabled();
+    await user.click(row().getByRole("button", { name: /^Mark held: / }));
     await user.click(sheet().getByRole("button", { name: "Mark held" }));
     expect(storedCase(S5).tasks.find((t) => t.catalogId === "site_walkthrough")?.status).toBe("done");
   });

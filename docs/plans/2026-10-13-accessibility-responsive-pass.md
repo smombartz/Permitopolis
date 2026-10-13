@@ -44,11 +44,11 @@ text, reduced motion honored.
 - [x] The wizard and the amendment
 - [x] My events, the board and its sheets
 - [x] Checkout, the permit and the public check
-- [ ] My queue, Cases, Intake
-- [ ] The case detail: every tab and every action panel
-- [ ] Active permits
-- [ ] Payments, closures map, work orders, verifications, inspections, settings
-- [ ] Contrast: `lib/contrast.test.ts` extended to the token pairs the screens use
+- [x] My queue, Cases, Intake
+- [x] The case detail: every tab and every action panel
+- [x] Active permits
+- [x] Payments, closures map, work orders, verifications, inspections, settings
+- [x] Contrast: `lib/contrast.test.ts` extended to the token pairs the screens use
 - [ ] Docs: `docs/readme.md` "Accessibility", `docs/log.md`, the main plan ticked
 
 ## Findings and fixes
@@ -162,6 +162,41 @@ page's content. `tests/render/keyboard.test.tsx` was written first and failed on
 - **Checkout.** The card fields are required and say so; a submit that fails puts focus on the
   first wrong field, whose error is its description. Signing took the signature form away with
   the button that had focus, and paying the card form: focus moves on to the Pay section.
+
+### The city's side
+
+- **Every panel and every card sheet is audited open**, not only the pages that hold them:
+  `tests/render/a11y-overlays.test.tsx` opens each action panel a role can reach in each state
+  (about 190) and each kind of card sheet (about 90), then the shell's menus and dialogs. It
+  found `<Field label="Department">` around a select that dropped the field's id.
+- **Names that say which.** A table with an action per row had the same name on every row:
+  "Accept as complete" and "Request information" on Intake, "Record payment" on Payments, "Mark
+  done", "Schedule" and "Mark held" on Work orders and on a case's Reviews tab, "Verify" on
+  its Documents tab, "Record" on Inspections. Each now ends with its event, meeting or
+  document, after the words on the button (so the visible label is still in the name). The
+  reason a row's button is off is its description, not a `title`.
+- **Calendars** (`MonthGrid`, `WeekGrid`, `DayStrip`). A day's name was "25"; it is the date,
+  whether it is today and how many events it has. A day is a button only where a day can be
+  chosen (Settings' blackout calendar had 35 buttons that did nothing). Days outside the month
+  were the whole cell at 40% opacity, events included: they are a dashed, flat cell at full
+  contrast. Day and item buttons were 16 to 18px tall and stacked 2px apart (WCAG 2.5.8 asks
+  24px): 24px. A series' item says its date. A blackout's reason was a `title` only.
+- **Tables.** A column header hidden with `sr-only` on the `th` itself is taken out of the
+  table's grid; the words are hidden inside it instead.
+- **Lists.** Arrow keys are the list's only once a row has focus. The Cases filter chips that
+  remove a filter say so; the column toggles are a group, apart from the table's own headers.
+- `EndingBanner` was `role="alert"` on every visit to a denied or expired case. The audit now
+  refuses any assertive region on any page.
+- **Side panels** are labelled (`aside` with a name): "What is on the map", "This day for your
+  role", "What this changes".
+
+### Tests, and what they cost
+
+Four new render test files and the audit helper: `a11y.test.tsx` (506 pages),
+`a11y-overlays.test.tsx` (289), `keyboard.test.tsx` (18), `live-regions.test.tsx` (16). They add
+about 80 seconds of CPU to the suite. Beside them, on a busy machine, a demo path clicked end to
+end (four seconds alone) ran past Vitest's five-second default, so the render project's timeout
+is 20 seconds.
 
 ## Not verifiable here
 

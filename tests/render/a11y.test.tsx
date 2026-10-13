@@ -167,11 +167,19 @@ describe("accessibility of the developer pages", () => {
     await renderScreen(ui, options);
     const problems = auditPage().filter((problem) => name !== "/dev/kit" || !problem.startsWith("Expected one h1"));
     expect(problems).toEqual([]);
-  }, 20_000);
+  });
 });
 
 describe("accessibility at 375px", () => {
-  const phonePages = [...PUBLIC_PAGES.filter((page) => page.name.startsWith("/ as") || page.name.startsWith("/demo as") || page.name.startsWith("/verify")), ...APPLICANT_PAGES];
+  // The permit page and the public check draw the same markup at every width (neither asks
+  // `useIsNarrow()`), so one of each is enough beside the phone's top bar; the board, the quote,
+  // the wizard and the amendment change with the width and are checked for every seeded event.
+  let permits = 0;
+  let checks = 0;
+  const phonePages = [
+    ...PUBLIC_PAGES.filter((page) => page.name.startsWith("/ as") || page.name.startsWith("/demo as") || (page.name.startsWith("/verify/") && checks++ === 0)),
+    ...APPLICANT_PAGES.filter((page) => !page.name.startsWith("/events/[id]/permit") || permits++ === 0),
+  ];
 
   it.each(phonePages)("$name", async ({ ui, options }) => {
     setViewport(375);

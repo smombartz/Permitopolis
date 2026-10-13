@@ -1,7 +1,8 @@
 "use client";
 
 import { cn } from "@/lib/utils";
-import { ItemMark, itemTitle, MEETING_ITEM_CLASS } from "./ItemMark";
+import { fmtDateShort } from "@/lib/format";
+import { ItemMark, dayName, eventCount, itemTitle, MEETING_ITEM_CLASS } from "./ItemMark";
 import { blackoutOn, dayOfMonth, groupItemsByDate, impactedOn, weekDays, weekdayShortLabel } from "./utils";
 import { SELECTED_DAY } from "./tierStyles";
 import type { CalendarItem } from "./types";
@@ -35,28 +36,41 @@ export function WeekGrid({ items, today, weekStart, onSelectItem, onSelectDay, s
         const isToday = date === today;
         return (
           <div key={date} className="min-h-32 rounded-panel border border-line-subtle bg-surface-1 p-2">
-            <button
-              type="button"
-              onClick={() => onSelectDay?.(date)}
-              aria-current={isToday ? "date" : undefined}
-              aria-pressed={selected === undefined ? undefined : date === selected}
-              className={cn(
-                "mb-1 block w-full rounded px-1 py-0.5 text-left text-xs font-semibold text-fg-label",
-                FOCUS_RING,
-                isToday && "bg-pill text-fg-pill",
-                date === selected && SELECTED_DAY,
-              )}
-            >
-              {weekdayShortLabel(date)} {dayOfMonth(date)}
-            </button>
+            {onSelectDay ? (
+              <button
+                type="button"
+                onClick={() => onSelectDay(date)}
+                aria-label={dayName(date, isToday, eventCount(dayItems))}
+                aria-current={isToday ? "date" : undefined}
+                aria-pressed={selected === undefined ? undefined : date === selected}
+                className={cn(
+                  "mb-1 flex min-h-6 w-full items-center rounded px-1 py-0.5 text-left text-xs font-semibold text-fg-label",
+                  FOCUS_RING,
+                  isToday && "bg-pill text-fg-pill",
+                  date === selected && SELECTED_DAY,
+                )}
+              >
+                {weekdayShortLabel(date)} {dayOfMonth(date)}
+              </button>
+            ) : (
+              // Nothing to choose: the day is a label, not a button that does nothing.
+              <p aria-current={isToday ? "date" : undefined} className={cn("mb-1 flex min-h-6 items-center rounded px-1 py-0.5 text-xs font-semibold text-fg-label", isToday && "bg-pill text-fg-pill")}>
+                <span aria-hidden="true">
+                  {weekdayShortLabel(date)} {dayOfMonth(date)}
+                </span>
+                <span className="sr-only">{dayName(date, isToday, eventCount(dayItems))}</span>
+              </p>
+            )}
             {blackout && (
               <p className="mb-1 text-[10px] font-medium text-danger-fg" title={blackout.label}>
                 Blackout
+                <span className="sr-only">: {blackout.label}</span>
               </p>
             )}
             {impacted.length > 0 && (
               <p className="mb-1 text-[10px] font-medium text-warning-fg" title={impacted.map((i) => i.reason).join("; ")}>
                 Impacted
+                <span className="sr-only">: {impacted.map((i) => i.reason).join("; ")}</span>
               </p>
             )}
             <ul className="space-y-1">
@@ -76,6 +90,8 @@ export function WeekGrid({ items, today, weekStart, onSelectItem, onSelectDay, s
                     <span className="flex items-center gap-1">
                       <ItemMark item={item} />
                       <span className="truncate font-medium text-fg">{item.label}</span>
+                      {/* A series is on many days: the name says which one. */}
+                      <span className="sr-only">, {fmtDateShort(date)}</span>
                     </span>
                     {(item.start || item.end) && (
                       <span className="pl-2.5 text-fg-secondary">

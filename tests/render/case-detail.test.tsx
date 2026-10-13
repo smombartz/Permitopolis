@@ -43,7 +43,7 @@ describe("case detail: S5, two parties up at once", () => {
 
     await user.click(screen.getByRole("tab", { name: "Documents" }));
     const card = screen.getByTestId(`document-card-${S5}:insurance_certificate`);
-    await user.click(within(card).getByRole("button", { name: "Verify" }));
+    await user.click(within(card).getByRole("button", { name: /^Verify / }));
     await user.click(sheetButton("Verify"));
 
     const task = storedCase(S5).tasks.find((t) => t.catalogId === "insurance_certificate");
@@ -100,7 +100,7 @@ describe("case detail: S3, answering a request", () => {
 
     await user.click(screen.getByRole("tab", { name: "Documents" }));
     const card = screen.getByTestId(`document-card-${S3}:vendor_health_permit:1`);
-    await user.click(within(card).getByRole("button", { name: "Verify" }));
+    await user.click(within(card).getByRole("button", { name: /^Verify / }));
     await user.click(sheetButton("Verify"));
     expect(storedCase(S3).tasks.find((t) => t.catalogId === "vendor_health_permit")?.status).toBe("done");
 

@@ -45,15 +45,22 @@ export function DayStrip({ items, today, onSelectItem, onSelectDay, selected, cl
               isToday && "border-indigo-650",
             )}
           >
-            <button
-              type="button"
-              onClick={() => onSelectDay?.(date)}
-              aria-current={isToday ? "date" : undefined}
-              aria-pressed={selected === undefined ? undefined : date === selected}
-              className={cn("block w-full rounded px-1 text-left text-xs font-medium text-fg-label", FOCUS_RING, date === selected && SELECTED_DAY)}
-            >
-              {fmtDateShort(date)}: {summary(eventCount(dayItems), isToday)}
-            </button>
+            {onSelectDay ? (
+              <button
+                type="button"
+                onClick={() => onSelectDay(date)}
+                aria-current={isToday ? "date" : undefined}
+                aria-pressed={selected === undefined ? undefined : date === selected}
+                className={cn("flex min-h-6 w-full items-center rounded px-1 text-left text-xs font-medium text-fg-label", FOCUS_RING, date === selected && SELECTED_DAY)}
+              >
+                {fmtDateShort(date)}: {summary(eventCount(dayItems), isToday)}
+              </button>
+            ) : (
+              // Nothing to choose: the day is a label, not a button that does nothing.
+              <p aria-current={isToday ? "date" : undefined} className="flex min-h-6 items-center px-1 text-xs font-medium text-fg-label">
+                {fmtDateShort(date)}: {summary(eventCount(dayItems), isToday)}
+              </p>
+            )}
             {dayItems.length > 0 && (
               <ul className="mt-1 space-y-0.5">
                 {dayItems.slice(0, 3).map((item) => (
@@ -64,13 +71,15 @@ export function DayStrip({ items, today, onSelectItem, onSelectDay, selected, cl
                       title={itemTitle(item)}
                       data-kind={item.kind ?? "event"}
                       className={cn(
-                        "flex w-full items-center gap-1 truncate rounded px-1 py-0.5 text-left text-[11px] text-fg-secondary hover:bg-surface-hover",
+                        "flex min-h-6 w-full items-center gap-1 truncate rounded px-1 py-0.5 text-left text-[11px] text-fg-secondary hover:bg-surface-hover",
                         item.kind === "meeting" && MEETING_ITEM_CLASS,
                         FOCUS_RING,
                       )}
                     >
                       <ItemMark item={item} />
                       <span className="truncate">{item.label}</span>
+                      {/* A series is on many days: the name says which one. */}
+                      <span className="sr-only">, {fmtDateShort(date)}</span>
                     </button>
                   </li>
                 ))}

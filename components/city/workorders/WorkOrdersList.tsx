@@ -60,7 +60,9 @@ function WorkOrdersList({ rows, today, here, filtered = false }: WorkOrdersListP
                   </Chip>
                   {row.status === "done" ? null : (
                     <Button asChild size="sm" variant="secondary">
-                      <Link href={routes.city.case(row.case.id, { task: row.task.id, from: here })}>Mark done</Link>
+                      <Link href={routes.city.case(row.case.id, { task: row.task.id, from: here })} aria-label={`Mark done: ${row.what}, ${row.case.name}`}>
+                        Mark done
+                      </Link>
                     </Button>
                   )}
                 </div>

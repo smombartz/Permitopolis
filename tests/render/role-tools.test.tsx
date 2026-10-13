@@ -167,7 +167,7 @@ describe("the review panel", () => {
     const card = within(documents.getByTestId(`document-card-${FARMERS_MARKET}:vendor_list`));
     expect(card.getByText(/Two vendors are missing from the list\./)).toBeInTheDocument();
     expect(card.getByText(/waiting on the applicant/)).toBeInTheDocument();
-    expect(card.queryByRole("button", { name: "Verify" })).not.toBeInTheDocument();
+    expect(card.queryByRole("button", { name: /^Verify / })).not.toBeInTheDocument();
   });
 
   it("a plain approval carries no conditions, and \"Approve with conditions\" needs one", async () => {
@@ -226,13 +226,13 @@ describe("S3 through Reviews, Documents and Conditions and fees, after each role
 
     /* Health & Legal checks the permit from the Documents tab. */
     documents = await openTab(user, "Documents");
-    await user.click(within(documents.getByTestId(`document-card-${permit}`)).getByRole("button", { name: "Verify" }));
+    await user.click(within(documents.getByTestId(`document-card-${permit}`)).getByRole("button", { name: /^Verify / }));
     expect(sheet().getByText("Rolling Dumpling Co. is on the vendor list.")).toBeInTheDocument();
     await user.click(sheet().getByRole("button", { name: "Verify" }));
     card = within(within(screen.getByRole("tabpanel", { name: "Documents" })).getByTestId(`document-card-${permit}`));
     expect(card.getByText("Verified")).toBeInTheDocument();
     expect(card.getByText("Verified Mon, May 3, 2027.")).toBeInTheDocument();
-    expect(card.queryByRole("button", { name: "Verify" })).not.toBeInTheDocument();
+    expect(card.queryByRole("button", { name: /^Verify / })).not.toBeInTheDocument();
 
     /* ...and decides its review, with the verified file in front of it. */
     reviews = await openTab(user, "Reviews");

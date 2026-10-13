@@ -201,7 +201,7 @@ function VerificationsScreen() {
             </div>
 
             {filters.group === "type" ? (
-              <div className="flex flex-wrap gap-2">
+              <div role="group" aria-label="Document type" className="flex flex-wrap gap-2">
                 <FilterChip active={filters.type === "all"} onClick={() => setFilters({ type: "all" })}>
                   All types
                 </FilterChip>

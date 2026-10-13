@@ -39,16 +39,24 @@ function MeetingsTab({ rows, role, today, here }: MeetingsTabProps) {
               </div>
               <div className="flex shrink-0 items-center gap-2">
                 <Button asChild size="sm" variant="secondary">
-                  <Link href={routes.city.case(row.case.id, { task: `schedule_meeting:${row.task.id}`, from: here })}>
+                  <Link
+                    href={routes.city.case(row.case.id, { task: `schedule_meeting:${row.task.id}`, from: here })}
+                    aria-label={`${row.scheduledFor ? "Reschedule" : "Schedule"}: ${MEETING_KIND_LABEL[row.kind]}, ${row.case.name}`}
+                  >
                     {row.scheduledFor ? "Reschedule" : "Schedule"}
                   </Link>
                 </Button>
                 {row.held || !canHold ? null : canHold.ok ? (
                   <Button asChild size="sm">
-                    <Link href={routes.city.case(row.case.id, { task: `complete_city_task:${row.task.id}`, from: here })}>Mark held</Link>
+                    <Link
+                      href={routes.city.case(row.case.id, { task: `complete_city_task:${row.task.id}`, from: here })}
+                      aria-label={`Mark held: ${MEETING_KIND_LABEL[row.kind]}, ${row.case.name}`}
+                    >
+                      Mark held
+                    </Link>
                   </Button>
                 ) : (
-                  <Button size="sm" disabled>
+                  <Button size="sm" disabled aria-label={`Mark held: ${MEETING_KIND_LABEL[row.kind]}, ${row.case.name}`} aria-describedby={`meeting-reason-${row.task.id}`}>
                     Mark held
                   </Button>
                 )}
@@ -58,7 +66,11 @@ function MeetingsTab({ rows, role, today, here }: MeetingsTabProps) {
               {MEETING_KIND_LABEL[row.kind]} ·{" "}
               {row.held ? "Held" : row.scheduledFor ? `Scheduled for ${fmtDate(row.scheduledFor)}` : "Not yet scheduled"}
             </p>
-            {canHold && !canHold.ok ? <p className="text-xs text-fg-secondary">{canHold.reason}</p> : null}
+            {canHold && !canHold.ok ? (
+              <p id={`meeting-reason-${row.task.id}`} className="text-xs text-fg-secondary">
+                {canHold.reason}
+              </p>
+            ) : null}
           </li>
         );
       })}

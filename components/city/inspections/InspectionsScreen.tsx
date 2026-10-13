@@ -84,7 +84,7 @@ function BoothCard({ caseId, booth }: { caseId: string; booth: BoothRow }) {
           className="min-h-9 flex-1 py-2 text-sm"
           rows={1}
         />
-        <Button type="button" size="sm" onClick={record}>
+        <Button type="button" size="sm" aria-label={`Record the result for ${booth.vendorName}`} onClick={record}>
           Record
         </Button>
       </div>
