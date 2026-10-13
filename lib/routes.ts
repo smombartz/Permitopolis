@@ -40,8 +40,13 @@ export const routes = {
 
   events: () => "/events",
   event: (id: string, options: { card?: string } = {}) => withQuery(`/events/${id}`, { card: options.card }),
-  /** Quote for Reviewed and Special events; booking and payment for Instant. */
-  quote: (id: string) => `/events/${id}/quote`,
+  /**
+   * The one place an applicant pays. With no option it is the quote for a Reviewed or Special
+   * event and the booking for an Instant one. `pay: "session"` pays a series session (with its
+   * date) and `pay: "final"` pays the final bill after closeout.
+   */
+  quote: (id: string, options: { pay?: "session" | "final"; date?: string } = {}) =>
+    withQuery(`/events/${id}/quote`, { pay: options.pay, date: options.date }),
   permit: (id: string) => `/events/${id}/permit`,
   amend: (id: string) => `/events/${id}/amend`,
   /** What an officer sees after scanning the permit's QR code. */

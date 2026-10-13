@@ -8,6 +8,10 @@ describe("routes", () => {
     expect(routes.apply({ caseId: "PMT-27-0142", step: "when" })).toBe("/apply?case=PMT-27-0142&step=when");
     expect(routes.event("PMT-27-0118")).toBe("/events/PMT-27-0118");
     expect(routes.quote("PMT-27-0097")).toBe("/events/PMT-27-0097/quote");
+    expect(routes.quote("PMT-27-0142", { pay: "session", date: "2027-06-13" })).toBe(
+      "/events/PMT-27-0142/quote?pay=session&date=2027-06-13",
+    );
+    expect(routes.quote("PMT-27-0031", { pay: "final" })).toBe("/events/PMT-27-0031/quote?pay=final");
     expect(routes.permit("PMT-27-0109")).toBe("/events/PMT-27-0109/permit");
     expect(routes.verify("PMT-27-0109")).toBe("/verify/PMT-27-0109");
     expect(routes.city.queue()).toBe("/city/queue");
