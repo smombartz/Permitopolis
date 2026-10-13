@@ -116,12 +116,19 @@ export const DEMO_DATE_JUMPS: DemoDateJump[] = [
 export type DemoPathPriority = "P0" | "P1";
 
 export interface DemoStep {
+  /**
+   * Stable within its path, read back by `lib/view/coach.ts`'s derive function so a coach strip
+   * or a render test can name the step a presenter is on without counting array indexes.
+   */
+  id: string;
   role: Party;
   /**
    * Who the applicant is, on every applicant step (a lib/data/people.ts id): the scenario's own
    * organizer, or "new" for somebody starting a fresh event. Never set on a city step.
    */
   persona?: string;
+  /** The page to be on for this step, a `lib/routes.ts` link. */
+  page: string;
   text: string;
 }
 
@@ -148,16 +155,20 @@ export const DEMO_PATHS: DemoPath[] = [
     summary: "Finish the wizard, pay the first session, and see the 13-session permit on Active permits.",
     steps: [
       {
+        id: "finish-wizard",
         role: "applicant",
         persona: "sunrise-yoga-club",
+        page: routes.apply({ caseId: S2, step: "when" }),
         text: "Finish the wizard from step 3. The plan shows Instant, 13 sessions at $20.",
       },
       {
+        id: "pay-first-session",
         role: "applicant",
         persona: "sunrise-yoga-club",
+        page: routes.quote(S2),
         text: "Pay the first session; the series permit appears with its QR code.",
       },
-      { role: "clerk", text: "Active permits shows 13 Sundays on Field 4." },
+      { id: "view-active-permits", role: "clerk", page: routes.city.active(), text: "Active permits shows 13 Sundays on Field 4." },
     ],
   },
   {
@@ -168,13 +179,15 @@ export const DEMO_PATHS: DemoPath[] = [
     summary: "Every answer updates the tier, the what-if chip, the reviewers and the fee estimate live.",
     steps: [
       {
+        id: "pick-shelter",
         role: "applicant",
         persona: "new",
+        page: routes.apply(),
         text: "Pick Picnic or party at Shelter 2 for 40 people: Instant.",
       },
-      { role: "applicant", persona: "new", text: "Turn on alcohol: Reviewed, and the what-if chip offers the way back." },
-      { role: "applicant", persona: "new", text: "Switch the location to two Main Street blocks: Special event." },
-      { role: "applicant", persona: "new", text: "Set attendance to 1,200 with no street: still Special." },
+      { id: "turn-on-alcohol", role: "applicant", persona: "new", page: routes.apply(), text: "Turn on alcohol: Reviewed, and the what-if chip offers the way back." },
+      { id: "two-main-blocks", role: "applicant", persona: "new", page: routes.apply(), text: "Switch the location to two Main Street blocks: Special event." },
+      { id: "set-attendance-1200", role: "applicant", persona: "new", page: routes.apply(), text: "Set attendance to 1,200 with no street: still Special." },
     ],
   },
   {
@@ -185,14 +198,16 @@ export const DEMO_PATHS: DemoPath[] = [
     summary: "Answer a reviewer's request, get the consolidated quote, pay, and the permit issues.",
     steps: [
       {
+        id: "respond-to-request",
         role: "applicant",
         persona: "downtown-arts-collective",
+        page: routes.event(S3),
         text: "Open the pinned card, use the sample file, send. The card moves to With the city.",
       },
-      { role: "hl", text: "Verify it and approve the section." },
-      { role: "clerk", text: "Consolidate (Public Works & Safety's conditions carry over), approve and send the $715 quote." },
-      { role: "applicant", persona: "downtown-arts-collective", text: "Accept, sign and pay." },
-      { role: "clerk", text: "Insurance was already verified, so issue the permit; it appears in Active permits." },
+      { id: "verify-and-approve", role: "hl", page: routes.city.case(S3), text: "Verify it and approve the section." },
+      { id: "send-quote", role: "clerk", page: routes.city.case(S3), text: "Consolidate (Public Works & Safety's conditions carry over), approve and send the $715 quote." },
+      { id: "accept-sign-pay", role: "applicant", persona: "downtown-arts-collective", page: routes.quote(S3), text: "Accept, sign and pay." },
+      { id: "issue-permit", role: "clerk", page: routes.city.case(S3), text: "Insurance was already verified, so issue the permit; it appears in Active permits." },
     ],
   },
   {
@@ -203,15 +218,19 @@ export const DEMO_PATHS: DemoPath[] = [
     summary: "The last sign-off unblocks intake; accepting places the date hold and routes the case.",
     steps: [
       {
+        id: "simulate-signoffs",
         role: "applicant",
         persona: "maple-street-block-captain",
+        page: routes.event(S4),
         text: 'Press "Simulate a sign-off" three times.',
       },
       {
+        id: "accept-and-route",
         role: "clerk",
+        page: routes.city.case(S4),
         text: "Accept is now enabled in intake: accept (the date hold appears), confirm routing, and the case moves to In review.",
       },
-      { role: "pws", text: "Public Works & Safety's queue now shows the block party." },
+      { id: "pws-queue", role: "pws", page: routes.city.queue(), text: "Public Works & Safety's queue now shows the block party." },
     ],
   },
   {
@@ -222,17 +241,21 @@ export const DEMO_PATHS: DemoPath[] = [
     summary: "Who's up shows two parties at once; issuing the permit waits on both of them.",
     steps: [
       {
+        id: "open-case",
         role: "clerk",
+        page: routes.city.case(S5),
         text: "Open the case: Who's up highlights both the applicant and Health & Legal, and Issue permit says why it is disabled.",
       },
-      { role: "hl", text: "Verify the insurance." },
-      { role: "applicant", persona: "riverfront-running-club", text: "Sign and pay." },
+      { id: "verify-insurance", role: "hl", page: routes.city.case(S5), text: "Verify the insurance." },
+      { id: "sign-and-pay", role: "applicant", persona: "riverfront-running-club", page: routes.quote(S5), text: "Sign and pay." },
       {
+        id: "issue-permit",
         role: "clerk",
+        page: routes.city.case(S5),
         text: "Issue the permit; Public Works & Safety gets its work orders and the route shows on its map for Jul 11.",
       },
       // In the wizard, as somebody new: the Clerk has no page that starts an event.
-      { role: "applicant", persona: "new", text: "Starting a new City Hall Plaza event on Jul 11 shows the Impacted warning." },
+      { id: "new-plaza-event", role: "applicant", persona: "new", page: routes.apply(), text: "Starting a new City Hall Plaza event on Jul 11 shows the Impacted warning." },
     ],
   },
   {
@@ -242,11 +265,13 @@ export const DEMO_PATHS: DemoPath[] = [
     scenario: "S6",
     summary: "Public Works & Safety logs the actuals; the Clerk reconciles and the applicant sees the refund.",
     steps: [
-      { role: "pws", text: "Pass the cleanup check and log 72 officer-hours and 4 crew-hours." },
-      { role: "clerk", text: "Reconciliation shows $750 over the estimate; issue the $250 deposit refund and close." },
+      { id: "log-cleanup", role: "pws", page: routes.city.case(S6), text: "Pass the cleanup check and log 72 officer-hours and 4 crew-hours." },
+      { id: "reconcile-close", role: "clerk", page: routes.city.case(S6), text: "Reconciliation shows $750 over the estimate; issue the $250 deposit refund and close." },
       {
+        id: "book-again",
         role: "applicant",
         persona: "main-street-business-alliance",
+        page: routes.event(S6),
         text: 'The board shows the refund, the feedback form and "Book again next year", which drafts Sat, Apr 22, 2028.',
       },
     ],
@@ -259,14 +284,18 @@ export const DEMO_PATHS: DemoPath[] = [
     summary: "Adding a DJ raises the tier mid-flight; the date gate fires and the live permit stays valid.",
     steps: [
       {
+        id: "add-dj",
         role: "applicant",
         persona: "maya-chen",
+        page: routes.event(S1),
         text: "Add a DJ. The event becomes Reviewed and the date gate fires: 19 days left, 30 needed.",
       },
-      { role: "applicant", persona: "maya-chen", text: "Choose the late fee." },
+      { id: "choose-late-fee", role: "applicant", persona: "maya-chen", page: routes.event(S1), text: "Choose the late fee." },
       {
+        id: "amendment-cards",
         role: "applicant",
         persona: "maya-chen",
+        page: routes.event(S1),
         text: "New cards tagged Amendment appear, and the current permit stays valid for the original plan.",
       },
     ],
