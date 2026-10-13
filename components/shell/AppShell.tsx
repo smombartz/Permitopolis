@@ -5,6 +5,7 @@ import { PageSkeleton } from "@/components/ui/page-skeleton";
 import { TopBar } from "@/components/shell/TopBar";
 import { StorageBanner } from "@/components/shell/StorageBanner";
 import { SwitchRolePanel } from "@/components/shell/SwitchRolePanel";
+import { CoachStrip } from "@/components/shell/CoachStrip";
 import { RememberPath } from "@/components/shell/RememberPath";
 import { useRoleSwitch } from "@/components/shell/useRoleSwitch";
 import { useDemo, useHydrated } from "@/lib/state";
@@ -35,6 +36,9 @@ function AppShell({ children }: AppShellProps) {
       ) : (
         <main className="flex-1">
           {!storageOk ? <StorageBanner /> : null}
+          <React.Suspense fallback={null}>
+            <CoachStrip />
+          </React.Suspense>
           {role === "applicant" ? (
             <>
               <React.Suspense fallback={null}>

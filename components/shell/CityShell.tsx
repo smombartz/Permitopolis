@@ -6,6 +6,7 @@ import { PageSkeleton } from "@/components/ui/page-skeleton";
 import { TopBar } from "@/components/shell/TopBar";
 import { StorageBanner } from "@/components/shell/StorageBanner";
 import { SwitchRolePanel } from "@/components/shell/SwitchRolePanel";
+import { CoachStrip } from "@/components/shell/CoachStrip";
 import { CitySidebar } from "@/components/shell/CitySidebar";
 import { RememberPath } from "@/components/shell/RememberPath";
 import { useRoleSwitch } from "@/components/shell/useRoleSwitch";
@@ -59,6 +60,9 @@ function CityShell({ children }: CityShellProps) {
       ) : (
         <main className="flex-1">
           {!storageOk ? <StorageBanner /> : null}
+          <React.Suspense fallback={null}>
+            <CoachStrip />
+          </React.Suspense>
           {isCityRole(role) ? (
             <div className="page-container flex gap-6 py-6">
               <CitySidebar role={role} pathname={pathname} queueCount={queueFor(cases, role, demoToday).length} />
