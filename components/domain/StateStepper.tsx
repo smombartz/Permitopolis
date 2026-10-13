@@ -22,78 +22,98 @@ function StateStepper({ state, ending, compact = false, className }: StateSteppe
   const effective: CaseState = state === "needs_info" ? "in_review" : state
   const activeIndex = MAIN_PATH.indexOf(effective)
   const EndingIcon = ending ? ENDING_ICON[ending] : null
+  // The step actually in play right now, for the compact view's visible label:
+  // the state it ended in, "Needs info" when that marker is showing, or the
+  // plain current step otherwise.
+  const currentLabel = ending
+    ? ENDING_LABEL[ending]
+    : state === "needs_info"
+      ? "Needs info"
+      : STATE_LABEL[effective]
 
   return (
-    <div
-      data-slot="state-stepper"
-      data-compact={compact || undefined}
-      role="list"
-      aria-label="Case progress"
-      className={cn("flex w-full items-start", className)}
-    >
-      {MAIN_PATH.map((step, index) => {
-        const done = !ending && index < activeIndex
-        const isCurrent = index === activeIndex
-        const stopped = isCurrent && !!ending
-        const showNeedsInfo = isCurrent && !ending && state === "needs_info"
+    <div data-slot="state-stepper-group" className={cn("flex w-full flex-col gap-1.5", className)}>
+      <div
+        data-slot="state-stepper"
+        data-compact={compact || undefined}
+        role="list"
+        aria-label="Case progress"
+        className="flex w-full items-start"
+      >
+        {MAIN_PATH.map((step, index) => {
+          const done = !ending && index < activeIndex
+          const isCurrent = index === activeIndex
+          const stopped = isCurrent && !!ending
+          const showNeedsInfo = isCurrent && !ending && state === "needs_info"
+          const stepName = stopped ? ENDING_LABEL[ending as Ending] : STATE_LABEL[step]
 
-        return (
-          <Fragment key={step}>
-            <div role="listitem" className="relative flex flex-col items-center gap-2">
-              {showNeedsInfo ? (
-                <span
-                  className={cn(
-                    "absolute -top-7 inline-flex items-center gap-1 rounded-full border border-warning-border bg-warning-surface px-2 py-0.5 text-[10px] font-bold whitespace-nowrap text-warning-fg uppercase",
-                    compact && "hidden"
-                  )}
-                >
-                  <TriangleAlertIcon className="size-3" aria-hidden="true" />
-                  Needs info
-                </span>
-              ) : null}
-              <span
-                aria-current={isCurrent ? "step" : undefined}
-                className={cn(
-                  "flex shrink-0 items-center justify-center rounded-full border-2 transition-colors",
-                  compact ? "size-2.5" : "size-4",
-                  done && "border-indigo-650 bg-indigo-650 text-fg-on-accent",
-                  isCurrent &&
-                    !stopped &&
-                    "border-indigo-650 bg-surface-solid text-indigo-650 shadow-step-lit",
-                  stopped && "border-danger bg-danger-surface text-danger-fg",
-                  !done && !isCurrent && "border-line-magnetic bg-surface-solid"
-                )}
-              >
-                {!compact && done ? <CheckIcon className="size-2.5 stroke-[3px]" aria-hidden="true" /> : null}
-                {!compact && stopped && EndingIcon ? (
-                  <EndingIcon className="size-2.5 stroke-[3px]" aria-hidden="true" />
+          return (
+            <Fragment key={step}>
+              <div role="listitem" className="relative flex flex-col items-center gap-2">
+                {showNeedsInfo ? (
+                  <span
+                    className={cn(
+                      "absolute -top-7 inline-flex items-center gap-1 rounded-full border border-warning-border bg-warning-surface px-2 py-0.5 text-[10px] font-bold whitespace-nowrap text-warning-fg uppercase",
+                      compact && "hidden"
+                    )}
+                  >
+                    <TriangleAlertIcon className="size-3" aria-hidden="true" />
+                    Needs info
+                  </span>
                 ) : null}
-              </span>
-              {!compact ? (
                 <span
+                  aria-current={isCurrent ? "step" : undefined}
+                  title={compact ? stepName : undefined}
                   className={cn(
-                    "text-[11px] font-medium whitespace-nowrap",
-                    done || isCurrent ? "text-fg" : "text-fg-secondary",
-                    isCurrent && "font-bold"
+                    "flex shrink-0 items-center justify-center rounded-full border-2 transition-colors",
+                    compact ? "size-2.5" : "size-4",
+                    done && "border-indigo-650 bg-indigo-650 text-fg-on-accent",
+                    isCurrent &&
+                      !stopped &&
+                      "border-indigo-650 bg-surface-solid text-indigo-650 shadow-step-lit",
+                    stopped && "border-danger bg-danger-surface text-danger-fg",
+                    !done && !isCurrent && "border-line-magnetic bg-surface-solid"
                   )}
                 >
-                  {stopped ? ENDING_LABEL[ending as Ending] : STATE_LABEL[step]}
+                  {!compact && done ? <CheckIcon className="size-2.5 stroke-[3px]" aria-hidden="true" /> : null}
+                  {!compact && stopped && EndingIcon ? (
+                    <EndingIcon className="size-2.5 stroke-[3px]" aria-hidden="true" />
+                  ) : null}
+                  {/* Every marker, compact or not, carries its own accessible name. */}
+                  <span className="sr-only">{stepName}</span>
                 </span>
+                {!compact ? (
+                  <span
+                    aria-hidden="true"
+                    className={cn(
+                      "text-[11px] font-medium whitespace-nowrap",
+                      done || isCurrent ? "text-fg" : "text-fg-secondary",
+                      isCurrent && "font-bold"
+                    )}
+                  >
+                    {stepName}
+                  </span>
+                ) : null}
+              </div>
+              {index < MAIN_PATH.length - 1 ? (
+                <span
+                  aria-hidden="true"
+                  className={cn(
+                    "mt-2 h-px flex-1",
+                    compact ? "mt-[5px]" : "mt-2",
+                    done ? "bg-indigo-650" : "bg-line-subtle"
+                  )}
+                />
               ) : null}
-            </div>
-            {index < MAIN_PATH.length - 1 ? (
-              <span
-                aria-hidden="true"
-                className={cn(
-                  "mt-2 h-px flex-1",
-                  compact ? "mt-[5px]" : "mt-2",
-                  done ? "bg-indigo-650" : "bg-line-subtle"
-                )}
-              />
-            ) : null}
-          </Fragment>
-        )
-      })}
+            </Fragment>
+          )
+        })}
+      </div>
+      {compact ? (
+        <p className={cn("text-xs font-semibold whitespace-nowrap", ending ? "text-danger-fg" : "text-fg")}>
+          {currentLabel}
+        </p>
+      ) : null}
     </div>
   )
 }

@@ -1,5 +1,6 @@
 import { cn } from "@/lib/utils";
 import { TIER_LABEL } from "@/lib/types";
+import { TIER_ICON } from "@/components/domain/icons";
 import { VIEWBOX } from "@/lib/data/mapGeometry";
 import { CityBackground } from "./CityBackground";
 import { resolveLocationShapes } from "./geometry";
@@ -32,6 +33,7 @@ const TIER_DOT: Record<MapHighlight["tier"], string> = {
  */
 export function MapThumbnail({ highlight, className }: MapThumbnailProps) {
   const shapes = resolveLocationShapes(highlight.location);
+  const TierIcon = TIER_ICON[highlight.tier];
 
   return (
     <figure className={cn("w-full max-w-64", className)}>
@@ -70,7 +72,8 @@ export function MapThumbnail({ highlight, className }: MapThumbnailProps) {
       </svg>
       <figcaption className="mt-1 flex items-center gap-1.5 text-xs text-fg-secondary">
         <span aria-hidden className={cn("size-1.5 shrink-0 rounded-full", TIER_DOT[highlight.tier])} />
-        <span className="sr-only">{TIER_LABEL[highlight.tier]}: </span>
+        <TierIcon aria-hidden className="size-3 shrink-0" />
+        <span className="text-fg-label">{TIER_LABEL[highlight.tier]}: </span>
         <span className="truncate">{highlight.label}</span>
       </figcaption>
     </figure>

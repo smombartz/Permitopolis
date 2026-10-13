@@ -3,10 +3,14 @@
 import { cn } from "@/lib/utils";
 import { fmtDateShort, plural } from "@/lib/format";
 import { TIER_LABEL } from "@/lib/types";
+import { TIER_ICON } from "@/components/domain/icons";
 import { groupItemsByDate, nextDays } from "./utils";
 import { TIER_DOT_CLASS } from "./tierStyles";
 import type { CalendarItem } from "./types";
 import type { ISODate } from "@/lib/types";
+
+const FOCUS_RING =
+  "outline-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring";
 
 export interface DayStripProps {
   items: CalendarItem[];
@@ -44,25 +48,33 @@ export function DayStrip({ items, today, onSelectItem, onSelectDay, className }:
               type="button"
               onClick={() => onSelectDay?.(date)}
               aria-current={isToday ? "date" : undefined}
-              className="block w-full rounded px-1 text-left text-xs font-medium text-fg-label"
+              className={cn("block w-full rounded px-1 text-left text-xs font-medium text-fg-label", FOCUS_RING)}
             >
               {fmtDateShort(date)}: {summary(dayItems.length, isToday)}
             </button>
             {dayItems.length > 0 && (
               <ul className="mt-1 space-y-0.5">
-                {dayItems.slice(0, 3).map((item) => (
-                  <li key={item.id}>
-                    <button
-                      type="button"
-                      onClick={() => onSelectItem?.(item.id)}
-                      className="flex w-full items-center gap-1 truncate rounded px-1 py-0.5 text-left text-[11px] text-fg-secondary hover:bg-surface-hover"
-                    >
-                      <span aria-hidden className={cn("size-1.5 shrink-0 rounded-full", TIER_DOT_CLASS[item.tier])} />
-                      <span className="sr-only">{TIER_LABEL[item.tier]}: </span>
-                      <span className="truncate">{item.label}</span>
-                    </button>
-                  </li>
-                ))}
+                {dayItems.slice(0, 3).map((item) => {
+                  const TierIcon = TIER_ICON[item.tier];
+                  return (
+                    <li key={item.id}>
+                      <button
+                        type="button"
+                        onClick={() => onSelectItem?.(item.id)}
+                        title={`${TIER_LABEL[item.tier]}: ${item.label}`}
+                        className={cn(
+                          "flex w-full items-center gap-1 truncate rounded px-1 py-0.5 text-left text-[11px] text-fg-secondary hover:bg-surface-hover",
+                          FOCUS_RING,
+                        )}
+                      >
+                        <span aria-hidden className={cn("size-1.5 shrink-0 rounded-full", TIER_DOT_CLASS[item.tier])} />
+                        <TierIcon aria-hidden className="size-2.5 shrink-0" />
+                        <span className="sr-only">{TIER_LABEL[item.tier]}: </span>
+                        <span className="truncate">{item.label}</span>
+                      </button>
+                    </li>
+                  );
+                })}
                 {dayItems.length > 3 && (
                   <li className="px-1 text-[11px] text-fg-secondary">+{dayItems.length - 3} more</li>
                 )}
