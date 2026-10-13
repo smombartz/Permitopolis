@@ -8,7 +8,7 @@
  */
 import { homeFor, routes } from "@/lib/routes";
 import { isVisibleToCity } from "@/lib/state/selectors";
-import type { EventCase, Party } from "@/lib/types";
+import type { Dept, EventCase, Party } from "@/lib/types";
 
 const EVENT_CASE_PATH = /^\/events\/([^/?]+)(?:\/.*)?$/;
 const CITY_CASE_PATH = /^\/city\/cases\/([^/?]+)(?:\/.*)?$/;
@@ -59,19 +59,23 @@ export interface RoleSwitchResult {
 }
 
 /**
- * The PRD's role-switch rule: between two city roles the URL stays, so the presenter keeps
- * looking at the same case through another role's eyes. Between the Applicant and a city
- * role, a case on screen follows to the same case for the new role. A Draft does not follow
- * to the city: it is the applicant's alone until it is submitted or booked. Off a case page
- * (or when the case does not exist), the switch goes to the role's last remembered page, query
- * string included, then its home.
+ * The PRD's role-switch rule: between two city roles the URL stays on a page they share (My
+ * queue, Cases, a case, Active permits), so the presenter keeps looking at the same case
+ * through another role's eyes. A role's own tool page (the Clerk's Intake, say) is not the
+ * other role's: from there the switch goes to the new role's last page, then its queue.
+ * Between the Applicant and a city role, a case on screen follows to the same case for the new
+ * role. A Draft does not follow to the city: it is the applicant's alone until it is submitted
+ * or booked. Off a case page (or when the case does not exist), the switch goes to the role's
+ * last remembered page, query string included, then its home.
  *
  * Landing on the Applicant also sets the persona to the applicant of the case the landing
  * page is about, so the board never shows one organizer's event under another's name.
  */
 export function resolveRoleSwitch({ fromRole, toRole, pathname, cases, lastPathByRole }: RoleSwitchArgs): RoleSwitchResult {
   if (fromRole === toRole) return { path: pathname };
-  if (fromRole !== "applicant" && toRole !== "applicant") return { path: pathname };
+  if (fromRole !== "applicant" && toRole !== "applicant") {
+    return cityPageIsFor(toRole, pathname) ? { path: pathname } : { path: rememberedCityPage(toRole, lastPathByRole) };
+  }
 
   const caseId = caseIdFromPath(pathname, fromRole);
   const onScreen = caseId ? cases.find((c) => c.id === caseId) : undefined;
@@ -80,9 +84,9 @@ export function resolveRoleSwitch({ fromRole, toRole, pathname, cases, lastPathB
     if (isVisibleToCity(onScreen)) return { path: pathForCase(toRole, onScreen.id) };
   }
 
+  if (toRole !== "applicant") return { path: rememberedCityPage(toRole, lastPathByRole) };
   const remembered = lastPathByRole[toRole];
   if (!remembered) return { path: homeFor(toRole) };
-  if (toRole !== "applicant") return { path: remembered };
 
   const rememberedCaseId = applicantCaseIdFromHref(remembered);
   if (!rememberedCaseId) return { path: remembered };
@@ -137,4 +141,30 @@ const CITY_TOOL_LINKS: Record<Exclude<Party, "applicant">, SidebarLink[]> = {
 /** A city role's own tools, under the shared sidebar links. */
 export function cityToolLinks(role: Exclude<Party, "applicant">): SidebarLink[] {
   return CITY_TOOL_LINKS[role];
+}
+
+/**
+ * The role whose tool page this is (the PRD's route map: Intake, Payments and Settings are the
+ * City Clerk's; the map and work orders are Public Works & Safety's; verifications and
+ * inspections are Health & Legal's). Null for a page every city role shares, and for any page
+ * outside the city area. Takes a pathname or a full href.
+ */
+export function cityToolOwner(href: string): Dept | null {
+  const path = href.split("?")[0];
+  for (const dept of ["clerk", "pws", "hl"] as const) {
+    if (CITY_TOOL_LINKS[dept].some((link) => path === link.href || path.startsWith(`${link.href}/`))) return dept;
+  }
+  return null;
+}
+
+/** Whether a city page is one this role has: a shared page, or one of its own tools. */
+export function cityPageIsFor(role: Party, href: string): boolean {
+  const owner = cityToolOwner(href);
+  return owner === null || owner === role;
+}
+
+/** The city role's last page, when it is still one of its own; otherwise its queue. */
+function rememberedCityPage(role: Party, lastPathByRole: Partial<Record<Party, string>>): string {
+  const remembered = lastPathByRole[role];
+  return remembered && cityPageIsFor(role, remembered) ? remembered : homeFor(role);
 }

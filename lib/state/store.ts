@@ -3,8 +3,12 @@
  * calls transition() and never touches a case directly. Persisted to localStorage through the
  * guarded helpers in ./storage, with skipHydration so server rendering and node tests never
  * read it implicitly.
+ *
+ * The stored demo is read once per page load (hydrateDemoStore(), started by useHydrated() and
+ * by the <StoreHydrator /> in the root layout, so it happens on every route). Until it has been
+ * read nothing is written: see `storageAdapter`.
  */
-import { useEffect, useState } from "react";
+import { useEffect, useSyncExternalStore } from "react";
 import { create } from "zustand";
 import { createJSONStorage, persist, type StateStorage } from "zustand/middleware";
 import { DEFAULT_CONFIG, DEFAULT_DEMO_TODAY, STORAGE_KEY } from "@/lib/rules";
@@ -18,9 +22,23 @@ import { transition } from "./transition";
 import type { Action } from "./actions";
 import type { DemoStore } from "./types";
 
+/** True once the stored demo has been read on this page load. */
+let storageRead = false;
+
+/**
+ * persist writes the whole demo on every set(), whether or not it has hydrated. A change made
+ * before the stored demo was read (a landing-page door that sets the role, say) would therefore
+ * save this page load's in-memory seed over the presenter's demo. So a write waits for the read:
+ * until then it is dropped, and the read that follows brings the stored demo in.
+ */
 const storageAdapter: StateStorage = {
-  getItem: (name) => safeGet(name),
+  getItem: (name) => {
+    const value = safeGet(name);
+    storageRead = true;
+    return value;
+  },
   setItem: (name, value) => {
+    if (!storageRead) return;
     safeSet(name, value);
   },
   removeItem: (name) => {
@@ -136,33 +154,77 @@ export const useDemo = create<DemoStore>()(
   ),
 );
 
+/* ---------- hydration: once per page load, shared by every mount ---------- */
+
+let hydrated = false;
+let hydration: Promise<void> | null = null;
+/** Counts page loads, so a read still in flight when a test starts over cannot mark the next one hydrated. */
+let pageLoad = 0;
+const hydrationListeners = new Set<() => void>();
+
+function subscribeToHydration(listener: () => void): () => void {
+  hydrationListeners.add(listener);
+  return () => {
+    hydrationListeners.delete(listener);
+  };
+}
+
+function setHydrated(value: boolean): void {
+  hydrated = value;
+  for (const listener of hydrationListeners) listener();
+}
+
+/**
+ * Reads the stored demo into the store. The first call does the work; every later one gets the
+ * same promise, so a second shell mounting (the applicant's and the city's layouts are separate)
+ * does not read localStorage again. With storage blocked there is nothing to read.
+ */
+export function hydrateDemoStore(): Promise<void> {
+  if (!hydration) {
+    const load = pageLoad;
+    hydration = Promise.resolve(storageAvailable() ? useDemo.persist.rehydrate() : undefined).then(() => {
+      if (load === pageLoad) setHydrated(true);
+    });
+  }
+  return hydration;
+}
+
 /**
  * True once the stored demo has been read on the client. Always false on the server and on the
- * first client render, so the two agree: a page that shows a skeleton until this is true never
- * hydrates against different HTML. (Starting from `storageAvailable()` would not do: the server
- * has no window, so it would render content where the browser's first render shows a skeleton.)
- * With storage blocked there is nothing to read and it turns true right after mount. Anything
- * that differs between server and client, `storageOk` included, belongs behind this gate.
+ * first client render of a page load, so the two agree: a page that shows a skeleton until this
+ * is true never hydrates against different HTML. (Starting from `storageAvailable()` would not
+ * do: the server has no window, so it would render content where the browser's first render
+ * shows a skeleton.) With storage blocked there is nothing to read and it turns true right
+ * after mount. Anything that differs between server and client, `storageOk` included, belongs
+ * behind this gate.
+ *
+ * The flag is the module's, not the component's: once the demo has been read, a component that
+ * mounts later (a client-side navigation to another layout) starts true and shows no skeleton.
  */
 export function useHydrated(): boolean {
-  const [hydrated, setHydrated] = useState(false);
   useEffect(() => {
-    let active = true;
-    Promise.resolve(storageAvailable() ? useDemo.persist.rehydrate() : undefined).then(() => {
-      if (active) setHydrated(true);
-    });
-    return () => {
-      active = false;
-    };
+    void hydrateDemoStore();
   }, []);
-  return hydrated;
+  return useSyncExternalStore(
+    subscribeToHydration,
+    () => hydrated,
+    () => false,
+  );
 }
 
 export function demoToday(): ISODate {
   return useDemo.getState().demoToday;
 }
 
-/** Restores the store to the seed and the defaults, bypassing React, for test setup. */
+/**
+ * A fresh page load, for test setup: the store back on the seed and the defaults, nothing in
+ * storage, and the stored demo not read yet. Bypasses React.
+ */
 export function resetDemoStoreForTests(): void {
+  pageLoad++;
+  hydration = null;
+  storageRead = false;
+  safeRemove(STORAGE_KEY);
   useDemo.setState(initialState());
+  setHydrated(false);
 }

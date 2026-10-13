@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
+import { taskDueDate } from "../core";
 import { makeCase, makeCtx, makeTask } from "../testSupport";
 import { transition } from "../transition";
 import { nextMove, waitingOn } from "../waitingOn";
@@ -167,6 +168,51 @@ describe("review_decide", () => {
     expect(transition(result.case, { type: "deny", reason: "Health & Legal could not approve the insurance." }, "clerk", makeCtx()).ok).toBe(true);
   });
 
+  it("the Clerk's consolidate task waits, locked, from routing; the last approval opens that same task", () => {
+    const pending = { dept: "pws" as const, sections: ["Sound details"], status: "pending" as const, dueDate: "2027-05-17", decidedOn: null, clock: { startedOn: "2027-05-03", pausedSince: null, pausedDays: 0, allowedDays: 14 }, internalNote: "", messageToApplicant: "" };
+    const tasks = [
+      makeTask({ id: "PMT-27-0001:review:pws", catalogId: "review:pws", owner: "pws", kind: "review" }),
+      makeTask({ id: "PMT-27-0001:review:hl", catalogId: "review:hl", owner: "hl", kind: "review" }),
+      makeTask({ id: "PMT-27-0001:consolidate", catalogId: "consolidate", owner: "clerk", kind: "action", title: "Consolidate reviews and send the quote", status: "locked" }),
+    ];
+    const routed = makeCase({ state: "in_review", reviews: [pending, { ...pending, dept: "hl" as const, sections: ["Certificate of insurance"] }], tasks });
+    const clerk = (c: typeof routed) => waitingOn(c, "2027-05-03").find((p) => p.party === "clerk")!;
+
+    // While the reviews are out the Clerk is waiting, and the row names the task that waits.
+    expect(clerk(routed)).toMatchObject({ status: "waiting", note: "Unlocks when every review is in", nextTask: { catalogId: "consolidate" } });
+    expect(nextMove(routed, "2027-05-03")).toBe("Next: Public Works & Safety reviews its sections, and Health & Legal reviews its sections, then City Clerk consolidates the reviews and sends the quote.");
+
+    const first = transition(routed, { type: "review_decide", decision: "approve", conditions: [], feeLines: [] }, "pws", makeCtx());
+    expect(first.ok && first.case.tasks.find((t) => t.catalogId === "consolidate")?.status).toBe("locked");
+    const last = first.ok ? transition(first.case, { type: "review_decide", decision: "approve", conditions: [], feeLines: [] }, "hl", makeCtx()) : first;
+    expect(last.ok).toBe(true);
+    if (!last.ok) return;
+    expect(last.case.tasks.filter((t) => t.catalogId === "consolidate")).toMatchObject([{ status: "todo", title: "Consolidate reviews and send the quote" }]);
+    expect(clerk(last.case)).toMatchObject({ status: "up_now" });
+    expect(clerk(last.case).nextTask).toBeUndefined();
+  });
+
+  it("a denial opens the locked consolidate task as the Clerk's decision", () => {
+    const review = { dept: "hl" as const, sections: ["Insurance"], status: "pending" as const, dueDate: "2027-05-17", decidedOn: null, clock: { startedOn: "2027-04-19", pausedSince: null, pausedDays: 0, allowedDays: 30 }, internalNote: "", messageToApplicant: "" };
+    const tasks = [
+      makeTask({ id: "PMT-27-0001:review:hl", catalogId: "review:hl", owner: "hl", kind: "review" }),
+      makeTask({ id: "PMT-27-0001:consolidate", catalogId: "consolidate", owner: "clerk", kind: "action", title: "Consolidate reviews and send the quote", status: "locked" }),
+    ];
+    const result = transition(makeCase({ state: "in_review", reviews: [review], tasks }), { type: "review_decide", decision: "deny", conditions: [], feeLines: [] }, "hl", makeCtx());
+    expect(result.ok && result.case.tasks.filter((t) => t.catalogId === "consolidate")).toMatchObject([{ status: "todo", title: "Decide: a reviewer denied", payload: { denied: true } }]);
+  });
+
+  it("writes the decision into the activity log in plain words", () => {
+    const review = { dept: "pws" as const, sections: ["Sound details"], status: "pending" as const, dueDate: "2027-05-17", decidedOn: null, clock: { startedOn: "2027-05-03", pausedSince: null, pausedDays: 0, allowedDays: 14 }, internalNote: "", messageToApplicant: "" };
+    const c = makeCase({ state: "in_review", reviews: [review] });
+    const withConditions = transition(c, { type: "review_decide", decision: "approve_with_conditions", conditions: ["Sound ends at 9 pm"], feeLines: [] }, "pws", makeCtx());
+    expect(withConditions.ok && withConditions.case.activity.at(-1)?.text).toBe("Decided: approved with conditions.");
+    const approved = transition(c, { type: "review_decide", decision: "approve", conditions: [], feeLines: [] }, "pws", makeCtx());
+    expect(approved.ok && approved.case.activity.at(-1)?.text).toBe("Decided: approved.");
+    // A second decision is refused, in plain words as well.
+    expect(withConditions.ok && transition(withConditions.case, { type: "review_decide", decision: "approve", conditions: [], feeLines: [] }, "pws", makeCtx())).toEqual({ ok: false, reason: "Review is already approved with conditions." });
+  });
+
   it("fails when the department isn't routed", () => {
     const c = makeCase({ state: "in_review", reviews: [] });
     const result = transition(c, { type: "review_decide", decision: "approve", conditions: [], feeLines: [] }, "pws", makeCtx());
@@ -196,6 +242,19 @@ describe("schedule_meeting and complete_city_task", () => {
     if (!result.ok) return;
     expect(result.case.tasks.find((t) => t.id === meeting.id)?.payload.scheduledFor).toBe("2027-05-10");
     expect(result.case.tasks.find((t) => t.id === scheduler.id)?.status).toBe("done");
+  });
+
+  it("a scheduled meeting is due on the day it is set for, not on the plan's default date", () => {
+    // The plan dated the coordination meeting 21 days before a Jul 11 event: Fri, Jun 18.
+    const meeting = makeTask({ id: "PMT-27-0001:coordination_meeting", catalogId: "coordination_meeting", kind: "meeting", reviewer: "clerk", status: "locked", unlocksOn: "permitted", dueDate: "2027-06-18" });
+    const scheduled = transition(makeCase({ state: "quote_sent", tier: "special", tasks: [meeting] }), { type: "schedule_meeting", taskId: meeting.id, date: "2027-06-21" }, "clerk", makeCtx());
+    expect(scheduled.ok).toBe(true);
+    if (!scheduled.ok) return;
+    expect(scheduled.case.tasks[0]).toMatchObject({ status: "locked", dueDate: "2027-06-21", payload: { scheduledFor: "2027-06-21" } });
+    expect(taskDueDate(scheduled.case.tasks[0])).toBe("2027-06-21");
+    // Moving it moves the due date with it.
+    const moved = transition(scheduled.case, { type: "schedule_meeting", taskId: meeting.id, date: "2027-06-23" }, "clerk", makeCtx());
+    expect(moved.ok && taskDueDate(moved.case.tasks[0])).toBe("2027-06-23");
   });
 
   it("a meeting can be moved to another day, and the scheduling is done only once", () => {

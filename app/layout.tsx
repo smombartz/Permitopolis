@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { IBM_Plex_Mono } from "next/font/google";
 import { Suspense } from "react";
+import { StoreHydrator } from "@/components/shell/StoreHydrator";
 import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import "./globals.css";
@@ -27,6 +28,8 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
           static shell prerender; do not remove it. Pages add their own boundary too.
         */}
         <Suspense fallback={null}>
+          {/* First, so the stored demo is read before any page's own effects run. */}
+          <StoreHydrator />
           <TooltipProvider>{children}</TooltipProvider>
           <Toaster />
         </Suspense>

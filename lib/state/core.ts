@@ -8,6 +8,7 @@ import { round2 } from "@/lib/rules/shared";
 import type { RulesConfig, RulesCtx } from "@/lib/rules/types";
 import type {
   Actor,
+  DateHold,
   Dept,
   EventCase,
   ISODate,
@@ -65,6 +66,11 @@ export function byDueDate(a: Task, b: Task): number {
   if (dueA === null) return 1;
   if (dueB === null) return -1;
   return dueA < dueB ? -1 : 1;
+}
+
+/** A held date given up: the case ended, or the event is over and closed. Any other hold is left as it is. */
+export function releaseHold(hold: DateHold): DateHold {
+  return hold.status === "held" ? { ...hold, status: "released" } : hold;
 }
 
 /** `ctx.now`, defaulting to 9am on `ctx.today`. transition() never reads the real clock. */
@@ -165,10 +171,16 @@ export function applyUnlockEvent(c: EventCase, event: UnlockEvent, ctx: RulesCtx
     changed = true;
     const spec = catalogSpecFor(t.catalogId);
     let dueDate = t.dueDate;
-    if (spec?.due.type === "after_unlock") {
+    if (t.payload.scheduledFor) {
+      // A meeting scheduled while its card was still locked keeps the day it was set for.
+      dueDate = t.payload.scheduledFor;
+    } else if (spec?.due.type === "after_unlock") {
       dueDate = dueDateRule(ctx.today, ctx.cfg.sla[spec.due.sla] as number, ctx.cfg);
     } else if (spec?.due.type === "hold_expiry") {
       dueDate = c.dateHold.expiresOn;
+    } else if (spec?.due.type === "event_day" && event === "event_day") {
+      // A series opens "Carry your permit" again for each session: it is for today's.
+      dueDate = ctx.today;
     }
     return {
       ...t,

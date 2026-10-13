@@ -1,6 +1,7 @@
 /** Transitions any city role (Clerk, Public Works & Safety, Health & Legal) can raise. */
 import { fmtDate } from "@/lib/format";
 import { dueDate } from "@/lib/rules";
+import { CITY_TASKS } from "@/lib/rules/catalog";
 import type { RulesCtx } from "@/lib/rules/types";
 import { PARTY_LABEL, type Actor, type Condition, type Dept, type EventCase, type FeeLine, type Task } from "@/lib/types";
 import type { Action } from "../actions";
@@ -113,12 +114,7 @@ export function reviewDecide(c: EventCase, action: Extract_<"review_decide">, ac
     // the Clerk's only move (a denial is final), and the Clerk gets a task that says so.
     const deniedReviewId = taskId(next.id, `review:${dept}`);
     if (findTask(next, deniedReviewId)) next = moveTask(next, deniedReviewId, "done", ctx, actor);
-    if (!findTask(next, taskId(next.id, "consolidate"))) {
-      next = addTask(
-        next,
-        newTask({ id: taskId(next.id, "consolidate"), catalogId: "consolidate", owner: "clerk", kind: "action", title: "Decide: a reviewer denied", phase: "permit", payload: { denied: true } }, ctx, "system"),
-      );
-    }
+    next = openConsolidate(next, ctx, { title: "Decide: a reviewer denied", payload: { denied: true } });
     next = appendActivity(next, actor, "Denied its section.", ctx);
     return { ok: true, case: next };
   }
@@ -172,12 +168,25 @@ export function reviewDecide(c: EventCase, action: Extract_<"review_decide">, ac
   };
 
   const allRouted = next.reviews.every((r) => r.status === "approved" || r.status === "approved_with_conditions");
-  if (allRouted && next.reviews.length > 0 && !findTask(next, taskId(next.id, "consolidate"))) {
-    next = addTask(next, newTask({ id: taskId(next.id, "consolidate"), catalogId: "consolidate", owner: "clerk", kind: "action", title: "Consolidate reviews and send the quote", phase: "permit" }, ctx, "system"));
-  }
+  if (allRouted && next.reviews.length > 0) next = openConsolidate(next, ctx);
 
-  next = appendActivity(next, actor, `Decided: ${status.replace("_", " ")}.`, ctx);
+  next = appendActivity(next, actor, `Decided: ${status === "approved" ? "approved" : "approved with conditions"}.`, ctx);
   return { ok: true, case: next };
+}
+
+/**
+ * Hands the case back to the Clerk once the reviews are in: its "Consolidate" task, created
+ * locked by confirm_routing, opens. A denial opens it too, retitled, since denying the
+ * application is then the Clerk's only move. A case routed before the task existed gets one now.
+ */
+function openConsolidate(c: EventCase, ctx: RulesCtx, as: { title: string; payload: Task["payload"] } = { title: CITY_TASKS.consolidate.title, payload: {} }): EventCase {
+  const id = taskId(c.id, "consolidate");
+  const existing = findTask(c, id);
+  if (!existing) {
+    return addTask(c, newTask({ id, catalogId: "consolidate", owner: "clerk", kind: "action", title: as.title, phase: "permit", payload: as.payload }, ctx, "system"));
+  }
+  if (existing.status !== "locked") return c;
+  return moveTask(c, id, "todo", ctx, "system", { title: as.title, payload: { ...existing.payload, ...as.payload } });
 }
 
 export function sendToCommission(c: EventCase, _action: Extract_<"send_to_commission">, actor: Actor, ctx: RulesCtx): TransitionResult {
@@ -192,7 +201,9 @@ export function scheduleMeeting(c: EventCase, action: Extract_<"schedule_meeting
   if (!check.ok) return check;
   // Always the applicant's meeting card, also when the Clerk's scheduler task was named.
   const task = meetingCardFor(c, action.taskId) as Task;
-  let next = patchTask(c, task.id, { payload: { ...task.payload, scheduledFor: action.date } });
+  // The day it is set for is the day the card is due: a meeting on Jun 21 is not late on Jun 19
+  // because the plan's default date for it (21 days before the event) has passed.
+  let next = patchTask(c, task.id, { dueDate: action.date, payload: { ...task.payload, scheduledFor: action.date } });
   if (task.catalogId === "pre_application_meeting") next = finishScheduling(next, ctx, actor);
   next = appendActivity(next, actor, `Scheduled "${task.title}" for ${fmtDate(action.date)}.`, ctx);
   return { ok: true, case: next };

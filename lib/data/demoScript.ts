@@ -117,7 +117,10 @@ export type DemoPathPriority = "P0" | "P1";
 
 export interface DemoStep {
   role: Party;
-  /** Set when the step is the applicant acting as a specific persona (a lib/data/people.ts id). */
+  /**
+   * Who the applicant is, on every applicant step (a lib/data/people.ts id): the scenario's own
+   * organizer, or "new" for somebody starting a fresh event. Never set on a city step.
+   */
   persona?: string;
   text: string;
 }
@@ -169,9 +172,9 @@ export const DEMO_PATHS: DemoPath[] = [
         persona: "new",
         text: "Pick Picnic or party at Shelter 2 for 40 people: Instant.",
       },
-      { role: "applicant", text: "Turn on alcohol: Reviewed, and the what-if chip offers the way back." },
-      { role: "applicant", text: "Switch the location to two Main Street blocks: Special event." },
-      { role: "applicant", text: "Set attendance to 1,200 with no street: still Special." },
+      { role: "applicant", persona: "new", text: "Turn on alcohol: Reviewed, and the what-if chip offers the way back." },
+      { role: "applicant", persona: "new", text: "Switch the location to two Main Street blocks: Special event." },
+      { role: "applicant", persona: "new", text: "Set attendance to 1,200 with no street: still Special." },
     ],
   },
   {
@@ -223,12 +226,13 @@ export const DEMO_PATHS: DemoPath[] = [
         text: "Open the case: Who's up highlights both the applicant and Health & Legal, and Issue permit says why it is disabled.",
       },
       { role: "hl", text: "Verify the insurance." },
-      { role: "applicant", text: "Sign and pay." },
+      { role: "applicant", persona: "riverfront-running-club", text: "Sign and pay." },
       {
         role: "clerk",
         text: "Issue the permit; Public Works & Safety gets its work orders and the route shows on its map for Jul 11.",
       },
-      { role: "clerk", text: "Starting a new City Hall Plaza event on Jul 11 shows the Impacted warning." },
+      // In the wizard, as somebody new: the Clerk has no page that starts an event.
+      { role: "applicant", persona: "new", text: "Starting a new City Hall Plaza event on Jul 11 shows the Impacted warning." },
     ],
   },
   {
@@ -242,6 +246,7 @@ export const DEMO_PATHS: DemoPath[] = [
       { role: "clerk", text: "Reconciliation shows $750 over the estimate; issue the $250 deposit refund and close." },
       {
         role: "applicant",
+        persona: "main-street-business-alliance",
         text: 'The board shows the refund, the feedback form and "Book again next year", which drafts Sat, Apr 22, 2028.',
       },
     ],
@@ -258,9 +263,10 @@ export const DEMO_PATHS: DemoPath[] = [
         persona: "maya-chen",
         text: "Add a DJ. The event becomes Reviewed and the date gate fires: 19 days left, 30 needed.",
       },
-      { role: "applicant", text: "Choose the late fee." },
+      { role: "applicant", persona: "maya-chen", text: "Choose the late fee." },
       {
         role: "applicant",
+        persona: "maya-chen",
         text: "New cards tagged Amendment appear, and the current permit stays valid for the original plan.",
       },
     ],

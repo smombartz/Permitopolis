@@ -251,3 +251,72 @@ describe("isStalled", () => {
     expect(isStalled(makeCase({ state: "submitted", ending: "withdrawn" }), "2027-05-03")).toBe(false);
   });
 });
+
+describe("days holding: how long the case has sat with the party that is up", () => {
+  const applicant = (c: ReturnType<typeof makeCase>, today = "2027-05-03") => waitingOn(c, today).find((r) => r.party === "applicant")!;
+
+  it("a plan card nobody has touched counts from the day the application went in (S4: 20 days)", () => {
+    // What requirements() writes: a card with no history at all.
+    const signoff = makeTask({ id: "PMT-27-0126:neighbor_signoff", catalogId: "neighbor_signoff", kind: "sign_off", payload: { progress: { done: 9, total: 12 } }, history: [] });
+    const c = makeCase({ id: "PMT-27-0126", state: "submitted", createdAt: "2027-04-02T09:00", submittedAt: "2027-04-13T09:00", tasks: [signoff] });
+    expect(applicant(c)).toMatchObject({ status: "up_now", daysHolding: 20 });
+  });
+
+  it("a Draft counts from the day it was started, with or without a board", () => {
+    const card = makeTask({ id: "PMT-27-0001:insurance_certificate", catalogId: "insurance_certificate", history: [] });
+    expect(applicant(makeCase({ state: "draft", createdAt: "2027-05-01T10:00", tasks: [card] })).daysHolding).toBe(2);
+    expect(applicant(makeCase({ state: "draft", createdAt: "2027-05-01T10:00" })).daysHolding).toBe(2);
+  });
+
+  it("a card a reviewer asked about counts from the request, not from the application (S3: 3 days)", () => {
+    const pinned = makeTask({ id: "PMT-27-0118:vendor_health_permit:1", catalogId: "vendor_health_permit", history: [{ at: "2027-04-30T09:05", actor: "hl", status: "todo" }] });
+    const c = makeCase({ state: "needs_info", submittedAt: "2027-04-16T09:30", tasks: [pinned] });
+    expect(applicant(c).daysHolding).toBe(3);
+  });
+
+  it("a card that opened again counts from the last time it opened", () => {
+    // A series' "Carry your permit": open for the Mar 1 session, locked after it, open again today.
+    const carry = makeTask({
+      id: "PMT-27-0034:carry_permit",
+      catalogId: "carry_permit",
+      kind: "action",
+      history: [
+        { at: "2027-03-01T09:00", actor: "system", status: "todo" },
+        { at: "2027-03-02T09:00", actor: "system", status: "locked" },
+        { at: "2027-05-03T09:00", actor: "system", status: "todo" },
+      ],
+    });
+    expect(applicant(makeCase({ state: "event_day", createdAt: "2027-02-18T09:00", tasks: [carry] })).daysHolding).toBe(0);
+    // A document sent back counts from the day it came back.
+    const sentBack = makeTask({
+      id: "PMT-27-0001:insurance_certificate",
+      catalogId: "insurance_certificate",
+      status: "changes_requested",
+      history: [
+        { at: "2027-04-10T09:00", actor: "applicant", status: "submitted" },
+        { at: "2027-04-28T09:00", actor: "hl", status: "changes_requested" },
+      ],
+    });
+    expect(applicant(makeCase({ state: "in_review", submittedAt: "2027-04-10T09:30", tasks: [sentBack] })).daysHolding).toBe(5);
+  });
+
+  it("is the longest-held of the party's open tasks, and 0 for a party that is not up", () => {
+    const older = makeTask({ id: "PMT-27-0001:a", catalogId: "accept_and_sign", history: [{ at: "2027-04-20T09:00", actor: "system", status: "todo" }] });
+    const newer = makeTask({ id: "PMT-27-0001:b", catalogId: "pay_fees", history: [{ at: "2027-04-30T09:00", actor: "system", status: "todo" }] });
+    const rows = waitingOn(makeCase({ state: "quote_sent", tasks: [newer, older] }), "2027-05-03");
+    expect(rows.find((r) => r.party === "applicant")?.daysHolding).toBe(13);
+    expect(rows.find((r) => r.party === "clerk")?.daysHolding).toBe(0);
+  });
+});
+
+describe("scope: what each party covers on the case", () => {
+  const review = (dept: "clerk" | "pws", sections: string[]) => ({ dept, sections, status: "pending" as const, dueDate: "2027-05-17", decidedOn: null, clock: { startedOn: "2027-05-03", pausedSince: null, pausedDays: 0, allowedDays: 14 }, internalNote: "", messageToApplicant: "" });
+
+  it("a department reads as the sections routed to it; the Clerk always as the owner of the case", () => {
+    // S6 and B06: the alcohol license is routed to the Clerk itself.
+    const c = makeCase({ state: "in_review", reviews: [review("pws", ["Sound details", "Site plan"]), review("clerk", ["Alcohol details and liquor liability insurance"])] });
+    const scope = Object.fromEntries(waitingOn(c, "2027-05-03").map((r) => [r.party, r.scope]));
+    expect(scope.pws).toBe("Sound details, Site plan");
+    expect(scope.clerk).toBe("Intake, routing, quote, permit and closeout");
+  });
+});

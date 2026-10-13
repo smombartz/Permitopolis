@@ -3,7 +3,8 @@
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { PageHeader } from "@/components/ui/page-header";
-import { useDemo } from "@/lib/state";
+import { PageSkeleton } from "@/components/ui/page-skeleton";
+import { useDemo, useHydrated } from "@/lib/state";
 import { homeFor } from "@/lib/routes";
 
 interface PlaceholderScreenProps {
@@ -19,8 +20,13 @@ interface PlaceholderScreenProps {
 /**
  * Stands in for every route a later workstream hasn't built yet. Replace it in the route's
  * `page.tsx` with the real screen; nothing else refers to it.
+ *
+ * It reads the role from the store. Inside a shell that is safe: the shell renders its page
+ * only once the stored demo has been read. With no shell (`standalone`) it gates itself, the
+ * way every shell-less screen that reads the store must: the skeleton until `useHydrated()`.
  */
 function PlaceholderScreen({ route, standalone = false }: PlaceholderScreenProps) {
+  const hydrated = useHydrated();
   const role = useDemo((s) => s.role);
   const header = (
     <PageHeader
@@ -35,11 +41,7 @@ function PlaceholderScreen({ route, standalone = false }: PlaceholderScreenProps
     />
   );
   if (!standalone) return header;
-  return (
-    <div className="app-ground min-h-dvh">
-      <main className="page-container py-6">{header}</main>
-    </div>
-  );
+  return <div className="app-ground min-h-dvh">{hydrated ? <main className="page-container py-6">{header}</main> : <PageSkeleton />}</div>;
 }
 
 export { PlaceholderScreen };

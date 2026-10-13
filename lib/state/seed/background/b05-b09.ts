@@ -60,7 +60,7 @@ export const B05: SeedScript = {
         { dept: "hl", sections: ["Certificate of insurance", "Vendor list"], dueDate: "2027-03-29" },
       ],
     }),
-    step("2027-03-20T09:00", "hl", { type: "review_decide", decision: "approve", conditions: [], feeLines: [] }),
+    step("2027-03-19T09:00", "hl", { type: "review_decide", decision: "approve", conditions: [], feeLines: [] }),
   ],
   expect: { tier: "reviewed", state: "in_review" },
   notes: "Stress row: a 90+ character event name. Public Works & Safety's review is overdue (due Mar 29), and with the event 10 days away the case is at lead-time risk.",
@@ -153,11 +153,11 @@ export const B07: SeedScript = {
     step("2027-03-22T09:00", "clerk", { type: "accept_complete" }),
     step("2027-03-22T09:05", "clerk", {
       type: "confirm_routing",
-      reviewers: [{ dept: "hl", sections: ["Certificate of insurance", "Vendor list"], dueDate: "2027-04-10" }],
+      reviewers: [{ dept: "hl", sections: ["Certificate of insurance", "Vendor list"], dueDate: "2027-04-09" }],
     }),
   ],
   expect: { tier: "reviewed", state: "in_review" },
-  notes: "Health & Legal's review is overdue (due Apr 10).",
+  notes: "Health & Legal's review is overdue (due Fri, Apr 9).",
 };
 
 /** B08 · Westside Youth Soccer League: Needs info, the applicant is overdue. */

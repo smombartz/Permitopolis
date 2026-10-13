@@ -9,6 +9,7 @@ import type { Action } from "../../actions";
 import type { EventAnswers } from "@/lib/types";
 import type { SeedScript } from "../../types";
 import { RIVERFRONT_5K_ROUTE } from "@/lib/data/streets";
+import { addDaysISO, datesEvery } from "@/lib/dates";
 import {
   addOns,
   cityServices,
@@ -97,21 +98,23 @@ export const B11: SeedScript = {
       form: { equipment: "Field PA system", soundCheckTime: "16:30" },
     }),
     step("2027-03-25T09:30", "applicant", { type: "submit" }),
-    step("2027-03-27T09:00", "clerk", { type: "accept_complete" }),
-    step("2027-03-27T09:05", "clerk", {
+    step("2027-03-26T09:00", "clerk", { type: "accept_complete" }),
+    step("2027-03-26T09:05", "clerk", {
       type: "confirm_routing",
       reviewers: [
-        { dept: "pws", sections: ["Sound details"], dueDate: "2027-04-10" },
-        { dept: "hl", sections: ["Certificate of insurance"], dueDate: "2027-04-10" },
+        { dept: "pws", sections: ["Sound details"], dueDate: "2027-04-09" },
+        { dept: "hl", sections: ["Certificate of insurance"], dueDate: "2027-04-09" },
       ],
     }),
     step("2027-04-01T09:00", "pws", { type: "review_decide", decision: "approve", conditions: [], feeLines: [] }),
     step("2027-04-01T09:05", "hl", { type: "review_decide", decision: "approve", conditions: [], feeLines: [] }),
-    step("2027-04-10T09:00", "clerk", { type: "send_quote", conditions: [], feeLines: [] }),
+    step("2027-04-09T09:00", "clerk", { type: "send_quote", conditions: [], feeLines: [] }),
     step("2027-04-11T09:00", "applicant", { type: "accept_and_sign", signature: "Edith Vance" }),
     // Field 3 for 3 hours $60, amplified sound $40, application $50, deposit $250.
     step("2027-04-11T09:05", "applicant", { type: "pay", amount: 400, method: "card", kind: "quote" }),
-    step("2027-04-30T09:00", "applicant", {
+    // Early on the demo date itself: its seven-day check falls due Mon, May 10, after the one
+    // Health & Legal already has from the 5K (S5, due Fri, May 7).
+    step("2027-05-03T07:30", "applicant", {
       type: "complete_task",
       taskId: taskId(CASE11, "insurance_certificate"),
       files: [sampleFile("greenfield-charter-insurance-certificate-v2.pdf")],
@@ -265,7 +268,7 @@ export const B14: SeedScript = {
     }),
     b14Notes("pws", "Confirmed aid station placement at each bridge crossing", "2027-02-18T09:00"),
     step("2027-02-19T14:00", "clerk", { type: "complete_city_task", taskId: taskId(CASE14, "pre_application_meeting") }),
-    b14Notes("hl", "Insurance carrier confirmed, pending final review", "2027-02-20T09:00"),
+    b14Notes("hl", "Insurance carrier confirmed, pending final review", "2027-02-19T15:00"),
     step("2027-02-22T09:00", "applicant", {
       type: "complete_task",
       taskId: taskId(CASE14, "community_notification"),
@@ -280,7 +283,7 @@ export const B14: SeedScript = {
     }),
     step("2027-02-25T09:05", "hl", { type: "review_decide", decision: "approve", conditions: [], feeLines: [] }),
     b14Notes("clerk", "Consolidated conditions, preparing the quote", "2027-02-26T09:00"),
-    step("2027-02-27T09:00", "clerk", { type: "send_quote", conditions: [], feeLines: [] }),
+    step("2027-02-26T15:00", "clerk", { type: "send_quote", conditions: [], feeLines: [] }),
     step("2027-02-28T09:00", "applicant", { type: "accept_and_sign", signature: "Kit Fennimore" }),
     // Route 12.4 miles $4,960, application $250, police 24 officer-hours $2,040, 30 barricades $450, deposit $1,000.
     step("2027-02-28T09:05", "applicant", { type: "pay", amount: 8700, method: "card", kind: "quote" }),
@@ -302,10 +305,10 @@ export const B14: SeedScript = {
     b14Notes("pws", "Early look at the finish-line area with the organizer; the full walkthrough is set for Aug 6", "2027-03-10T09:00"),
     b14Notes("hl", "Accessible viewing area confirmed near the finish", "2027-03-11T09:00"),
     b14Notes("clerk", "Reminder sent: permit packet available for pickup", "2027-03-12T09:00"),
-    b14Notes("pws", "Road paint for lap markers scheduled", "2027-03-14T09:00"),
     b14Notes("clerk", "Noted date on the Active permits calendar", "2027-03-15T09:00"),
-    b14Notes("pws", "Confirmed water station refill schedule with Parks", "2027-03-20T09:00"),
-    b14Notes("hl", "Medical tent staffing plan received and filed", "2027-03-21T09:00"),
+    b14Notes("pws", "Road paint for lap markers scheduled", "2027-03-16T09:00"),
+    b14Notes("pws", "Confirmed water station refill schedule with Parks", "2027-03-19T09:00"),
+    b14Notes("hl", "Medical tent staffing plan received and filed", "2027-03-22T09:00"),
   ],
   expect: { tier: "special", state: "permitted" },
   notes:
@@ -349,6 +352,9 @@ const b16Answers: EventAnswers = {
   addOns: addOns({}),
 };
 
+/** The Mondays from Mar 8 to Apr 26: the sessions after the first that have already been held. */
+const B16_PAID_SESSIONS = datesEvery("2027-03-08", "2027-04-26", 7);
+
 export const B16: SeedScript = {
   id: CASE16,
   key: "B16",
@@ -359,7 +365,12 @@ export const B16: SeedScript = {
   steps: [
     step("2027-02-18T09:00", "applicant", { type: "create_board" }),
     step("2027-02-18T09:05", "applicant", { type: "book_and_pay", method: "card" }),
+    // The booking paid the first session (Mar 1). The eight since were each paid the Friday before.
+    ...B16_PAID_SESSIONS.map((occurrenceDate) =>
+      step(`${addDaysISO(occurrenceDate, -3)}T12:00`, "applicant", { type: "pay", amount: 20, method: "card", kind: "session", occurrenceDate }),
+    ),
   ],
   expect: { tier: "instant", state: "event_day" },
-  notes: "Today, May 3, is one of its Monday sessions. May 31 is skipped for the Memorial Day blackout.",
+  notes:
+    "Today, May 3, is its tenth Monday session: the nine before it are paid for and today's is due. May 31 is skipped for the Memorial Day blackout.",
 };

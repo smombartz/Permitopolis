@@ -88,7 +88,7 @@ export const B17: SeedScript = {
     step("2027-03-13T09:00", "applicant", { type: "accept_and_sign", signature: "Spencer Quigley" }),
     // Shelter 4 for 7 hours $175, amplified sound $40, application $50, deposit $250.
     step("2027-03-13T09:05", "applicant", { type: "pay", amount: 515, method: "card", kind: "quote" }),
-    step("2027-03-14T09:00", "clerk", { type: "issue_permit" }),
+    step("2027-03-15T09:00", "clerk", { type: "issue_permit" }),
     step("2027-04-21T09:00", "pws", {
       type: "log_closeout",
       cleanup: "pass",
@@ -157,16 +157,16 @@ export const B18: SeedScript = {
       form: { accessibleRoute: true, restrooms: 2 },
     }),
     step("2027-02-05T10:00", "applicant", { type: "submit" }),
-    step("2027-02-07T09:00", "clerk", { type: "accept_complete" }),
-    step("2027-02-07T09:05", "clerk", {
+    step("2027-02-08T09:00", "clerk", { type: "accept_complete" }),
+    step("2027-02-08T09:05", "clerk", {
       type: "confirm_routing",
       reviewers: [
         {
           dept: "pws",
           sections: ["Site plan", "Traffic control plan", "Security and medical plan", "Emergency plan", "Cleanup plan"],
-          dueDate: "2027-02-28",
+          dueDate: "2027-03-01",
         },
-        { dept: "hl", sections: ["Certificate of insurance", "Accessibility plan"], dueDate: "2027-02-28" },
+        { dept: "hl", sections: ["Certificate of insurance", "Accessibility plan"], dueDate: "2027-03-01" },
       ],
     }),
     ...beforeThePermit(CASE18, { scheduledOn: "2027-02-09", noticeOn: "2027-02-10", noticeAcceptedOn: "2027-02-11", meetingOn: "2027-02-12", noticeFile: "poker-run-posted-notice.jpg" }),
@@ -178,7 +178,7 @@ export const B18: SeedScript = {
     step("2027-02-18T09:05", "applicant", { type: "pay", amount: 1400, method: "card", kind: "quote" }),
     step("2027-02-19T09:00", "clerk", { type: "issue_permit" }),
     ...beforeTheEvent(CASE18, { scheduledOn: "2027-02-22", coordinationOn: "2027-03-19", walkthroughOn: "2027-04-02", workOrdersOn: "2027-04-08" }),
-    step("2027-04-11T09:00", "pws", {
+    step("2027-04-12T09:00", "pws", {
       type: "log_closeout",
       cleanup: "issues",
       notes: "Trash left along the route; a follow-up sweep is needed.",
@@ -260,21 +260,21 @@ export const B19: SeedScript = {
     ...beforeThePermit(CASE19, { scheduledOn: "2027-01-11", noticeOn: "2027-01-12", noticeAcceptedOn: "2027-01-13", meetingOn: "2027-01-14", noticeFile: "downtown-dash-posted-notice.jpg" }),
     step("2027-01-15T09:00", "pws", { type: "review_decide", decision: "approve", conditions: [], feeLines: [] }),
     step("2027-01-15T09:05", "hl", { type: "review_decide", decision: "approve", conditions: [], feeLines: [] }),
-    step("2027-01-17T09:00", "clerk", { type: "send_quote", conditions: [], feeLines: [] }),
+    step("2027-01-15T15:00", "clerk", { type: "send_quote", conditions: [], feeLines: [] }),
     step("2027-01-18T09:00", "applicant", { type: "accept_and_sign", signature: "Niko Alexopoulos" }),
     // Route 0.2 miles $80, application $250, deposit $1,000.
     step("2027-01-18T09:05", "applicant", { type: "pay", amount: 1330, method: "card", kind: "quote" }),
     step("2027-01-19T09:00", "clerk", { type: "issue_permit" }),
     ...beforeTheEvent(CASE19, { scheduledOn: "2027-01-21", coordinationOn: "2027-02-12", walkthroughOn: "2027-02-26", workOrdersOn: "2027-03-03" }),
-    step("2027-03-06T09:00", "pws", {
+    step("2027-03-08T09:00", "pws", {
       type: "log_closeout",
       cleanup: "pass",
       notes: "Clean sweep, nothing beyond the plan.",
       actuals: [],
       extraLines: [],
     }),
-    step("2027-03-07T09:00", "clerk", { type: "reconcile_close" }),
-    step("2027-03-08T09:00", "applicant", { type: "submit_feedback", rating: 5, comment: "Smooth process, great route support." }),
+    step("2027-03-09T09:00", "clerk", { type: "reconcile_close" }),
+    step("2027-03-10T09:00", "applicant", { type: "submit_feedback", rating: 5, comment: "Smooth process, great route support." }),
   ],
   expect: { tier: "special", state: "closed" },
   notes: "Nothing ran over the estimate, so the full deposit comes back as a refund.",

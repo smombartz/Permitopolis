@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { makeCase } from "@/lib/state/testSupport";
 import { routes } from "@/lib/routes";
-import { applicantCaseIdFromHref, caseIdFromPath, cityToolLinks, pathForCase, pathForPersona, resolveRoleSwitch } from "./shell";
+import { applicantCaseIdFromHref, caseIdFromPath, cityPageIsFor, cityToolLinks, cityToolOwner, pathForCase, pathForPersona, resolveRoleSwitch } from "./shell";
 
 describe("caseIdFromPath", () => {
   it("reads a case id off an applicant event page and its subpages", () => {
@@ -76,13 +76,44 @@ describe("resolveRoleSwitch", () => {
     ).toEqual({ path: "/city/cases/PMT-27-0097" });
   });
 
-  it("keeps the URL when switching between two city roles, case page or not", () => {
+  it("keeps the URL when switching between two city roles on a shared page, case page or not", () => {
     expect(
       resolveRoleSwitch({ fromRole: "clerk", toRole: "pws", pathname: "/city/cases/PMT-27-0118", cases, lastPathByRole: {} }),
     ).toEqual({ path: "/city/cases/PMT-27-0118" });
     expect(
       resolveRoleSwitch({ fromRole: "hl", toRole: "clerk", pathname: "/city/queue", cases, lastPathByRole: {} }),
     ).toEqual({ path: "/city/queue" });
+  });
+
+  it("keeps the URL on every page the city roles share: My queue, Cases, a case and Active permits", () => {
+    for (const pathname of ["/city/queue", "/city/cases", "/city/cases/PMT-27-0118", "/city/active"]) {
+      for (const [fromRole, toRole] of [["clerk", "pws"], ["pws", "hl"], ["hl", "clerk"]] as const) {
+        expect(resolveRoleSwitch({ fromRole, toRole, pathname, cases, lastPathByRole: { [toRole]: "/city/cases?tier=special" } }), `${fromRole} to ${toRole} on ${pathname}`).toEqual({ path: pathname });
+      }
+    }
+  });
+
+  it("does not take a role onto another role's tool page: path 4's last step leaves the Clerk's Intake for the queue", () => {
+    // The Clerk confirmed routing from Intake, then switches to Public Works & Safety.
+    expect(resolveRoleSwitch({ fromRole: "clerk", toRole: "pws", pathname: "/city/intake", cases, lastPathByRole: {} })).toEqual({ path: "/city/queue" });
+    // With a page of its own remembered, the role goes back to that, query string included.
+    expect(resolveRoleSwitch({ fromRole: "clerk", toRole: "pws", pathname: "/city/intake", cases, lastPathByRole: { pws: "/city/cases?waiting=me" } })).toEqual({ path: "/city/cases?waiting=me" });
+    expect(resolveRoleSwitch({ fromRole: "clerk", toRole: "pws", pathname: "/city/payments", cases, lastPathByRole: { pws: "/city/work-orders" } })).toEqual({ path: "/city/work-orders" });
+    // Every tool page, to every role that does not own it.
+    const tools: Record<string, string> = { "/city/intake": "clerk", "/city/payments": "clerk", "/city/settings": "clerk", "/city/map": "pws", "/city/work-orders": "pws", "/city/verifications": "hl", "/city/inspections": "hl" };
+    for (const [pathname, owner] of Object.entries(tools)) {
+      for (const toRole of ["clerk", "pws", "hl"] as const) {
+        const fromRole = toRole === "clerk" ? "pws" : "clerk";
+        expect(resolveRoleSwitch({ fromRole, toRole, pathname, cases, lastPathByRole: {} }), `${pathname} to ${toRole}`).toEqual({ path: toRole === owner ? pathname : "/city/queue" });
+      }
+    }
+  });
+
+  it("never lands a role on another role's tool page from memory either", () => {
+    // A remembered page that is not the role's own (stored before the rule, or typed in) is passed over.
+    expect(resolveRoleSwitch({ fromRole: "clerk", toRole: "hl", pathname: "/city/intake", cases, lastPathByRole: { hl: "/city/work-orders" } })).toEqual({ path: "/city/queue" });
+    expect(resolveRoleSwitch({ fromRole: "applicant", toRole: "pws", pathname: "/events", cases, lastPathByRole: { pws: "/city/intake?tab=special" } })).toEqual({ path: "/city/queue" });
+    expect(resolveRoleSwitch({ fromRole: "applicant", toRole: "clerk", pathname: "/events", cases, lastPathByRole: { clerk: "/city/intake?tab=special" } })).toEqual({ path: "/city/intake?tab=special" });
   });
 
   it("follows a case from the applicant's board to the matching city role, with no persona to set", () => {
@@ -212,6 +243,28 @@ describe("pathForPersona", () => {
   it("opens My events for everyone else", () => {
     expect(pathForPersona("maya-chen", cases)).toBe("/events");
     expect(pathForPersona("two-events", cases)).toBe("/events");
+  });
+});
+
+describe("cityToolOwner and cityPageIsFor (the PRD's route map)", () => {
+  it("names the one role each tool page belongs to, with or without a query string", () => {
+    expect(["/city/intake", "/city/intake?tab=reviewed", "/city/payments", "/city/settings"].map(cityToolOwner)).toEqual(["clerk", "clerk", "clerk", "clerk"]);
+    expect(["/city/map", "/city/work-orders"].map(cityToolOwner)).toEqual(["pws", "pws"]);
+    expect(["/city/verifications", "/city/inspections"].map(cityToolOwner)).toEqual(["hl", "hl"]);
+  });
+
+  it("is null for the shared city pages and for everything outside the city area", () => {
+    for (const path of ["/city/queue", "/city/cases", "/city/cases/PMT-27-0097?tab=reviews", "/city/active?view=map", "/events", "/apply", "/"]) {
+      expect(cityToolOwner(path), path).toBeNull();
+    }
+  });
+
+  it("a role has the shared pages and its own tools, and nobody else's", () => {
+    expect(cityPageIsFor("pws", "/city/queue")).toBe(true);
+    expect(cityPageIsFor("pws", "/city/work-orders")).toBe(true);
+    expect(cityPageIsFor("pws", "/city/intake")).toBe(false);
+    expect(cityPageIsFor("hl", "/city/map")).toBe(false);
+    expect(cityPageIsFor("clerk", "/city/settings")).toBe(true);
   });
 });
 

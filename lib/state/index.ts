@@ -34,7 +34,7 @@ export {
   waitingOnOthers,
   whoIsUp,
 } from "./selectors";
-export { demoToday, resetDemoStoreForTests, useDemo, useHydrated } from "./store";
+export { demoToday, hydrateDemoStore, resetDemoStoreForTests, useDemo, useHydrated } from "./store";
 export { transition } from "./transition";
 export { involvement, isStalled, nextMove, waitingOn } from "./waitingOn";
 

@@ -68,6 +68,53 @@ describe("applyTick: event day and returning to Permitted", () => {
     expect(result.case.state).toBe("permitted");
   });
 
+  it("a series carries its permit to every session: the card relocks for the next one, and opens dated that day", () => {
+    const session = (date: string, billing: "paid" | "upcoming") => ({ date, availability: { status: "open" as const }, billing });
+    const carry = makeTask({ id: "PMT-27-0001:carry_permit", catalogId: "carry_permit", kind: "action", status: "locked", unlocksOn: "event_day", dueDate: "2027-06-06", history: [] });
+    const series = makeCase({
+      state: "permitted",
+      schedule: {
+        date: "2027-06-06",
+        start: "08:00",
+        end: "09:00",
+        recurrence: { frequency: "weekly", weekday: 0, until: "2027-06-20" },
+        occurrences: [session("2027-06-06", "paid"), session("2027-06-13", "upcoming"), session("2027-06-20", "upcoming")],
+      },
+      tasks: [carry],
+    });
+    const card = (c: typeof series) => c.tasks.find((t) => t.catalogId === "carry_permit")!;
+    const billing = (c: typeof series) => c.schedule!.occurrences.map((o) => o.billing);
+
+    // The first session: paid at booking, so nothing is due.
+    const [first] = advanceClock([series], "2027-06-05", "2027-06-06", DEFAULT_CONFIG);
+    expect(first.state).toBe("event_day");
+    expect(card(first)).toMatchObject({ status: "todo", dueDate: "2027-06-06" });
+    expect(billing(first)).toEqual(["paid", "upcoming", "upcoming"]);
+
+    // The day after: back to Permitted, and the card waits for Jun 13.
+    const [between] = advanceClock([first], "2027-06-06", "2027-06-07", DEFAULT_CONFIG);
+    expect(between.state).toBe("permitted");
+    expect(card(between)).toMatchObject({ status: "locked", unlocksOn: "event_day", dueDate: "2027-06-13" });
+
+    // The second session: its payment is due today, and the card is today's.
+    const [second] = advanceClock([between], "2027-06-07", "2027-06-13", DEFAULT_CONFIG);
+    expect(second.state).toBe("event_day");
+    expect(card(second)).toMatchObject({ status: "todo", unlocksOn: null, dueDate: "2027-06-13" });
+    expect(billing(second)).toEqual(["paid", "due", "upcoming"]);
+
+    // After the last session the card is done for good.
+    const [after] = advanceClock([second], "2027-06-13", "2027-06-21", DEFAULT_CONFIG);
+    expect(after.state).toBe("closed");
+    expect(card(after).status).toBe("done");
+    expect(billing(after)).toEqual(["paid", "due", "due"]);
+  });
+
+  it("a single event's one session is never marked due: it was paid for with the booking or the quote", () => {
+    const c = makeCase({ state: "permitted", schedule: { date: "2027-05-22", start: "11:00", end: "16:00", occurrences: [{ date: "2027-05-22", availability: { status: "open" }, billing: "upcoming" }] } });
+    const result = applyTick(c, makeCtx({ today: "2027-05-22" }));
+    expect(result.ok && result.case.schedule?.occurrences[0].billing).toBe("upcoming");
+  });
+
   it("a session skipped for a blackout is not an event day", () => {
     const c = makeCase({
       state: "permitted",
@@ -130,6 +177,17 @@ describe("applyTick: Closeout and Instant closing itself", () => {
     expect(result.ok).toBe(true);
     if (!result.ok) return;
     expect(result.case.state).toBe("closed");
+  });
+
+  it("...and gives up its date: a closed case holds nothing", () => {
+    const c = makeCase({
+      state: "event_day",
+      tier: "instant",
+      dateHold: { status: "held", placedOn: "2027-04-26", expiresOn: null },
+      schedule: { date: "2027-05-22", start: "11:00", end: "16:00", occurrences: [{ date: "2027-05-22", availability: { status: "open" }, billing: "paid" }] },
+    });
+    const result = applyTick(c, makeCtx({ today: "2027-05-23" }));
+    expect(result.ok && result.case.dateHold).toEqual({ status: "released", placedOn: "2027-04-26", expiresOn: null });
   });
 
   it("an Instant event flagged with cleanup issues enters Closeout with just the exception task", () => {

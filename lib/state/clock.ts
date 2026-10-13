@@ -8,7 +8,7 @@ import { closeoutCards, dueDate as dueDateRule } from "@/lib/rules";
 import { CITY_TASKS } from "@/lib/rules/catalog";
 import type { RulesConfig, RulesCtx } from "@/lib/rules/types";
 import type { EventCase, ISODate, ISODateTime } from "@/lib/types";
-import { appendActivity, applyUnlockEvent, findTask, heldSessionDates, moveTask, newTask, quotePaid, taskId } from "./core";
+import { appendActivity, applyUnlockEvent, findTask, heldSessionDates, moveTask, newTask, quotePaid, releaseHold, taskId } from "./core";
 import type { TransitionResult } from "./types";
 
 /** Every date the event takes place on. A session skipped for a blackout is not one of them. */
@@ -21,6 +21,22 @@ function finishEventDayCards(c: EventCase, ctx: RulesCtx): EventCase {
   const carry = findTask(c, taskId(c.id, "carry_permit"));
   if (!carry || carry.status === "done") return c;
   return moveTask(c, carry.id, "done", ctx, "system", { unlocksOn: null });
+}
+
+/**
+ * A series carries its permit to every session. When one ends with more to come, the card goes
+ * back to Coming up, dated for the next session; that day's tick opens it again.
+ */
+function relockEventDayCards(c: EventCase, nextSession: ISODate, ctx: RulesCtx): EventCase {
+  const carry = findTask(c, taskId(c.id, "carry_permit"));
+  if (!carry || carry.status !== "todo") return c;
+  return moveTask(c, carry.id, "locked", ctx, "system", { unlocksOn: "event_day", dueDate: nextSession });
+}
+
+/** A series is billed session by session: on its day, a session not yet paid for is due. */
+function markSessionDue(c: EventCase, date: ISODate): EventCase {
+  if (!c.schedule?.recurrence) return c;
+  return { ...c, schedule: { ...c.schedule, occurrences: c.schedule.occurrences.map((o) => (o.date === date && o.billing === "upcoming" ? { ...o, billing: "due" as const } : o)) } };
 }
 
 export function lastSessionDate(c: EventCase): ISODate | null {
@@ -59,16 +75,19 @@ export function applyTick(c: EventCase, ctx: RulesCtx): TransitionResult {
   }
 
   if (c.state === "permitted" && isSessionDate(c, today)) {
-    let next: EventCase = { ...c, state: "event_day" };
+    let next: EventCase = markSessionDue({ ...c, state: "event_day" }, today);
     next = applyUnlockEvent(next, "event_day", ctx);
     next = appendActivity(next, "system", "Today is event day.", ctx);
     return { ok: true, case: next };
   }
 
   if (c.state === "event_day" && !isSessionDate(c, today)) {
-    const laterSessionRemains = sessionDates(c).some((d) => isAfter(d, today));
-    if (laterSessionRemains) {
-      const next = appendActivity({ ...c, state: "permitted" }, "system", "The session ended; the series returns to Permitted until its next date.", ctx);
+    const nextSession = sessionDates(c)
+      .filter((d) => isAfter(d, today))
+      .sort()[0];
+    if (nextSession) {
+      let next = relockEventDayCards({ ...c, state: "permitted" }, nextSession, ctx);
+      next = appendActivity(next, "system", "The session ended; the series returns to Permitted until its next date.", ctx);
       return { ok: true, case: next };
     }
 
@@ -76,7 +95,8 @@ export function applyTick(c: EventCase, ctx: RulesCtx): TransitionResult {
     c = finishEventDayCards(c, ctx);
 
     if (c.tier === "instant" && c.closeout.cleanup !== "issues") {
-      let next: EventCase = { ...c, tasks: [...c.tasks, ...closeoutCards(c, ctx.cfg)], state: "closed" };
+      // Closed with nothing to settle: the date is no longer held for it.
+      let next: EventCase = { ...c, tasks: [...c.tasks, ...closeoutCards(c, ctx.cfg)], state: "closed", dateHold: releaseHold(c.dateHold) };
       next = applyUnlockEvent(next, "closed", ctx);
       next = appendActivity(next, "system", "The event closed out with no issues.", ctx);
       return { ok: true, case: next };

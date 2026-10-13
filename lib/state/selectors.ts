@@ -23,11 +23,17 @@ export const boardColumn: StateApi["boardColumn"] = (task: Task): BoardColumn =>
  * The applicant's board: their cards by column. Do now is in the order the PRD gives it: a
  * city request pinned on top, then Submit application once it has unlocked, then by due date.
  * The other columns keep the order of the plan.
+ *
+ * A case that ended (withdrawn, denied, cancelled, hold expired) has nothing left to do, nothing
+ * with the city and nothing coming up: only what was done stays on its board. The cards it left
+ * open are still on the case.
  */
 export const boardColumns: StateApi["boardColumns"] = (c: EventCase): Record<BoardColumn, Task[]> => {
   const columns: Record<BoardColumn, Task[]> = { do_now: [], with_city: [], coming_up: [], done: [] };
   for (const task of c.tasks) {
-    if (task.owner === "applicant") columns[boardColumn(task)].push(task);
+    if (task.owner !== "applicant") continue;
+    const column = boardColumn(task);
+    if (c.ending === null || column === "done") columns[column].push(task);
   }
   const pin = (task: Task) => (task.request && !task.request.resolved ? 0 : task.catalogId === "submit_application" ? 1 : 2);
   columns.do_now.sort((a, b) => pin(a) - pin(b) || byDueDate(a, b));

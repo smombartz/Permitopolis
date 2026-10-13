@@ -96,14 +96,14 @@ export const S5: SeedScript = {
       taskId: taskId(CASE_ID, "community_notification"),
       files: [sampleFile("riverfront-5k-posted-notice.jpg", { type: "image/jpeg", size: 980_000 })],
     }),
-    step("2027-03-21T09:00", "clerk", { type: "verify_document", taskId: taskId(CASE_ID, "community_notification") }),
-    step("2027-04-10T09:00", "pws", {
+    step("2027-03-22T09:00", "clerk", { type: "verify_document", taskId: taskId(CASE_ID, "community_notification") }),
+    step("2027-04-09T09:00", "pws", {
       type: "review_decide",
       decision: "approve_with_conditions",
       conditions: ["Route closed 6 to 11:30 am", "8 officers on the route", "40 barricades", "Finish-line sound off by 11 am"],
       feeLines: [],
     }),
-    step("2027-04-10T09:05", "hl", { type: "review_decide", decision: "approve", conditions: [], feeLines: [] }),
+    step("2027-04-09T09:05", "hl", { type: "review_decide", decision: "approve", conditions: [], feeLines: [] }),
     step("2027-04-30T09:00", "clerk", { type: "send_quote", conditions: [], feeLines: [] }),
     step("2027-04-30T09:10", "applicant", {
       type: "complete_task",

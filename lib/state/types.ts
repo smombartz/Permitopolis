@@ -46,6 +46,11 @@ export interface PartyStatus {
   daysHolding: number;
   /** One line for the row, e.g. "Approved with conditions" or "Unlocks when paid and verified". */
   note: string;
+  /**
+   * For a party that is 'waiting': the locked task it gets next, the one `note` says is waiting
+   * ("Issue permit", for "Unlocks when paid and verified"). Absent when it has none.
+   */
+  nextTask?: Task;
   /** What this party covers on this case, e.g. "Insurance, accessibility". */
   scope: string;
 }

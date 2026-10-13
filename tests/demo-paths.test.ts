@@ -193,6 +193,12 @@ describe("Path 1 · Instant in two minutes (S2)", () => {
     expect(up(S2)).toEqual([]);
     // Paying twice is refused.
     expect(refusal(S2, { type: "book_and_pay", method: "card" })).toBe("This case is permitted.");
+    // The other twelve sessions are paid one at a time: the next one has its own control.
+    expect(availableActions(booked, "applicant", ctx()).map((a) => [a.type, a.label, a.enabled])).toEqual([
+      ["pay", "Pay the next session", true],
+      ["cancel", "Cancel", true],
+      ["amend", "Amend", true],
+    ]);
 
     // Switch to City Clerk: Active permits shows 13 Sundays on Field 4.
     as("clerk");
@@ -498,7 +504,9 @@ describe("Path 4 · Neighbors and the date hold (S4)", () => {
       ["hl", "pending", "2027-05-17", TODAY, 14],
     ]);
     expect(queue("clerk", S4)).toEqual([]);
-    expect(note(S4, "clerk")).toBe("Nothing due right now");
+    // The Clerk is waiting on the two reviews, and its row says so.
+    expect(waitingOn(get(S4), TODAY).find((p) => p.party === "clerk")).toMatchObject({ status: "waiting", note: "Unlocks when every review is in", nextTask: { catalogId: "consolidate" } });
+    expect(task(get(S4), "consolidate")).toMatchObject({ owner: "clerk", status: "locked" });
 
     // Public Works & Safety's queue now shows the block party. So does Health & Legal's.
     as("pws");
@@ -582,6 +590,12 @@ describe("Path 5 · Two parties up at once (S5)", () => {
     // The meetings the Clerk set are now on the applicant's board, with their dates.
     expect(board(permitted).do_now).toEqual(["coordination_meeting", "site_walkthrough"]);
     expect([task(permitted, "coordination_meeting").payload.scheduledFor, task(permitted, "site_walkthrough").payload.scheduledFor]).toEqual(["2027-06-21", "2027-07-02"]);
+    // Each is due on the day it is set for: the applicant's row reads Jun 21, not the plan's Jun 18.
+    expect(boardColumns(permitted).do_now.map((t) => [t.catalogId, t.dueDate])).toEqual([
+      ["coordination_meeting", "2027-06-21"],
+      ["site_walkthrough", "2027-07-02"],
+    ]);
+    expect(waitingOn(permitted, TODAY).find((p) => p.party === "applicant")?.oldestDue).toBe("2027-06-21");
     expect(up(S5)).toEqual(["applicant", "pws"]);
 
     // Starting a new City Hall Plaza event on Jul 11 shows the Impacted warning. Impacted, not blocked.
@@ -650,6 +664,8 @@ describe("Path 6 · Closeout (S6)", () => {
     // A closed case leaves the Active permits list and its Closeout tab.
     expect(hasActivePermit(closed)).toBe(false);
     expect(active()).not.toContain(S6);
+    // ...and no longer holds Main Street: the header stops reading "Date held".
+    expect(closed.dateHold).toEqual({ status: "released", placedOn: "2027-02-03", expiresOn: null });
 
     // As the applicant: the board shows the refund, the feedback form and "Book again next year".
     as("applicant", "main-street-business-alliance");
@@ -660,6 +676,9 @@ describe("Path 6 · Closeout (S6)", () => {
     act(S6, { type: "submit_feedback", rating: 5, comment: "The closure went smoothly." });
     expect(get(S6).closeout.feedback).toEqual({ rating: 5, comment: "The closure went smoothly." });
     expect(board(get(S6)).do_now).toEqual(["book_again"]);
+    // Feedback is given once.
+    expect(panel(S6, "applicant", "submit_feedback")).toMatchObject({ enabled: false, reason: "Feedback is already in. Thank you." });
+    expect(refusal(S6, { type: "submit_feedback", rating: 1 })).toBe("Feedback is already in. Thank you.");
 
     // "Book again next year" drafts Sat, Apr 22, 2028.
     const [nextYear] = act(S6, { type: "book_again" });

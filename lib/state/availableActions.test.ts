@@ -140,3 +140,95 @@ describe("availableActions: reviewer", () => {
     expect(instantEventDay.map((i) => i.type)).toContain("log_closeout");
   });
 });
+
+describe("availableActions: a case that has ended", () => {
+  const fee = { id: "f1", dept: "clerk" as const, label: "Fee", qty: 1, unit: "flat", unitPrice: 480, estimate: 480, actual: null, kind: "fee" as const };
+
+  it("offers nothing that transition() would refuse: no payment, no signature, no reminder", () => {
+    // B25: the quote was never paid and the hold expired.
+    const expired = makeCase({ state: "quote_sent", ending: "hold_expired", endingReason: "The date hold expired before the quote was paid.", dateHold: { status: "expired", placedOn: "2027-03-03", expiresOn: "2027-04-26" }, feeLines: [fee] });
+    expect(availableActions(expired, "applicant", makeCtx())).toEqual([]);
+    expect(availableActions(expired, "clerk", makeCtx()).map((i) => [i.type, i.enabled])).toEqual([["add_note", true]]);
+    for (const role of ["pws", "hl"] as const) expect(availableActions(expired, role, makeCtx()).map((i) => i.type)).toEqual(["add_note"]);
+  });
+
+  it.each(["withdrawn", "denied", "cancelled", "hold_expired"] as const)("%s: every action offered goes through, in every state", (ending) => {
+    for (const state of ["draft", "submitted", "in_review", "needs_info", "quote_sent", "permitted", "event_day", "closeout", "closed"] as const) {
+      const c = makeCase({ state, ending });
+      for (const role of ["applicant", "clerk", "pws", "hl"] as const) {
+        for (const item of availableActions(c, role, makeCtx())) {
+          expect([state, role, item.type, item.enabled]).toEqual([state, role, "add_note", true]);
+        }
+      }
+    }
+  });
+});
+
+describe("availableActions: payments", () => {
+  const fee = { id: "f1", dept: "clerk" as const, label: "Fee", qty: 1, unit: "flat", unitPrice: 715, estimate: 715, actual: null, kind: "fee" as const };
+
+  it("both pay rows of a quote are built from the check `pay` itself runs", () => {
+    const quoted = makeCase({ state: "quote_sent", feeLines: [fee] });
+    expect(availableActions(quoted, "applicant", makeCtx()).find((i) => i.type === "pay")).toMatchObject({ label: "Pay fees and deposit", enabled: true });
+    expect(availableActions(quoted, "clerk", makeCtx()).find((i) => i.type === "pay")).toMatchObject({ label: "Record an in-person payment", enabled: true });
+  });
+
+  it("a closed case that still owes its final bill offers the payment, to the applicant and at the counter (B20)", () => {
+    const extra = { id: "f2", dept: "pws" as const, label: "Extra cleanup crew", qty: 5, unit: "worker-hour", unitPrice: 60, estimate: 0, actual: 300, kind: "fee" as const };
+    const deposit = { id: "f3", dept: "clerk" as const, label: "Refundable cleanup deposit", qty: 1, unit: "flat", unitPrice: 250, estimate: 250, actual: 250, kind: "deposit" as const };
+    const owing = makeCase({
+      state: "closed",
+      feeLines: [{ ...fee, unitPrice: 130, estimate: 130, actual: 130 }, extra, deposit],
+      payments: [{ id: "p1", at: "2027-01-21T09:05", amount: 380, method: "card", kind: "quote" }],
+      closeout: { cleanup: "issues", notes: "", hoursLoggedOn: "2027-03-16", balance: 300, refund: null, feedback: null },
+    });
+    expect(availableActions(owing, "applicant", makeCtx()).map((i) => [i.type, i.label, i.enabled, i.primary])).toEqual([
+      ["pay", "Pay the final bill", true, true],
+      ["submit_feedback", "Tell us how it went", true, false],
+      ["book_again", "Book again next year", true, false],
+    ]);
+    expect(availableActions(owing, "clerk", makeCtx()).map((i) => [i.type, i.label])).toEqual([["pay", "Record an in-person payment"]]);
+
+    // Paid up: the payment row goes.
+    const settled = { ...owing, payments: [...owing.payments, { id: "p2", at: "2027-03-20T09:00", amount: 50, method: "card" as const, kind: "final_invoice" as const }] };
+    expect(availableActions(settled, "applicant", makeCtx()).map((i) => i.type)).toEqual(["submit_feedback", "book_again"]);
+    expect(availableActions(settled, "clerk", makeCtx())).toEqual([]);
+  });
+
+  it("a permitted series offers the next session still to pay; a single event and a paid-up series do not", () => {
+    const session = (date: string, billing: "paid" | "due" | "upcoming" | "skipped") => ({ date, availability: { status: "open" as const }, billing });
+    const series = makeCase({
+      state: "permitted",
+      schedule: {
+        date: "2027-06-06",
+        start: "08:00",
+        end: "09:00",
+        recurrence: { frequency: "weekly", weekday: 0, until: "2027-06-27" },
+        occurrences: [session("2027-06-06", "paid"), session("2027-06-13", "skipped"), session("2027-06-20", "upcoming"), session("2027-06-27", "upcoming")],
+      },
+    });
+    for (const state of ["permitted", "event_day"] as const) {
+      expect(availableActions({ ...series, state }, "applicant", makeCtx()).map((i) => [i.type, i.label, i.enabled])).toEqual([
+        ["pay", "Pay the next session", true],
+        ["cancel", "Cancel", false],
+        ["amend", "Amend", true],
+      ]);
+      expect(availableActions({ ...series, state }, "clerk", makeCtx()).map((i) => [i.type, i.label])).toEqual([
+        ["pay", "Record an in-person payment"],
+        ["remind", "Send a reminder"],
+        ["add_note", "Add a note"],
+      ]);
+    }
+    const paidUp = { ...series, schedule: { ...series.schedule!, occurrences: series.schedule!.occurrences.map((o) => (o.billing === "upcoming" ? { ...o, billing: "paid" as const } : o)) } };
+    expect(availableActions(paidUp, "applicant", makeCtx()).map((i) => i.type)).toEqual(["cancel", "amend"]);
+    const single = makeCase({ state: "permitted", schedule: { date: "2027-05-22", start: "11:00", end: "16:00", occurrences: [session("2027-05-22", "upcoming")] } });
+    expect(availableActions(single, "applicant", makeCtx()).map((i) => i.type)).toEqual(["cancel", "amend"]);
+  });
+
+  it("feedback is given once: the row is disabled, with the reason, after it is in", () => {
+    const closed = makeCase({ state: "closed" });
+    expect(availableActions(closed, "applicant", makeCtx()).find((i) => i.type === "submit_feedback")).toMatchObject({ enabled: true, primary: true });
+    const given = { ...closed, closeout: { ...closed.closeout, feedback: { rating: 5, comment: "Smooth process." } } };
+    expect(availableActions(given, "applicant", makeCtx()).find((i) => i.type === "submit_feedback")).toMatchObject({ enabled: false, primary: false, reason: "Feedback is already in. Thank you." });
+  });
+});

@@ -7,7 +7,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { STORAGE_KEY } from "@/lib/rules";
 import { buildSeed, seedFingerprint } from "./seed";
-import { resetDemoStoreForTests, useDemo } from "./store";
+import { hydrateDemoStore, resetDemoStoreForTests, useDemo } from "./store";
 
 const stored = new Map<string, string>();
 const localStorage = {
@@ -16,7 +16,7 @@ const localStorage = {
   removeItem: (key: string) => void stored.delete(key),
 };
 
-const storedDemo = () => JSON.parse(stored.get(STORAGE_KEY) ?? "null") as { version: number; state: { cases: { id: string; name: string }[]; role: string } } | null;
+const storedDemo = () => JSON.parse(stored.get(STORAGE_KEY) ?? "null") as { version: number; state: { cases: unknown[]; role: string } } | null;
 
 beforeEach(() => {
   stored.clear();
@@ -36,10 +36,65 @@ describe("the seed's fingerprint", () => {
     expect(seedFingerprint()).toBe(seedFingerprint());
   });
 
-  it("is the version the demo is stored under, in the PRD's storage key", () => {
+  it("is the version the demo is stored under, in the PRD's storage key", async () => {
     expect(useDemo.persist.getOptions()).toMatchObject({ name: "permitopolis-demo-v1", version: seedFingerprint() });
+    await hydrateDemoStore();
     useDemo.getState().setRole("clerk");
     expect(storedDemo()).toMatchObject({ version: seedFingerprint(), state: { role: "clerk" } });
+  });
+});
+
+describe("nothing is written before the stored demo has been read", () => {
+  /** A demo the presenter left behind: a note on the first case, as the Clerk, on Jun 18. */
+  function leaveADemoBehind() {
+    const cases = buildSeed();
+    cases[0].activity.push({ at: "2027-05-03T09:00", actor: "clerk", text: "Called the organizer." });
+    stored.set(STORAGE_KEY, JSON.stringify({ version: seedFingerprint(), state: { cases, role: "clerk", personaId: "maya-chen", demoToday: "2027-06-18", hints: false, lastPathByRole: { clerk: "/city/cases" } } }));
+    return cases;
+  }
+
+  it("a change made on a page that has not hydrated (a landing-page door, a demo-guide jump) leaves the stored demo as it was", () => {
+    const left = leaveADemoBehind();
+    const before = stored.get(STORAGE_KEY);
+
+    // A fresh page load: the store holds the seed in memory, and nothing has read storage yet.
+    useDemo.getState().setRole("pws");
+    useDemo.getState().setPersona("sunrise-yoga-club");
+    useDemo.getState().rememberPath("pws", "/city/queue");
+
+    expect(stored.get(STORAGE_KEY)).toBe(before);
+    expect(storedDemo()?.state.cases).toEqual(left);
+    expect(storedDemo()?.state.cases[0]).toMatchObject({ activity: expect.arrayContaining([expect.objectContaining({ text: "Called the organizer." })]) });
+  });
+
+  it("the read that follows brings the stored demo in, and from then on every change is saved", async () => {
+    const left = leaveADemoBehind();
+    useDemo.getState().setRole("pws");
+
+    await hydrateDemoStore();
+    expect(useDemo.getState()).toMatchObject({ role: "clerk", personaId: "maya-chen", demoToday: "2027-06-18", hints: false });
+    expect(useDemo.getState().cases).toEqual(left);
+
+    useDemo.getState().setRole("hl");
+    expect(storedDemo()).toMatchObject({ state: { role: "hl", demoToday: "2027-06-18" } });
+    expect(storedDemo()?.state.cases).toEqual(left);
+  });
+
+  it("reads storage once per page load, however many shells mount", async () => {
+    leaveADemoBehind();
+    const getItem = vi.spyOn(localStorage, "getItem");
+    await Promise.all([hydrateDemoStore(), hydrateDemoStore()]);
+    await hydrateDemoStore();
+    expect(getItem.mock.calls.filter(([key]) => key === STORAGE_KEY)).toHaveLength(1);
+    getItem.mockRestore();
+  });
+
+  it("with nothing stored, the first change after the read saves the seed with it", async () => {
+    await hydrateDemoStore();
+    expect(storedDemo()).toBeNull();
+    useDemo.getState().setRole("clerk");
+    expect(storedDemo()).toMatchObject({ version: seedFingerprint(), state: { role: "clerk" } });
+    expect(storedDemo()?.state.cases).toHaveLength(38);
   });
 });
 

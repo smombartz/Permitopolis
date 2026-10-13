@@ -156,8 +156,8 @@ export const B25: SeedScript = {
       reviewers: [{ dept: "hl", sections: ["Certificate of insurance", "Vendor list"], dueDate: "2027-03-17" }],
     }),
     step("2027-03-10T09:00", "hl", { type: "review_decide", decision: "approve", conditions: [], feeLines: [] }),
-    step("2027-04-11T09:00", "clerk", { type: "send_quote", conditions: [], feeLines: [] }),
+    step("2027-04-12T09:00", "clerk", { type: "send_quote", conditions: [], feeLines: [] }),
   ],
   expect: { tier: "reviewed", state: "quote_sent", ending: "hold_expired" },
-  notes: "Hold placed Apr 11 + 14 days = expires Apr 25, which has already passed on the demo date.",
+  notes: "Quote sent Mon, Apr 12 + 14 days = the hold expires Apr 26, which has already passed on the demo date.",
 };

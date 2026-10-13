@@ -1,6 +1,6 @@
 /**
  * S6 · Main Street Food Truck Festival. Special event, the whole history through permit, paid
- * $9,645 Mar 13. The event (Apr 24) has already happened by the demo date, so the engine opens
+ * $9,645 Sat, Mar 13, with the permit issued the Monday after. The event (Apr 24) has already happened by the demo date, so the engine opens
  * Closeout on its own (Apr 25) as the clock advances during replay; no log_closeout is scripted.
  *
  * The PRD's board on load is "Coming up: final bill or refund, feedback. Everything else Done",
@@ -126,7 +126,7 @@ export const S6: SeedScript = {
     step("2027-03-12T09:00", "clerk", { type: "send_quote", conditions: [], feeLines: [] }),
     step("2027-03-13T09:00", "applicant", { type: "accept_and_sign", signature: "Harold Petrov" }),
     step("2027-03-13T09:05", "applicant", { type: "pay", amount: 9645, method: "card", kind: "quote" }),
-    step("2027-03-13T09:10", "clerk", { type: "issue_permit" }),
+    step("2027-03-15T08:30", "clerk", { type: "issue_permit" }),
     step("2027-03-15T09:00", "clerk", {
       type: "schedule_meeting",
       taskId: taskId(CASE_ID, "coordination_meeting"),

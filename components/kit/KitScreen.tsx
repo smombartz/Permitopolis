@@ -132,6 +132,7 @@ import {
   PartyAvatar,
   PartyChip,
   PersonaAvatar,
+  REVIEW_STATUS_TEXT,
   ReviewClock,
   ReviewStatusDot,
   StackedTaskCard,
@@ -260,7 +261,82 @@ const SAMPLE_TASKS: Task[] = [
     status: "done",
     dueDate: "2027-04-30",
   }),
+  // A finished card with a history says when it was finished.
+  sampleTask({
+    id: "t-done-dated",
+    title: "Certificate of insurance",
+    why: "Every reviewed event needs proof of liability insurance",
+    reviewer: "hl",
+    status: "done",
+    history: [
+      { at: "2027-04-16T09:05", actor: "applicant", status: "submitted" },
+      { at: "2027-04-21T11:00", actor: "hl", status: "done" },
+    ],
+  }),
+  // Locked, with the day it is for under the unlock hint.
+  sampleTask({
+    id: "t-locked-dated",
+    kind: "action",
+    title: "Carry your permit",
+    why: "Have your permit on your phone on the day",
+    status: "locked",
+    unlocksOn: "event_day",
+    dueDate: "2027-06-18",
+    reviewer: null,
+  }),
+  // A meeting the Clerk has scheduled while its card is still locked, and one that is open.
+  sampleTask({
+    id: "t-meeting-locked",
+    kind: "meeting",
+    title: "Coordination meeting",
+    why: "Special events meet with the City Clerk and Public Works & Safety before the day",
+    reviewer: "clerk",
+    status: "locked",
+    unlocksOn: "permitted",
+    dueDate: "2027-06-21",
+    payload: { scheduledFor: "2027-06-21" },
+  }),
+  sampleTask({
+    id: "t-meeting-open",
+    kind: "meeting",
+    title: "Site walkthrough",
+    why: "Public Works & Safety walks the site with you before the event",
+    reviewer: "pws",
+    dueDate: "2027-07-02",
+    payload: { scheduledFor: "2027-07-02" },
+  }),
+  // Sent back by the reviewer, with the reason.
+  sampleTask({
+    id: "t-sent-back",
+    title: "Health permit: Rolling Dumpling Co.",
+    why: "Each food vendor needs a current health permit",
+    reviewer: "hl",
+    status: "changes_requested",
+    dueDate: "2027-05-07",
+    payload: { rejectedReason: "This permit expired in March. Please upload the current one." },
+    history: [
+      { at: "2027-04-27T09:10", actor: "applicant", status: "submitted" },
+      { at: "2027-04-30T10:00", actor: "hl", status: "changes_requested" },
+    ],
+  }),
+  // Added by an amendment to a permitted event.
+  sampleTask({
+    id: "t-amendment",
+    kind: "form",
+    title: "Sound details",
+    why: "Because you added amplified sound",
+    reviewer: "pws",
+    dueDate: "2027-05-10",
+    tags: ["amendment"],
+  }),
 ];
+
+/** What each locked sample waits for: the card catalogue's own hints. */
+const SAMPLE_UNLOCK_HINTS: Record<string, string> = {
+  "t-locked": "Unlocks when your quote is ready.",
+  "t-locked-dated": "For the day of your event",
+  "t-meeting-locked": "Unlocks when your permit is issued",
+};
 
 const SAMPLE_FEE_LINES: FeeLine[] = [
   { id: "f1", dept: "clerk", label: "Application fee", qty: 1, unit: "flat", unitPrice: 250, estimate: 250, actual: 250, kind: "fee" },
@@ -321,8 +397,10 @@ const SAMPLE_WHO_IS_UP: PartyStatus[] = [
     openTasks: [],
     oldestDue: null,
     daysHolding: 0,
-    note: "Waiting on the applicant's updated vendor list",
+    note: "Waiting on the applicant's response",
     scope: "Insurance, accessibility",
+    // The task that waits: its title sits above the note.
+    nextTask: sampleTask({ id: "t-review-hl", owner: "hl", kind: "review", title: "Review your sections", status: "locked", reviewer: null }),
   },
 ];
 
@@ -1119,7 +1197,17 @@ function KitScreen() {
                 { dept: "hl", status: "needs_info" },
               ]}
             />
+            <span className="text-xs text-fg-secondary">Focus or hover the row for the words.</span>
           </Row>
+          {/* Every status has a glyph of its own beside the department's icon, so none differs by tint alone. */}
+          <div className="grid grid-cols-1 gap-x-6 gap-y-2 sm:grid-cols-2 lg:grid-cols-3">
+            {(["not_routed", "pending", "approved", "approved_with_conditions", "needs_info", "denied"] as const).map((status) => (
+              <div key={status} className="flex items-center gap-2">
+                <DeptStatusDots items={[{ dept: "pws", status }]} />
+                <span className="text-xs text-fg-secondary">{REVIEW_STATUS_TEXT[status]}</span>
+              </div>
+            ))}
+          </div>
         </KitSection>
 
         {/* ---- Domain: CaseHeader ---- */}
@@ -1182,24 +1270,25 @@ function KitScreen() {
         </KitSection>
 
         {/* ---- Domain: WhoIsUp ---- */}
-        <KitSection id="domain-who-is-up" title="Domain: WhoIsUp" description="docs/spec/img/wireframe-case-s5.png, with an overdue applicant task and a long organization name.">
+        <KitSection id="domain-who-is-up" title="Domain: WhoIsUp" description="docs/spec/img/wireframe-case-s5.png, with an overdue applicant task, a long organization name under Applicant, and a waiting row that names the task it waits to do. Rows that are up come first.">
           <WhoIsUp
             items={SAMPLE_WHO_IS_UP}
             today={DEMO_TODAY}
+            applicantName={LONG_ORG_NAME}
             nextMove="Next: the applicant responds to Health & Legal's request, then Health & Legal re-reviews."
             onSelectTask={(taskId) => toast(`Open ${taskId}`)}
           />
         </KitSection>
 
         {/* ---- Domain: TaskCard ---- */}
-        <KitSection id="domain-task-card" title="Domain: TaskCard, StackedTaskCard" description="Locked (dashed), a pinned and overdue request, sign-off progress, a payment amount, done, and the stacked-card variant.">
+        <KitSection id="domain-task-card" title="Domain: TaskCard, StackedTaskCard" description="Locked (dashed), a pinned and overdue request, sign-off progress, a payment amount, done with and without its date, a locked card with its day, a scheduled meeting locked and open, changes requested with the reason, an amendment card, and the stacked-card variant.">
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
             {SAMPLE_TASKS.map((task) => (
               <TaskCard
                 key={task.id}
                 task={task}
                 today={DEMO_TODAY}
-                unlockHint="Unlocks when your quote is ready."
+                unlockHint={SAMPLE_UNLOCK_HINTS[task.id]}
                 onSelect={() => toast(`Open ${task.title}`)}
               />
             ))}

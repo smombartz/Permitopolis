@@ -295,7 +295,7 @@ export function checkReviewDecide(c: EventCase, dept: Dept): CheckResult {
   const review = reviewFor(c, dept);
   if (!review) return fail("Not routed to this department.");
   if (review.status === "needs_info") return fail("Waiting on the applicant's response.");
-  if (review.status !== "pending") return fail(`Review is already ${review.status.replace("_", " ")}.`);
+  if (review.status !== "pending") return fail(`Review is already ${review.status.replace(/_/g, " ")}.`);
   return OK;
 }
 
@@ -317,8 +317,49 @@ export function checkAcceptAndSign(c: EventCase): CheckResult {
   return requireState(c, "quote_sent");
 }
 
-export function checkPayQuote(c: EventCase): CheckResult {
-  return requireState(c, "quote_sent");
+/** What a `pay` records: a quote payment, one session of a series, or a final bill. */
+export interface PaymentAsk {
+  kind: "booking" | "quote" | "session" | "final_invoice" | "refund";
+  /** Left out by availableActions(), which asks before any amount has been entered. */
+  amount?: number;
+  occurrenceDate?: string;
+}
+
+/**
+ * `pay` records three kinds of payment: toward a quote, for one session of a series, and for a
+ * final bill, each in the state it belongs to. A booking payment and a refund are written by
+ * the actions that cause them (book_and_pay; cancel, withdraw and reconcile_close), never
+ * through `pay`. An ended case takes no payment at all.
+ */
+export function checkPay(c: EventCase, ask: PaymentAsk): CheckResult {
+  const open = requireOpen(c);
+  if (!open.ok) return open;
+  if (ask.amount !== undefined && !(ask.amount > 0)) return fail("Enter an amount above $0.");
+  switch (ask.kind) {
+    case "quote":
+      return c.state === "quote_sent" ? OK : fail("No quote to pay.");
+    case "session": {
+      if (!c.schedule?.recurrence) return fail("Only a series is paid by session.");
+      const occurrence = c.schedule.occurrences.find((o) => o.date === ask.occurrenceDate);
+      if (!occurrence) return fail("No such session.");
+      if (occurrence.billing === "skipped") return fail("That session is skipped.");
+      if (occurrence.billing === "paid") return fail("That session is already paid.");
+      return OK;
+    }
+    case "final_invoice":
+      return c.state === "closeout" || c.state === "closed" ? OK : fail("There is no final bill yet.");
+    default:
+      return fail("That payment is recorded by the action that causes it.");
+  }
+}
+
+/** The next session of a series still to be paid for (earliest first), or undefined. */
+export function nextUnpaidSession(c: EventCase): string | undefined {
+  if (!c.schedule?.recurrence) return undefined;
+  return c.schedule.occurrences
+    .filter((o) => o.billing === "upcoming" || o.billing === "due")
+    .map((o) => o.date)
+    .sort()[0];
 }
 
 export function checkIssuePermit(c: EventCase, ctx: RulesCtx): CheckResult {
@@ -364,7 +405,11 @@ export function checkCancel(c: EventCase, today: string, lastSession: string | n
 }
 
 export function checkSubmitFeedback(c: EventCase): CheckResult {
-  return requireState(c, "closed");
+  const state = requireState(c, "closed");
+  if (!state.ok) return state;
+  // Feedback is given once: a second form would overwrite the first.
+  if (c.closeout.feedback) return fail("Feedback is already in. Thank you.");
+  return OK;
 }
 
 export function checkBookAgain(c: EventCase): CheckResult {
@@ -485,17 +530,41 @@ export function cardUnderVerification(c: EventCase, verifyTask: Task): Task | un
   return card?.status === "submitted" ? card : undefined;
 }
 
+/**
+ * Applicant cards that are finished by an action of their own, or by somebody else. Marking one
+ * done by hand would skip what that action does (the payment, the signature, the sign-offs, the
+ * answer to a reviewer), so complete_task refuses and says what finishes the card instead.
+ */
+function ownCardActionFor(c: EventCase, task: Task): string | undefined {
+  if (task.request && !task.request.resolved) return "Respond to the request to finish this card.";
+  if (task.kind === "meeting") return "The city closes this card once the meeting has been held.";
+  const actions: Record<string, string> = {
+    pay_fees: c.tier === "instant" && c.state === "draft" ? "Pay and book to finish this card." : "Pay the fees and deposit to finish this card.",
+    final_bill_or_refund: "Pay the final bill to finish this card.",
+    accept_and_sign: "Accept the conditions and sign to finish this card.",
+    neighbor_signoff: "Collect the neighbor sign-offs to finish this card.",
+    submit_application: "Submit the application to finish this card.",
+    feedback: "Send your feedback to finish this card.",
+    book_again: "Book again to finish this card.",
+    carry_permit: "This card is finished for you once the event day has passed.",
+  };
+  return actions[task.catalogId];
+}
+
 export function checkCompleteTask(c: EventCase, taskIdArg: string): CheckResult {
   const open = requireOpen(c);
   if (!open.ok) return open;
   const task = findTask(c, taskIdArg);
   if (!task) return fail("Card not found.");
+  if (task.owner !== "applicant") return fail(`That task belongs to ${PARTY_LABEL[task.owner]}.`);
   if (task.status === "locked") return fail(unlockHintFor(task.catalogId) ?? "This card is locked.");
   if (task.status === "submitted") return fail("This card is already submitted.");
   if (task.status === "done") {
     const canRedo = task.kind === "document" && c.state !== "permitted" && c.state !== "event_day" && c.state !== "closeout" && c.state !== "closed";
     if (!canRedo) return fail("This card is already done.");
   }
+  const ownAction = ownCardActionFor(c, task);
+  if (ownAction) return fail(ownAction);
   return OK;
 }
 

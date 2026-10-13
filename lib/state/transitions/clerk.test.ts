@@ -195,7 +195,26 @@ describe("confirm_routing: the list the Clerk confirms", () => {
   it("a list with each department once goes through", () => {
     const result = transition(accepted(), { type: "confirm_routing", reviewers: [{ dept: "pws", sections: ["Sound details"], dueDate: "2027-05-17" }, hl] }, "clerk", makeCtx());
     expect(result.ok && result.case.reviews.map((r) => r.dept)).toEqual(["pws", "hl"]);
-    expect(result.ok && new Set(result.case.tasks.map((t) => t.id)).size).toBe(3);
+    // The routing task, one review each, and the Clerk's own next step.
+    expect(result.ok && result.case.tasks.map((t) => [t.catalogId, t.owner, t.status])).toEqual([
+      ["confirm_routing", "clerk", "done"],
+      ["review:pws", "pws", "todo"],
+      ["review:hl", "hl", "todo"],
+      ["consolidate", "clerk", "locked"],
+    ]);
+  });
+
+  it("the review clock's allowance is the days the Clerk gave: from routing to the due date", () => {
+    // Routed on Mon, May 3. The config would allow a Reviewed event 14 days; the Clerk gives 21 and 10.
+    const reviewers = [
+      { dept: "pws" as const, sections: ["Sound details"], dueDate: "2027-05-24" },
+      { dept: "hl" as const, sections: ["Certificate of insurance"], dueDate: "2027-05-13" },
+    ];
+    const result = transition({ ...accepted(), tier: "reviewed" }, { type: "confirm_routing", reviewers }, "clerk", makeCtx());
+    expect(result.ok && result.case.reviews.map((r) => [r.dept, r.dueDate, r.clock.startedOn, r.clock.allowedDays])).toEqual([
+      ["pws", "2027-05-24", "2027-05-03", 21],
+      ["hl", "2027-05-13", "2027-05-03", 10],
+    ]);
   });
 });
 
@@ -235,6 +254,16 @@ describe("reconcile_close (S6)", () => {
     expect(result.case.payments.find((p) => p.kind === "refund")?.amount).toBe(-250);
     expect(result.case.tasks.find((t) => t.catalogId === "final_bill_or_refund")?.status).toBe("done");
     expect(result.case.activity.at(-1)?.text).toBe("Closed. Refunded $250 from the deposit.");
+  });
+
+  it("a closed case no longer holds its date", () => {
+    const c = makeCase({
+      state: "closeout",
+      dateHold: { status: "held", placedOn: "2027-02-03", expiresOn: null },
+      closeout: { cleanup: "pass", notes: "", hoursLoggedOn: "2027-04-25", balance: null, refund: null, feedback: null },
+    });
+    const result = transition(c, { type: "reconcile_close" }, "clerk", makeCtx());
+    expect(result.ok && result.case).toMatchObject({ state: "closed", dateHold: { status: "released", placedOn: "2027-02-03", expiresOn: null } });
   });
 
   it("closing finishes the Clerk's own reconcile task", () => {

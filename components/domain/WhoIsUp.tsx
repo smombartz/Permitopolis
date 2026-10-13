@@ -1,3 +1,4 @@
+import * as React from "react"
 import { cn } from "cn"
 import { ArrowRightIcon, CheckIcon, ClockIcon, MinusIcon, type LucideIcon } from "lucide-react"
 import { DueDate } from "@/components/domain/DueDate"
@@ -29,36 +30,58 @@ const STATUS_PILL_CLASS: Record<PartyStanding, string> = {
 }
 
 interface WhoIsUpProps extends React.ComponentProps<"div"> {
-  /** Always four rows, applicant/clerk/pws/hl, exactly as `waitingOn()` returns them. */
+  /** The four rows, applicant/clerk/pws/hl, exactly as `waitingOn()` returns them. */
   items: PartyStatus[]
   today: ISODate
   /** The generated sentence from `nextMove()`, e.g. "Next: ... uploads ..., then ... re-reviews." */
   nextMove: string
+  /** Who the applicant is, shown under "Applicant": the persona's name. */
+  applicantName?: string
   onSelectTask?: (taskId: string) => void
 }
 
+/** "applicant, Health & Legal": the parties that are up, as the heading's summary names them. */
+function upNowSummary(items: PartyStatus[]): string {
+  const up = items.filter((item) => item.status === "up_now").map((item) => (item.party === "applicant" ? "applicant" : PARTY_LABEL[item.party]))
+  return up.length > 0 ? `Waiting on: ${up.join(", ")}` : "Waiting on nobody"
+}
+
 /**
- * "Who's up", the case-detail centerpiece (docs/spec/img/wireframe-case-s5.png): one row
- * per party with its status pill, each open action with its own due date (oldest due first,
- * as `waitingOn()` sorts them), and days holding. A party with nothing open shows its note
- * instead. Up-now rows get an indigo wash and a leading bar (plan 3.2 moves this off the
- * wireframe's amber, since indigo is the only action color), not a status-pill color alone.
+ * "Who's up", the case-detail centerpiece (docs/spec/img/wireframe-case-s5.png): a heading
+ * that names who the case is waiting on, then one row per party with its status pill, each
+ * open action with its own due date (oldest due first, as `waitingOn()` sorts them), and days
+ * holding. The parties that are up come first. The applicant's row carries the applicant's
+ * name. A party with nothing open shows its note, under the task the note is about when it is
+ * waiting ("Issue permit", "Unlocks when paid and verified"). Up-now rows get an indigo wash
+ * and a leading bar (plan 3.2 moves this off the wireframe's amber, since indigo is the only
+ * action color), not a status-pill color alone.
  */
-function WhoIsUp({ items, today, nextMove, onSelectTask, className, ...props }: WhoIsUpProps) {
+function WhoIsUp({ items, today, nextMove, applicantName, onSelectTask, className, ...props }: WhoIsUpProps) {
+  const headingId = React.useId()
+  // Up now first; within each group the order waitingOn() gives: applicant, clerk, pws, hl.
+  const rows = [...items].sort((a, b) => Number(b.status === "up_now") - Number(a.status === "up_now"))
+
   return (
     <div
       data-slot="who-is-up"
       className={cn("flex flex-col overflow-hidden rounded-panel border border-line-subtle bg-surface-1", className)}
       {...props}
     >
-      <div role="list" aria-label="Who's up" className="flex flex-col divide-y divide-line-subtle">
-        {items.map((item) => {
+      <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1 border-b border-line-subtle px-4 py-3">
+        <h2 id={headingId} className="text-base font-bold text-fg">
+          Who&apos;s up
+        </h2>
+        <p className="text-xs text-fg-secondary">{upNowSummary(items)}</p>
+      </div>
+      <div role="list" aria-labelledby={headingId} className="flex flex-col divide-y divide-line-subtle">
+        {rows.map((item) => {
           const StatusIcon = STATUS_ICON[item.status]
           return (
             <div
               key={item.party}
               role="listitem"
               data-status={item.status}
+              data-party={item.party}
               className={cn(
                 "grid grid-cols-1 gap-2 px-4 py-3.5 sm:grid-cols-[1fr_auto_1.4fr] sm:items-center sm:gap-4",
                 item.status === "up_now" && "border-l-[3px] border-indigo-650 bg-pill"
@@ -67,9 +90,11 @@ function WhoIsUp({ items, today, nextMove, onSelectTask, className, ...props }: 
               <div className="flex items-center gap-2.5">
                 {/* The name is spelled out beside it, so the tile adds nothing for a screen reader. */}
                 <PartyAvatar party={item.party} aria-hidden="true" />
-                <div className="flex flex-col">
+                <div className="flex min-w-0 flex-col">
                   <span className="text-sm font-semibold text-fg">{PARTY_LABEL[item.party]}</span>
-                  <span className="text-xs text-fg-secondary">{item.scope}</span>
+                  <span className="text-xs break-words text-fg-secondary">
+                    {item.party === "applicant" && applicantName ? applicantName : item.scope}
+                  </span>
                 </div>
               </div>
               <span
@@ -105,7 +130,11 @@ function WhoIsUp({ items, today, nextMove, onSelectTask, className, ...props }: 
                     })}
                   </ul>
                 ) : (
-                  <span className="text-sm text-fg-secondary">{item.note}</span>
+                  <>
+                    {/* What a waiting party does next, over what it waits for. */}
+                    {item.nextTask ? <span className="text-sm font-medium text-fg">{item.nextTask.title}</span> : null}
+                    <span className="text-sm text-fg-secondary">{item.note}</span>
+                  </>
                 )}
                 {item.daysHolding > 0 ? (
                   <span className="text-xs text-fg-secondary">{plural(item.daysHolding, "day")} holding</span>

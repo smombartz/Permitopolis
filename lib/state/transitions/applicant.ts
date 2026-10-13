@@ -8,7 +8,7 @@ import { cancellationRefund, classify, dueDate, estimateFees, requirements } fro
 import { CARD_BY_ID, type CardSpec } from "@/lib/rules/catalog";
 import { round2 } from "@/lib/rules/shared";
 import type { FeeEstimate, RulesCtx } from "@/lib/rules/types";
-import type { Actor, DateHold, EventAnswers, EventCase, Task } from "@/lib/types";
+import type { Actor, EventAnswers, EventCase, Task } from "@/lib/types";
 import type { Action } from "../actions";
 import {
   amendmentNeedsNotice,
@@ -42,6 +42,7 @@ import {
   parkTasksAwaitingAnswer,
   patchTask,
   preSubmitCardsIn,
+  releaseHold,
   resumeTasksAwaitingAnswer,
   signoffsLeft,
   taskId,
@@ -313,7 +314,7 @@ export function withdraw(c: EventCase, _action: Extract_<"withdraw">, actor: Act
   if (!check.ok) return check;
   // Withdrawing leaves no fees owed, so anything paid toward the quote goes back.
   const paid = totalPaid(c);
-  let next: EventCase = { ...c, ending: "withdrawn", endingReason: "Withdrawn by the applicant.", dateHold: releaseHold(c) };
+  let next: EventCase = { ...c, ending: "withdrawn", endingReason: "Withdrawn by the applicant.", dateHold: releaseHold(c.dateHold) };
   if (paid > 0) {
     next = {
       ...next,
@@ -333,7 +334,7 @@ export function cancel(c: EventCase, _action: Extract_<"cancel">, actor: Actor, 
   // The schedule works from the fee lines, which for a series cover sessions not yet paid for.
   // A refund never exceeds what the applicant has paid. To the cent, like every amount.
   const refund = Math.min(round2(result.refund + depositPaid), Math.max(0, totalPaid(c)));
-  let next: EventCase = { ...c, ending: "cancelled", endingReason: result.rule, dateHold: releaseHold(c) };
+  let next: EventCase = { ...c, ending: "cancelled", endingReason: result.rule, dateHold: releaseHold(c.dateHold) };
   if (refund > 0) {
     next = {
       ...next,
@@ -444,7 +445,11 @@ export function amend(c: EventCase, action: Extract_<"amend">, actor: Actor, ctx
   const lateFee = amendmentNeedsNotice(c, amended) && lateFeeApplies(amended, ctx);
   const estimate = estimateFees(amended, cls, ctx.cfg, { caseId: c.id, lateFee });
   const freshTasks = requirements(amended, cls, { caseId: c.id, today: ctx.today, cfg: ctx.cfg });
-  const newCards = freshTasks.filter((t) => !c.tasks.some((existing) => existing.id === t.id)).map((t) => ({ ...t, tags: ["amendment" as const] }));
+  // A new card is dated from the amendment: it has been the applicant's since now, not since the
+  // original application went in.
+  const newCards = freshTasks
+    .filter((t) => !c.tasks.some((existing) => existing.id === t.id))
+    .map((t) => ({ ...t, tags: ["amendment" as const], history: [{ at: nowOf(ctx), actor, status: t.status }] }));
 
   let next: EventCase = {
     ...amended,
@@ -455,8 +460,4 @@ export function amend(c: EventCase, action: Extract_<"amend">, actor: Actor, ctx
   const lateFeeLine = estimate.lines.find((line) => line.kind === "late_fee");
   next = appendActivity(next, actor, `Amended the plan: ${cls.summary}.${lateFeeLine ? ` Late fee: ${fmtMoney(lateFeeLine.estimate)}.` : ""}`, ctx);
   return { ok: true, case: next };
-}
-
-function releaseHold(c: EventCase): DateHold {
-  return c.dateHold.status === "held" ? { ...c.dateHold, status: "released" } : c.dateHold;
 }

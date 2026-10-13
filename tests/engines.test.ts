@@ -335,9 +335,10 @@ describe("seeded cases, taken further through both engines", () => {
   });
 
   it("S5: a decided review's clock stops on the day it was decided", () => {
-    // Routed Mar 10, approved Apr 10: 31 days, whatever the demo date is.
-    expect(reviewClock(seeded("S5"), "pws", TODAY)).toMatchObject({ day: 31, of: 21, paused: false });
-    expect(reviewClock(seeded("S5"), "pws", "2027-06-01")?.day).toBe(31);
+    // Routed Mar 10, approved Fri, Apr 9: 30 days, whatever the demo date is. The Clerk gave it
+    // until Apr 14, which is 35.
+    expect(reviewClock(seeded("S5"), "pws", TODAY)).toMatchObject({ day: 30, of: 35, paused: false });
+    expect(reviewClock(seeded("S5"), "pws", "2027-06-01")?.day).toBe(30);
   });
 
   it("F7: closing the Instant exception puts the $95 repair on a final-bill card", () => {

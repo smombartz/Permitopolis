@@ -1,5 +1,43 @@
 # Change log
 
+## 2026-10-12 - Phase 2 review fixes
+
+**What Changed:**
+- Fixed all 21 findings of the Phase 2 review (3 high, 14 medium, 4 low), each confirmed in the code first and each with a test that fails without the fix. Plan: `docs/plans/2026-10-12-phase-2-review-fixes.md`
+- **Demo menu (high):** "Set demo date" opened the date picker and it closed at once, because the closing menu handed focus back to its trigger and the popover took that for a click away. The menu no longer hands focus back when it closes to open the picker. A shell test now goes Demo menu, Set demo date, Fri, Jun 18 and finds a permitted Jazz in the Plaza on Event day
+- **Render harness (high):** the `next/navigation` mock is a live router. `router.push()`, `router.replace()` and a click on a `<Link>` move the mocked location, and `usePathname()`, `useSearchParams()` and `useParams()` re-render with it; `useRouter()` returns one stable object. New `navigate()`, `prepareScreen()`, `flushHydration()` and a `stored` option (a demo left in localStorage by an earlier visit)
+- **Store hydration (high):** the stored demo is read on every route (a `StoreHydrator` in the root layout) and once per page load; nothing is written to localStorage before it has been read, so a role or persona set on a shell-less page can no longer save the in-memory seed over the presenter's demo
+- **Hydration gate:** `useHydrated()` is one flag for the page load, so the second shell to mount shows no skeleton and reads nothing again; the top bar shows the wordmark and placeholders until the demo has been read (the prerendered page showed the seed's Applicant and May 3 on every reload)
+- **Role switch:** two city roles keep the URL only on the pages they share (My queue, Cases, a case, Active permits). From another role's tool page the switch goes to the new role's last page, then its queue; `CityShell` shows "This screen is built for ..." on a tool page typed in under the wrong city role and does not remember it
+- **Engine, applicant cards:** `complete_task` refuses cards finished some other way (pay, sign, sign-offs, submit, feedback, book again, a pinned request, meetings, carry permit) and says what finishes them; it refuses a city task
+- **Engine, Who's up:** days holding counts from the last time the party's task became its to do, and from the day the application went in for a card nobody has touched (S4: 20 days, was 0); the Clerk's `consolidate` task is created locked at routing, so the Clerk reads "Waiting · Unlocks when every review is in" (was "Done for now"); `PartyStatus.nextTask` names the task a waiting party gets next; the Clerk's scope is always its role on the case
+- **Engine, dates and clocks:** a scheduled meeting is due on the day it is set for; a review's allowance is the days from routing to the Clerk's due date (S5 "Day 30 of 35", S6 "Day 35 of 42"); a closed case releases its date hold
+- **Engine, actions:** an ended case offers `add_note` and nothing else, and its board keeps only its Done cards; both `pay` rows go through the engine's own check; new `pay` rows for a closed case's final bill and a permitted series' next session; feedback can be given once
+- **Engine, series:** on a session's day the clock marks it due; "Carry your permit" locks again after each session, dated for the next, and opens dated for the day
+- **Engine, copy:** "Decided: approved with conditions." (was "approved with_conditions")
+- **Seed:** each role's opening queue has one overdue row, the planned one (F1, F2, F3 and F5 are due in the coming week), and is asserted row by row; B16's nine past sessions are paid for and today's is due; city staff act on working days in every history (F7's damage report excepted); B11's verification is due after S5's
+- **Demo script:** path 5's last step is the new applicant in the wizard (was the Clerk); every applicant step names its persona
+- **Shared components:** `TaskCard` shows "Scheduled for ...", a locked card's date, "Changes requested" with who sent it back and why, an "Amendment" chip and "Done Apr 21"; `WhoIsUp` has a "Who's up" heading, the applicant's name, the waiting party's next task, and the parties that are up first; `DeptStatusDots` has a glyph per status and a keyboard-reachable tooltip; all on `/dev/kit`
+- **Accessibility:** the role switcher is one tab stop with Left/Right/Home/End; below 640 px the top bar shows the demo date as "May 3"
+- `docs/readme.md`: the page-ownership rule for city routes, hydration on shell-less pages, the live navigation mock, the engine notes above, and a new "Open questions for the owner" section (seven)
+
+**Why:**
+- The review ran against the merged Phase 2 tree, the one the seven Phase 3 screen builders start from. Three findings would have blocked them outright (the date picker, a harness that could not follow a URL change, a store that could lose the demo), and the rest would have been copied into every screen
+
+**Files Modified:**
+- `lib/state/checks.ts`, `core.ts`, `clock.ts`, `selectors.ts`, `availableActions.ts`, `waitingOn.ts`, `store.ts`, `index.ts`, `types.ts` (contract: `PartyStatus.nextTask`), `lib/state/transitions/{applicant,city,clerk,payment}.ts`
+- `lib/state/seed/scenarios/{s5,s6,f1,f2,f3,f5}.ts`, `lib/state/seed/background/{b05-b09,b10-b16,b17-b21,b22-b25}.ts`
+- `lib/view/shell.ts`, `lib/data/demoScript.ts`
+- `components/shell/{TopBar,DemoMenu,CityShell,PlaceholderScreen}.tsx`, `components/shell/StoreHydrator.tsx` (new), `components/shell/index.ts`, `app/layout.tsx`
+- `components/domain/{TaskCard,WhoIsUp,DeptStatusDots}.tsx`, `components/ui/segmented-control.tsx`, `components/kit/KitScreen.tsx`
+- `tests/render/setup.ts`, `tests/render/harness.tsx`, `tests/render/harness.test.tsx` (new), `tests/render/{hydration,shell,blocks-seed,kit}.test.tsx`
+- `tests/seed.test.ts`, `tests/demo-paths.test.ts`, `tests/engines.test.ts`
+- `lib/state/{availableActions,clock,persist,waitingOn}.test.ts`, `lib/state/transitions/{applicant,city,clerk}.test.ts`, `lib/view/shell.test.ts`
+- `components/domain/{TaskCard,WhoIsUp}.test.tsx`, `components/domain/DeptStatusDots.test.tsx` (new), `components/ui/segmented-control.test.tsx` (new)
+- `docs/readme.md`, `docs/log.md`, `docs/plans/2026-10-12-phase-2-review-fixes.md` (new), `docs/plans/2026-10-12-permitopolis-prototype.md`
+
+---
+
 ## 2026-10-12 - Phase 2 merge: the seed, the shell and the shared components wired together
 
 **What Changed:**

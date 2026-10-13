@@ -25,8 +25,13 @@ const CITY_UNLOCK_HINT: Record<string, string> = {
   consolidate: "Unlocks when every review is in",
 };
 
+/**
+ * What a party covers on this case. A reviewing department reads as the sections routed to it.
+ * The Clerk owns every case from intake to closeout, so its row says that even when a section
+ * of its own (the alcohol license) is routed to it as well.
+ */
 function scopeFor(c: EventCase, party: Party): string {
-  if (party === "applicant") return DEFAULT_SCOPE.applicant;
+  if (party === "applicant" || party === "clerk") return DEFAULT_SCOPE[party];
   const review = c.reviews.find((r) => r.dept === party);
   if (review && review.sections.length > 0) return review.sections.join(", ");
   return DEFAULT_SCOPE[party];
@@ -42,14 +47,26 @@ export const involvement: StateApi["involvement"] = (c: EventCase, party: Party)
   return notRoutedYet && c.tasks.some((t) => t.reviewer === party) ? "awaiting_routing" : "none";
 };
 
-function daysActionable(tasks: Task[], today: ISODate): number {
+const isOpenStatus = (status: Task["status"]) => status === "todo" || status === "changes_requested";
+
+/**
+ * The day an open task last became this party's to act on: the start of the stretch it has been
+ * open for now. A card that was sent back, or a series' "Carry your permit" that opens again for
+ * each session, counts from that last opening, not from its first. A plan card nobody has
+ * touched has no history: it has been the applicant's since the application went in (or, for a
+ * Draft, since it was started).
+ */
+function openSince(c: EventCase, task: Task): ISODate {
+  let since: string | null = null;
+  for (let i = task.history.length - 1; i >= 0 && isOpenStatus(task.history[i].status); i--) since = task.history[i].at;
+  return (since ?? task.history.at(-1)?.at ?? c.submittedAt ?? c.createdAt).slice(0, 10);
+}
+
+/** Days the case has sat with a party: counted from its longest-open task. */
+function daysActionable(c: EventCase, tasks: Task[], today: ISODate): number {
   let max = 0;
-  for (const t of tasks) {
-    const firstOpen = t.history.find((h) => h.status === "todo" || h.status === "changes_requested");
-    if (!firstOpen) continue;
-    max = Math.max(max, daysBetween(firstOpen.at.slice(0, 10), today));
-  }
-  return Math.max(0, max);
+  for (const t of tasks) max = Math.max(max, daysBetween(openSince(c, t), today));
+  return max;
 }
 
 /** The stages of a case in the order they happen, as the events that unlock tasks. */
@@ -102,16 +119,16 @@ const UNLOCK_NOTE: Partial<Record<UnlockEvent, string>> = {
   closed: "Unlocks when the event is closed out",
 };
 
-/** What a waiting party's row says: what its locked task waits for. */
-function lockedNote(c: EventCase, party: Party, tasks: Task[]): string | undefined {
-  if (tasks.some((t) => t.payload.awaitingAnswer === true)) return "Waiting on the applicant's response";
-  if (tasks.some((t) => t.payload.awaitingSignoffs === true)) return `Waiting on ${plural(signoffsLeft(c), "neighbor sign-off")}`;
-  for (const t of tasks) {
-    const hint = CITY_UNLOCK_HINT[t.catalogId];
-    if (hint) return hint;
-  }
+/** What a waiting party's row says: the locked task it gets next, and what that task waits for. */
+function lockedStanding(c: EventCase, party: Party, locked: Task[]): { task?: Task; note?: string } {
+  const answering = locked.find((t) => t.payload.awaitingAnswer === true);
+  if (answering) return { task: answering, note: "Waiting on the applicant's response" };
+  const signoffs = locked.find((t) => t.payload.awaitingSignoffs === true);
+  if (signoffs) return { task: signoffs, note: `Waiting on ${plural(signoffsLeft(c), "neighbor sign-off")}` };
+  const hinted = locked.find((t) => CITY_UNLOCK_HINT[t.catalogId]);
+  if (hinted) return { task: hinted, note: CITY_UNLOCK_HINT[hinted.catalogId] };
   const next = nextToUnlock(c, party);
-  return next?.unlocksOn ? UNLOCK_NOTE[next.unlocksOn] : undefined;
+  return { task: next, note: next?.unlocksOn ? UNLOCK_NOTE[next.unlocksOn] : undefined };
 }
 
 function decisionNote(c: EventCase, party: Party): string | undefined {
@@ -160,22 +177,27 @@ export const waitingOn: StateApi["waitingOn"] = (c: EventCase, today: ISODate): 
 
     // `open` is sorted, so its first dated task is the oldest due.
     const oldestDue = open.map(taskDueDate).find((d): d is ISODate => d !== null) ?? null;
-    const daysHolding = status === "up_now" ? daysActionable(open, today) : 0;
+    // An applicant who is up with no card open is still in the wizard: since the Draft was started.
+    const daysHolding = status !== "up_now" ? 0 : open.length > 0 ? daysActionable(c, open, today) : Math.max(0, daysBetween(c.createdAt.slice(0, 10), today));
 
     let note: string;
+    let nextTask: Task | undefined;
     if (status === "up_now") {
       note = open[0]?.title ? `Up: ${open[0].title}` : "Working on the plan";
     } else if (standing === "awaiting_routing") {
       note = AWAITING_ROUTING_NOTE;
     } else if (status === "waiting") {
-      note = lockedNote(c, party, locked) ?? "Waiting on an earlier step";
+      const waitingFor = lockedStanding(c, party, locked);
+      note = waitingFor.note ?? "Waiting on an earlier step";
+      nextTask = waitingFor.task;
     } else if (status === "done_for_now") {
       note = decisionNote(c, party) ?? "Nothing due right now";
     } else {
       note = "Not involved in this case";
     }
 
-    return { party, status, openTasks: open, oldestDue, daysHolding, note, scope: scopeFor(c, party) };
+    const row: PartyStatus = { party, status, openTasks: open, oldestDue, daysHolding, note, scope: scopeFor(c, party) };
+    return nextTask ? { ...row, nextTask } : row;
   });
 };
 

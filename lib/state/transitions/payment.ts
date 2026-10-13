@@ -3,38 +3,12 @@ import { fmtMoney } from "@/lib/format";
 import type { RulesCtx } from "@/lib/rules/types";
 import type { Actor, EventCase } from "@/lib/types";
 import type { Action } from "../actions";
-import { fail, OK, type CheckResult } from "../checks";
+import { checkPay } from "../checks";
 import { appendActivity, findTask, moveTask, nowOf, patchTask, quoteBalance, taskId, totalPaid } from "../core";
 import type { TransitionResult } from "../types";
 import { maybeUnlockIssuePermit } from "./shared";
 
 type PayAction = Extract<Action, { type: "pay" }>;
-
-/**
- * `pay` records three kinds of payment: toward a quote, for one session of a series, and for a
- * final bill. A booking payment and a refund are written by the actions that cause them
- * (book_and_pay; cancel, withdraw and reconcile_close), never through here.
- */
-function checkPay(c: EventCase, action: PayAction): CheckResult {
-  if (c.ending) return fail(`This case is ${c.ending.replace("_", " ")}.`);
-  if (!(action.amount > 0)) return fail("Enter an amount above $0.");
-  switch (action.kind) {
-    case "quote":
-      return c.state === "quote_sent" ? OK : fail("No quote to pay.");
-    case "session": {
-      if (!c.schedule?.recurrence) return fail("Only a series is paid by session.");
-      const occurrence = c.schedule.occurrences.find((o) => o.date === action.occurrenceDate);
-      if (!occurrence) return fail("No such session.");
-      if (occurrence.billing === "skipped") return fail("That session is skipped.");
-      if (occurrence.billing === "paid") return fail("That session is already paid.");
-      return OK;
-    }
-    case "final_invoice":
-      return c.state === "closeout" || c.state === "closed" ? OK : fail("There is no final bill yet.");
-    default:
-      return fail("That payment is recorded by the action that causes it.");
-  }
-}
 
 export function pay(c: EventCase, action: PayAction, actor: Actor, ctx: RulesCtx): TransitionResult {
   const check = checkPay(c, action);

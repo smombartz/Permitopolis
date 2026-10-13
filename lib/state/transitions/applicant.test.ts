@@ -3,6 +3,7 @@ import type { Classification, FeeEstimate } from "@/lib/rules/types";
 import type { EventCase } from "@/lib/types";
 import { makeCase, makeCtx, makeTask } from "../testSupport";
 import { transition } from "../transition";
+import { waitingOn } from "../waitingOn";
 
 vi.mock("@/lib/rules", async () => {
   const actual = await vi.importActual<typeof import("@/lib/rules")>("@/lib/rules");
@@ -273,7 +274,7 @@ describe("complete_task", () => {
   });
 
   it("a card with no check goes straight to done", () => {
-    const task = makeTask({ id: "PMT-27-0001:carry_permit", catalogId: "carry_permit", kind: "action" });
+    const task = makeTask({ id: "PMT-27-0001:vendor_food_permits", catalogId: "vendor_food_permits", kind: "action" });
     const c = makeCase({ state: "permitted", tasks: [task] });
     const result = transition(c, { type: "complete_task", taskId: task.id }, "applicant", makeCtx());
     expect(result.ok).toBe(true);
@@ -361,6 +362,81 @@ describe("complete_task", () => {
     expect(result).toEqual({ ok: false, reason: expect.any(String) });
     if (result.ok) return;
     expect(result.reason.length).toBeGreaterThan(0);
+  });
+});
+
+describe("complete_task refuses a card that is finished some other way, and says how", () => {
+  // Marking one of these done by hand would skip the payment, the signature, the sign-offs or
+  // the submission itself, and leave a case that reads further along than it is.
+  const refused = (state: EventCase["state"], card: Parameters<typeof makeTask>[0], overrides: Partial<EventCase> = {}) => {
+    const c = makeCase({ state, tier: "reviewed", tasks: [makeTask(card)], ...overrides });
+    return { c, result: transition(c, { type: "complete_task", taskId: card.id }, "applicant", makeCtx()) };
+  };
+
+  it("Pay fees and deposit: paid with `pay`, never ticked off with $0 paid", () => {
+    const { result } = refused("quote_sent", { id: "PMT-27-0001:pay_fees", catalogId: "pay_fees", kind: "payment", payload: { amount: 6530 } });
+    expect(result).toEqual({ ok: false, reason: "Pay the fees and deposit to finish this card." });
+  });
+
+  it("Pay and book, on an Instant draft: booked with `book_and_pay`", () => {
+    const { result } = refused("draft", { id: "PMT-27-0001:pay_fees", catalogId: "pay_fees", kind: "payment", title: "Pay and book" }, { tier: "instant" });
+    expect(result).toEqual({ ok: false, reason: "Pay and book to finish this card." });
+  });
+
+  it("Final bill or refund: paid with `pay`, never done with the bill still due", () => {
+    const { result } = refused("closed", { id: "PMT-27-0001:final_bill_or_refund", catalogId: "final_bill_or_refund", kind: "payment", payload: { amount: 50 } });
+    expect(result).toEqual({ ok: false, reason: "Pay the final bill to finish this card." });
+  });
+
+  it("Accept conditions and sign: signed with `accept_and_sign`, never done unsigned", () => {
+    const { result } = refused("quote_sent", { id: "PMT-27-0001:accept_and_sign", catalogId: "accept_and_sign", kind: "sign_off" });
+    expect(result).toEqual({ ok: false, reason: "Accept the conditions and sign to finish this card." });
+  });
+
+  it("Neighbor sign-off: finished by the last sign-off, never at 9 of 12", () => {
+    const { result } = refused("submitted", { id: "PMT-27-0001:neighbor_signoff", catalogId: "neighbor_signoff", kind: "sign_off", payload: { progress: { done: 9, total: 12 } } });
+    expect(result).toEqual({ ok: false, reason: "Collect the neighbor sign-offs to finish this card." });
+  });
+
+  it("Submit application: finished by `submit`", () => {
+    const { result } = refused("draft", { id: "PMT-27-0001:submit_application", catalogId: "submit_application", kind: "action" });
+    expect(result).toEqual({ ok: false, reason: "Submit the application to finish this card." });
+  });
+
+  it("Tell us how it went: finished by `submit_feedback`", () => {
+    const { result } = refused("closed", { id: "PMT-27-0001:feedback", catalogId: "feedback", kind: "form" });
+    expect(result).toEqual({ ok: false, reason: "Send your feedback to finish this card." });
+  });
+
+  it("Book again next year: finished by `book_again`", () => {
+    const { result } = refused("closed", { id: "PMT-27-0001:book_again", catalogId: "book_again", kind: "action" });
+    expect(result).toEqual({ ok: false, reason: "Book again to finish this card." });
+  });
+
+  it("Carry your permit: finished by the clock once the day has passed", () => {
+    const { result } = refused("event_day", { id: "PMT-27-0001:carry_permit", catalogId: "carry_permit", kind: "action" });
+    expect(result).toEqual({ ok: false, reason: "This card is finished for you once the event day has passed." });
+  });
+
+  it.each(["pre_application_meeting", "coordination_meeting", "site_walkthrough"])("%s: a meeting is closed by the city once it has been held", (catalogId) => {
+    const { result } = refused("permitted", { id: `PMT-27-0001:${catalogId}`, catalogId, kind: "meeting", reviewer: "clerk" });
+    expect(result).toEqual({ ok: false, reason: "The city closes this card once the meeting has been held." });
+  });
+
+  it("a card with a reviewer's request open on it is answered with `respond_to_request`", () => {
+    const request = { from: "hl" as const, message: "Please upload the permit", at: "2027-04-30T09:05", dueDate: "2027-05-05", resolved: false };
+    const { result } = refused("needs_info", { id: "PMT-27-0001:vendor_health_permit:1", catalogId: "vendor_health_permit", reviewer: "hl", request });
+    expect(result).toEqual({ ok: false, reason: "Respond to the request to finish this card." });
+  });
+
+  it("a city task is not the applicant's to complete", () => {
+    const { result } = refused("in_review", { id: "PMT-27-0001:review:pws", catalogId: "review:pws", owner: "pws", kind: "review" });
+    expect(result).toEqual({ ok: false, reason: "That task belongs to Public Works & Safety." });
+  });
+
+  it("a locked card still says what unlocks it, and a finished one that it is done", () => {
+    expect(refused("in_review", { id: "PMT-27-0001:pay_fees", catalogId: "pay_fees", kind: "payment", status: "locked" }).result).toEqual({ ok: false, reason: "Unlocks when your quote is ready" });
+    expect(refused("permitted", { id: "PMT-27-0001:accept_and_sign", catalogId: "accept_and_sign", kind: "sign_off", status: "done" }).result).toEqual({ ok: false, reason: "This card is already done." });
   });
 });
 
@@ -607,6 +683,10 @@ describe("submit_feedback and book_again", () => {
     if (!result.ok) return;
     expect(result.case.closeout.feedback).toEqual({ rating: 5, comment: "Great." });
     expect(result.case.tasks[0].status).toBe("done");
+
+    // Feedback is given once: a second form does not overwrite the first.
+    const again = transition(result.case, { type: "submit_feedback", rating: 1, comment: "Changed my mind." }, "applicant", makeCtx());
+    expect(again).toEqual({ ok: false, reason: "Feedback is already in. Thank you." });
   });
 
   it("book_again spawns a Draft dated 364 days later, same weekday", () => {
@@ -626,6 +706,23 @@ describe("submit_feedback and book_again", () => {
     expect(spawned.state).toBe("draft");
     expect(spawned.clonedFrom).toBe("PMT-27-0001");
     expect(spawned.schedule?.date).toBe("2028-04-22");
+  });
+});
+
+describe("amend: the cards it adds", () => {
+  it("are dated from the amendment, so they have been the applicant's since then and not since the booking", () => {
+    const reviewedCls: Classification = { ...instantCls, tier: "reviewed", leadTimeDays: 30, summary: "This is a Reviewed event" };
+    vi.mocked(classify).mockReturnValue(reviewedCls);
+    vi.mocked(requirements).mockReturnValue([makeTask({ id: "PMT-27-0001:sound_details", catalogId: "sound_details", kind: "form", history: [] })]);
+    const schedule = { date: "2027-07-22", start: "11:00", end: "16:00", occurrences: [{ date: "2027-07-22", availability: { status: "open" as const }, billing: "paid" as const }] };
+    const location = { mode: "inventory" as const, inventoryIds: ["shelter-3"], segmentIds: [], label: "Shelter 3" };
+    const c = makeCase({ state: "permitted", createdAt: "2027-04-26T09:00", permit: { issuedOn: "2027-04-26", signature: null }, schedule, location });
+    const answers = { eventType: c.eventType, name: c.name, location, schedule, attendance: c.attendance, addOns: { ...c.addOns, amplifiedSound: true } };
+    const result = transition(c, { type: "amend", answers }, "applicant", makeCtx());
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.case.tasks).toMatchObject([{ catalogId: "sound_details", tags: ["amendment"], history: [{ at: "2027-05-03T09:00", actor: "applicant", status: "todo" }] }]);
+    expect(waitingOn(result.case, "2027-05-03").find((p) => p.party === "applicant")).toMatchObject({ status: "up_now", daysHolding: 0 });
   });
 });
 

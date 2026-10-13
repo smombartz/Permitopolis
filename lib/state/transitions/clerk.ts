@@ -1,15 +1,15 @@
 /** Transitions only the City Clerk raises. */
-import { addDaysISO } from "@/lib/dates";
+import { addDaysISO, daysBetween } from "@/lib/dates";
 import { fmtMoney } from "@/lib/format";
 import { dueDate } from "@/lib/rules";
-import { CARD_BY_ID } from "@/lib/rules/catalog";
+import { CARD_BY_ID, CITY_TASKS } from "@/lib/rules/catalog";
 import { round2 } from "@/lib/rules/shared";
 import type { RulesCtx } from "@/lib/rules/types";
 import type { Actor, Condition, EventCase, FeeLine, Review } from "@/lib/types";
 import type { Action } from "../actions";
 import { checkAcceptComplete, checkConfirmRouting, checkDeny, checkIssuePermit, checkReconcileClose, checkSendQuote } from "../checks";
 import { lastSessionDate } from "../clock";
-import { addTask, addTasks, appendActivity, applyUnlockEvent, dueAtQuote, findTask, lineAmount, moveTask, newTask, nowOf, patchTask, taskId } from "../core";
+import { addTask, addTasks, appendActivity, applyUnlockEvent, dueAtQuote, findTask, lineAmount, moveTask, newTask, nowOf, patchTask, releaseHold, taskId } from "../core";
 import type { TransitionResult } from "../types";
 
 type Extract_<T extends Action["type"]> = Extract<Action, { type: T }>;
@@ -61,7 +61,9 @@ export function confirmRouting(c: EventCase, action: Extract_<"confirm_routing">
     status: "pending",
     dueDate: r.dueDate,
     decidedOn: null,
-    clock: { startedOn: ctx.today, pausedSince: null, pausedDays: 0, allowedDays: ctx.cfg.sla.reviewDays[c.tier] },
+    // The allowance is what the Clerk gave this department: the days from routing to its due
+    // date. The config's review days only prefill that date in the routing panel.
+    clock: { startedOn: ctx.today, pausedSince: null, pausedDays: 0, allowedDays: Math.max(0, daysBetween(ctx.today, r.dueDate)) },
     internalNote: "",
     messageToApplicant: "",
   }));
@@ -72,8 +74,15 @@ export function confirmRouting(c: EventCase, action: Extract_<"confirm_routing">
       "system",
     ),
   );
+  // The Clerk's next step exists from the start, locked: while the reviews are out the Clerk
+  // reads "Waiting", with what it waits for, not "Done for now". The last approval opens it.
+  const consolidate = newTask(
+    { id: taskId(c.id, "consolidate"), catalogId: "consolidate", owner: "clerk", kind: "action", title: CITY_TASKS.consolidate.title, status: "locked", phase: "permit" },
+    ctx,
+    "system",
+  );
   let next: EventCase = { ...c, reviews: [...c.reviews, ...reviews], state: "in_review" };
-  next = addTasks(next, reviewTasks);
+  next = addTasks(next, findTask(c, consolidate.id) ? reviewTasks : [...reviewTasks, consolidate]);
   next = moveTask(next, taskId(next.id, "confirm_routing"), "done", ctx, actor);
   next = applyUnlockEvent(next, "routed", ctx);
   next = appendActivity(next, actor, "Confirmed routing; the case moved to In review.", ctx);
@@ -84,7 +93,7 @@ export function deny(c: EventCase, action: Extract_<"deny">, actor: Actor, ctx: 
   const check = checkDeny(c);
   if (!check.ok) return check;
   const next = appendActivity(
-    { ...c, ending: "denied", endingReason: action.reason, dateHold: c.dateHold.status === "held" ? { ...c.dateHold, status: "released" } : c.dateHold },
+    { ...c, ending: "denied", endingReason: action.reason, dateHold: releaseHold(c.dateHold) },
     actor,
     `Denied: ${action.reason}`,
     ctx,
@@ -226,7 +235,8 @@ export function reconcileClose(c: EventCase, _action: Extract_<"reconcile_close"
   const reconcileId = taskId(next.id, "reconcile");
   if (findTask(next, reconcileId)) next = moveTask(next, reconcileId, "done", ctx, actor, { unlocksOn: null });
 
-  next = { ...next, state: "closed" };
+  // The event is over and settled: the date is no longer held for it.
+  next = { ...next, state: "closed", dateHold: releaseHold(next.dateHold) };
   next = applyUnlockEvent(next, "invoice_issued", ctx);
   next = applyUnlockEvent(next, "closed", ctx);
   next = appendActivity(next, actor, refund !== null ? `Closed. Refunded ${fmtMoney(refund)} from the deposit.` : `Closed. Final bill: ${fmtMoney(owed ?? 0)}.`, ctx);

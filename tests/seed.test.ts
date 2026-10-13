@@ -10,12 +10,14 @@ import { describe, expect, it } from "vitest";
 import { DEMO_DATE_JUMPS, DEMO_PATHS, SCENARIO_JUMPS, type ScenarioKey } from "@/lib/data/demoScript";
 import { MAIN_1ST_TO_4TH } from "@/lib/data/streets";
 import { PERSONAS, PERSONA_BY_ID, PICKABLE_PERSONA_IDS } from "@/lib/data/people";
-import { addDaysISO, dateOf, datesEvery, daysBetween, weekdayOf } from "@/lib/dates";
+import { BLACKOUTS } from "@/lib/data/calendar";
+import { addDaysISO, dateOf, datesEvery, daysBetween, isWeekend, weekdayOf } from "@/lib/dates";
 import { fmtDate } from "@/lib/format";
 import { routes } from "@/lib/routes";
 import { DEFAULT_CONFIG, DEFAULT_DEMO_TODAY, availability, cancellationRefund, classify, dateGate, estimateFees, routing, type RulesCtx } from "@/lib/rules";
 import {
   activePermits,
+  advanceClock,
   applicantCases,
   availableActions,
   boardColumns,
@@ -224,6 +226,213 @@ describe("the demo date", () => {
   });
 });
 
+describe("the histories read as a city's would", () => {
+  it("no activity entry shows an internal name: nothing with an underscore in it", () => {
+    const leaked = seed.flatMap((c) => c.activity.filter((a) => a.text.includes("_")).map((a) => `${c.id} ${a.text}`));
+    expect(leaked).toEqual([]);
+    expect(seeded("S3").activity.map((a) => a.text)).toContain("Decided: approved with conditions.");
+    expect(seeded("S5").activity.map((a) => a.text)).toContain("Decided: approved with conditions.");
+  });
+
+  it("city staff act on working days: no Clerk or department entry on a Saturday, a Sunday or a blackout date", () => {
+    const closed = new Set(BLACKOUTS.map((b) => b.date));
+    const offDays = seed.flatMap((c) =>
+      c.activity.filter((a) => (a.actor === "clerk" || a.actor === "pws" || a.actor === "hl") && (isWeekend(dateOf(a.at)) || closed.has(dateOf(a.at)))).map((a) => `${c.name}: ${a.actor} on ${fmtDate(dateOf(a.at))}`),
+    );
+    // The one exception. An Instant event closes itself the morning after, so damage can only be
+    // reported on the day: the picnic was on a Saturday (the PRD's date), and the crew on site logged it.
+    expect(offDays).toEqual(["Brightline Logistics company picnic: pws on Sat, Apr 17, 2027"]);
+  });
+
+  it("the due dates the Clerk set are working days too", () => {
+    for (const c of seed) {
+      for (const review of c.reviews) expect(isWeekend(review.dueDate!), `${c.id} ${review.dept} ${review.dueDate}`).toBe(false);
+      for (const t of c.tasks) if (t.request) expect(isWeekend(t.request.dueDate), `${c.id} ${t.catalogId}`).toBe(false);
+    }
+  });
+
+  it("no review that was decided on time reads as over its allowance", () => {
+    let decided = 0;
+    for (const c of seed) {
+      for (const review of c.reviews) {
+        if (!review.decidedOn) continue;
+        decided++;
+        const clock = reviewClock(c, review.dept, TODAY)!;
+        // The allowance is the days the Clerk gave: the day count reaches it on the due date.
+        expect(clock.of, `${c.id} ${review.dept}`).toBe(daysBetween(review.clock.startedOn!, review.dueDate!));
+        if (review.decidedOn <= review.dueDate!) expect(clock.day, `${c.id} ${review.dept}: ${clock.label}`).toBeLessThanOrEqual(clock.of);
+      }
+    }
+    expect(decided).toBeGreaterThan(20);
+    // The two that are late say so.
+    expect(reviewClock(seeded("B05"), "pws", TODAY)?.label).toBe("Day 54 of 19");
+    expect(reviewClock(seeded("B07"), "hl", TODAY)?.label).toBe("Day 42 of 18");
+  });
+
+  it("a closed case no longer holds its date", () => {
+    const closed = seed.filter((c) => c.state === "closed" && c.ending === null);
+    expect(closed.map((c) => c.id).sort()).toEqual(["B19", "B20", "B21"].map((key) => seeded(key).id).sort());
+    for (const c of closed) expect(c.dateHold.status, c.id).toBe("released");
+    // Everything that does hold a date is still on its way to its day, or in Closeout.
+    for (const c of seed) if (c.dateHold.status === "held") expect(c.ending === null && c.state !== "closed" && c.state !== "draft", c.id).toBe(true);
+  });
+
+  it("a party that is up has held the case since the application went in, when nobody has touched its card", () => {
+    // Vendor health permits nobody has uploaded yet: the applicant's since they submitted.
+    for (const key of ["B05", "B07", "F2"]) {
+      const c = seeded(key);
+      expect(row(c, "applicant"), key).toMatchObject({ status: "up_now", daysHolding: daysBetween(dateOf(c.submittedAt!), TODAY) });
+    }
+    // Nobody who is up reads "0 days" unless it became theirs today.
+    for (const c of seed) {
+      for (const p of waitingOn(c, TODAY)) {
+        if (p.status !== "up_now" || p.daysHolding > 0) continue;
+        const sinceToday = p.openTasks.every((t) => t.history.some((h) => dateOf(h.at) === TODAY)) && (p.openTasks.length > 0 || dateOf(c.createdAt) === TODAY);
+        expect(sinceToday, `${c.id} ${p.party}`).toBe(true);
+      }
+    }
+  });
+});
+
+describe("a seeded case never offers what the engine refuses", () => {
+  const roles: Party[] = ["applicant", "clerk", "pws", "hl"];
+
+  it("an ended case offers a note for the file and nothing else (B25: no dead Pay button)", () => {
+    const b25 = seeded("B25");
+    expect(availableActions(b25, "applicant", ctx)).toEqual([]);
+    expect(availableActions(b25, "clerk", ctx)).toEqual([{ type: "add_note", label: "Add a note", enabled: true }]);
+    expect(reasonFor(b25, { type: "pay", amount: 280, method: "card", kind: "quote" }, "applicant")).toBe("This case is hold expired.");
+    for (const key of ["B22", "B23", "B24", "B25"]) {
+      for (const role of roles) expect(availableActions(seeded(key), role, ctx).map((a) => a.type), `${key} ${role}`).toEqual(role === "applicant" ? [] : ["add_note"]);
+    }
+  });
+
+  it("an ended case's board has nothing to do, nothing with the city and nothing coming up", () => {
+    for (const key of ["B22", "B23", "B24", "B25"]) {
+      const c = seeded(key);
+      const columns = board(c);
+      expect([columns.do_now, columns.with_city, columns.coming_up], key).toEqual([[], [], []]);
+      expect(columns.done, key).toEqual(c.tasks.filter((t) => t.owner === "applicant" && t.status === "done").map((t) => t.id.slice(c.id.length + 1)));
+    }
+    // What B22 and B23 had with the city, and B25 had to sign and pay, is still on the record.
+    expect(card(seeded("B25"), "pay_fees").status).toBe("todo");
+    expect(card(seeded("B23"), "insurance_certificate").status).toBe("submitted");
+  });
+
+  it("the Demo menu's Jun 18 jump from a fresh seed: the 5K's unpaid quote expires, and it stops offering its payment", () => {
+    const onJun18 = advanceClock(seed, TODAY, "2027-06-18", DEFAULT_CONFIG);
+    const then: RulesCtx = { today: "2027-06-18", cases: onJun18, cfg: DEFAULT_CONFIG };
+    for (const key of ["S5", "F4", "B10"]) {
+      const c = onJun18.find((candidate) => candidate.id === seeded(key).id)!;
+      expect([key, c.ending, c.dateHold.status]).toEqual([key, "hold_expired", "expired"]);
+      expect(availableActions(c, "applicant", then), key).toEqual([]);
+      expect(availableActions(c, "clerk", then).map((a) => a.type), key).toEqual(["add_note"]);
+      expect(boardColumns(c).do_now, key).toEqual([]);
+      expect(boardColumns(c).with_city, key).toEqual([]);
+      expect(whoIsUp(c, "2027-06-18"), key).toEqual([]);
+      expect(caseTotals(c).due, key).toBe(0);
+    }
+  });
+
+  it("every enabled action of every role on every seeded case goes through; every disabled one is refused for the reason shown", () => {
+    const payload: Partial<Record<Action["type"], Action>> = {
+      create_board: { type: "create_board" },
+      book_and_pay: { type: "book_and_pay", method: "card" },
+      submit: { type: "submit" },
+      accept_and_sign: { type: "accept_and_sign", signature: "A. Applicant" },
+      withdraw: { type: "withdraw" },
+      cancel: { type: "cancel" },
+      submit_feedback: { type: "submit_feedback", rating: 4 },
+      book_again: { type: "book_again" },
+      accept_complete: { type: "accept_complete" },
+      send_to_commission: { type: "send_to_commission" },
+      send_quote: { type: "send_quote", conditions: [], feeLines: [] },
+      deny: { type: "deny", reason: "Not this year." },
+      issue_permit: { type: "issue_permit" },
+      reconcile_close: { type: "reconcile_close" },
+      request_info: { type: "request_info", message: "One more thing, please." },
+      review_decide: { type: "review_decide", decision: "approve", conditions: [], feeLines: [] },
+      log_closeout: { type: "log_closeout", cleanup: "pass", actuals: [], extraLines: [] },
+      add_note: { type: "add_note", text: "For the file." },
+      remind: { type: "remind", party: "applicant" },
+    };
+    let checked = 0;
+    for (const c of seed) {
+      for (const role of roles) {
+        for (const offered of availableActions(c, role, ctx)) {
+          let action = payload[offered.type];
+          if (offered.type === "pay") {
+            const occurrenceDate = c.schedule?.occurrences.find((o) => o.billing === "upcoming" || o.billing === "due")?.date;
+            const kind = c.state === "quote_sent" ? "quote" : c.state === "closed" ? "final_invoice" : "session";
+            action = { type: "pay", amount: 20, method: role === "clerk" ? "in_person" : "card", kind, occurrenceDate: kind === "session" ? occurrenceDate : undefined };
+          }
+          if (offered.type === "amend") action = { type: "amend", answers: c, lateFee: true };
+          if (offered.type === "confirm_routing") action = { type: "confirm_routing", reviewers: [{ dept: "hl", sections: ["Certificate of insurance"], dueDate: "2027-05-17" }] };
+          if (!action) throw new Error(`no payload for ${offered.type}`);
+          const reason = reasonFor(c, action, role);
+          expect([c.id, role, offered.type, reason], `${c.name}: ${offered.label}`).toEqual([c.id, role, offered.type, offered.enabled ? null : offered.reason]);
+          checked++;
+        }
+      }
+    }
+    expect(checked).toBeGreaterThan(150);
+  });
+
+  it("the payments the engine takes have a control: the final bill of a closed case, and a series' next session", () => {
+    // B20: closed, $50 over what its deposit covered.
+    const b20 = seeded("B20");
+    expect(caseTotals(b20).due).toBe(50);
+    expect(availableActions(b20, "applicant", ctx).map((a) => [a.type, a.label, a.enabled])).toEqual([
+      ["pay", "Pay the final bill", true],
+      ["submit_feedback", "Tell us how it went", true],
+      ["book_again", "Book again next year", true],
+    ]);
+    expect(availableActions(b20, "clerk", ctx).map((a) => [a.type, a.label])).toEqual([["pay", "Record an in-person payment"]]);
+    const paid = run(b20, { type: "pay", amount: 50, method: "card", kind: "final_invoice" }, "applicant");
+    expect(caseTotals(paid).due).toBe(0);
+    expect(availableActions(paid, "applicant", ctx).map((a) => a.type)).toEqual(["submit_feedback", "book_again"]);
+
+    // B13: a permitted series, its first session paid at booking.
+    const b13 = seeded("B13");
+    expect(availableActions(b13, "applicant", ctx).map((a) => [a.type, a.label, a.enabled])).toEqual([
+      ["pay", "Pay the next session", true],
+      ["cancel", "Cancel", true],
+      ["amend", "Amend", true],
+    ]);
+    const nextSession = b13.schedule!.occurrences.find((o) => o.billing === "upcoming")!.date;
+    expect(nextSession).toBe("2027-05-11");
+    expect(run(b13, { type: "pay", amount: 30, method: "card", kind: "session", occurrenceDate: nextSession }, "applicant").schedule!.occurrences.filter((o) => o.billing === "paid")).toHaveLength(2);
+    // A single event has no session to pay.
+    expect(availableActions(seeded("S1"), "applicant", ctx).map((a) => a.type)).toEqual(["cancel", "amend"]);
+  });
+
+  it("feedback is given once: B19's is in, and a second form is refused", () => {
+    const b19 = seeded("B19");
+    expect(b19.closeout.feedback).toEqual({ rating: 5, comment: "Smooth process, great route support." });
+    expect(availableActions(b19, "applicant", ctx).find((a) => a.type === "submit_feedback")).toMatchObject({ enabled: false, reason: "Feedback is already in. Thank you." });
+    expect(reasonFor(b19, { type: "submit_feedback", rating: 1 }, "applicant")).toBe("Feedback is already in. Thank you.");
+  });
+
+  it("a card with an action of its own cannot be ticked off: the hero cases keep their real state", () => {
+    const tick = (c: EventCase, suffix: string) => reasonFor(c, { type: "complete_task", taskId: `${c.id}:${suffix}` }, "applicant");
+    // S5: not Done with $0 paid, and not Done unsigned.
+    expect(tick(seeded("S5"), "pay_fees")).toBe("Pay the fees and deposit to finish this card.");
+    expect(tick(seeded("S5"), "accept_and_sign")).toBe("Accept the conditions and sign to finish this card.");
+    // S4: not Done at 9 of 12, which would leave nobody up.
+    expect(tick(seeded("S4"), "neighbor_signoff")).toBe("Collect the neighbor sign-offs to finish this card.");
+    // B20: not Done with $50 still due.
+    expect(tick(seeded("B20"), "final_bill_or_refund")).toBe("Pay the final bill to finish this card.");
+    // S3: the pinned request is answered, not completed around.
+    expect(tick(seeded("S3"), "vendor_health_permit:1")).toBe("Respond to the request to finish this card.");
+    expect(tick(seeded("B16"), "carry_permit")).toBe("This card is finished for you once the event day has passed.");
+    expect(tick(seeded("B14"), "coordination_meeting")).toBe("The city closes this card once the meeting has been held.");
+    expect(tick(seeded("B21"), "feedback")).toBe("Send your feedback to finish this card.");
+    expect(tick(seeded("B19"), "book_again")).toBe("Book again to finish this card.");
+    // A card that is the applicant's to upload still goes through.
+    expect(tick(seeded("B07"), "vendor_health_permit:1")).toBeNull();
+  });
+});
+
 describe("PRD seed table: the six scenarios", () => {
   describe("S1 · Maya Chen's 40th birthday picnic", () => {
     const s1 = seeded("S1");
@@ -375,7 +584,16 @@ describe("PRD seed table: the six scenarios", () => {
       expect(reviewClock(s3, "hl", TODAY)).toEqual({ day: 11, of: 14, pausedDays: 3, paused: true, label: "Day 11 of 14 · paused 3 days" });
       expect(row(s3, "hl")).toMatchObject({ status: "waiting", note: "Waiting on the applicant's response", openTasks: [] });
       expect(queued("hl", s3)).toEqual([]);
-      expect(standing(s3).clerk).toBe("done_for_now");
+    });
+
+    it("the City Clerk is waiting on reviews: its consolidate step is locked until every review is in", () => {
+      expect(card(s3, "consolidate")).toMatchObject({ owner: "clerk", status: "locked", title: "Consolidate reviews and send the quote" });
+      expect(row(s3, "clerk")).toMatchObject({ status: "waiting", note: "Unlocks when every review is in", nextTask: { catalogId: "consolidate" }, openTasks: [] });
+      expect(queued("clerk", s3)).toEqual([]);
+    });
+
+    it("the applicant has held the request for 3 days, since Health & Legal asked", () => {
+      expect(row(s3, "applicant")).toMatchObject({ status: "up_now", daysHolding: 3 });
     });
   });
 
@@ -395,6 +613,11 @@ describe("PRD seed table: the six scenarios", () => {
       expect(whoIsUp(s4, TODAY)).toEqual(["applicant"]);
       expect(card(s4, "neighbor_signoff").payload.progress).toEqual({ done: 9, total: 12 });
       expect(row(s4, "applicant").note).toBe("Up: Neighbor sign-off");
+    });
+
+    it("the case has sat with the applicant for 20 days: since it was submitted on Tue, Apr 13", () => {
+      expect(dateOf(s4.submittedAt!)).toBe("2027-04-13");
+      expect(row(s4, "applicant")).toMatchObject({ status: "up_now", daysHolding: 20 });
     });
 
     it("board: Do now is the neighbor sign-off, 9 of 12; insurance and the city services request are with the city; accept and sign and pay $510 are coming up", () => {
@@ -515,12 +738,34 @@ describe("PRD seed table: the six scenarios", () => {
       expect(fmtDate("2027-07-02")).toBe("Fri, Jul 2, 2027");
     });
 
+    it("each meeting is due on the day it is set for, so it does not read overdue before it is held", () => {
+      // The plan's own date for the coordination meeting was Fri, Jun 18, three days earlier.
+      expect(taskDueDate(card(s5, "coordination_meeting"))).toBe("2027-06-21");
+      expect(taskDueDate(card(s5, "site_walkthrough"))).toBe("2027-07-02");
+      // Path 5, then the Demo menu's Jun 18 jump: the meeting is in Do now and still three days off.
+      let permitted = run(s5, { type: "verify_document", taskId: `${s5.id}:insurance_certificate` }, "hl");
+      permitted = run(permitted, { type: "accept_and_sign", signature: "Simone Dubois" }, "applicant");
+      permitted = run(permitted, { type: "pay", amount: 6530, method: "card", kind: "quote" }, "applicant");
+      permitted = run(permitted, { type: "issue_permit" }, "clerk");
+      const [onJun19] = advanceClock([permitted], TODAY, "2027-06-19", DEFAULT_CONFIG);
+      const meeting = boardColumns(onJun19).do_now.find((t) => t.catalogId === "coordination_meeting")!;
+      expect(taskDueDate(meeting)! > "2027-06-19").toBe(true);
+      expect(waitingOn(onJun19, "2027-06-19").find((p) => p.party === "applicant")?.oldestDue).toBe("2027-06-21");
+    });
+
     it("Clerk: Issue permit is disabled until paid and verified, and says so", () => {
       expect(card(s5, "issue_permit")).toMatchObject({ owner: "clerk", status: "locked" });
       expect(queued("clerk", s5)).toEqual([]);
       const issue = availableActions(s5, "clerk", ctx).find((a) => a.type === "issue_permit");
       expect(issue).toMatchObject({ enabled: false, reason: "Needs: signature (applicant), payment (applicant), insurance (Health & Legal)" });
-      expect(row(s5, "clerk").note).toBe("Unlocks when paid and verified");
+      expect(row(s5, "clerk")).toMatchObject({ note: "Unlocks when paid and verified", nextTask: { catalogId: "issue_permit", title: "Issue permit" } });
+    });
+
+    it("both reviews were decided inside the five weeks the Clerk gave them: Day 30 of 35", () => {
+      for (const dept of ["pws", "hl"] as const) {
+        expect(s5.reviews.find((r) => r.dept === dept)).toMatchObject({ dueDate: "2027-04-14", decidedOn: "2027-04-09", clock: { startedOn: "2027-03-10", allowedDays: 35 } });
+        expect(reviewClock(s5, dept, TODAY)).toMatchObject({ day: 30, of: 35, paused: false, label: "Day 30 of 35" });
+      }
     });
 
     it("Public Works & Safety approved with four conditions; Health & Legal approved accessibility", () => {
@@ -591,6 +836,17 @@ describe("PRD seed table: the six scenarios", () => {
       expect(s6.payments).toMatchObject([{ kind: "quote", amount: 9645, at: "2027-03-13T09:05" }]);
     });
 
+    it("all three reviews were decided inside the six weeks the Clerk gave them: Day 35 of 42", () => {
+      for (const dept of ["pws", "hl", "clerk"] as const) expect(reviewClock(s6, dept, TODAY)?.label).toBe("Day 35 of 42");
+    });
+
+    it("the Clerk's row says it owns the case, though the alcohol license was routed to it as well", () => {
+      expect(s6.reviews.find((r) => r.dept === "clerk")?.sections).toEqual(["Alcohol details and liquor liability insurance"]);
+      expect(row(s6, "clerk").scope).toBe("Intake, routing, quote, permit and closeout");
+      expect(row(seeded("B06"), "clerk").scope).toBe("Intake, routing, quote, permit and closeout");
+      expect(row(s6, "pws").scope).toContain("Traffic control plan");
+    });
+
     it("every work order was done before the day, and all three departments approved", () => {
       const workOrders = s6.tasks.filter((t) => t.catalogId.startsWith("work_order:"));
       expect(workOrders.map((t) => t.status)).toEqual(["done", "done", "done", "done", "done"]);
@@ -604,38 +860,65 @@ describe("PRD seed table: the six scenarios", () => {
 });
 
 describe("each city role opens to work", () => {
-  const titles = (role: Dept) => queueFor(seed, role, TODAY).map((item) => `${item.case.name}: ${item.task.title}`);
+  const keyOf = (c: EventCase) => SEED_SCRIPTS.find((script) => script.id === c.id)!.key;
+  /** A role's My queue as it opens: one row per task, in the order shown. */
+  const opening = (role: Dept) => queueFor(seed, role, TODAY).map((item) => [keyOf(item.case), item.task.catalogId, item.task.dueDate, item.group]);
 
-  it("City Clerk: the Downtown Art Walk intake, the Plaza wedding photos and the Company picnic exception", () => {
-    expect(queuedTasks("clerk", seeded("F1"))).toEqual(["intake_check"]);
-    expect(queuedTasks("clerk", seeded("F5"))).toEqual(["intake_check"]);
-    expect(queuedTasks("clerk", seeded("F7"))).toEqual(["instant_exception"]);
-    expect(titles("clerk")).toEqual(
-      expect.arrayContaining([
-        "Downtown Art Walk: Check the application is complete",
-        "Plaza wedding photos: Check the application is complete",
-        "Brightline Logistics company picnic: Resolve the exception",
-      ]),
-    );
+  it("City Clerk: one overdue intake check, then the Downtown Art Walk and the Plaza wedding photos, then what has no date", () => {
+    expect(opening("clerk")).toEqual([
+      // The planned overdue row: Maple Grove Preschool, six days old against three.
+      ["B03", "intake_check", "2027-04-30", "overdue"],
+      ["B04", "intake_check", "2027-05-03", "this_week"],
+      ["F1", "intake_check", "2027-05-03", "this_week"],
+      ["F5", "intake_check", "2027-05-04", "this_week"],
+      ["B06", "consolidate", null, "later"],
+      ["F7", "instant_exception", null, "later"],
+      ["B17", "reconcile", null, "later"],
+      ["B18", "reconcile", null, "later"],
+    ]);
+    expect(queued("clerk", seeded("F7")).map((item) => `${item.case.name}: ${item.task.title}`)).toEqual(["Brightline Logistics company picnic: Resolve the exception"]);
   });
 
   it("the six scenarios alone give the Clerk nothing: S4 waits on neighbors and S6 on Public Works & Safety", () => {
     for (const key of ["S1", "S2", "S3", "S4", "S5", "S6"]) expect(queued("clerk", seeded(key)), key).toEqual([]);
   });
 
-  it("Public Works & Safety: the S6 closeout tasks and the Farmers Market review", () => {
-    expect(queuedTasks("pws", seeded("S6"))).toEqual(["cleanup_inspection", "log_actual_hours"]);
-    expect(queuedTasks("pws", seeded("F2"))).toEqual(["review:pws"]);
+  it("Public Works & Safety: one overdue review, then the S6 closeout tasks, then the Farmers Market review", () => {
+    expect(opening("pws")).toEqual([
+      ["B05", "review:pws", "2027-03-29", "overdue"],
+      ["S6", "cleanup_inspection", "2027-05-07", "this_week"],
+      ["S6", "log_actual_hours", "2027-05-07", "this_week"],
+      ["F2", "review:pws", "2027-05-10", "this_week"],
+      ["B14", "work_order:barricades", "2027-08-12", "later"],
+      ["B14", "work_order:police", "2027-08-12", "later"],
+      ["B14", "work_order:closure", "2027-08-12", "later"],
+    ]);
     expect(seeded("F2").reviews.find((r) => r.dept === "pws")).toMatchObject({ status: "pending", sections: ["Structure specs and layout"] });
   });
 
-  it("Health & Legal: the S5 insurance verification, the Movie Night insurance and the Farmers Market", () => {
-    expect(queuedTasks("hl", seeded("S5"))).toEqual(["verify:insurance_certificate"]);
+  it("Health & Legal: one overdue review, then the S5 insurance verification, then the Farmers Market and the Movie Night insurance", () => {
+    expect(opening("hl")).toEqual([
+      ["B07", "review:hl", "2027-04-09", "overdue"],
+      ["S5", "verify:insurance_certificate", "2027-05-07", "this_week"],
+      ["B11", "verify:insurance_certificate", "2027-05-10", "this_week"],
+      ["F2", "review:hl", "2027-05-10", "this_week"],
+      ["F3", "review:hl", "2027-05-11", "later"],
+    ]);
     const movieNight = seeded("F3");
-    expect(queuedTasks("hl", movieNight)).toEqual(["review:hl"]);
     expect(movieNight.reviews.find((r) => r.dept === "hl")).toMatchObject({ status: "pending", sections: ["Certificate of insurance"] });
     expect(card(movieNight, "insurance_certificate").status).toBe("submitted");
-    expect(queuedTasks("hl", seeded("F2"))).toEqual(["review:hl"]);
+  });
+
+  it("the only overdue rows are the planned ones: no PRD filler opens late", () => {
+    const overdue = (["clerk", "pws", "hl"] as const).flatMap((role) => queueFor(seed, role, TODAY).filter((item) => item.group === "overdue").map((item) => [role, keyOf(item.case)]));
+    expect(overdue).toEqual([
+      ["clerk", "B03"],
+      ["pws", "B05"],
+      ["hl", "B07"],
+    ]);
+    for (const key of ["F1", "F2", "F3", "F5"]) {
+      for (const role of ["clerk", "pws", "hl"] as const) expect(queued(role, seeded(key)).every((item) => item.group !== "overdue"), `${key} ${role}`).toBe(true);
+    }
   });
 
   it("every queue is in due-date order, and every queued task belongs to its role on an open case", () => {
@@ -746,7 +1029,7 @@ describe("PRD filler cases", () => {
     // What was uploaded as the certificate is a photo of a contract: nobody has accepted it.
     expect(card(f5, "insurance_certificate")).toMatchObject({ status: "submitted", payload: { files: [{ name: "wedding-photographer-contract.jpg", type: "image/jpeg" }] } });
 
-    // S3 was complete first: its hold dates from Apr 19, ten days before this was submitted.
+    // S3 was complete first: its hold dates from Apr 19, twelve days before this was submitted.
     expect(s3.dateHold.placedOn! < dateOf(f5.submittedAt!)).toBe(true);
     expect(reasonFor(f5, { type: "accept_complete" }, "clerk")).toBe("Jazz in the Plaza has this date held");
     expect(availableActions(f5, "clerk", ctx).find((a) => a.type === "accept_complete")).toMatchObject({ enabled: false, reason: "Jazz in the Plaza has this date held" });
@@ -859,8 +1142,8 @@ describe("background cases (plan 6.2)", () => {
     expect(card(b11, "insurance_certificate").status).toBe("submitted");
     expect(whoIsUp(b11, TODAY)).toEqual(["hl"]);
     expect(reasonFor(b11, { type: "issue_permit" }, "clerk")).toBe("Needs: insurance (Health & Legal)");
-    // Paid in full, so the date can no longer be lost: nothing reads "held until Apr 24".
-    expect(b11.dateHold).toEqual({ status: "held", placedOn: "2027-03-27", expiresOn: null });
+    // Paid in full, so the date can no longer be lost: nothing reads "held until Apr 23".
+    expect(b11.dateHold).toEqual({ status: "held", placedOn: "2027-03-26", expiresOn: null });
   });
 
   it("Permitted: one within the next 7 days, one series, one Special with work orders", () => {
@@ -898,6 +1181,30 @@ describe("background cases (plan 6.2)", () => {
     expect(b16.schedule!.occurrences.filter((o) => o.billing === "skipped")).toHaveLength(1);
     expect(sessionDates(b16)).not.toContain("2027-05-31");
     expect(card(b16, "carry_permit").status).toBe("todo");
+  });
+
+  it("Event day: today is the tai chi series' tenth session; the nine before it are paid for and today's is due", () => {
+    const b16 = seeded("B16");
+    const held = b16.schedule!.occurrences.filter((o) => o.billing !== "skipped");
+    expect(held).toHaveLength(21);
+    expect(held.findIndex((o) => o.date === TODAY)).toBe(9);
+    expect(held.map((o) => o.billing)).toEqual([...Array(9).fill("paid"), "due", ...Array(11).fill("upcoming")]);
+    // $20 a session: nine paid of twenty-one.
+    expect(caseTotals(b16)).toEqual({ fees: 420, deposit: 0, total: 420, paid: 180, due: 240 });
+    expect(b16.payments.map((payment) => payment.kind)).toEqual(["booking", ...Array(8).fill("session")]);
+    expect(availableActions(b16, "applicant", ctx).find((a) => a.type === "pay")).toMatchObject({ label: "Pay the next session", enabled: true });
+    expect(reasonFor(b16, { type: "pay", amount: 20, method: "card", kind: "session", occurrenceDate: TODAY }, "applicant")).toBeNull();
+  });
+
+  it("Event day: \"Carry your permit\" is for today's session, opened today: not due since the first one in March", () => {
+    const b16 = seeded("B16");
+    expect(card(b16, "carry_permit")).toMatchObject({ status: "todo", dueDate: TODAY, unlocksOn: null });
+    expect(row(b16, "applicant")).toMatchObject({ status: "up_now", oldestDue: TODAY, daysHolding: 0 });
+    // Tomorrow the session is over: the card waits for next Monday's.
+    const [tomorrow] = advanceClock([b16], TODAY, addDaysISO(TODAY, 1), DEFAULT_CONFIG);
+    expect(tomorrow.state).toBe("permitted");
+    expect(card(tomorrow, "carry_permit")).toMatchObject({ status: "locked", unlocksOn: "event_day", dueDate: "2027-05-10" });
+    expect(board(tomorrow).coming_up).toContain("carry_permit");
   });
 
   it("Closeout: one with hours logged, waiting on the Clerk; one with a failed cleanup inspection", () => {
@@ -948,8 +1255,8 @@ describe("background cases (plan 6.2)", () => {
       expect(c.dateHold.status, key).not.toBe("held");
       expect(whoIsUp(c, TODAY), key).toEqual([]);
     }
-    expect(seeded("B25").dateHold).toMatchObject({ status: "expired", expiresOn: "2027-04-25" });
-    expect(activityOn(seeded("B25"), "The date hold expired. The space and date were released.")).toBe("2027-04-26");
+    expect(seeded("B25").dateHold).toMatchObject({ status: "expired", expiresOn: "2027-04-26" });
+    expect(activityOn(seeded("B25"), "The date hold expired. The space and date were released.")).toBe("2027-04-27");
   });
 
   describe("stress rows, each at least once", () => {
@@ -987,6 +1294,8 @@ describe("background cases (plan 6.2)", () => {
       expect(overdueFor("pws")).toContain(seeded("B05").id);
       expect(overdueFor("hl")).toContain(seeded("B07").id);
       expect(overdueFor("applicant")).toContain(seeded("B08").id);
+      // The Event-day series is up today, not overdue: its card is today's.
+      expect(overdueFor("applicant")).not.toContain(seeded("B16").id);
     });
 
     it("a $0 fee line", () => {
@@ -1155,9 +1464,22 @@ describe("the Demo menu against the seed (lib/data/demoScript.ts)", () => {
         expect(path.steps[0]).toMatchObject({ role: "applicant", persona: "new" });
       }
       for (const step of path.steps) {
-        if (step.persona) expect(PERSONA_BY_ID[step.persona], step.persona).toBeDefined();
-        if (step.persona && jump) expect(step.persona).toBe(jump.personaId);
+        // Every applicant step says who the applicant is; a city step has no persona.
+        expect(step.role === "applicant" ? typeof step.persona : step.persona, `path ${path.id}: ${step.text}`).toBe(step.role === "applicant" ? "string" : undefined);
+        if (!step.persona) continue;
+        expect(PERSONA_BY_ID[step.persona], step.persona).toBeDefined();
+        // The scenario's own organizer, or a new applicant starting a fresh event.
+        if (jump) expect([jump.personaId, "new"], `path ${path.id}: ${step.text}`).toContain(step.persona);
       }
     }
+  });
+
+  it("path 5 ends in the wizard as a new applicant, where the Impacted warning shows; paths 5 and 6 name their organizers", () => {
+    const steps = (id: number) => DEMO_PATHS.find((path) => path.id === id)!.steps;
+    expect(steps(5).at(-1)).toMatchObject({ role: "applicant", persona: "new", text: "Starting a new City Hall Plaza event on Jul 11 shows the Impacted warning." });
+    expect(steps(5).filter((step) => step.role === "applicant").map((step) => step.persona)).toEqual(["riverfront-running-club", "new"]);
+    expect(steps(6).filter((step) => step.role === "applicant").map((step) => step.persona)).toEqual(["main-street-business-alliance"]);
+    // No step sends the presenter to an applicant page as a city role, or the reverse.
+    expect(steps(5).map((step) => step.role)).toEqual(["clerk", "hl", "applicant", "clerk", "applicant"]);
   });
 });

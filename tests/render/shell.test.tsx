@@ -1,4 +1,4 @@
-import { screen, within } from "@testing-library/react";
+import { act, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it } from "vitest";
 import { AppShell } from "@/components/shell/AppShell";
@@ -121,6 +121,49 @@ describe("switching role", () => {
     expect(screen.getByText("case detail")).toBeInTheDocument();
   });
 
+  it("leaves the Clerk's Intake for the new role's queue: Intake is not Public Works & Safety's page (path 4)", async () => {
+    await renderScreen(<CityShell>intake</CityShell>, { path: "/city/intake", search: { tab: "reviewed" }, role: "clerk" });
+    expect(screen.getByText("intake")).toBeInTheDocument();
+    expect(useDemo.getState().lastPathByRole.clerk).toBe("/city/intake?tab=reviewed");
+
+    await userEvent.click(screen.getByRole("radio", { name: "Public Works & Safety" }));
+
+    expect(useDemo.getState().role).toBe("pws");
+    expect(lastPush()).toBe("/city/queue");
+    expect(navState.pathname).toBe("/city/queue");
+    expect(screen.getByRole("link", { name: /My queue/ })).toHaveAttribute("aria-current", "page");
+    // Intake was the Clerk's page and stays the Clerk's: the new role remembers its own.
+    expect(useDemo.getState().lastPathByRole).toMatchObject({ clerk: "/city/intake?tab=reviewed", pws: "/city/queue" });
+
+    // Back to the Clerk from the shared queue: the URL stays, as between any two city roles there.
+    await userEvent.click(screen.getByRole("radio", { name: "City Clerk" }));
+    expect(navState.pathname).toBe("/city/queue");
+    expect(navState.pushCalls).toEqual(["/city/queue"]);
+  });
+
+  it("a tool page typed in under another city role shows who it is built for, and is not remembered", async () => {
+    await renderScreen(<CityShell>work orders</CityShell>, { path: "/city/work-orders", role: "hl" });
+
+    expect(screen.getByText("This screen is built for Public Works & Safety.")).toBeInTheDocument();
+    expect(screen.queryByText("work orders")).not.toBeInTheDocument();
+    // The role keeps its own sidebar, with nothing marked current.
+    expect(screen.getByRole("link", { name: "Verifications" })).toBeInTheDocument();
+    expect(document.querySelector('[aria-current="page"]')).toBeNull();
+    expect(useDemo.getState().lastPathByRole).toEqual({});
+
+    await userEvent.click(screen.getByRole("button", { name: "Switch to Public Works & Safety" }));
+    expect(useDemo.getState().role).toBe("pws");
+    expect(navState.pushCalls).toEqual([]); // already on its page
+    expect(screen.getByText("work orders")).toBeInTheDocument();
+    expect(useDemo.getState().lastPathByRole).toEqual({ pws: "/city/work-orders" });
+  });
+
+  it("the Clerk's tool pages name the Clerk", async () => {
+    await renderScreen(<CityShell>payments</CityShell>, { path: "/city/payments", role: "pws" });
+    expect(screen.getByText("This screen is built for the City Clerk.")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Switch to City Clerk" })).toBeInTheDocument();
+  });
+
   it("does not follow a Draft to the city", async () => {
     // B02, a Draft with a board: no city role can see it yet.
     await renderScreen(<AppShell>board</AppShell>, { path: "/events/PMT-27-0004", personaId: "riverside-garden-society" });
@@ -214,6 +257,60 @@ describe("Demo menu", () => {
     expect(screen.getByText("the page")).toBeInTheDocument();
     expect(screen.queryByText(/This screen is built for/)).not.toBeInTheDocument();
     expect(useDemo.getState().lastPathByRole[jump.role]).toBe(jump.path);
+  });
+
+  it("Set demo date opens the date picker and it stays open, by mouse and by keyboard", async () => {
+    const { user } = await renderScreen(<AppShell>my events</AppShell>, { path: "/events" });
+
+    await user.click(screen.getByRole("button", { name: "Demo menu" }));
+    await user.click(screen.getByRole("menuitem", { name: /Set demo date/ }));
+    expect(await screen.findByRole("button", { name: /Fri, Jun 18, 2027/ })).toBeInTheDocument();
+    // Closing the menu hands focus back to its trigger; the picker must not take that for a click away.
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    expect(screen.getByRole("button", { name: /Fri, Jun 18, 2027/ })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Mon, May 3, 2027/ })).toHaveAttribute("aria-pressed", "true");
+
+    await user.keyboard("{Escape}");
+    expect(screen.queryByRole("button", { name: /Fri, Jun 18, 2027/ })).not.toBeInTheDocument();
+
+    // The same from the keyboard: open the menu, arrow to the item, Enter.
+    screen.getByRole("button", { name: "Demo menu" }).focus();
+    await user.keyboard("{Enter}");
+    const item = await screen.findByRole("menuitem", { name: /Set demo date/ });
+    item.focus();
+    await user.keyboard("{Enter}");
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    expect(screen.getByRole("button", { name: /Fri, Jun 18, 2027/ })).toBeInTheDocument();
+  });
+
+  it("jumping to Fri, Jun 18 moves the demo date and puts a permitted Jazz in the Plaza on Event day (path 3)", async () => {
+    const S3 = "PMT-27-0118";
+    const { user } = await renderScreen(<AppShell>my events</AppShell>, { path: "/events" });
+    // Path 3, up to the permit.
+    const { dispatch } = useDemo.getState();
+    const steps: [Parameters<typeof dispatch>[1], Parameters<typeof dispatch>[2]][] = [
+      [{ type: "respond_to_request", taskId: `${S3}:vendor_health_permit:1`, files: [{ name: "sample-health-permit.pdf", size: 248_000, type: "application/pdf" }] }, "applicant"],
+      [{ type: "verify_document", taskId: `${S3}:vendor_health_permit:1` }, "hl"],
+      [{ type: "review_decide", decision: "approve", conditions: [], feeLines: [] }, "hl"],
+      [{ type: "send_quote", conditions: [], feeLines: [] }, "clerk"],
+      [{ type: "accept_and_sign", signature: "Jordan Alvarez" }, "applicant"],
+      [{ type: "pay", amount: 715, method: "card", kind: "quote" }, "applicant"],
+      [{ type: "issue_permit" }, "clerk"],
+    ];
+    act(() => {
+      for (const [action, actor] of steps) expect(dispatch(S3, action, actor)).toMatchObject({ ok: true });
+    });
+    expect(storedCase(S3).state).toBe("permitted");
+
+    await user.click(screen.getByRole("button", { name: "Demo menu" }));
+    await user.click(screen.getByRole("menuitem", { name: /Set demo date/ }));
+    await user.click(await screen.findByRole("button", { name: /Fri, Jun 18, 2027/ }));
+
+    expect(useDemo.getState().demoToday).toBe("2027-06-18");
+    expect(storedCase(S3).state).toBe("event_day");
+    expect(screen.getByText("Demo today: Fri, Jun 18, 2027")).toBeInTheDocument();
+    // Picking a date closes the picker.
+    expect(screen.queryByRole("button", { name: /Sun, Jul 11, 2027/ })).not.toBeInTheDocument();
   });
 
   it("asks for confirmation before resetting, then restores the seed and goes to the Applicant's home", async () => {

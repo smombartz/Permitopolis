@@ -18,6 +18,7 @@ import {
   checkDeny,
   checkIssuePermit,
   checkLogCloseout,
+  checkPay,
   checkReconcileClose,
   checkRequestInfo,
   checkReviewDecide,
@@ -26,17 +27,24 @@ import {
   checkSubmit,
   checkSubmitFeedback,
   checkWithdraw,
+  nextUnpaidSession,
   type CheckResult,
 } from "./checks";
 import { lastSessionDate } from "./clock";
-import { eventDate } from "./selectors";
+import { caseTotals, eventDate } from "./selectors";
 import type { ActionAvailability, StateApi } from "./types";
+
+/** The Clerk's label for every payment taken at the counter: a quote, a session, a final bill. */
+const IN_PERSON = "Record an in-person payment";
 
 function row(type: ActionAvailability["type"], label: string, check: CheckResult, primary = false): ActionAvailability {
   return { type, label, enabled: check.ok, reason: check.ok ? undefined : check.reason, primary };
 }
 
 export const availableActions: StateApi["availableActions"] = (c: EventCase, role: Party, ctx: RulesCtx): ActionAvailability[] => {
+  // An ended case takes no action but a note for the file (transition() refuses everything
+  // else), so it offers none: a button that could only ever be refused is a dead click.
+  if (c.ending) return role !== "applicant" && c.state !== "draft" ? [addNoteRow()] : [];
   if (role === "applicant") return applicantActions(c, ctx);
   if (role === "clerk") return clerkActions(c, ctx);
   return reviewerActions(c, role);
@@ -56,16 +64,30 @@ function applicantActions(c: EventCase, ctx: RulesCtx): ActionAvailability[] {
     items.push(row("withdraw", "Withdraw", checkWithdraw(c)));
   } else if (c.state === "quote_sent") {
     items.push(row("accept_and_sign", "Accept and sign", checkAcceptAndSign(c), !c.flags.signed));
-    items.push({ type: "pay", label: "Pay fees and deposit", enabled: c.state === "quote_sent", primary: c.flags.signed });
+    items.push(row("pay", "Pay fees and deposit", checkPay(c, { kind: "quote" }), c.flags.signed));
     items.push(row("withdraw", "Withdraw", checkWithdraw(c)));
   } else if (c.state === "permitted" || c.state === "event_day") {
+    const session = sessionPayRow(c, "Pay the next session");
+    if (session) items.push(session);
     items.push(row("cancel", "Cancel", checkCancel(c, ctx.today, lastSessionDate(c))));
     items.push(row("amend", "Amend", checkAmend(c, ctx.today, eventDate(c, ctx.today))));
   } else if (c.state === "closed") {
-    items.push(row("submit_feedback", "Tell us how it went", checkSubmitFeedback(c), !c.closeout.feedback));
+    if (finalBillDue(c)) items.push(row("pay", "Pay the final bill", checkPay(c, { kind: "final_invoice" }), true));
+    items.push(row("submit_feedback", "Tell us how it went", checkSubmitFeedback(c), !c.closeout.feedback && !finalBillDue(c)));
     items.push(row("book_again", "Book again next year", checkBookAgain(c)));
   }
   return items;
+}
+
+/** A closed case that ran over its deposit still owes its final bill. */
+function finalBillDue(c: EventCase): boolean {
+  return c.state === "closed" && caseTotals(c).due > 0;
+}
+
+/** A permitted series is billed session by session: the row for the next one still unpaid, if any. */
+function sessionPayRow(c: EventCase, label: string): ActionAvailability | null {
+  const occurrenceDate = nextUnpaidSession(c);
+  return occurrenceDate ? row("pay", label, checkPay(c, { kind: "session", occurrenceDate })) : null;
 }
 
 /**
@@ -102,14 +124,20 @@ function clerkActions(c: EventCase, ctx: RulesCtx): ActionAvailability[] {
     items.push(addNoteRow());
   } else if (c.state === "quote_sent") {
     items.push(row("issue_permit", "Issue permit", checkIssuePermit(c, ctx), true));
-    items.push({ type: "pay", label: "Record an in-person payment", enabled: true });
+    items.push(row("pay", IN_PERSON, checkPay(c, { kind: "quote" })));
     items.push(remindRow());
     items.push(addNoteRow());
   } else if (c.state === "closeout") {
     items.push(row("reconcile_close", "Reconcile and close", checkReconcileClose(c), true));
   } else if (c.state === "permitted" || c.state === "event_day") {
+    // A session paid at the counter.
+    const session = sessionPayRow(c, IN_PERSON);
+    if (session) items.push(session);
     items.push(remindRow());
     items.push(addNoteRow());
+  } else if (c.state === "closed") {
+    // A final bill paid at the counter. A closed case with nothing owed has no action left.
+    if (finalBillDue(c)) items.push(row("pay", IN_PERSON, checkPay(c, { kind: "final_invoice" })));
   }
   return items;
 }

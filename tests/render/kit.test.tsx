@@ -129,6 +129,39 @@ describe("the Phase 1 kit page", () => {
       expect(screen.getByText(/^Next: the applicant responds/)).toBeInTheDocument();
     });
 
+    it("renders WhoIsUp's heading, the applicant's name, and a waiting row with the task it waits to do", () => {
+      render(<KitScreen />);
+      const whoIsUp = within(document.getElementById("domain-who-is-up") as HTMLElement);
+      expect(whoIsUp.getByRole("heading", { name: "Who's up" })).toBeInTheDocument();
+      expect(whoIsUp.getByText("Waiting on: applicant")).toBeInTheDocument();
+      const rows = whoIsUp.getAllByRole("listitem").filter((row) => row.hasAttribute("data-status"));
+      expect(rows[0]).toHaveAttribute("data-status", "up_now");
+      expect(within(rows[0]).getByText("Permitopolis Riverside Neighborhood Association and Community Partners Coalition")).toBeInTheDocument();
+      const waiting = rows.find((row) => row.getAttribute("data-status") === "waiting") as HTMLElement;
+      expect(within(waiting).getByText("Review your sections")).toBeInTheDocument();
+      expect(within(waiting).getByText("Waiting on the applicant's response")).toBeInTheDocument();
+    });
+
+    it("renders every state a TaskCard can be in: scheduled, dated while locked, sent back, amended, done on a date", () => {
+      render(<KitScreen />);
+      const cards = within(document.getElementById("domain-task-card") as HTMLElement);
+      expect(cards.getByText("Scheduled for Mon, Jun 21")).toBeInTheDocument();
+      expect(cards.getByText("Scheduled for Fri, Jul 2")).toBeInTheDocument();
+      expect(cards.getByText("For the day of your event")).toBeInTheDocument();
+      expect(cards.getByText("Fri, Jun 18")).toBeInTheDocument();
+      expect(cards.getByText("Changes requested")).toBeInTheDocument();
+      expect(cards.getByText("Health & Legal sent this back:")).toBeInTheDocument();
+      expect(cards.getByText("Amendment")).toBeInTheDocument();
+      expect(cards.getByText("Done Apr 21")).toBeInTheDocument();
+    });
+
+    it("renders a DeptStatusDots marker for each of the six review statuses", () => {
+      render(<KitScreen />);
+      const section = document.getElementById("domain-case-row") as HTMLElement;
+      const statuses = [...section.querySelectorAll('[data-slot="dept-status-dots"] [data-status]')].map((marker) => marker.getAttribute("data-status"));
+      for (const status of ["not_routed", "pending", "approved", "approved_with_conditions", "needs_info", "denied"]) expect(statuses, status).toContain(status);
+    });
+
     it("renders FeeTable's subtotal, deposit and total, and a $0 line", () => {
       render(<KitScreen />);
       const feesSection = document.getElementById("domain-fees");

@@ -37,6 +37,8 @@ function DemoMenu() {
 
   const [resetOpen, setResetOpen] = React.useState(false);
   const [dateOpen, setDateOpen] = React.useState(false);
+  // Set by "Set demo date" and read once as the menu closes: see onCloseAutoFocus below.
+  const openingDatePicker = React.useRef(false);
 
   /**
    * Reset puts the role switcher back on the Applicant, so the page has to follow: a city
@@ -54,6 +56,22 @@ function DemoMenu() {
     setDateOpen(false);
   }
 
+  function handleOpenDatePicker() {
+    openingDatePicker.current = true;
+    setDateOpen(true);
+  }
+
+  /**
+   * A menu hands focus back to its trigger when it closes. The date picker is a popover that
+   * closes when focus lands outside it, so that hand-back shut it the moment it opened. When
+   * the menu is closing to open the picker, focus goes to the picker and stays there.
+   */
+  function handleMenuCloseAutoFocus(event: Event) {
+    if (!openingDatePicker.current) return;
+    openingDatePicker.current = false;
+    event.preventDefault();
+  }
+
   /** A jump names its own page, so it sets the role and persona itself and skips useRoleSwitch(). */
   function handleScenarioJump(jump: ScenarioJump) {
     setRole(jump.role);
@@ -69,13 +87,13 @@ function DemoMenu() {
             <SettingsIcon aria-hidden="true" />
           </Button>
         </DropdownMenuTrigger>
-        <DropdownMenuContent align="end" className="w-64">
+        <DropdownMenuContent align="end" className="w-64" onCloseAutoFocus={handleMenuCloseAutoFocus}>
           <DropdownMenuLabel>Demo</DropdownMenuLabel>
           <DropdownMenuItem onSelect={() => setResetOpen(true)}>
             <RotateCcwIcon aria-hidden="true" />
             Reset demo data
           </DropdownMenuItem>
-          <DropdownMenuItem onSelect={() => setDateOpen(true)}>
+          <DropdownMenuItem onSelect={handleOpenDatePicker}>
             <CalendarIcon aria-hidden="true" />
             Set demo date&hellip;
           </DropdownMenuItem>

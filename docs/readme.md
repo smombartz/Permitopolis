@@ -80,14 +80,31 @@ components. Start here, then read "How the engine behaves" for the engine's fine
 - **What a shell gives a screen**: the top bar, the `<main>` landmark, a skeleton until
   `useHydrated()` is true, the storage-blocked banner, the page container with `py-6`, and in the
   city the sidebar. So a screen inside a shell starts with its `PageHeader`, reads the store
-  directly, and never adds `page-container`, a `<main>`, or a hydration gate of its own.
+  directly, and never adds `page-container`, a `<main>`, or a hydration gate of its own. Until
+  the stored demo has been read the top bar shows the wordmark and placeholders only: the role,
+  the persona and the date all come from the store.
 - **Each shell guards its area.** `AppShell` renders the screen only for the Applicant and
-  `CityShell` only for a city role; any other role gets a panel offering to switch. A city screen
-  still has to work for all three city roles, because two city roles share every city URL.
+  `CityShell` only for a city role; any other role gets a panel offering to switch.
+- **Which city pages are whose** (the PRD's route map). My queue, Cases, a case and Active
+  permits (`/city/queue`, `/city/cases`, `/city/cases/[id]`, `/city/active`) are shared: a screen
+  there has to work for all three city roles, because a switch between them keeps the URL. The
+  tool pages belong to one role each: Intake, Payments and Settings to the City Clerk; Closures
+  and routes and Work orders to Public Works & Safety; Verifications and Inspections to Health &
+  Legal. A tool screen is built for its own role only. `CityShell` shows "This screen is built
+  for ..." when another city role types its URL in, and never remembers it as that role's last
+  page. `cityToolOwner(href)` and `cityPageIsFor(role, href)` in `lib/view/shell.ts` are the rule.
 - **`AppShell` and `CityShell` are siblings, not nested.** Each wraps the same top bar, skeleton
   and banner around the opposite guard.
-- **A screen with no shell that reads the store** (`/verify/[id]`, the demo guide if it shows live
-  state) gates on `useHydrated()` itself: render `PageSkeleton` until it is true.
+- **The stored demo is read on every route**, once per page load: the root layout mounts
+  `<StoreHydrator />`, and `useHydrated()` is one flag for the whole page load. A shell that
+  mounts later (the applicant's and the city's layouts are separate, so a role switch or a hop
+  from the wizard to a board remounts it) starts hydrated: no second skeleton, no second read.
+- **A screen with no shell that reads the store** (`/`, `/demo`, `/verify/[id]`) gates on
+  `useHydrated()` itself: render `PageSkeleton` until it is true, as `PlaceholderScreen
+  standalone` does. **It must not change the store before then either.** Nothing is written to
+  localStorage until the stored demo has been read, so a `setRole()` or `setPersona()` made
+  earlier is made to the in-memory seed and replaced a moment later by the stored demo. Enable a
+  door or a jump only once `useHydrated()` is true.
 - **Unknown case id**: render `<CaseNotFound id backHref backLabel />` from `@/components/shell`.
   The id comes from `useParams()`, so it is only known on the client; `notFound()` is not needed.
 - **Below 768 px** the role switcher and persona picker collapse into one menu button. The top
@@ -98,8 +115,9 @@ components. Start here, then read "How the engine behaves" for the engine's fine
 ### Switching role and persona
 
 - **The rule** is `resolveRoleSwitch()` in `lib/view/shell.ts`, used through `useRoleSwitch()`:
-  - Two city roles keep the URL, query string included. Nothing navigates; the screen re-renders
-    for the new role.
+  - Two city roles keep the URL, query string included, on a page they share. Nothing
+    navigates; the screen re-renders for the new role. From one role's tool page (the Clerk's
+    Intake, say) the other role goes to its own last page, then to its queue.
   - The Applicant and a city role follow the case on screen: `/events/[id]...` to
     `/city/cases/[id]` and back. A Draft does not follow to the city; no city role can see it.
   - Off a case page, the switch goes to the role's last page (`lastPathByRole`, query string
@@ -135,8 +153,11 @@ components. Start here, then read "How the engine behaves" for the engine's fine
 
 - **`DEMO_DATE_JUMPS`**: the "Set demo date" quick jumps (May 3, Jun 18, Jul 11).
 - **`DEMO_PATHS`**: the PRD's seven demo paths as `{ id, title, priority, scenario, summary,
-  steps: [{ role, persona?, text }] }`, for the demo guide (3A) and for demo hints. Hints are on
-  when `useDemo((s) => s.hints)` is true.
+  steps: [{ role, persona?, text }] }`, for the demo guide (3A) and for demo hints. Every
+  applicant step names its `persona` (the scenario's organizer, or `"new"` for somebody starting
+  a fresh event, as in path 2 and the last step of path 5); a city step has none. So a guide can
+  call `setRole(step.role)` and, when there is one, `setPersona(step.persona)`. Hints are on when
+  `useDemo((s) => s.hints)` is true.
 - `tests/seed.test.ts` holds all three to the seed: every jump's case exists, in the state the
   PRD's seed table gives it, with the role, page and persona above; every date jump is its
   scenario's event day.
@@ -148,8 +169,14 @@ components. Start here, then read "How the engine behaves" for the engine's fine
   `redirect`) and `next/link` for all of them. Pure view-models are tested next to the file, in
   `lib/view/<surface>.test.ts` (node).
 - **Use `renderScreen()` from `tests/render/harness.tsx`**, never `render()` and never your own
-  navigation mock. It resets the store to the real seed (all 38 cases on Mon, May 3, 2027),
-  applies your options, points the navigation mock at the page and flushes hydration.
+  navigation mock. It starts a fresh page load on the real seed (all 38 cases on Mon, May 3,
+  2027, nothing in localStorage), applies your options, points the navigation mock at the page
+  and reads the stored demo, as the root layout does on every route.
+- **The navigation mock is a live router.** `router.push()`, `router.replace()` and a click on
+  a `<Link>` move the mocked location, and `usePathname()`, `useSearchParams()` and `useParams()`
+  re-render with it. A screen that keeps a step, a tab or a filter in the URL can be clicked
+  through in a test: push `?view=table` and the screen that reads `view` shows the table.
+  `useRouter()` returns the same object on every render, as in the app.
 
   | Option | Effect |
   |---|---|
@@ -159,9 +186,13 @@ components. Start here, then read "How the engine behaves" for the engine's fine
   | `search` | Extra search params |
   | `role`, `personaId`, `demoToday` | Set as given, over what the scenario set |
   | `cases` | Replaces the seed with hand-built cases (`makeCase`, `makeTask` in `lib/state/testSupport.ts`) |
+  | `stored` | A demo left in localStorage by an earlier visit (`{ role, demoToday, cases, ... }`). Hydration brings it in and it wins over the options above: this is a reload |
 
   It returns the testing-library result plus `user` (a user-event session). Also exported:
-  `lastPush()`, `lastReplace()`, `switchRole(role)` and `storedCase(id)`.
+  `lastPush()`, `lastReplace()`, `navigate(href)` (moves the location from the test, as the
+  browser's Back would), `switchRole(role)`, `storedCase(id)`, and `prepareScreen(options)` with
+  `flushHydration()` for a test that needs the page before the stored demo is read
+  (`tests/render/hydration.test.tsx` renders the prerendered HTML that way).
 
   ```tsx
   // tests/render/case-detail.test.tsx
@@ -222,9 +253,9 @@ one in every state. Reach for these before writing markup of your own.
 | `Truncate` | A long name on one or two lines, with the full text in its tooltip |
 | `CopyButton` | Copy a case id or a permit link |
 | `EmptyState`, `PageSkeleton`, `Banner`, `Callout` | From Phase 1: an empty list, loading, a page-level message, an aside |
-| `TaskCard`, `StackedTaskCard` | The applicant board's cards. A card with an open request shows as pinned with the reviewer's message. Pass `unlockHint` for a locked card. `StackedTaskCard` is the "Vendor health permits · 25 of 25" stack |
-| `WhoIsUp` | The case detail's centerpiece: `items={waitingOn(c, today)}` and `nextMove={nextMove(c, today, applicantName)}`. It lists every open action with its due date; `onSelectTask` makes them buttons |
-| `WaitingOnChips`, `DeptStatusDots` | The compact forms for a table row: who is up, and each department's review status |
+| `TaskCard`, `StackedTaskCard` | The applicant board's cards. A card with an open request shows as pinned with the reviewer's message. Pass `unlockHint` for a locked card (the catalogue's `CARD_BY_ID[catalogId].unlockHint`); a locked card with a date shows it under the hint. Read off the task itself: "Scheduled for Mon, Jun 21" on a scheduled meeting, "Changes requested" with who sent it back and why (`payload.rejectedReason`), an "Amendment" chip (`tags`), and "Done Apr 21" from its history. `StackedTaskCard` is the "Vendor health permits · 25 of 25" stack |
+| `WhoIsUp` | The case detail's centerpiece, with its own "Who's up" heading (an `<h2>`; do not wrap it in a titled `Section`): `items={waitingOn(c, today)}`, `nextMove={nextMove(c, today, applicantName)}` and `applicantName`, shown under "Applicant". The parties that are up come first. It lists every open action with its due date (`onSelectTask` makes them buttons); a waiting party shows the task it waits to do over what it waits for ("Issue permit", "Unlocks when paid and verified") |
+| `WaitingOnChips`, `DeptStatusDots` | The compact forms for a table row: who is up, and each department's review status. `DeptStatusDots` pairs the department's icon with a glyph for the status and is one tab stop per row: focus or hover shows every department's status in words |
 | `FeeTable` | Fee lines by department with subtotal, deposit and total. `showActual` adds Actual and Difference for closeout |
 | `ConditionList` | Conditions by department. `editable` adds the "I accept" checkboxes for the quote |
 | `ActivityTimeline` | The activity log; pass the items in the order to show, and `collapsedCount` for "Show all" |
@@ -258,7 +289,7 @@ Every one is pure. Read cases, the date and the config from the store
 | Cases pipeline | `isVisibleToCity(c)`, `isOpen(c)`, `involves(c, role)`, `involvement(c, party)`, `whoIsUp(c, today)`, `leadTimeRisk(c, today, cfg)`, `reviewClock(c, dept, today)` |
 | Case detail | `waitingOn(c, today)`, `nextMove(c, today, applicantName)`, `availableActions(c, role, { today, cases, cfg })`, `actorsFor(type)` |
 | Active permits | `activePermits(cases, today, { includeHolds })`, `permitSessions(cases, { from, to, includeHolds })` (one entry per held session, for the calendar and map), `hasActivePermit(c)`, `holdsDateAtQuote(c)`, `sessionDates(c)`, `isSessionDate(c, date)`, `lastSessionDate(c)` |
-| Store | `useDemo`, `useHydrated()`, `demoToday()`, `buildSeed()` |
+| Store | `useDemo`, `useHydrated()`, `hydrateDemoStore()`, `demoToday()`, `buildSeed()` |
 
 - A screen changes a case only with `useDemo.getState().dispatch(caseId, action)`. It acts as
   the current role and returns `{ ok, reason }`; show the reason when it is refused.
@@ -317,7 +348,24 @@ Things a screen builder needs to know that the type signatures do not say.
   (`complete_task`, `respond_to_request`, `verify_document`, `reject_document`, `schedule_meeting`,
   `complete_city_task`) belong on that card's own control and are dispatched directly. It also
   offers `request_info` (the Clerk at intake; a reviewer while its review is open) and
-  `review_decide` for the Clerk's own license review, ahead of the quote.
+  `review_decide` for the Clerk's own license review, ahead of the quote. Every row is built
+  from the check `transition()` runs, so an enabled row always goes through and a disabled one
+  carries the engine's reason (`tests/seed.test.ts` holds this for every role on all 38 cases).
+- **An ended case offers a note and nothing else.** A city role gets `add_note`; the applicant
+  gets no actions. Its board (`boardColumns()`) has nothing in Do now, With the city or Coming
+  up: only what was done. Show the `EndingBanner` and the Done column.
+- **`pay` has a row wherever the engine takes a payment**: the quote ("Pay fees and deposit");
+  the next unpaid session of a permitted series ("Pay the next session", with
+  `{ kind: "session", occurrenceDate }`: the earliest session whose `billing` is `due` or
+  `upcoming`); and the final bill of a closed case that still owes one ("Pay the final bill",
+  `{ kind: "final_invoice" }`, while `caseTotals(c).due > 0`). The Clerk has "Record an
+  in-person payment" in the same three places. `submit_feedback` is disabled once feedback is in.
+- **`complete_task` is for cards the applicant fills in or uploads.** A card finished some other
+  way is refused, with what finishes it: `pay_fees` and `final_bill_or_refund` (`pay`, or
+  `book_and_pay` on an Instant draft), `accept_and_sign`, `neighbor_signoff`
+  (`simulate_signoff`), `submit_application` (`submit`), `feedback` (`submit_feedback`),
+  `book_again`, a card with an open request (`respond_to_request`), a meeting (the city closes
+  it), and `carry_permit` (the clock finishes it after the day). A city task is refused too.
 - **Who may act.** `transition()` refuses an action from a party that may not raise it ("Only
   the City Clerk can issue the permit."); `actorsFor(type)` lists the parties. `dispatch()` acts
   as the current role unless given an actor.
@@ -326,8 +374,9 @@ Things a screen builder needs to know that the type signatures do not say.
   - `verify_document` and `reject_document`: the card's reviewer, or the department whose
     request the card answers.
   - `schedule_meeting`: the meeting's department or the Clerk. It accepts the Clerk's
-    `schedule_pre_application_meeting` task id and puts the date on the applicant's card. A
-    meeting can be moved until it is held.
+    `schedule_pre_application_meeting` task id and puts the date on the applicant's card, as
+    `payload.scheduledFor` and as the card's `dueDate`: a scheduled meeting is due on its day,
+    not on the plan's default date. A meeting can be moved until it is held.
   - `complete_city_task` closes a work order (its owner), a meeting that was held (its
     department or the Clerk), or a `verify:*` task (which also accepts the card). Every other
     city task is finished by its own action; the refusal names it.
@@ -335,9 +384,19 @@ Things a screen builder needs to know that the type signatures do not say.
 - **Who's up.** `waitingOn().openTasks` and `queueFor()` are oldest due first; a task with no
   date goes last. A department named on cards before routing is `waiting`, "Starts when the City
   Clerk routes the case"; once the case is routed without it, it is `not_involved`. A waiting
-  party's note says what its next task waits for ("Unlocks when the quote is ready"). `nextMove()`
-  names the waiting party whose task unlocks soonest: after closeout hours, the Clerk reconciles
-  before the applicant's final bill.
+  party's note says what its next task waits for ("Unlocks when the quote is ready"), and
+  `nextTask` is that task. `nextMove()` names the waiting party whose task unlocks soonest:
+  after closeout hours, the Clerk reconciles before the applicant's final bill.
+- **The Clerk waits on the reviews.** `confirm_routing` creates the Clerk's `consolidate` task
+  locked, so from routing until the last decision the Clerk is `waiting`, "Unlocks when every
+  review is in" (S3 on load). The last approval opens that task; a denial opens it as "Decide: a
+  reviewer denied".
+- **`daysHolding`** counts from the day the party's longest-open task last became its to do: a
+  card sent back counts from when it came back, a card a reviewer asked about from the request.
+  A plan card nobody has touched counts from the day the application went in (S4: 20 days), and
+  a Draft from the day it was started.
+- **`scope`** is the sections routed to a department. The Clerk's is always "Intake, routing,
+  quote, permit and closeout", also when the alcohol license is routed to it (S6, B06).
 - **Money is to the cent** everywhere: fee lines, totals, refunds and the paid-in-full check.
   Paying a quote in full clears `dateHold.expiresOn`; show "Pay by" only while it is set.
 - **`amend`** takes only the answer fields of its payload, lists the new schedule's sessions and
@@ -365,9 +424,12 @@ Things a screen builder needs to know that the type signatures do not say.
 - **A reviewer's denial goes to the Clerk.** `review_decide` with `deny` finishes that
   department's review task and gives the Clerk a `consolidate` task titled "Decide: a reviewer
   denied" (`payload.denied`). `send_quote` then says which department denied; Deny is the move.
-- **The review clock** counts days elapsed since routing, less days paused, so the due date
-  (routing plus the allowance) reads "Day 14 of 14" and the next day is over. It stops on the day
-  the department decides. A second request while it is paused keeps the first pause's start.
+- **The review clock** counts days elapsed since routing, less days paused. Its allowance is
+  what the Clerk gave: the days from routing to the review's due date (`confirm_routing` sets
+  `clock.allowedDays` from the `dueDate` in its payload; the config's `sla.reviewDays` only
+  prefills that date in the routing panel). So the due date reads "Day 14 of 14", or "Day 35 of
+  35" for S5's five weeks, and the next day is over. It stops on the day the department decides.
+  A second request while it is paused keeps the first pause's start.
 - **`nextMove(case, today, applicantName)`** takes the persona's name for the "Next:" sentence.
 - **Issue permit** is a Clerk task created locked by `send_quote`. It unlocks when the case is
   signed, the quote is paid and the insurance card is done, whichever comes last. Re-uploading
@@ -386,12 +448,19 @@ Things a screen builder needs to know that the type signatures do not say.
   on the `final_bill_or_refund` card). After reconciliation `caseTotals()` no longer counts the
   deposit, so `due` is what is really owed. An ended case owes nothing. An Instant event has no
   final-bill card until its closeout exception carries a charge; `reconcile_close` then adds one.
+- **A series, session by session.** On a session's day the clock marks it `due` unless it is
+  already `paid` (a single event's one session is never marked: the booking or the quote paid for
+  it). "Carry your permit" opens for the day, dated that day; the morning after, with more
+  sessions to come, it locks again dated for the next one. An unpaid session stays `due`; nothing
+  stops the session from being held (see Open questions).
+- **A closed case holds no date.** `reconcile_close` and an Instant event closing itself set
+  `dateHold.status` to `released`, like the four endings.
 - **A new case has one activity entry**, "Started a draft.", written by `newCase()`.
-- **`useHydrated()` is false on the server and on the first client render**, then true once the
-  stored demo has been read (or at once after mount when storage is blocked). Render the skeleton
-  until it is true, and read `storageOk` only after that.
-- **Not done yet**: a series' later sessions are never marked `due` by the clock (workstream 4E
-  owns the payment schedule).
+- **`useHydrated()` is false on the server and on the first client render of a page load**, then
+  true once the stored demo has been read (or at once after mount when storage is blocked), and
+  stays true for every component that mounts afterwards. Render the skeleton until it is true,
+  read `storageOk` only after that, and change the store only after that: a write made before
+  the read is not saved.
 
 **Seed and demo paths (`lib/state/seed`)**
 
@@ -408,6 +477,12 @@ Things a screen builder needs to know that the type signatures do not say.
 - **`tests/seed.test.ts`** holds the seed to the PRD's seed table, plan 6.2 and the Demo menu's
   jumps. **`tests/demo-paths.test.ts`** runs the PRD's seven demo paths through the store and
   checks `reset()` against a fresh seed after each.
+- **How each role's queue opens** is asserted row by row in `tests/seed.test.ts`. Each has one
+  overdue row, the planned one (B03 for the Clerk, B05 for Public Works & Safety, B07 for Health
+  & Legal; B08 is the overdue applicant), then the PRD's hero and filler tasks, due in the coming
+  week. City staff act on working days in every history, and the due dates they set are working
+  days. The one exception is F7's damage report, logged on the Saturday of the picnic (see Open
+  questions).
 - **Where the seed differs from the PRD's wording**: S4's routing reasons read "Block party" and
   "City services" (the PRD says "closure, barricades"); F7 is named "Brightline Logistics
   company picnic"; "missing insurance" (F5, B03) is a JPEG uploaded as the certificate, because
@@ -422,7 +497,6 @@ Things a screen builder needs to know that the type signatures do not say.
   exists, or `confirm_routing` should refuse.
 - **A pending amendment's `submit_application` card cannot be submitted**, because `submit`
   needs a Draft. Workstream 5A owns that flow.
-- **A closed case keeps `dateHold.status: "held"`**, so `HoldStatus` reads "Date held" on it.
 - **`classify()`'s summary phrases** ("about 3 weeks", "about 2 months") are fixed copy from the
   PRD, not derived from the config.
 - **A role switch that navigates** sets the role before the new page arrives, so the old page's
@@ -443,6 +517,9 @@ Things a screen builder needs to know that the type signatures do not say.
   screen (Phase 2)".
 - A tier is never shown by a dot alone: calendar items carry the tier icon, and the map has a
   legend and spells the tier out in its list.
+- `SegmentedControl` (the role switcher, view toggles) is a radio group to the keyboard too: one
+  tab stop, and Left/Right, Home and End move to an option and select it. Tests find its options
+  with `getByRole("radio", { name })`.
 - `/dev/kit` and `/dev/map` show every primitive, domain component, map mode and calendar view.
   Neither is linked from the app.
 
@@ -481,3 +558,36 @@ Fictional and kept in `lib/data/`: eight bookable spaces in Riverside Park, the 
 Hall Plaza; Main Street (five blocks), River Road (four stretches; with Main Street it makes the
 3.1-mile 5K loop), and residential Maple, Elm and Oak. Fees, the cancellation schedule and the
 calendar's blackout and impacted dates are placeholders from the PRD.
+
+## Open questions for the owner
+
+Decisions the PRD does not settle. Each is built one way, the way named here, and is a small
+change if you would rather have the other.
+
+- **Reporting damage after an Instant event.** An Instant event closes itself the morning after
+  its day unless Public Works & Safety logged a cleanup issue on the day. So the Company picnic's
+  damage report (F7; the PRD puts the picnic on Sat, Apr 17) is logged on that Saturday, the one
+  city action in the seed that falls on a weekend. Should Public Works & Safety be able to report
+  damage on the next working day, reopening a closed Instant case as a Clerk exception? That is a
+  transition the PRD's state list does not have.
+- **A series session that is not paid for.** On its day the session is marked due and the
+  applicant and the Clerk each get a control to pay it. Nothing stops the session from being
+  held, and nothing happens to the permit when it stays unpaid. Should an unpaid session block
+  anything, or only show as owed on the Clerk's Payments page (4E)?
+- **What a quote for a series asks for.** As before: the one-off lines and the first session now,
+  the rest on schedule (`dueAtQuote()`), following the PRD's "first session now and the rest on
+  schedule". Still awaiting your confirmation.
+- **The board of a case that ended.** A withdrawn, denied, cancelled or expired case shows only
+  its Done cards: nothing in Do now, With the city or Coming up. The review asked for the first
+  two; Coming up is emptied as well, since no quote, permit or event day is coming. Say if you
+  would rather keep the locked cards visible there.
+- **"Carry your permit" cannot be ticked off.** It is a reminder for the day: it opens on Event
+  day and the clock finishes it the morning after. If applicants should be able to mark it done
+  themselves, it is one line in `checkCompleteTask`.
+- **The review allowance is the Clerk's due date.** The clock reads "Day 30 of 35" for a review
+  the Clerk gave five weeks, where it used to read "of 21" from the tier's default. The other
+  reading (the tier's default is the allowance, and a longer due date is the Clerk running late
+  by design) would make S5 and S6 read as overdue reviews that were decided on time.
+- **The role switcher's arrow keys switch role at once.** That is how a radio group behaves, and
+  a switch between the Applicant and a city role navigates. If moving focus should not switch,
+  the control becomes a group of toggle buttons, each its own tab stop.

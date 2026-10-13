@@ -10,33 +10,46 @@
  *
  * What `renderScreen()` does, in order:
  *
- * 1. Resets the demo store (`resetDemoStoreForTests`): the 38 seeded cases of `buildSeed()`
- *    on Mon, May 3, 2027, the Applicant role and the "new" persona. Pass `cases` to replace
- *    the seed with hand-built ones (`makeCase` and `makeTask` from lib/state/testSupport).
+ * 1. Starts a fresh page load (`resetDemoStoreForTests`): the 38 seeded cases of `buildSeed()`
+ *    on Mon, May 3, 2027, the Applicant role and the "new" persona, nothing in localStorage,
+ *    and the stored demo not read yet. Pass `cases` to replace the seed with hand-built ones
+ *    (`makeCase` and `makeTask` from lib/state/testSupport).
  * 2. Applies `scenario` (a Demo menu jump: its role, persona and page), then `role`,
  *    `personaId`, `demoToday` and `path`, which each override what the scenario set.
- * 3. Points the mocked `usePathname()`, `useSearchParams()` and `useParams()` at `path`. A
- *    query string in `path` becomes the search params, so `path` can come straight from
- *    lib/routes.ts; `search` adds to it. `params.id` is read off an event, case or verify
- *    path unless `params` is given.
- * 4. Renders, then flushes the microtask `useHydrated()` waits on, so a screen gated on it
- *    shows its content, not its skeleton, by the time this returns. Always `await` it.
+ * 3. Points the mocked router at `path`. A query string in `path` becomes the search params,
+ *    so `path` can come straight from lib/routes.ts; `search` adds to it. `params.id` is read
+ *    off an event, case or verify path unless `params` is given.
+ * 4. Renders, then reads the stored demo as the root layout's `<StoreHydrator />` does on
+ *    every route, so a screen gated on `useHydrated()` shows its content, not its skeleton,
+ *    by the time this returns. Always `await` it.
+ *
+ * The router is live: `router.push()`, `router.replace()` and a click on a `<Link>` move the
+ * mocked location, and `usePathname()`, `useSearchParams()` and `useParams()` re-render with
+ * it. So a screen that keeps a step, a tab or a filter in the URL can be clicked through.
+ * `lastPush()` / `lastReplace()` read the most recent `router.push()` / `router.replace()`;
+ * `navigate(href)` moves the location from the test itself, as the browser's Back would.
  *
  * `demoToday` sets the date as it is. To move the seed forward the way the Demo menu does
  * (hold expiry, Event day, Closeout), call `useDemo.getState().setDemoToday(date)` inside
  * `act()` after rendering.
  *
- * `lastPush()` / `lastReplace()` read the most recent `router.push()` / `router.replace()` the
- * screen made. `switchRole()` flips the store's role without navigating, for a test that
- * checks what a mounted screen shows to another role.
+ * `stored` is a demo left in localStorage by an earlier visit (a reload). Hydration brings it
+ * in, and it wins over `role`, `personaId`, `demoToday` and `cases`. To see what the page shows
+ * before that (the prerendered HTML), call `prepareScreen(options)` and render the screen with
+ * `renderToString()` from react-dom/server: tests/render/hydration.test.tsx does.
+ *
+ * `switchRole()` flips the store's role without navigating, for a test that checks what a
+ * mounted screen shows to another role.
  */
 import type { ReactElement } from "react";
 import { act, render, type RenderResult } from "@testing-library/react";
 import userEvent, { type UserEvent } from "@testing-library/user-event";
 import { SCENARIO_JUMPS, type ScenarioKey } from "@/lib/data/demoScript";
-import { resetDemoStoreForTests, useDemo } from "@/lib/state";
+import { STORAGE_KEY } from "@/lib/rules";
+import { hydrateDemoStore, resetDemoStoreForTests, useDemo, type DemoState } from "@/lib/state";
+import { seedFingerprint } from "@/lib/state/seed";
 import type { EventCase, ISODate, Party } from "@/lib/types";
-import { navState, resetNavState } from "./setup";
+import { navState, navigate, paramsFromPath, resetNavState } from "./setup";
 
 export interface RenderScreenOptions {
   /** A Demo menu scenario jump: the role, the persona and the page it opens. */
@@ -52,6 +65,8 @@ export interface RenderScreenOptions {
   demoToday?: ISODate;
   /** Replaces the seed. Leave it out to render against all 38 seeded cases. */
   cases?: EventCase[];
+  /** A demo saved by an earlier visit, read from localStorage when the screen hydrates. */
+  stored?: Partial<Omit<DemoState, "storageOk">>;
 }
 
 export type RenderScreenResult = RenderResult & {
@@ -59,14 +74,11 @@ export type RenderScreenResult = RenderResult & {
   user: UserEvent;
 };
 
-const ID_ROUTE = /^\/(?:events|city\/cases|verify)\/([^/]+)/;
-
-function paramsFromPath(pathname: string): Record<string, string> {
-  const id = ID_ROUTE.exec(pathname)?.[1];
-  return id ? { id } : {};
-}
-
-export async function renderScreen(ui: ReactElement, options: RenderScreenOptions = {}): Promise<RenderScreenResult> {
+/**
+ * Steps 1 to 3 of `renderScreen()`: a fresh page load with the store, the stored demo and the
+ * mocked location set up, and nothing rendered yet.
+ */
+export function prepareScreen(options: RenderScreenOptions = {}): void {
   resetDemoStoreForTests();
   resetNavState();
 
@@ -85,20 +97,36 @@ export async function renderScreen(ui: ReactElement, options: RenderScreenOption
     ...(options.demoToday !== undefined ? { demoToday: options.demoToday } : {}),
     ...(options.cases !== undefined ? { cases: options.cases } : {}),
   });
+  if (options.stored) {
+    // What persist would have saved: the whole demo, under this seed's fingerprint.
+    const { cases, demoToday, cfg, role, personaId, hints, lastPathByRole } = { ...useDemo.getInitialState(), ...options.stored };
+    window.localStorage.setItem(STORAGE_KEY, JSON.stringify({ state: { cases, demoToday, cfg, role, personaId, hints, lastPathByRole }, version: seedFingerprint() }));
+  }
+}
+
+export async function renderScreen(ui: ReactElement, options: RenderScreenOptions = {}): Promise<RenderScreenResult> {
+  prepareScreen(options);
 
   let result!: RenderResult;
   await act(async () => {
     result = render(ui);
   });
-  // useHydrated() resolves on a microtask after mount (it reads localStorage through a
-  // promise so the server and the first client render always agree). Flush that now so
-  // callers see the hydrated screen, not its skeleton, without an extra `await findBy...`.
-  await act(async () => {
-    await Promise.resolve();
-    await Promise.resolve();
-  });
+  await flushHydration();
   return Object.assign(result, { user: userEvent.setup() });
 }
+
+/**
+ * Reads the stored demo and lets the screen re-render with it. The store reads localStorage
+ * through a promise (so the server and the first client render always agree); this waits for
+ * that same promise, so callers see the hydrated screen without an extra `await findBy...`.
+ */
+export async function flushHydration(): Promise<void> {
+  await act(async () => {
+    await hydrateDemoStore();
+  });
+}
+
+export { navigate };
 
 export function lastPush(): string | undefined {
   return navState.pushCalls.at(-1);
