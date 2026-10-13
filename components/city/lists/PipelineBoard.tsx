@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { CountBadge } from "@/components/ui/count-badge";
-import { CaseId, TierBadge, WaitingOnChips } from "@/components/domain";
+import { CaseId, StateChip, TierBadge, WaitingOnChips } from "@/components/domain";
 import { routes } from "@/lib/routes";
 import { fmtDaysToGo } from "@/lib/format";
 import { eventDate } from "@/lib/state";
@@ -25,7 +25,7 @@ function PipelineCard({ c, today }: { c: EventCase; today: ISODate }) {
           <CaseId id={c.id} />
           {date ? <span>{fmtDaysToGo(date, today)}</span> : <span>No date yet</span>}
         </div>
-        <WaitingOnChips items={waiting} emptyText="Nothing waiting" />
+        {c.ending ? <StateChip state={c.state} ending={c.ending} /> : <WaitingOnChips items={waiting} emptyText="Nothing waiting" />}
       </Link>
     </li>
   );
