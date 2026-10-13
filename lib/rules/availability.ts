@@ -23,6 +23,15 @@ function blackoutFor(location: Location, window: Window): Availability | null {
   return null;
 }
 
+/**
+ * The label of a blackout on this day, whatever the place, or null. A booking asks
+ * availability(), which knows which spaces a blackout closes and from what time; this is for
+ * something with no place of its own (a meeting, a walkthrough, a day on a calendar).
+ */
+export function citywideBlackoutOn(date: ISODate): string | null {
+  return BLACKOUTS.find((b) => b.date === date)?.label ?? null;
+}
+
 function scheduleHasDate(schedule: Schedule, date: ISODate): boolean {
   // A session the series skips (a blackout date) does not take the slot.
   if (schedule.occurrences.some((o) => o.date === date && o.billing === "skipped")) return false;

@@ -243,6 +243,7 @@ export interface TaskPayload {
   progress?: { done: number; total: number };
   scheduledFor?: ISODate;
   amount?: number;
+  /** On a per-vendor card (a vendor's health permit): the vendor it is for, set by requirements(). */
   vendorName?: string;
   rejectedReason?: string;
   [key: string]: unknown;

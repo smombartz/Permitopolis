@@ -2,12 +2,12 @@
 
 /** The consolidation panel's merged fee lines: editable rows, grouped by department, with the deposit, the late fee and live totals. */
 import * as React from "react"
-import { PlusIcon, Trash2Icon } from "lucide-react"
+import { PlusIcon } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Money } from "@/components/domain"
+import { FeeLineFields } from "@/components/case/FeeLineFields"
 import { fmtMoney } from "@/lib/format"
-import { quoteLineAmount } from "@/lib/view/clerkTools"
 import type { QuoteLineRow, QuoteTotals } from "@/lib/view/clerkTools"
 import { DEPTS, PARTY_LABEL, type Dept } from "@/lib/types"
 
@@ -35,29 +35,6 @@ function groupByDept(rows: QuoteLineRow[]): Partial<Record<Dept, QuoteLineRow[]>
     group.push(row)
   }
   return groups
-}
-
-/** One editable line: department, label, quantity, unit, unit price, amount, and a remove button. */
-function LineRow({ row, onUpdate, onRemove }: { row: QuoteLineRow; onUpdate: QuoteLinesEditorProps["onUpdate"]; onRemove: (id: string) => void }) {
-  return (
-    <div className="grid grid-cols-[1fr_4.5rem_5rem_5.5rem_5rem_auto] items-center gap-1.5">
-      <Input aria-label={`Label: ${row.label || "new line"}`} placeholder="Label" value={row.label} onChange={(e) => onUpdate(row.id, { label: e.target.value })} />
-      <Input aria-label={`Quantity: ${row.label}`} type="number" min="0" step="0.5" value={row.qty} onChange={(e) => onUpdate(row.id, { qty: Number(e.target.value) || 0 })} />
-      <Input aria-label={`Unit: ${row.label}`} placeholder="unit" value={row.unit} onChange={(e) => onUpdate(row.id, { unit: e.target.value })} />
-      <Input
-        aria-label={`Unit price: ${row.label}`}
-        type="number"
-        min="0"
-        step="0.01"
-        value={row.unitPrice}
-        onChange={(e) => onUpdate(row.id, { unitPrice: Number(e.target.value) || 0 })}
-      />
-      <Money amount={quoteLineAmount(row)} className="text-right text-sm" />
-      <Button type="button" variant="ghost" size="icon-sm" aria-label={`Remove line: ${row.label}`} onClick={() => onRemove(row.id)}>
-        <Trash2Icon />
-      </Button>
-    </div>
-  )
 }
 
 function AddLineRow({ onAdd }: { onAdd: (row: QuoteLineRow) => void }) {
@@ -103,7 +80,7 @@ function QuoteLinesEditor({ rows, deposit, lateFeeAdvice, totals, onUpdate, onRe
         <div key={dept} className="flex flex-col gap-1.5">
           <p className="text-eyebrow font-bold tracking-[.12em] text-fg-label uppercase">{PARTY_LABEL[dept]}</p>
           {(groups[dept] ?? []).map((row) => (
-            <LineRow key={row.id} row={row} onUpdate={onUpdate} onRemove={onRemove} />
+            <FeeLineFields key={row.id} line={row} onChange={(patch) => onUpdate(row.id, patch)} onRemove={() => onRemove(row.id)} />
           ))}
         </div>
       ))}

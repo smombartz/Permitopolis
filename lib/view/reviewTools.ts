@@ -2,16 +2,16 @@
  * Pure view-model for the reviewer tools (workstream 4C): what a department's review panel
  * shows (the submitted material behind each routed section, the triggers that routed it), the
  * fee-line presets the fee schedule gives each department, the closeout's actual-vs-estimate
- * rows and running total, meeting-date validation, and a work order's plain-language detail.
+ * rows and running total, and a work order's plain-language detail. (A meeting's date is checked
+ * by the engine: `checkScheduleMeeting()` in lib/state.)
  * No React, no store: the generic panels and the Reviews tab read store state and pass it in.
  * Covered by lib/view/reviewTools.test.ts against the real seed.
  */
 import { classify, routing } from "@/lib/rules";
 import type { RulesConfig } from "@/lib/rules/types";
-import { eventDate, lastSessionDate } from "@/lib/state";
+import { lastSessionDate } from "@/lib/state";
 import type { FeeLineDraft } from "@/lib/state/actions";
-import { BLACKOUTS } from "@/lib/data/calendar";
-import { fmtDate, plural } from "@/lib/format";
+import { plural } from "@/lib/format";
 import type { Dept, EventCase, FeeLine, FileRef, ISODate, Task } from "@/lib/types";
 import { formRows, type FormRow } from "@/lib/view/cardForms";
 
@@ -142,28 +142,6 @@ export function closeoutRows(c: EventCase, dept: Dept, actualQtyByLineId: Record
   const extra: CloseoutExtraRow[] = extraLines.filter((e) => e.qty > 0).map((e) => ({ ...e, amount: round2(e.qty * e.unitPrice) }));
   const runningTotal = round2(rows.reduce((sum, r) => sum + r.difference, 0) + extra.reduce((sum, e) => sum + e.amount, 0));
   return { rows, extra, runningTotal };
-}
-
-/* ---------- meeting-date validation ---------- */
-
-/** A citywide blackout date (Memorial Day, the fireworks closures), independent of location. */
-export function isBlackoutDate(date: ISODate): boolean {
-  return BLACKOUTS.some((b) => b.date === date);
-}
-
-export interface DateCheck {
-  ok: boolean;
-  reason?: string;
-}
-
-/** A meeting or walkthrough must fall on or after today, before the event, and not on a blackout. */
-export function meetingDateValid(c: EventCase, date: ISODate, today: ISODate): DateCheck {
-  if (!date) return { ok: false, reason: "Choose a date." };
-  if (date < today) return { ok: false, reason: "Choose today or a later date." };
-  const ev = eventDate(c, today);
-  if (ev && date >= ev) return { ok: false, reason: `Choose a date before ${fmtDate(ev)}.` };
-  if (isBlackoutDate(date)) return { ok: false, reason: "That date is a citywide blackout." };
-  return { ok: true };
 }
 
 /* ---------- a work order's own detail ---------- */

@@ -12,7 +12,7 @@ import { checkConfirmRouting } from "@/lib/state"
 import type { RoutedReviewer } from "@/lib/state/actions"
 import { defaultReviewDueDate, leadTimeLeftAfterRouting } from "@/lib/view/clerkTools"
 import { plural } from "@/lib/format"
-import { PARTY_LABEL, type Dept } from "@/lib/types"
+import { DEPTS, PARTY_LABEL, type Dept } from "@/lib/types"
 import { PanelActions, PanelBody, PanelHeader, useCaseContext, useCaseDispatch } from "../panelKit"
 import type { ActionPanelProps } from "../types"
 
@@ -33,9 +33,12 @@ function ConfirmRoutingPanel({ caseId, onClose }: ActionPanelProps) {
   const suggestions = React.useMemo(() => (c ? routing(c, classify(c, cfg), cfg) : []), [c, cfg]);
   // Today plus the tier's review days, rolled back off a weekend: never empty, never a weekend.
   const defaultDue = c ? defaultReviewDueDate(c, cfg, today) : today;
-  const [rows, setRows] = React.useState<Row[]>(() =>
-    suggestions.map((s) => ({ dept: s.dept, reasons: s.reasons, checked: true, sections: s.sections.join("\n"), dueDate: defaultDue })),
-  )
+  // Every department has a row, so the Clerk can add a reviewer as well as take one off (PRD,
+  // "Routing"): the suggested ones first and checked, the others after them and unchecked.
+  const [rows, setRows] = React.useState<Row[]>(() => [
+    ...suggestions.map((s) => ({ dept: s.dept, reasons: s.reasons, checked: true, sections: s.sections.join("\n"), dueDate: defaultDue })),
+    ...DEPTS.filter((dept) => !suggestions.some((s) => s.dept === dept)).map((dept) => ({ dept, reasons: [], checked: false, sections: "", dueDate: defaultDue })),
+  ])
 
   if (!c) return null
   const check = checkConfirmRouting(c)
@@ -44,41 +47,39 @@ function ConfirmRoutingPanel({ caseId, onClose }: ActionPanelProps) {
     setRows((cur) => cur.map((r) => (r.dept === dept ? { ...r, ...patch } : r)))
   }
 
+  const reviewers: RoutedReviewer[] = rows
+    .filter((r) => r.checked)
+    .map((r) => ({ dept: r.dept, sections: r.sections.split("\n").map((s) => s.trim()).filter(Boolean), dueDate: r.dueDate }))
+
   function submit() {
-    const reviewers: RoutedReviewer[] = rows
-      .filter((r) => r.checked)
-      .map((r) => ({ dept: r.dept, sections: r.sections.split("\n").map((s) => s.trim()).filter(Boolean), dueDate: r.dueDate }))
     const result = dispatch({ type: "confirm_routing", reviewers }, "Routing confirmed; the case moved to In review.")
     if (result.ok) onClose()
     else setError(result.reason ?? "Routing could not be confirmed.")
   }
 
-  const anyChecked = rows.some((r) => r.checked)
-  // A checked reviewer needs a date on or after today: it is the review's allowance. The engine
-  // refuses the same thing (checkConfirmRouting), so a richer panel inherits the guard.
+  // A checked reviewer needs a date on or after today: it is the review's allowance. Shown on
+  // the row's own field; the engine refuses the same thing.
   const dateProblem = (row: Row): string | null => {
     if (!row.checked) return null
     if (!row.dueDate) return "Choose a due date."
     return row.dueDate < today ? "The due date has passed; choose today or later." : null
   }
   const datesOk = rows.every((row) => dateProblem(row) === null)
+  // The list as it stands, asked of the engine before the click: nobody routed, or a
+  // department left off that one of the applicant's cards names as its reviewer.
+  const listCheck = check.ok ? checkConfirmRouting(c, reviewers, today) : check
+  const listProblem = datesOk && !listCheck.ok ? listCheck.reason : null
 
   const checkedDueDates = rows.filter((r) => r.checked && r.dueDate).map((r) => r.dueDate);
   const latestDueDate = checkedDueDates.length > 0 ? checkedDueDates.reduce((a, b) => (a > b ? a : b)) : null;
   const leadTimeLeft = latestDueDate ? leadTimeLeftAfterRouting(c, latestDueDate) : null;
-
-  // A card routed without its reviewer leaves it with nobody tasked (readme, "Open items"):
-  // an insurance card exists on the plan but its department, Health & Legal, is unchecked.
-  const hasInsuranceCard = c.tasks.some((t) => t.catalogId === "insurance_certificate");
-  const hlRow = rows.find((r) => r.dept === "hl");
-  const droppingInsuranceReviewer = hasInsuranceCard && hlRow && !hlRow.checked;
 
   return (
     <>
       <PanelHeader title="Confirm routing" description="Suggested from the plan's triggers. Adjust who reviews, what each checks, and the due date for its decision." />
       <PanelBody>
         {!check.ok ? <InlineAlert variant="warning">{check.reason}</InlineAlert> : null}
-        {rows.length === 0 ? (
+        {suggestions.length === 0 ? (
           <p className="text-sm text-fg-secondary">Nothing suggests a reviewer for this plan; route at least one department.</p>
         ) : null}
         {rows.map((row) => (
@@ -87,7 +88,7 @@ function ConfirmRoutingPanel({ caseId, onClose }: ActionPanelProps) {
               <Checkbox checked={row.checked} onCheckedChange={(v) => updateRow(row.dept, { checked: v === true })} className="mt-1" aria-label={`Route to ${PARTY_LABEL[row.dept]}`} />
               <div className="flex min-w-0 flex-1 flex-col gap-1">
                 <PartyChip party={row.dept} />
-                <p className="text-xs text-fg-secondary">{row.reasons.join(", ")}</p>
+                <p className="text-xs text-fg-secondary">{row.reasons.length > 0 ? row.reasons.join(", ") : "Not suggested by this plan."}</p>
               </div>
             </div>
             <Field label="Sections">
@@ -105,15 +106,13 @@ function ConfirmRoutingPanel({ caseId, onClose }: ActionPanelProps) {
               : `${plural(leadTimeLeft, "day")} of lead time left after the latest due date, for the quote and payment.`}
           </InlineAlert>
         ) : null}
-        {droppingInsuranceReviewer ? (
-          <InlineAlert variant="danger">This plan carries an insurance card; route Health &amp; Legal or nobody checks it.</InlineAlert>
-        ) : null}
+        {listProblem ? <InlineAlert variant="danger">{listProblem}</InlineAlert> : null}
       </PanelBody>
       <PanelActions
         error={error}
         onCancel={onClose}
         submitLabel="Confirm routing"
-        disabled={!check.ok || !anyChecked || !datesOk || droppingInsuranceReviewer}
+        disabled={!check.ok || !datesOk || !listCheck.ok}
         onSubmit={submit}
       />
     </>

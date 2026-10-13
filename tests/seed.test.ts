@@ -367,7 +367,10 @@ describe("a seeded case never offers what the engine refuses", () => {
             action = { type: "pay", amount: 20, method: role === "clerk" ? "in_person" : "card", kind, occurrenceDate: kind === "session" ? occurrenceDate : undefined };
           }
           if (offered.type === "amend") action = { type: "amend", answers: c, lateFee: true };
-          if (offered.type === "confirm_routing") action = { type: "confirm_routing", reviewers: [{ dept: "hl", sections: ["Certificate of insurance"], dueDate: "2027-05-17" }] };
+          // What the routing panel prefills: a list that left a card's reviewer out would be refused.
+          if (offered.type === "confirm_routing") {
+            action = { type: "confirm_routing", reviewers: routing(c, classify(c, DEFAULT_CONFIG), DEFAULT_CONFIG).map((r) => ({ dept: r.dept, sections: r.sections, dueDate: "2027-05-17" })) };
+          }
           if (!action) throw new Error(`no payload for ${offered.type}`);
           const reason = reasonFor(c, action, role);
           expect([c.id, role, offered.type, reason], `${c.name}: ${offered.label}`).toEqual([c.id, role, offered.type, offered.enabled ? null : offered.reason]);

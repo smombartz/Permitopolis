@@ -1,6 +1,7 @@
 "use client"
 
 /** The consolidation panel's side-by-side view: each routed department's decision, conditions and fee lines, with conflicts flagged above. */
+import { cn } from "cn"
 import { InlineAlert } from "@/components/ui/inline-alert"
 import { ConditionList, PartyChip, ReviewStatusDot } from "@/components/domain"
 import { fmtMoney } from "@/lib/format"
@@ -19,7 +20,7 @@ function DepartmentCard({ summary }: { summary: ReviewSummary }) {
   const feeTotal = summary.feeLines.reduce((sum, line) => sum + line.estimate, 0)
   return (
     <div className="flex flex-col gap-3 rounded-panel border border-line-subtle bg-surface-1 p-3.5">
-      <div className="flex items-center justify-between gap-2">
+      <div className="flex flex-wrap items-center justify-between gap-2">
         <PartyChip party={summary.dept} />
         <ReviewStatusDot dept={summary.dept} status={summary.review?.status ?? "not_routed"} showDept={false} />
       </div>
@@ -64,7 +65,8 @@ function DepartmentConsolidation({ summaries, conflicts }: DepartmentConsolidati
           ))}
         </div>
       ) : null}
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+      {/* Side by side in the wide sheet: one column per routed department, two or three. */}
+      <div data-slot="consolidation-columns" className={cn("grid grid-cols-1 gap-3", routed.length === 2 ? "lg:grid-cols-2" : routed.length >= 3 ? "lg:grid-cols-3" : undefined)}>
         {routed.map((summary) => (
           <DepartmentCard key={summary.dept} summary={summary} />
         ))}

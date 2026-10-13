@@ -73,8 +73,14 @@ export type Action =
    */
   | { type: "confirm_routing"; reviewers: RoutedReviewer[] }
   | { type: "send_to_commission" }
-  /** In review to Quote sent. Needs every routed review approved. Replaces conditions and fee lines with the merged ones. */
-  | { type: "send_quote"; conditions: ConditionDraft[]; feeLines: FeeLineDraft[] }
+  /**
+   * In review to Quote sent. Needs every routed review approved. Replaces conditions and fee
+   * lines with the merged ones. An empty list means "as the case stands" (the reviewers'
+   * conditions, the estimate's lines), which is what a script or a one-click panel sends. With
+   * `merged: true` both lists are the Clerk's final ones and are taken as given, an empty one
+   * included: the quote builder sends this, so removing every condition sends a quote with none.
+   */
+  | { type: "send_quote"; conditions: ConditionDraft[]; feeLines: FeeLineDraft[]; merged?: boolean }
   /** Final. Releases the hold. */
   | { type: "deny"; reason: string }
   /** Quote sent to Permitted. Needs signed, paid and insurance verified. Creates work-order tasks. */

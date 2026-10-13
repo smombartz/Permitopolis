@@ -62,13 +62,14 @@ function CaseHeader({
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="flex min-w-0 flex-col gap-1.5">
           <div className="flex flex-wrap items-center gap-2">
-            <h1 className="text-h4 font-bold text-fg">{name}</h1>
+            {/* The case's own page shows its name in full: it wraps, and is never cut short. */}
+            <h1 className="min-w-0 text-h4 font-bold break-words text-fg">{name}</h1>
             <TierBadge tier={tier} />
           </div>
           <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-fg-secondary">
             <CaseId id={caseId} />
             <span aria-hidden="true">·</span>
-            <span>{applicantName}</span>
+            <span className="min-w-0 break-words">{applicantName}</span>
             <span aria-hidden="true">·</span>
             {eventDate ? (
               <>

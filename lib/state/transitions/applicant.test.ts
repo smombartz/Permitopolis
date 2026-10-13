@@ -73,6 +73,18 @@ describe("create_board", () => {
     expect(result.ok && result.case.tasks[0]).toMatchObject({ status: "locked", unlocksOn: "quote_sent", payload: { amount: 465 } });
   });
 
+  it("rebuilding keeps what is on a card (the sign-offs so far) and takes only a per-vendor card's vendor from the new plan", () => {
+    const freshSignoff = makeTask({ id: "PMT-27-0001:neighbor_signoff", catalogId: "neighbor_signoff", kind: "action", payload: { progress: { done: 0, total: 12 } }, history: [] });
+    const freshPermit = makeTask({ id: "PMT-27-0001:vendor_health_permit:1", catalogId: "vendor_health_permit", title: "Health permit: New Name", payload: { vendorName: "New Name" }, history: [] });
+    vi.mocked(requirements).mockReturnValue([freshSignoff, freshPermit]);
+    const signoff = makeTask({ id: freshSignoff.id, catalogId: "neighbor_signoff", kind: "action", payload: { progress: { done: 9, total: 12 } } });
+    const file = { name: "permit.pdf", size: 1000, type: "application/pdf" };
+    const permit = makeTask({ id: freshPermit.id, catalogId: "vendor_health_permit", title: "Health permit: Old Name", status: "submitted", payload: { vendorName: "Old Name", files: [file] } });
+    const result = transition(makeCase({ state: "draft", tasks: [signoff, permit] }), { type: "create_board" }, "applicant", makeCtx());
+    expect(result.ok && result.case.tasks[0].payload).toEqual({ progress: { done: 9, total: 12 } });
+    expect(result.ok && result.case.tasks[1]).toMatchObject({ title: "Health permit: New Name", status: "submitted", payload: { vendorName: "New Name", files: [file] } });
+  });
+
   it("fails outside Draft", () => {
     const c = makeCase({ state: "submitted" });
     const result = transition(c, { type: "create_board" }, "applicant", makeCtx());

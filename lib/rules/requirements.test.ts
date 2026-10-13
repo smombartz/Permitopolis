@@ -69,6 +69,18 @@ describe("requirements: multiple vendors", () => {
     expect(vendorCards.map((t) => t.id)).toEqual(["PMT-27-0999:vendor_health_permit:1", "PMT-27-0999:vendor_health_permit:2", "PMT-27-0999:vendor_health_permit:3"]);
     expect(vendorCards.map((t) => t.title)).toEqual(["Health permit: Alpha", "Health permit: Beta", "Health permit: Vendor 3"]);
   });
+
+  it("each per-vendor card carries its vendor's name in its payload, so nothing has to read it back out of the title", () => {
+    const a = answers({
+      location: areaLocation("city-hall-plaza"),
+      attendance: 150,
+      addOns: addOns({ foodVending: { vendors: 3, vendorNames: ["Alpha", "Beta"] } }),
+    });
+    const tasks = requirements(a, classify(a), { caseId: "PMT-27-0999", today: "2027-01-01" });
+    expect(tasks.filter((t) => t.catalogId === "vendor_health_permit").map((t) => t.payload.vendorName)).toEqual(["Alpha", "Beta", "Vendor 3"]);
+    // No other card has one.
+    expect(tasks.filter((t) => t.catalogId !== "vendor_health_permit").every((t) => t.payload.vendorName === undefined)).toBe(true);
+  });
 });
 
 describe("requirements: block party", () => {

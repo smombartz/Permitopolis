@@ -96,27 +96,28 @@ function AddConditionRow({ onAdd }: { onAdd: (row: ConditionRow) => void }) {
 function ConditionsEditor({ rows, conflictIds, onUpdate, onRemove, onMove, onAdd }: ConditionsEditorProps) {
   return (
     <div className="flex flex-col gap-3">
-      {rows.length === 0 ? <p className="text-sm text-fg-secondary">No conditions yet.</p> : null}
+      {rows.length === 0 ? <p className="text-sm text-fg-secondary">No conditions. The applicant will have none to accept.</p> : null}
       {rows.map((row, index) => (
         <div key={row.id} className="flex flex-col gap-2 rounded-panel border border-line-subtle bg-surface-1 p-3">
           <div className="flex flex-wrap items-center gap-2">
             <PartyChip party={row.dept} />
             {conflictIds.has(row.id) ? <Badge variant="warning">Conflicts</Badge> : null}
             <div className="ml-auto flex items-center gap-1">
-              <Button type="button" variant="ghost" size="icon-sm" aria-label="Move up" disabled={index === 0} onClick={() => onMove(row.id, -1)}>
+              {/* Named for the condition, as the review panel's list names them: several rows, several buttons. */}
+              <Button type="button" variant="ghost" size="icon-sm" aria-label={`Move "${row.text}" up`} disabled={index === 0} onClick={() => onMove(row.id, -1)}>
                 <ArrowUpIcon />
               </Button>
-              <Button type="button" variant="ghost" size="icon-sm" aria-label="Move down" disabled={index === rows.length - 1} onClick={() => onMove(row.id, 1)}>
+              <Button type="button" variant="ghost" size="icon-sm" aria-label={`Move "${row.text}" down`} disabled={index === rows.length - 1} onClick={() => onMove(row.id, 1)}>
                 <ArrowDownIcon />
               </Button>
-              <Button type="button" variant="ghost" size="icon-sm" aria-label="Remove condition" onClick={() => onRemove(row.id)}>
+              <Button type="button" variant="ghost" size="icon-sm" aria-label={`Remove "${row.text}"`} onClick={() => onRemove(row.id)}>
                 <Trash2Icon />
               </Button>
             </div>
           </div>
           <div className="flex flex-wrap items-end gap-2">
-            <DeptSelect value={row.dept} onChange={(dept) => onUpdate(row.id, { dept })} ariaLabel="Department" className={`${SELECT_CLASS} w-40`} />
-            <Input aria-label="Condition text" className="min-w-48 flex-1" value={row.text} onChange={(e) => onUpdate(row.id, { text: e.target.value })} />
+            <DeptSelect value={row.dept} onChange={(dept) => onUpdate(row.id, { dept })} ariaLabel={`Department for "${row.text}"`} className={`${SELECT_CLASS} w-40`} />
+            <Input aria-label={`Condition ${index + 1}`} className="min-w-48 flex-1" value={row.text} onChange={(e) => onUpdate(row.id, { text: e.target.value })} />
           </div>
         </div>
       ))}

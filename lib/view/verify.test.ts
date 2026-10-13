@@ -60,7 +60,8 @@ describe("buildVerificationPreview: S3's health permit, after the applicant answ
       ctx,
     );
     if (!answered.ok) throw new Error(answered.reason);
-    const task = { ...taskById(answered.case, taskId), title: "Health permit: Some Other Vendor" };
+    const card = taskById(answered.case, taskId);
+    const task = { ...card, title: "Health permit: Some Other Vendor", payload: { ...card.payload, vendorName: "Some Other Vendor" } };
 
     const preview = buildVerificationPreview(answered.case, task);
     const vendorItem = preview.checklist.find((i) => i.id === "vendor_matches")!;

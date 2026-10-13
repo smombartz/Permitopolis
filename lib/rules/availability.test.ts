@@ -1,8 +1,15 @@
 import { describe, expect, it } from "vitest";
-import { availability, occurrences } from "./availability";
+import { availability, citywideBlackoutOn, occurrences } from "./availability";
 import { ctx, eventCase, inventoryLocation, areaLocation } from "./test-helpers";
 
 describe("availability: blackout", () => {
+  it("citywideBlackoutOn names the blackout on a day, whatever the place, and is null on an ordinary day", () => {
+    expect(citywideBlackoutOn("2027-05-31")).toMatch(/Memorial Day/);
+    expect(citywideBlackoutOn("2027-07-04")).toMatch(/fireworks/);
+    expect(citywideBlackoutOn("2027-07-05")).toMatch(/cleanup/);
+    expect(citywideBlackoutOn("2027-06-01")).toBeNull();
+  });
+
   it("all parks are blackout on 2027-05-31", () => {
     const shelter = availability(inventoryLocation(["shelter-1"]), { date: "2027-05-31", start: "10:00", end: "14:00" }, ctx());
     expect(shelter.status).toBe("blackout");

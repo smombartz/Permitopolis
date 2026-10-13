@@ -60,11 +60,16 @@ function SendQuotePanel({ caseId, role, onClose }: ActionPanelProps) {
   const showLateFeeAdvice = lateFeeApplies(c, { today, cases: [], cfg }) && !feeRows.some((r) => r.kind === "late_fee")
   const lateFeeAdvice = showLateFeeAdvice ? previewLateFeeAmount(feeRows, cfg) : null
 
+  const feeDrafts = quoteLineRowsToDrafts(feeRows)
+  // A quote with no fee line would unlock a payment card with nothing to pay.
+  const emptyQuote = feeDrafts.length === 0
+
   function submit() {
-    // The deposit is shown as its own fixed line, not one of the editable rows, but send_quote
-    // replaces the whole list once it is given any lines at all: it has to go back in.
+    // `merged`: these are the final lists, so a condition the Clerk removed stays removed, also
+    // when it was the last one. The deposit is shown as its own fixed line, not one of the
+    // editable rows, and send_quote takes the list as given: it has to go back in.
     const result = dispatch(
-      { type: "send_quote", conditions: conditionRowsToDrafts(conditionRows), feeLines: [...quoteLineRowsToDrafts(feeRows), ...depositDrafts] },
+      { type: "send_quote", merged: true, conditions: conditionRowsToDrafts(conditionRows), feeLines: [...feeDrafts, ...depositDrafts] },
       "Quote sent.",
     )
     if (result.ok) onClose()
@@ -113,7 +118,7 @@ function SendQuotePanel({ caseId, role, onClose }: ActionPanelProps) {
           {c.schedule?.recurrence ? " (the series' first session; the rest is billed on schedule)" : ""}. The date hold will expire {fmtDate(totals.holdExpiresOn)} unless it is paid first.
         </InlineAlert>
       </PanelBody>
-      <PanelActions error={error} onCancel={onClose} submitLabel="Send quote" disabled={!check.ok} onSubmit={submit} />
+      <PanelActions error={error ?? (check.ok && emptyQuote ? "Add at least one fee line: a quote has to ask for something." : null)} onCancel={onClose} submitLabel="Send quote" disabled={!check.ok || emptyQuote} onSubmit={submit} />
     </>
   )
 }

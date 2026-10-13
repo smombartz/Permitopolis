@@ -7,10 +7,10 @@
  * panel and its closeout).
  */
 import * as React from "react"
-import { PlusIcon, Trash2Icon } from "lucide-react"
+import { PlusIcon } from "lucide-react"
 import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
 import { Money } from "@/components/domain"
+import { FeeLineFields, feeLineAmount } from "@/components/case/FeeLineFields"
 import type { FeeLineDraft } from "@/lib/state/actions"
 import type { FeeLine } from "@/lib/types"
 
@@ -33,7 +33,7 @@ function toFeeRow(draft: FeeLineDraft): FeeRow {
 }
 
 export function feeRowTotal(rows: FeeRow[]): number {
-  return Math.round(rows.reduce((sum, r) => sum + r.qty * r.unitPrice, 0) * 100) / 100
+  return Math.round(rows.reduce((sum, r) => sum + feeLineAmount(r), 0) * 100) / 100
 }
 
 interface FeeLineBuilderProps {
@@ -101,24 +101,7 @@ function FeeLineBuilder({ presets, existing, value, onChange }: FeeLineBuilderPr
         {value.length === 0 ? (
           <p className="text-sm text-fg-secondary">No fee lines added.</p>
         ) : (
-          value.map((row) => (
-            <div key={row.key} className="grid grid-cols-[1fr_4.5rem_5rem_5.5rem_auto] items-center gap-1.5">
-              <Input aria-label="Label" placeholder="Label" value={row.label} onChange={(e) => updateRow(row.key, { label: e.target.value })} />
-              <Input aria-label="Quantity" type="number" min="0" step="0.5" value={row.qty} onChange={(e) => updateRow(row.key, { qty: Number(e.target.value) || 0 })} />
-              <Input aria-label="Unit" placeholder="unit" value={row.unit} onChange={(e) => updateRow(row.key, { unit: e.target.value })} />
-              <Input
-                aria-label="Unit price"
-                type="number"
-                min="0"
-                step="0.01"
-                value={row.unitPrice}
-                onChange={(e) => updateRow(row.key, { unitPrice: Number(e.target.value) || 0 })}
-              />
-              <Button type="button" variant="ghost" size="icon-sm" aria-label={`Remove ${row.label || "line"}`} onClick={() => removeRow(row.key)}>
-                <Trash2Icon />
-              </Button>
-            </div>
-          ))
+          value.map((row) => <FeeLineFields key={row.key} line={row} onChange={(patch) => updateRow(row.key, patch)} onRemove={() => removeRow(row.key)} />)
         )}
         {value.length > 0 ? (
           <div className="flex items-center justify-between border-t border-line-subtle pt-2 text-sm">

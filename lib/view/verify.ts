@@ -181,13 +181,9 @@ function buildInsurance(c: EventCase, file: FileRef): { kind: PreviewKind; facts
 
 /* ---------- vendor health permit ---------- */
 
-function vendorNameFromTitle(title: string): string {
-  const m = title.match(/^Health permit: (.+)$/);
-  return m ? m[1] : title;
-}
-
 function buildHealthPermit(c: EventCase, task: Task): { kind: PreviewKind; facts: DocFact[]; checklist: ChecklistItem[] } {
-  const vendor = vendorNameFromTitle(task.title);
+  // The card names its vendor (`requirements()` writes it); the title is only how it reads.
+  const vendor = task.payload.vendorName ?? task.title;
   const vendorNames = c.addOns.foodVending?.vendorNames ?? [];
   const onList = vendorNames.includes(vendor);
   const permitNumber = `HP-2027-${String(10_000 + (stableHash(task.id) % 90_000)).padStart(5, "0")}`;

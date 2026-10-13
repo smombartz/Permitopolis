@@ -63,9 +63,10 @@ describe("review decide: a fresh routed case (the Farmers Market filler)", () =>
     await user.click(sheet().getByRole("button", { name: "Generators placed at least 10 feet from any structure" }));
     await user.click(sheet().getByRole("button", { name: "Tents secured with weighted ballast, no stakes in paved areas" }));
     await user.click(sheet().getByRole("button", { name: "Add line" }));
+    // A new line's fields are plainly named; once it has a label they are named for it.
     fireEvent.change(sheet().getByLabelText("Label"), { target: { value: "Extra barricade watch" } });
-    fireEvent.change(sheet().getByLabelText("Quantity"), { target: { value: "2" } });
-    fireEvent.change(sheet().getByLabelText("Unit price"), { target: { value: "50" } });
+    fireEvent.change(sheet().getByLabelText("Quantity: Extra barricade watch"), { target: { value: "2" } });
+    fireEvent.change(sheet().getByLabelText("Unit price: Extra barricade watch"), { target: { value: "50" } });
     await user.click(sheet().getByRole("button", { name: "Approve with conditions" }));
 
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();

@@ -67,7 +67,10 @@ function planBoard(draft: EventCase, ctx: RulesCtx): { board: EventCase; estimat
     const existing = c.tasks.find((t) => t.id === fresh.id);
     // The payment card is the plan's own: its amount, and whether it waits for a quote.
     if (!existing || fresh.catalogId === "pay_fees") return fresh;
-    return { ...fresh, status: existing.status, payload: existing.payload, history: existing.history, request: existing.request };
+    // What the applicant put on the card stays (its files, its form, the sign-offs so far).
+    // Whose permit a per-vendor card is follows the answers as they are now, like its title.
+    const payload = fresh.payload.vendorName === undefined ? existing.payload : { ...existing.payload, vendorName: fresh.payload.vendorName };
+    return { ...fresh, status: existing.status, payload, history: existing.history, request: existing.request };
   });
   // Submit application is open exactly when every card before it is in, whatever it was before.
   const ready = preSubmitCardsIn({ ...c, tasks: mergedTasks });

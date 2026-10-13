@@ -12,10 +12,11 @@ import type { ActionPanelProps } from "../types"
 
 /**
  * Verify, with Send back folded into the same panel (workstream 4D, replacing the two thin
- * forms Phase 3 shipped): a mock preview of the document on top, drawn from the case, the
- * card and its file (never a real file, never random), and its checklist below, each item
- * pre-evaluated and overridable. Verify is the primary action while every item passes; once
- * one is unchecked, Send back takes over with its reason prefilled from the failing items.
+ * forms Phase 3 shipped): a mock preview of the document on the left, drawn from the case, the
+ * card and its file (never a real file, never random), and its checklist on the right, each
+ * item pre-evaluated and overridable. The sheet opens wide for this panel; under 1024px the
+ * two stack. Verify is the primary action while every item passes; once one is unchecked,
+ * Send back takes over with its reason prefilled from the failing items.
  */
 function VerifyDocumentPanel({ caseId, arg, role, onClose }: ActionPanelProps) {
   const { c } = useCaseContext(caseId)
@@ -62,24 +63,26 @@ function VerifyDocumentPanel({ caseId, arg, role, onClose }: ActionPanelProps) {
         {nothingSubmitted ? (
           <p className="text-sm text-fg-secondary">Nothing uploaded yet.</p>
         ) : (
-          <>
+          <div data-slot="verify-layout" className="grid grid-cols-1 gap-4 lg:grid-cols-2 lg:items-start">
             <DocumentPreview preview={preview} task={task} />
-            <ChecklistPanel items={preview.checklist} overrides={overrides} onToggle={toggle} />
-            {!allPassNow ? (
-              <Field label="Reason the applicant will see" required>
-                <Textarea
-                  autoFocus
-                  rows={3}
-                  value={reasonValue}
-                  onChange={(e) => {
-                    setReason(e.target.value)
-                    setReasonTouched(true)
-                  }}
-                  placeholder="What needs to change"
-                />
-              </Field>
-            ) : null}
-          </>
+            <div className="flex min-w-0 flex-col gap-4">
+              <ChecklistPanel items={preview.checklist} overrides={overrides} onToggle={toggle} />
+              {!allPassNow ? (
+                <Field label="Reason the applicant will see" required>
+                  <Textarea
+                    autoFocus
+                    rows={3}
+                    value={reasonValue}
+                    onChange={(e) => {
+                      setReason(e.target.value)
+                      setReasonTouched(true)
+                    }}
+                    placeholder="What needs to change"
+                  />
+                </Field>
+              ) : null}
+            </div>
+          </div>
         )}
       </PanelBody>
       <PanelActions

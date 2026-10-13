@@ -61,7 +61,9 @@ function cardFromSpec(
     status,
     unlocksOn: spec.unlocksOn,
     phase: spec.phase,
-    payload: {},
+    // A per-vendor card says whose it is in its payload as well as its title, so a screen that
+    // needs the vendor (the health permit's checklist) does not read it back out of the title.
+    payload: n === undefined ? {} : { vendorName: vendorName(a, n) },
     history: [],
     tags: [],
   };

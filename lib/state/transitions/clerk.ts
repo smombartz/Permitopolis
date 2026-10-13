@@ -105,15 +105,17 @@ export function sendQuote(c: EventCase, action: Extract_<"send_quote">, actor: A
   const check = checkSendQuote(c);
   if (!check.ok) return check;
 
+  // `merged` is the quote builder: its lists are final, an empty one included. Without it an
+  // empty list stands for the case's own.
   let conditions: Condition[];
-  if (action.conditions.length > 0) {
+  if (action.merged || action.conditions.length > 0) {
     conditions = action.conditions.map((cd, i) => ({ id: taskId(c.id, "cond", i + 1), dept: cd.dept, text: cd.text, mergedByClerk: true, acceptedByApplicant: false }));
   } else {
     conditions = c.conditions.map((cond) => ({ ...cond, mergedByClerk: true }));
   }
 
   let feeLines: FeeLine[];
-  if (action.feeLines.length > 0) {
+  if (action.merged || action.feeLines.length > 0) {
     feeLines = action.feeLines.map((fl, i) => ({
       id: taskId(c.id, "fee", i + 1),
       dept: fl.dept,

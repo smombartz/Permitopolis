@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
+import { checkScheduleMeeting } from "../checks";
 import { taskDueDate } from "../core";
 import { makeCase, makeCtx, makeTask } from "../testSupport";
 import { transition } from "../transition";
@@ -255,6 +256,34 @@ describe("schedule_meeting and complete_city_task", () => {
     // Moving it moves the due date with it.
     const moved = transition(scheduled.case, { type: "schedule_meeting", taskId: meeting.id, date: "2027-06-23" }, "clerk", makeCtx());
     expect(moved.ok && taskDueDate(moved.case.tasks[0])).toBe("2027-06-23");
+  });
+
+  it("a meeting is set for today or later, before the event, and never on a blackout day", () => {
+    // A Special event on Sun, Jul 11; today is Mon, May 3.
+    const walkthrough = makeTask({ id: "PMT-27-0001:site_walkthrough", catalogId: "site_walkthrough", kind: "meeting", reviewer: "pws", status: "locked", unlocksOn: "permitted" });
+    const schedule = { date: "2027-07-11", start: "07:00" as const, end: "11:00" as const, occurrences: [{ date: "2027-07-11", availability: { status: "open" as const }, billing: "upcoming" as const }] };
+    const c = makeCase({ state: "quote_sent", tier: "special", schedule, tasks: [walkthrough] });
+    const on = (date: string) => transition(c, { type: "schedule_meeting", taskId: walkthrough.id, date }, "pws", makeCtx());
+
+    expect(on("")).toEqual({ ok: false, reason: "Choose a date." });
+    expect(on("2027-05-02")).toEqual({ ok: false, reason: "Choose today or a later date." });
+    expect(on("2027-07-11")).toEqual({ ok: false, reason: "Choose a date before Sun, Jul 11, 2027." });
+    expect(on("2027-07-20")).toEqual({ ok: false, reason: "Choose a date before Sun, Jul 11, 2027." });
+    // Memorial Day, and the day the city cleans up after the fireworks.
+    expect(on("2027-05-31")).toEqual({ ok: false, reason: "That date is a citywide blackout." });
+    expect(on("2027-07-05")).toEqual({ ok: false, reason: "That date is a citywide blackout." });
+    expect(on("2027-05-03").ok).toBe(true);
+    expect(on("2027-07-02").ok).toBe(true);
+  });
+
+  it("checkScheduleMeeting gives a panel the same reasons before the click, and none about the date until one is asked about", () => {
+    const walkthrough = makeTask({ id: "PMT-27-0001:site_walkthrough", catalogId: "site_walkthrough", kind: "meeting", reviewer: "pws" });
+    const schedule = { date: "2027-07-11", start: "07:00" as const, end: "11:00" as const, occurrences: [{ date: "2027-07-11", availability: { status: "open" as const }, billing: "upcoming" as const }] };
+    const c = makeCase({ state: "quote_sent", tier: "special", schedule, tasks: [walkthrough] });
+    expect(checkScheduleMeeting(c, walkthrough.id, "pws")).toEqual({ ok: true });
+    expect(checkScheduleMeeting(c, walkthrough.id, "pws", { date: "2027-07-12", today: "2027-05-03" })).toEqual({ ok: false, reason: "Choose a date before Sun, Jul 11, 2027." });
+    // Who may schedule comes before when: the reason a date cannot fix is the one shown.
+    expect(checkScheduleMeeting(c, walkthrough.id, "hl", { date: "2027-07-12", today: "2027-05-03" })).toEqual({ ok: false, reason: "Only Public Works & Safety or the City Clerk can schedule this meeting." });
   });
 
   it("a meeting can be moved to another day, and the scheduling is done only once", () => {

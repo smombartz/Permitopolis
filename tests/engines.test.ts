@@ -203,6 +203,40 @@ describe("accept_complete and confirm_routing", () => {
   });
 });
 
+describe("confirm_routing and the plan's cards", () => {
+  it("routing() suggests every department a card of the plan names, on all 38 seed scripts, so the Clerk is never refused its own prefill", () => {
+    for (const script of SEED_SCRIPTS) {
+      const createdOn = script.createdAt.slice(0, 10);
+      const planned = draft(script.id, script.answers, createdOn);
+      if (planned.tier === "instant") continue;
+      const c = run(planned, { type: "create_board" }, "applicant", createdOn);
+      const suggested = new Set(routing(c, classify(c, DEFAULT_CONFIG)).map((r) => r.dept));
+      const named = c.tasks.filter((t) => t.owner === "applicant" && (t.kind === "document" || t.kind === "form") && t.reviewer && t.reviewer !== "clerk").map((t) => t.reviewer);
+      for (const dept of named) expect(suggested.has(dept!), `${script.key}: ${dept} is named on a card and not suggested`).toBe(true);
+    }
+  });
+
+  it("leaving a card's reviewer off the list is refused, with the department and the card", () => {
+    const jazz = run(submitted("PMT-27-0118", S3.answers, "2027-04-16"), { type: "accept_complete" }, "clerk", "2027-04-19");
+    const suggested = routing(jazz, classify(jazz, DEFAULT_CONFIG)).map((r) => ({ dept: r.dept, sections: r.sections, dueDate: "2027-05-03" }));
+    expect(reasonFor(jazz, { type: "confirm_routing", reviewers: suggested.filter((r) => r.dept !== "hl") }, "clerk", "2027-04-19")).toMatch(/^Route Health & Legal too: it checks "/);
+    expect(reasonFor(jazz, { type: "confirm_routing", reviewers: suggested }, "clerk", "2027-04-19")).toBeNull();
+  });
+});
+
+describe("schedule_meeting on the seed (S5, the 5K on Sun, Jul 11)", () => {
+  it("a walkthrough is refused on or after the event, before today and on a blackout, for whoever dispatches it", () => {
+    const s5 = replayScripts(SEED_SCRIPTS, { until: "2027-05-03" }).find((c) => c.id === "PMT-27-0097")!;
+    const walkthrough = `${s5.id}:site_walkthrough`;
+    const on = (date: ISODate, actor: Actor = "pws") => reasonFor(s5, { type: "schedule_meeting", taskId: walkthrough, date }, actor, "2027-05-03");
+    expect(on("2027-07-20")).toBe("Choose a date before Sun, Jul 11, 2027.");
+    expect(on("2027-07-11", "clerk")).toBe("Choose a date before Sun, Jul 11, 2027.");
+    expect(on("2027-04-01")).toBe("Choose today or a later date.");
+    expect(on("2027-05-31")).toBe("That date is a citywide blackout.");
+    expect(on("2027-06-15")).toBeNull();
+  });
+});
+
 describe("closeout (S6)", () => {
   it("permit to Closed: $9,645 paid, $750 over, $250 of the $1,000 deposit refunded, next year drafted", () => {
     let c = submitted("PMT-27-0031", S6.answers, "2027-02-01");
@@ -598,6 +632,18 @@ describe("a board built before the last edit", () => {
     c = completePreSubmitCards(c, TODAY);
     expect(task(c, "submit_application")?.status).toBe("todo");
     expect(reasonFor(c, { type: "submit" }, "applicant", TODAY)).toBeNull();
+  });
+
+  it("a vendor renamed after its permit was uploaded: the card keeps the file and takes the new name, in its title and its payload", () => {
+    const withVendor: EventAnswers = { ...withSound, addOns: { ...withSound.addOns, foodVending: { vendors: 1, vendorNames: ["Old Name Tacos"] } } };
+    let c = run(draft("PMT-27-0163", withVendor, TODAY), { type: "create_board" }, "applicant", TODAY);
+    expect(task(c, "vendor_health_permit:1")).toMatchObject({ title: "Health permit: Old Name Tacos", payload: { vendorName: "Old Name Tacos" } });
+    c = run(c, { type: "complete_task", taskId: `${c.id}:vendor_health_permit:1`, files: [FILE] }, "applicant", TODAY);
+    expect(task(c, "vendor_health_permit:1")?.payload).toMatchObject({ vendorName: "Old Name Tacos", files: [FILE] });
+
+    c = edit(c, { addOns: { ...c.addOns, foodVending: { vendors: 1, vendorNames: ["New Name Tacos"] } } }, TODAY);
+    c = run(c, { type: "create_board" }, "applicant", TODAY);
+    expect(task(c, "vendor_health_permit:1")).toMatchObject({ title: "Health permit: New Name Tacos", status: "submitted", payload: { vendorName: "New Name Tacos", files: [FILE] } });
   });
 
   it("the payment card follows the plan when the tier changes after the board exists", () => {

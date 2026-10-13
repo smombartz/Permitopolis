@@ -7,8 +7,6 @@ import {
   damageRepairLine,
   existingFeeLines,
   feePresetsFor,
-  isBlackoutDate,
-  meetingDateValid,
   reviewMaterial,
   routingReasons,
   workOrderDetail,
@@ -140,29 +138,6 @@ describe("closeoutRows", () => {
 describe("damageRepairLine", () => {
   it("labels the extra line from the issue, as F7's seed script writes it", () => {
     expect(damageRepairLine("Broken picnic table", 95)).toEqual({ dept: "pws", label: "Broken picnic table repair", qty: 1, unit: "item", unitPrice: 95 });
-  });
-});
-
-describe("isBlackoutDate", () => {
-  it("flags Memorial Day and the fireworks closures", () => {
-    expect(isBlackoutDate("2027-05-31")).toBe(true);
-    expect(isBlackoutDate("2027-07-04")).toBe(true);
-    expect(isBlackoutDate("2027-06-01")).toBe(false);
-  });
-});
-
-describe("meetingDateValid", () => {
-  it("S5: a walkthrough cannot be scheduled after the event", () => {
-    const c = caseById(buildSeed(), "PMT-27-0097"); // the 5K is Jul 11
-    expect(meetingDateValid(c, "2027-07-20", "2027-05-03").ok).toBe(false);
-    expect(meetingDateValid(c, "2027-07-11", "2027-05-03").ok).toBe(false); // not on the event day itself
-    expect(meetingDateValid(c, "2027-06-15", "2027-05-03").ok).toBe(true);
-  });
-
-  it("refuses a date before today or on a citywide blackout", () => {
-    const c = caseById(buildSeed(), "PMT-27-0097");
-    expect(meetingDateValid(c, "2027-04-01", "2027-05-03").ok).toBe(false);
-    expect(meetingDateValid(c, "2027-05-31", "2027-05-03").ok).toBe(false);
   });
 });
 

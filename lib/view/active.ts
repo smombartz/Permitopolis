@@ -8,7 +8,7 @@
  */
 import { addDaysISO, weekdayOf } from "@/lib/dates";
 import { fmtDateShort, plural } from "@/lib/format";
-import { BLACKOUTS } from "@/lib/data/calendar";
+import { citywideBlackoutOn } from "@/lib/rules";
 import { CITY_STAFF_BY_DEPT } from "@/lib/data/people";
 import { activePermits, eventDate, holdsDateAtQuote, permitSessions, sessionDates, waitingOn } from "@/lib/state";
 import { isHoldExpiringTomorrow } from "@/lib/view/caseDetail";
@@ -164,7 +164,7 @@ export function activeMapHighlights(cases: EventCase[], date: ISODate, options: 
 
 /** The label of a citywide blackout on this date, if any ("Memorial Day: all parks..."). */
 export function blackoutLabelOn(date: ISODate): string | null {
-  return BLACKOUTS.find((b) => b.date === date)?.label ?? null;
+  return citywideBlackoutOn(date);
 }
 
 /* ---------- closeout ---------- */

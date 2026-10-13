@@ -1,8 +1,11 @@
 /**
- * Default, generic panel for every action a city role can take (plan 8, workstream 3F): a
- * small, complete form that dispatches the action and shows the engine's reason if refused.
- * A later phase (4A to 4D) replaces some of these with richer tools, registered as overrides
- * in ../clerk.tsx, ../pws.tsx and ../hl.tsx; the registry falls back to this map.
+ * The panel for every action a city role can take: each dispatches its action and shows the
+ * engine's reason when it would be refused, before the click. Phase 3 shipped these as small
+ * forms; Phase 4 built the role tools in place, in these same files (4A the Clerk's: request
+ * information, routing, the quote builder, record payment, issue permit, reconcile; 4C the
+ * reviewer's: the review panel, the closeout log, work orders and meetings; 4D verification,
+ * with Send back folded into Verify). ../clerk.tsx, ../pws.tsx and ../hl.tsx stay empty: a
+ * role gets an override there only for a panel no other role shares.
  */
 import type { ActionType } from "@/lib/state/actions";
 import type { ActionPanelComponent } from "../types";

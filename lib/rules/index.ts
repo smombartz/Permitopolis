@@ -13,7 +13,7 @@ export { classify, whatIf, isBlockPartyException } from "./classify";
 export { routing, buildRouting, type RoutingBasis } from "./routing";
 export { requirements, permitComponents } from "./requirements";
 export { estimateFees } from "./fees";
-export { availability, occurrences } from "./availability";
+export { availability, citywideBlackoutOn, occurrences } from "./availability";
 export { dateGate } from "./dateGate";
 export { cancellationRefund } from "./cancellation";
 export { planTimeline } from "./timeline";

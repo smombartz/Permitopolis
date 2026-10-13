@@ -1,6 +1,7 @@
 /**
- * The City Clerk's own richer action panels, overriding the generic ones by action type.
- * Owned by workstream 4A/4B; empty for now, so the registry falls back to ../generic.
+ * The City Clerk's own action panels, overriding the shared ones by action type. Empty: Phase 4
+ * built every role tool as a shared panel in ./generic (see ./generic/index.ts), so the
+ * registry falls back to that map. Add a key here only for a panel this role alone uses.
  */
 import type { ActionType } from "@/lib/state/actions";
 import type { ActionPanelComponent } from "./types";

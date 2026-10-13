@@ -6,13 +6,14 @@
  */
 import { daysBetween } from "@/lib/dates";
 import { fmtDate, plural } from "@/lib/format";
-import { availability as availabilityRule, occupiedWindow, occurrences } from "@/lib/rules";
+import { availability as availabilityRule, citywideBlackoutOn, occupiedWindow, occurrences } from "@/lib/rules";
 import { CARD_BY_ID, type CardSpec } from "@/lib/rules/catalog";
 import { tier as higherTier } from "@/lib/rules/shared";
 import { PARTY_LABEL, STATE_LABEL, type Actor, type Availability, type Dept } from "@/lib/types";
 import type { EventCase, ISODate, Task } from "@/lib/types";
 import type { RulesConfig, RulesCtx } from "@/lib/rules/types";
 import type { ActionType, RoutedReviewer } from "./actions";
+import { sessionDates } from "./clock";
 import { findTask, idSuffix, preSubmitCardsIn, quoteBalance, quotePaid, reviewFor, signoffsLeft, taskId } from "./core";
 
 function unlockHintFor(catalogId: string): string | undefined {
@@ -257,6 +258,16 @@ export function checkConfirmRouting(c: EventCase, reviewers?: RoutedReviewer[], 
     if (undated) return fail(`Give ${PARTY_LABEL[undated.dept]} a due date.`);
     const past = today ? reviewers.find((r) => r.dueDate < today) : undefined;
     if (past) return fail(`${PARTY_LABEL[past.dept]}'s due date has passed; choose today or later.`);
+    // A document or form names the department that checks it. Routed without that department,
+    // the card would sit "With the city" with nobody tasked (the Clerk checks its own cards
+    // whether or not it is on the list, and a meeting is held, not checked).
+    const routed = new Set(reviewers.map((r) => r.dept));
+    const orphans = c.tasks.filter((t) => t.owner === "applicant" && (t.kind === "document" || t.kind === "form") && t.reviewer !== null && t.reviewer !== "clerk" && !routed.has(t.reviewer));
+    if (orphans.length > 0) {
+      const dept = orphans[0].reviewer as Dept;
+      const others = orphans.filter((t) => t.reviewer === dept).length - 1;
+      return fail(`Route ${PARTY_LABEL[dept]} too: it checks "${orphans[0].title}"${others > 0 ? ` and ${plural(others, "more card")}` : ""}.`);
+    }
   }
   return OK;
 }
@@ -499,7 +510,22 @@ function meetingHosts(task: Task): Actor[] {
   return task.reviewer && task.reviewer !== "clerk" ? [task.reviewer, "clerk"] : ["clerk"];
 }
 
-export function checkScheduleMeeting(c: EventCase, taskIdArg: string, actor: Actor): CheckResult {
+/** The session a meeting has to come before: the next one still ahead, or the last one once all have passed. */
+function sessionToMeetBefore(c: EventCase, today: ISODate): ISODate | null {
+  const dates = sessionDates(c);
+  if (dates.length === 0) return null;
+  const ahead = dates.filter((d) => d >= today).sort();
+  return ahead[0] ?? dates.reduce((a, b) => (a > b ? a : b));
+}
+
+/**
+ * `when` is the day being asked about: availableActions() and a panel that has no date yet
+ * leave it out, and get only who may schedule and whether the meeting is still open. With it,
+ * the day must be today or later, before the event, and not a citywide blackout: a walkthrough
+ * after the race, or a coordination meeting on Memorial Day, is refused here for every caller,
+ * not only by the panel that offers the date field.
+ */
+export function checkScheduleMeeting(c: EventCase, taskIdArg: string, actor: Actor, when?: { date: ISODate; today: ISODate }): CheckResult {
   const open = requireOpen(c);
   if (!open.ok) return open;
   const task = meetingCardFor(c, taskIdArg);
@@ -508,6 +534,13 @@ export function checkScheduleMeeting(c: EventCase, taskIdArg: string, actor: Act
   const hosts = meetingHosts(task);
   if (!hosts.includes(actor)) return fail(`Only ${whoPhrase(hosts)} can schedule this meeting.`);
   if (task.status === "done") return fail("That meeting has already been held.");
+  if (when) {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(when.date ?? "")) return fail("Choose a date.");
+    if (when.date < when.today) return fail("Choose today or a later date.");
+    const event = sessionToMeetBefore(c, when.today);
+    if (event && when.date >= event) return fail(`Choose a date before ${fmtDate(event)}.`);
+    if (citywideBlackoutOn(when.date)) return fail("That date is a citywide blackout.");
+  }
   return OK;
 }
 

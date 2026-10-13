@@ -197,7 +197,7 @@ export function sendToCommission(c: EventCase, _action: Extract_<"send_to_commis
 }
 
 export function scheduleMeeting(c: EventCase, action: Extract_<"schedule_meeting">, actor: Actor, ctx: RulesCtx): TransitionResult {
-  const check = checkScheduleMeeting(c, action.taskId, actor);
+  const check = checkScheduleMeeting(c, action.taskId, actor, { date: action.date, today: ctx.today });
   if (!check.ok) return check;
   // Always the applicant's meeting card, also when the Clerk's scheduler task was named.
   const task = meetingCardFor(c, action.taskId) as Task;

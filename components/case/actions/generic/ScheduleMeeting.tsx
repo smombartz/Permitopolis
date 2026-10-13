@@ -6,7 +6,6 @@ import { Input } from "@/components/ui/input"
 import { InlineAlert } from "@/components/ui/inline-alert"
 import { checkScheduleMeeting, meetingCardFor } from "@/lib/state"
 import { PARTY_LABEL } from "@/lib/types"
-import { meetingDateValid } from "@/lib/view/reviewTools"
 import { PanelActions, PanelBody, PanelHeader, useCaseContext, useCaseDispatch } from "../panelKit"
 import type { ActionPanelProps } from "../types"
 
@@ -19,8 +18,11 @@ function ScheduleMeetingPanel({ caseId, arg, role, onClose }: ActionPanelProps) 
   const dispatch = useCaseDispatch(caseId)
   if (!c || !arg || !card) return null
 
+  // Who may schedule, and whether the meeting is still open: a reason no date can fix.
   const check = checkScheduleMeeting(c, arg, role)
-  const dateCheck = meetingDateValid(c, date, today)
+  // The day in the field, asked of the engine before the click: today or later, before the
+  // event, not a citywide blackout.
+  const dateCheck = checkScheduleMeeting(c, arg, role, { date, today })
   const attendees = [PARTY_LABEL.clerk, ...(card.reviewer && card.reviewer !== "clerk" ? [PARTY_LABEL[card.reviewer]] : []), PARTY_LABEL.applicant]
 
   function submit() {

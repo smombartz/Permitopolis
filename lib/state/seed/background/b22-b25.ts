@@ -41,7 +41,12 @@ export const B22: SeedScript = {
     step("2027-03-03T09:00", "clerk", { type: "accept_complete" }),
     step("2027-03-03T09:05", "clerk", {
       type: "confirm_routing",
-      reviewers: [{ dept: "pws", sections: ["Sound details"], dueDate: "2027-03-17" }],
+      // Health & Legal checks the insurance on every Reviewed event, so it is routed with
+      // Public Works & Safety: confirm_routing refuses a list that leaves a card's reviewer out.
+      reviewers: [
+        { dept: "pws", sections: ["Sound details"], dueDate: "2027-03-17" },
+        { dept: "hl", sections: ["Certificate of insurance"], dueDate: "2027-03-17" },
+      ],
     }),
     step("2027-03-10T09:00", "pws", {
       type: "review_decide",

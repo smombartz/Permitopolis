@@ -83,6 +83,58 @@ describe("4A: Consolidation and quote builder (send_quote)", () => {
     expect(quoted.feeLines.reduce((sum, l) => sum + l.estimate, 0)).toBe(755);
   });
 
+  it("a condition the Clerk removes stays removed, also when it was the last one; one reordered goes out in the new order", async () => {
+    const { user } = await renderScreen(<CaseDetailScreen />, { path: routes.city.case(S3), role: "clerk" });
+
+    await act(async () => {
+      const dispatch = useDemo.getState().dispatch;
+      dispatch(S3, { type: "respond_to_request", taskId: `${S3}:vendor_health_permit:1`, files: [{ name: "health-permit.pdf", size: 120_000, type: "application/pdf" }] }, "applicant");
+      dispatch(S3, { type: "verify_document", taskId: `${S3}:vendor_health_permit:1` }, "hl");
+      dispatch(S3, { type: "review_decide", decision: "approve", conditions: [], feeLines: [] }, "hl");
+    });
+    expect(storedCase(S3).conditions.map((c) => c.text)).toEqual(["Sound ends at 9 pm", "Speakers face away from the residences on Elm Street", "No more than 85 dB at 50 feet"]);
+
+    await user.click(actions().getByRole("button", { name: "Send quote" }));
+    const panel = sheet();
+    await user.click(within(panel).getByRole("button", { name: 'Move "No more than 85 dB at 50 feet" up' }));
+    await user.click(within(panel).getByRole("button", { name: 'Remove "Sound ends at 9 pm"' }));
+    await user.click(sheetButton("Send quote"));
+    expect(storedCase(S3).conditions.map((c) => c.text)).toEqual(["No more than 85 dB at 50 feet", "Speakers face away from the residences on Elm Street"]);
+  });
+
+  it("removing every condition sends a quote with none, and a quote with no fee line cannot be sent", async () => {
+    const { user } = await renderScreen(<CaseDetailScreen />, { path: routes.city.case(S3), role: "clerk" });
+
+    await act(async () => {
+      const dispatch = useDemo.getState().dispatch;
+      dispatch(S3, { type: "respond_to_request", taskId: `${S3}:vendor_health_permit:1`, files: [{ name: "health-permit.pdf", size: 120_000, type: "application/pdf" }] }, "applicant");
+      dispatch(S3, { type: "verify_document", taskId: `${S3}:vendor_health_permit:1` }, "hl");
+      dispatch(S3, { type: "review_decide", decision: "approve", conditions: [], feeLines: [] }, "hl");
+    });
+
+    await user.click(actions().getByRole("button", { name: "Send quote" }));
+    const panel = sheet();
+    for (const text of ["Sound ends at 9 pm", "Speakers face away from the residences on Elm Street", "No more than 85 dB at 50 feet"]) {
+      await user.click(within(panel).getByRole("button", { name: `Remove "${text}"` }));
+    }
+    expect(within(panel).getByText("No conditions. The applicant will have none to accept.")).toBeInTheDocument();
+
+    // Every fee line removed: nothing to ask for, so nothing to send.
+    const feeLabels = storedCase(S3).feeLines.filter((l) => l.kind !== "deposit").map((l) => l.label);
+    for (const label of feeLabels) await user.click(within(panel).getByRole("button", { name: `Remove line: ${label}` }));
+    expect(sheetButton("Send quote")).toBeDisabled();
+    expect(within(panel).getByText("Add at least one fee line: a quote has to ask for something.")).toBeInTheDocument();
+    expect(storedCase(S3).state).toBe("in_review");
+
+    // One line back, and it goes out with no conditions at all.
+    await user.type(within(panel).getByRole("textbox", { name: "New line's label" }), "Application fee");
+    await user.click(within(panel).getByRole("button", { name: "Add line" }));
+    await user.click(sheetButton("Send quote"));
+    const quoted = storedCase(S3);
+    expect(quoted.state).toBe("quote_sent");
+    expect(quoted.conditions).toEqual([]);
+  });
+
   it("when a review is not yet approved, the panel says exactly what blocks sending", async () => {
     await renderScreen(<CaseDetailScreen />, { path: routes.city.case(S3), role: "clerk" });
     const button = actions().getByRole("button", { name: "Send quote" });
@@ -131,8 +183,39 @@ describe("4A: Confirm routing (confirm_routing)", () => {
     const panel = sheet();
 
     await user.click(within(panel).getByRole("checkbox", { name: "Route to Health & Legal" }));
-    expect(within(panel).getByText(/route Health & Legal or nobody checks it/)).toBeInTheDocument();
+    // The engine's own refusal, shown before the click.
+    expect(within(panel).getByText('Route Health & Legal too: it checks "Certificate of insurance".')).toBeInTheDocument();
     expect(sheetButton("Confirm routing")).toBeDisabled();
+
+    // The same list is refused when it is dispatched from anywhere else.
+    const pwsOnly = [{ dept: "pws" as const, sections: ["City services request"], dueDate: "2027-05-17" }];
+    let refused: { ok: boolean; reason?: string } = { ok: true };
+    await act(async () => {
+      refused = useDemo.getState().dispatch(S4, { type: "confirm_routing", reviewers: pwsOnly }, "clerk");
+    });
+    expect(refused).toEqual({ ok: false, reason: 'Route Health & Legal too: it checks "Certificate of insurance".' });
+    expect(storedCase(S4).state).toBe("submitted");
+  });
+
+  it("offers every department: the City Clerk is there to add, unchecked, when the plan does not suggest it", async () => {
+    const { user } = await renderScreen(<CaseDetailScreen />, { path: routes.city.case(S4), role: "clerk" });
+
+    await act(async () => {
+      const dispatch = useDemo.getState().dispatch;
+      for (let i = 0; i < 9; i++) dispatch(S4, { type: "simulate_signoff" }, "applicant");
+      dispatch(S4, { type: "accept_complete" }, "clerk");
+    });
+
+    await user.click(actions().getByRole("button", { name: "Confirm routing" }));
+    const panel = sheet();
+    expect(within(panel).getByRole("checkbox", { name: "Route to Public Works & Safety" })).toBeChecked();
+    expect(within(panel).getByRole("checkbox", { name: "Route to Health & Legal" })).toBeChecked();
+    expect(within(panel).getByRole("checkbox", { name: "Route to City Clerk" })).not.toBeChecked();
+    expect(within(panel).getByText("Not suggested by this plan.")).toBeInTheDocument();
+
+    await user.click(within(panel).getByRole("checkbox", { name: "Route to City Clerk" }));
+    await user.click(sheetButton("Confirm routing"));
+    expect(storedCase(S4).reviews.map((r) => r.dept).sort()).toEqual(["clerk", "hl", "pws"]);
   });
 });
 

@@ -115,6 +115,28 @@ describe("send_quote and issue_permit (S5)", () => {
     expect(result.case.tasks.find((t) => t.catalogId === "issue_permit")?.status).toBe("locked");
   });
 
+  it("an empty list means \"as the case stands\"; a merged quote is taken as given, also when the Clerk removed every condition", () => {
+    const withConditions = {
+      ...routedCase(),
+      conditions: [
+        { id: "c1", dept: "pws" as const, text: "Sound ends at 9 pm", mergedByClerk: false, acceptedByApplicant: false },
+        { id: "c2", dept: "hl" as const, text: "Sound ends at 9 pm", mergedByClerk: false, acceptedByApplicant: false },
+      ],
+    };
+    const fee = { dept: "clerk" as const, label: "Application fee", qty: 1, unit: "flat", unitPrice: 6530 };
+
+    // The one-click panel and the seed scripts: nothing given, so the case's own lists go out.
+    const asItStands = transition(withConditions, { type: "send_quote", conditions: [], feeLines: [] }, "clerk", makeCtx());
+    expect(asItStands.ok && asItStands.case.conditions.map((c) => [c.text, c.mergedByClerk])).toEqual([["Sound ends at 9 pm", true], ["Sound ends at 9 pm", true]]);
+
+    // The quote builder: the Clerk merged the duplicate away, then removed the last one too.
+    const merged = transition(withConditions, { type: "send_quote", merged: true, conditions: [{ dept: "pws", text: "Sound ends at 9 pm" }], feeLines: [fee] }, "clerk", makeCtx());
+    expect(merged.ok && merged.case.conditions.map((c) => c.text)).toEqual(["Sound ends at 9 pm"]);
+    const none = transition(withConditions, { type: "send_quote", merged: true, conditions: [], feeLines: [fee] }, "clerk", makeCtx());
+    expect(none.ok && none.case.conditions).toEqual([]);
+    expect(none.ok && none.case.feeLines.map((line) => line.label)).toEqual(["Application fee"]);
+  });
+
   it("send_quote prices each merged line to the cent (3.1 miles at $400 is $1,240, not $1,240.0000000000002)", () => {
     const result = transition(
       routedCase(),
@@ -214,6 +236,34 @@ describe("confirm_routing: the list the Clerk confirms", () => {
       ["review:hl", "hl", "todo"],
       ["consolidate", "clerk", "locked"],
     ]);
+  });
+
+  it("refuses a list that leaves out a department one of the applicant's cards names: nobody would check that card", () => {
+    const insurance = makeTask({ id: "PMT-27-0001:insurance_certificate", catalogId: "insurance_certificate", title: "Certificate of insurance", reviewer: "hl", status: "submitted" });
+    const sound = makeTask({ id: "PMT-27-0001:sound_details", catalogId: "sound_details", kind: "form", title: "Sound details", reviewer: "pws", status: "submitted" });
+    const sitePlan = makeTask({ id: "PMT-27-0001:site_plan", catalogId: "site_plan", kind: "form", title: "Site plan", reviewer: "pws", status: "todo" });
+    const base = accepted();
+    const c = { ...base, tasks: [...base.tasks, insurance, sound, sitePlan] };
+    const pws = { dept: "pws" as const, sections: ["Sound details"], dueDate: "2027-05-17" };
+
+    expect(transition(c, { type: "confirm_routing", reviewers: [pws] }, "clerk", makeCtx())).toEqual({
+      ok: false,
+      reason: 'Route Health & Legal too: it checks "Certificate of insurance".',
+    });
+    // More than one card: the first is named and the rest counted.
+    expect(transition(c, { type: "confirm_routing", reviewers: [hl] }, "clerk", makeCtx())).toEqual({
+      ok: false,
+      reason: 'Route Public Works & Safety too: it checks "Sound details" and 1 more card.',
+    });
+    expect(transition(c, { type: "confirm_routing", reviewers: [pws, hl] }, "clerk", makeCtx()).ok).toBe(true);
+  });
+
+  it("a card the Clerk checks, a meeting and a city task never force a reviewer onto the list", () => {
+    const alcohol = makeTask({ id: "PMT-27-0001:alcohol_details", catalogId: "alcohol_details", kind: "form", title: "Alcohol details", reviewer: "clerk", status: "submitted" });
+    const walkthrough = makeTask({ id: "PMT-27-0001:site_walkthrough", catalogId: "site_walkthrough", kind: "meeting", title: "Site walkthrough", reviewer: "pws", status: "locked" });
+    const base = accepted();
+    const c = { ...base, tasks: [...base.tasks, alcohol, walkthrough] };
+    expect(transition(c, { type: "confirm_routing", reviewers: [hl] }, "clerk", makeCtx()).ok).toBe(true);
   });
 
   it("the review clock's allowance is the days the Clerk gave: from routing to the due date", () => {
