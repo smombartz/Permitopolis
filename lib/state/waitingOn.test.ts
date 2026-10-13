@@ -173,6 +173,32 @@ describe("nextMove", () => {
   });
 });
 
+describe("nextMove: who goes after the party that is up", () => {
+  const cleanup = makeTask({ id: "PMT-27-0031:cleanup_inspection", catalogId: "cleanup_inspection", owner: "pws", kind: "inspection", title: "Cleanup inspection" });
+  const reconcile = makeTask({ id: "PMT-27-0031:reconcile", catalogId: "reconcile", owner: "clerk", kind: "action", status: "locked", unlocksOn: "hours_logged" });
+  const bill = makeTask({ id: "PMT-27-0031:final_bill_or_refund", catalogId: "final_bill_or_refund", kind: "payment", status: "locked", unlocksOn: "invoice_issued" });
+  const feedback = makeTask({ id: "PMT-27-0031:feedback", catalogId: "feedback", kind: "form", status: "locked", unlocksOn: "closed" });
+
+  it("S6: Public Works & Safety logs hours, then the Clerk reconciles (not the applicant, whose cards unlock later)", () => {
+    // The applicant's locked cards come first in the list; the Clerk's task unlocks first.
+    const c = makeCase({ id: "PMT-27-0031", state: "closeout", tasks: [bill, feedback, cleanup, reconcile] });
+    expect(nextMove(c, "2027-05-03")).toBe("Next: Public Works & Safety inspects the cleanup, then City Clerk reconciles the costs and closes.");
+  });
+
+  it("once the Clerk is up, the applicant's final bill is what follows", () => {
+    const c = makeCase({ id: "PMT-27-0031", state: "closeout", tasks: [bill, feedback, { ...cleanup, status: "done" }, { ...reconcile, status: "todo", unlocksOn: null }] });
+    expect(nextMove(c, "2027-05-03")).toBe("Next: City Clerk reconciles the costs and closes, then The applicant pays the final bill.");
+  });
+
+  it("a task parked on something specific (payment and verification) goes before one waiting on a later stage", () => {
+    const verify = makeTask({ id: "PMT-27-0024:verify:insurance_certificate", catalogId: "verify:insurance_certificate", owner: "hl", kind: "review", title: "Verify Certificate of insurance" });
+    const carry = makeTask({ id: "PMT-27-0024:carry_permit", catalogId: "carry_permit", kind: "action", status: "locked", unlocksOn: "event_day" });
+    const issue = makeTask({ id: "PMT-27-0024:issue_permit", catalogId: "issue_permit", owner: "clerk", kind: "action", status: "locked" });
+    const c = makeCase({ id: "PMT-27-0024", state: "quote_sent", tasks: [carry, verify, issue] });
+    expect(nextMove(c, "2027-05-03")).toBe("Next: Health & Legal verifies the certificate of insurance, then City Clerk issues the permit.");
+  });
+});
+
 describe("isStalled", () => {
   it("flags a pre-Permitted case with nobody up", () => {
     const review = { dept: "hl" as const, sections: [], status: "approved" as const, dueDate: null, decidedOn: "2027-05-01", clock: { startedOn: "2027-04-19", pausedSince: null, pausedDays: 0, allowedDays: 14 }, internalNote: "", messageToApplicant: "" };

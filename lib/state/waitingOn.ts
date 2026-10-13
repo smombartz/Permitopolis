@@ -5,7 +5,7 @@
 import { daysBetween } from "@/lib/dates";
 import { plural } from "@/lib/format";
 import { ENDING_LABEL, PARTIES, PARTY_LABEL } from "@/lib/types";
-import type { EventCase, ISODate, Party, Task } from "@/lib/types";
+import type { EventCase, ISODate, Party, Task, UnlockEvent } from "@/lib/types";
 import { byDueDate, signoffsLeft, taskDueDate } from "./core";
 import type { PartyStanding, PartyStatus, StateApi } from "./types";
 
@@ -214,19 +214,58 @@ export const nextMove: StateApi["nextMove"] = (c: EventCase, today: ISODate, app
   const parts = upNow.map((s) => `${partyName(s.party, applicantName)} ${s.openTasks[0] ? verbPhrase(s.openTasks[0]) : "acts"}`);
   let sentence = `Next: ${parts.join(", and ")}`;
 
-  // A department parked on the applicant's answer goes next; otherwise whoever holds a task
-  // that waits on an earlier step. A department still waiting to be routed has no task to name.
-  const lockedTaskOf = (party: Party) => c.tasks.find((t) => t.owner === party && t.status === "locked");
+  // A department parked on the applicant's answer goes next. Otherwise it is the waiting party
+  // whose locked task unlocks soonest: after closeout hours are logged the Clerk reconciles,
+  // and only then does the applicant's final bill open. A department still waiting to be
+  // routed has no task to name, so the sentence stops before it.
   const reReviewer = statuses.find((s) => s.status === "waiting" && c.tasks.some((t) => t.owner === s.party && t.payload.awaitingAnswer === true));
-  const waitingParty = reReviewer ?? statuses.find((s) => s.status === "waiting" && lockedTaskOf(s.party));
-  if (waitingParty) {
-    const lockedTask = lockedTaskOf(waitingParty.party);
-    const then = reReviewer ? "re-reviews" : lockedTask ? verbPhrase(lockedTask) : "acts";
-    sentence += `, then ${partyName(waitingParty.party, applicantName)} ${then}`;
+  if (reReviewer) return `${sentence}, then ${partyName(reReviewer.party, applicantName)} re-reviews.`;
+
+  let next: { party: Party; task: Task } | undefined;
+  for (const s of statuses) {
+    if (s.status !== "waiting") continue;
+    const task = nextToUnlock(c, s.party);
+    if (task && (!next || unlockRank(task) < unlockRank(next.task))) next = { party: s.party, task };
   }
+  if (next) sentence += `, then ${partyName(next.party, applicantName)} ${verbPhrase(next.task)}`;
 
   return `${sentence}.`;
 };
+
+/** The stages of a case in the order they happen, as the events that unlock tasks. */
+const UNLOCK_ORDER: UnlockEvent[] = [
+  "presubmit_done",
+  "submitted",
+  "accepted",
+  "routed",
+  "quote_sent",
+  "signed",
+  "paid",
+  "permitted",
+  "event_day",
+  "closeout",
+  "hours_logged",
+  "invoice_issued",
+  "closed",
+];
+
+/**
+ * How soon a locked task opens. A task with no unlock event is parked on something specific
+ * that a party up now is doing (the sign-offs, payment and verification), so it comes first.
+ */
+function unlockRank(task: Task): number {
+  return task.unlocksOn ? UNLOCK_ORDER.indexOf(task.unlocksOn) : -1;
+}
+
+/** This party's locked task that opens first; the earlier-created one when two open together. */
+function nextToUnlock(c: EventCase, party: Party): Task | undefined {
+  let soonest: Task | undefined;
+  for (const t of c.tasks) {
+    if (t.owner !== party || t.status !== "locked") continue;
+    if (!soonest || unlockRank(t) < unlockRank(soonest)) soonest = t;
+  }
+  return soonest;
+}
 
 /** A case before Permitted with nobody up is a bug; dev builds can surface this. */
 export function isStalled(c: EventCase, today: ISODate): boolean {
