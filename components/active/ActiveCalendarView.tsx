@@ -9,7 +9,8 @@ import { SegmentedControl } from "@/components/ui/segmented-control";
 import { StickyAside } from "@/components/ui/sticky-aside";
 import { fmtDateShort } from "@/lib/format";
 import type { Dept, EventCase, ISODate } from "@/lib/types";
-import { monthAnchorOf, shiftMonth, shiftWeek, weekStartOf } from "@/lib/view/active";
+import { monthAnchorOf, shiftMonth, shiftWeek, weekStartOf, type MeetingItem } from "@/lib/view/active";
+import { MeetingsList } from "./MeetingsList";
 import { RoleOverlaySidePanel } from "./RoleOverlay";
 
 export type CalendarSubView = "month" | "week";
@@ -26,10 +27,13 @@ interface ActiveCalendarViewProps {
   subView: CalendarSubView;
   onSubViewChange: (next: CalendarSubView) => void;
   onSelectCase: (caseId: string) => void;
+  /** Every scheduled meeting and walkthrough in the visible month or week, "Show meetings" permitting. */
+  meetings: MeetingItem[];
+  showMeetings: boolean;
 }
 
 /** Calendar: month and week, every series session shown, tier-colored with a legend. */
-export function ActiveCalendarView({ items, cases, today, role, date, onDateChange, subView, onSubViewChange, onSelectCase }: ActiveCalendarViewProps) {
+export function ActiveCalendarView({ items, cases, today, role, date, onDateChange, subView, onSubViewChange, onSelectCase, meetings, showMeetings }: ActiveCalendarViewProps) {
   const monthAnchor = monthAnchorOf(date);
   const weekStart = weekStartOf(date);
 
@@ -77,9 +81,10 @@ export function ActiveCalendarView({ items, cases, today, role, date, onDateChan
         ) : (
           <WeekGrid items={items} today={today} weekStart={weekStart} onSelectItem={onSelectItem} onSelectDay={onDateChange} selected={date} />
         )}
+        {showMeetings ? <MeetingsList meetings={meetings} onSelectCase={onSelectCase} heading={subView === "month" ? "Meetings this month" : "Meetings this week"} /> : null}
       </div>
       <StickyAside>
-        <RoleOverlaySidePanel role={role} cases={cases} today={today} />
+        <RoleOverlaySidePanel role={role} cases={cases} today={today} date={date} />
       </StickyAside>
     </div>
   );

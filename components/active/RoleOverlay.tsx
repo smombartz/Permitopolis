@@ -1,8 +1,8 @@
 import { DEPT_ICON, DueDate } from "@/components/domain";
 import { Stat } from "@/components/ui/stat";
-import { plural } from "@/lib/format";
+import { fmtDateShort, plural } from "@/lib/format";
 import type { Dept, EventCase, ISODate } from "@/lib/types";
-import { roleOverlayForCase, roleOverlayTotal, type RoleOverlay as RoleOverlayData } from "@/lib/view/active";
+import { dayOfContactRows, roleOverlayForCase, roleOverlayTotal, type RoleOverlay as RoleOverlayData } from "@/lib/view/active";
 
 /** The extra list column's header, one per city role (plan 3G: PRD "Role overlays"). */
 export const ROLE_OVERLAY_COLUMN_LABEL: Record<Dept, string> = {
@@ -42,11 +42,14 @@ export function RoleOverlayCell({ role, case: c, today }: { role: Dept; case: Ev
 
 /**
  * The role overlay's side panel for the Calendar and Map views, totaled across every case
- * currently shown (plan 3G: "a side panel on the other views").
+ * currently shown (plan 3G: "a side panel on the other views"). `date`, when given, adds the
+ * Clerk's day-of contact duty for that one day (5B: "for each day, the events for which the
+ * Clerk is the day-of contact, with the contact's name and phone").
  */
-export function RoleOverlaySidePanel({ role, cases, today }: { role: Dept; cases: EventCase[]; today: ISODate }) {
+export function RoleOverlaySidePanel({ role, cases, today, date }: { role: Dept; cases: EventCase[]; today: ISODate; date?: ISODate }) {
   const overlay = roleOverlayTotal(role, cases);
   const Icon = DEPT_ICON[role];
+  const dutyRows = role === "clerk" && date !== undefined ? dayOfContactRows(cases, date) : [];
 
   return (
     <div className="flex flex-col gap-4">
@@ -86,6 +89,22 @@ export function RoleOverlaySidePanel({ role, cases, today }: { role: Dept; cases
             <p className="text-sm text-fg">{overlay.contactName}</p>
             <p className="font-mono text-[13px] text-fg-secondary">{overlay.contactPhone}</p>
           </div>
+          {date !== undefined ? (
+            <div className="flex flex-col gap-1">
+              <p className="text-eyebrow font-bold tracking-[.12em] text-fg-label uppercase">Day-of contact duty, {fmtDateShort(date)}</p>
+              {dutyRows.length === 0 ? (
+                <p className="text-sm text-fg-secondary">No event that day.</p>
+              ) : (
+                <ul className="flex flex-col gap-0.5">
+                  {dutyRows.map((row) => (
+                    <li key={row.caseId} className="text-sm text-fg-secondary">
+                      {row.eventName}
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          ) : null}
           <div className="flex flex-col gap-1">
             <p className="text-eyebrow font-bold tracking-[.12em] text-fg-label uppercase">Compliance log</p>
             <p className="text-sm text-fg-secondary">{overlay.complianceLogCount === 0 ? "No log entries yet" : plural(overlay.complianceLogCount, "entry", "entries")}</p>

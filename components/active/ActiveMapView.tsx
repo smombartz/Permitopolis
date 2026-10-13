@@ -67,7 +67,7 @@ export function ActiveMapView({ highlights, cases, today, role, date, onDateChan
         )}
       </div>
       <StickyAside>
-        <RoleOverlaySidePanel role={role} cases={cases} today={today} />
+        <RoleOverlaySidePanel role={role} cases={cases} today={today} date={date} />
       </StickyAside>
     </div>
   );

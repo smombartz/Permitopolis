@@ -11,13 +11,17 @@ import {
   blackoutLabelOn,
   closeoutRows,
   clerkOverlay,
+  dayOfContactRows,
   hlOverlayForCase,
+  meetingItems,
   monthAnchorOf,
+  monthGridRange,
   pwsOverlayForCase,
   roleOverlayTotal,
   shiftMonth,
   shiftWeek,
   todayLine,
+  weekGridRange,
   weekStartOf,
 } from "./active";
 
@@ -209,6 +213,65 @@ describe("role overlays", () => {
   });
 });
 
+describe("meetingItems", () => {
+  it("S5's coordination meeting on Mon, Jun 21 and walkthrough on Fri, Jul 2, each with who attends", () => {
+    const cases = buildSeed();
+    const items = meetingItems(cases).filter((i) => i.caseId === S5);
+    expect(items.map((i) => [i.date, i.label])).toEqual(
+      expect.arrayContaining([
+        ["2027-06-21", "Coordination meeting"],
+        ["2027-07-02", "Site walkthrough"],
+      ]),
+    );
+    const coordination = items.find((i) => i.date === "2027-06-21")!;
+    expect(coordination.attendees).toEqual(["applicant", "clerk", "pws"]);
+    const walkthrough = items.find((i) => i.date === "2027-07-02")!;
+    expect(walkthrough.attendees).toEqual(["applicant", "pws"]);
+    // Scheduled, but S5 is still Quote sent: these two cards stay locked until the permit is
+    // issued (the pre-application meeting, held back on Mar 17, is the one already done).
+    expect(coordination.held).toBe(false);
+    expect(walkthrough.held).toBe(false);
+  });
+
+  it("filters to a date range (the Today strip's 8 days, or a calendar month)", () => {
+    const cases = buildSeed();
+    const items = meetingItems(cases, { from: "2027-06-21", to: "2027-06-21" });
+    expect(items.map((i) => i.caseId)).toEqual([S5]);
+  });
+
+  it("leaves out an ended case's meetings", () => {
+    const cases = buildSeed();
+    const ended = cases.map((c) => (c.id === S5 ? { ...c, ending: "cancelled" as const } : c));
+    expect(meetingItems(ended).some((i) => i.caseId === S5)).toBe(false);
+  });
+
+  it("leaves out a meeting card with no scheduled date yet", () => {
+    const cases = buildSeed();
+    // Every meeting on the seed that is not S5's or S6's has no date yet; only scheduled ones show.
+    const unscheduled = cases
+      .flatMap((c) => c.tasks)
+      .filter((t) => t.kind === "meeting" && t.payload.scheduledFor === undefined);
+    expect(unscheduled.length).toBeGreaterThan(0);
+    const scheduledIds = new Set(meetingItems(cases).map((i) => i.id));
+    for (const task of unscheduled) expect(scheduledIds.has(task.id)).toBe(false);
+  });
+});
+
+describe("dayOfContactRows", () => {
+  it("names the Clerk's contact for every event active on the day", () => {
+    const cases = buildSeed();
+    const rows = dayOfContactRows(cases, TODAY);
+    expect(rows.length).toBeGreaterThan(0);
+    for (const row of rows) expect(row).toMatchObject({ contactName: "Priya Natarajan", contactPhone: "(555) 014-2200" });
+  });
+
+  it("an empty day has no rows", () => {
+    const cases = buildSeed();
+    const day = findEmptyDay(cases);
+    expect(dayOfContactRows(cases, day)).toEqual([]);
+  });
+});
+
 describe("month/week navigation", () => {
   it("monthAnchorOf and shiftMonth, including a year boundary", () => {
     expect(monthAnchorOf("2027-06-18")).toBe("2027-06-01");
@@ -221,5 +284,13 @@ describe("month/week navigation", () => {
     expect(weekStartOf("2027-05-03")).toBe("2027-05-02");
     expect(shiftWeek("2027-05-02", 1)).toBe("2027-05-09");
     expect(shiftWeek("2027-05-02", -1)).toBe("2027-04-25");
+  });
+
+  it("monthGridRange: the full weeks MonthGrid draws around May 2027", () => {
+    expect(monthGridRange("2027-05-01")).toEqual({ from: "2027-04-25", to: "2027-06-05" });
+  });
+
+  it("weekGridRange: the 7 days WeekGrid draws", () => {
+    expect(weekGridRange("2027-05-02")).toEqual({ from: "2027-05-02", to: "2027-05-08" });
   });
 });
