@@ -321,6 +321,12 @@ export interface Payment {
   method: "card" | "in_person";
   kind: "booking" | "quote" | "session" | "final_invoice" | "refund";
   occurrenceDate?: ISODate;
+  /**
+   * Set when the payment settles an amendment on a permitted case: what the amended plan added
+   * (a `quote` payment made after the permit) or what it gave back (a `refund`). Absent on
+   * every other payment, so a screen can say "Amendment" instead of "Quote payment".
+   */
+  amendment?: true;
 }
 
 export interface Activity {

@@ -38,7 +38,9 @@ describe("Inspections", () => {
     expect(screen.queryByText("Jazz in the Plaza")).not.toBeInTheDocument();
     // St. Agnes Parish's festival, May 13, has food vendors and falls in the window: it shows.
     expect(screen.getByRole("heading", { name: "Upcoming" })).toBeInTheDocument();
-    expect(screen.getByText(/St\. Agnes Parish/)).toBeInTheDocument();
+    // Named as every list names an event: the event over its applicant (the parish, both times), a link to the case.
+    const festival = screen.getByRole("link", { name: /St\. Agnes Parish/ });
+    expect(festival).toHaveAttribute("href", routes.city.case("PMT-27-0012", { from: routes.city.inspections() }));
   });
 
   it("jumping the demo date to Jun 18, after Jazz in the Plaza is permitted, shows its one booth, under Today", async () => {

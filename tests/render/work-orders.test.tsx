@@ -104,7 +104,9 @@ describe("/city/work-orders: the Work orders tab", () => {
     });
 
     expect(screen.getByText("0 open: 0 overdue, 0 due this week")).toBeInTheDocument();
-    expect(screen.getByText("No open work orders")).toBeInTheDocument();
+    // A filter is on (Scheduled), so the empty list says it is the filters', and the bar offers to clear them.
+    expect(screen.getByText("No work orders match these filters")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Clear filters" })).toBeInTheDocument();
   });
 });
 

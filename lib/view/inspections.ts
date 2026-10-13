@@ -9,9 +9,10 @@
  * reset() and a fresh seed replay carry it like any other note. Tested against the real seed in
  * inspections.test.ts.
  */
+import { applicantNameOf } from "@/lib/data/people";
 import { addDaysISO } from "@/lib/dates";
-import { sessionDates } from "@/lib/state";
-import type { EventCase, ISODate, ISODateTime, Task } from "@/lib/types";
+import { isVisibleToCity, sessionDates } from "@/lib/state";
+import type { EventCase, ISODate, ISODateTime, Task, Tier } from "@/lib/types";
 
 export type InspectionResult = "pass" | "fail" | "re-inspect";
 
@@ -74,6 +75,8 @@ export type InspectionBucket = "today" | "upcoming";
 export interface InspectionEventGroup {
   caseId: string;
   caseName: string;
+  applicantName: string;
+  tier: Tier;
   /** The earliest session in the 14-day window: the day these booths are inspected. */
   eventDate: ISODate;
   bucket: InspectionBucket;
@@ -91,13 +94,14 @@ export function buildInspectionGroups(cases: EventCase[], today: ISODate): Inspe
   const horizon = addDaysISO(today, UPCOMING_WINDOW_DAYS);
   const groups: InspectionEventGroup[] = [];
   for (const c of cases) {
-    if (c.ending !== null) continue;
+    // A Draft is the applicant's alone: the city has no page for it, and no booth of its to inspect.
+    if (c.ending !== null || !isVisibleToCity(c)) continue;
     const booths = boothRowsFor(c);
     if (booths.length === 0) continue;
     const upcoming = sessionDates(c).filter((d) => d >= today && d <= horizon);
     if (upcoming.length === 0) continue;
     const eventDate = upcoming.reduce((a, b) => (a < b ? a : b));
-    groups.push({ caseId: c.id, caseName: c.name, eventDate, bucket: eventDate === today ? "today" : "upcoming", booths });
+    groups.push({ caseId: c.id, caseName: c.name, applicantName: applicantNameOf(c), tier: c.tier, eventDate, bucket: eventDate === today ? "today" : "upcoming", booths });
   }
   return groups.sort((a, b) => (a.eventDate !== b.eventDate ? (a.eventDate < b.eventDate ? -1 : 1) : a.caseName < b.caseName ? -1 : 1));
 }

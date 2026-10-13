@@ -184,50 +184,86 @@ describe("Active permits: a hold expiring tomorrow", () => {
 
 describe("Active permits: meetings and walkthroughs", () => {
   const CAL_JUNE = routes.city.active({ view: "calendar", date: "2027-06-15" });
+  // The accessible name runs the screen-reader prefix and the label together, as for every calendar item ("Instant:Riverside Tai Chi ...").
+  const MEETING = /^Meeting: ?Coordination meeting: Riverfront Summer 5K/;
 
-  it("the calendar for June 2027 shows S5's coordination meeting as a meeting item, for each city role", async () => {
+  /** The calendar grid's own cell for a day: the day's button, then its items. */
+  function dayCell(dayOfMonth: string): HTMLElement {
+    const grid = document.querySelector('[role="tabpanel"][data-state="active"]') as HTMLElement;
+    const day = within(grid).getAllByRole("button", { name: new RegExp(`^${dayOfMonth}( Today)?$`) })[0];
+    return day.parentElement as HTMLElement;
+  }
+
+  it("the calendar for June 2027 draws S5's coordination meeting in the cell of its day, Mon, Jun 21, as a meeting, for each city role", async () => {
     await renderScreen(<ActiveScreen />, { role: "clerk", path: CAL_JUNE });
 
-    expect(screen.getByText("Meetings this month")).toBeInTheDocument();
-    expect(screen.getByText(/Coordination meeting/)).toBeInTheDocument();
+    const meeting = within(dayCell("21")).getByRole("button", { name: MEETING });
+    // A meeting is not an event: it carries its own mark and outline, and its tooltip says who attends.
+    expect(meeting).toHaveAttribute("data-kind", "meeting");
+    expect(meeting).toHaveAttribute("title", "Meeting: Coordination meeting · Riverfront Summer 5K · Applicant, City Clerk, Public Works & Safety");
+    expect(screen.getByText("Meeting or walkthrough")).toBeInTheDocument();
+    // No other day has it.
+    expect(screen.getAllByRole("button", { name: MEETING })).toHaveLength(1);
 
     switchRole("pws");
-    expect(screen.getByText(/Coordination meeting/)).toBeInTheDocument();
+    expect(within(dayCell("21")).getByRole("button", { name: MEETING })).toBeInTheDocument();
 
     switchRole("hl");
-    expect(screen.getByText(/Coordination meeting/)).toBeInTheDocument();
+    expect(within(dayCell("21")).getByRole("button", { name: MEETING })).toBeInTheDocument();
   });
 
-  it('"Show meetings" is on by default and hides the list once turned off', async () => {
+  it("the day is the one the case holds: rescheduling the meeting on the case moves it on the calendar", async () => {
+    await renderScreen(<ActiveScreen />, { role: "clerk", path: CAL_JUNE });
+    expect(within(dayCell("21")).getByRole("button", { name: MEETING })).toBeInTheDocument();
+
+    act(() => {
+      expect(useDemo.getState().dispatch("PMT-27-0097", { type: "schedule_meeting", taskId: "PMT-27-0097:coordination_meeting", date: "2027-06-24" }).ok).toBe(true);
+    });
+
+    expect(within(dayCell("21")).queryByRole("button", { name: MEETING })).not.toBeInTheDocument();
+    expect(within(dayCell("24")).getByRole("button", { name: MEETING })).toBeInTheDocument();
+  });
+
+  it("the week view draws it too", async () => {
+    await renderScreen(<ActiveScreen />, { role: "pws", path: routes.city.active({ view: "calendar", date: "2027-06-21" }), search: { cal: "week" } });
+    expect(screen.getByRole("button", { name: MEETING })).toHaveAttribute("data-kind", "meeting");
+  });
+
+  it('"Show meetings" is on by default and takes the meetings off the calendar once turned off', async () => {
     const { user } = await renderScreen(<ActiveScreen />, { role: "clerk", path: CAL_JUNE });
     expect(screen.getByRole("switch", { name: "Show meetings" })).toBeChecked();
-    expect(screen.getByText(/Coordination meeting/)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: MEETING })).toBeInTheDocument();
 
     await user.click(screen.getByRole("switch", { name: "Show meetings" }));
 
     expect(navState.search.get("meetings")).toBe("0");
-    expect(screen.queryByText(/Coordination meeting/)).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: MEETING })).not.toBeInTheDocument();
+    expect(screen.queryByText("Meeting or walkthrough")).not.toBeInTheDocument();
   });
 
   it("clicking a meeting opens its case", async () => {
     const { user } = await renderScreen(<ActiveScreen />, { role: "clerk", path: CAL_JUNE });
 
-    await user.click(screen.getByText(/Coordination meeting/));
+    await user.click(screen.getByRole("button", { name: MEETING }));
 
     expect(lastPush()).toBe(routes.city.case("PMT-27-0097", { from: CAL_JUNE }));
   });
 
-  it("the Today strip lists a meeting within its own 8 days", async () => {
+  it("the Today strip has a meeting inside its own 8 days in that day's column, and does not count it as an event", async () => {
     await renderScreen(<ActiveScreen />, { role: "clerk", path: routes.city.active(), demoToday: "2027-06-20" });
 
-    expect(screen.getByText("Meetings this week")).toBeInTheDocument();
-    expect(screen.getByText(/Coordination meeting/)).toBeInTheDocument();
+    const strip = within(screen.getByRole("list", { name: "Today and the next 7 days" }));
+    const day = strip.getByRole("button", { name: /^Mon, Jun 21:/ }).parentElement as HTMLElement;
+    expect(within(day).getByRole("button", { name: MEETING })).toHaveAttribute("data-kind", "meeting");
+    // That Monday has a tai chi session and the meeting: one event, counted as one.
+    expect(within(day).getAllByRole("button")).toHaveLength(3);
+    expect(strip.getByRole("button", { name: "Mon, Jun 21: 1 event" })).toBeInTheDocument();
   });
 
-  it("an empty range (the List and Closeout tabs' own week) shows no meetings list", async () => {
+  it("a week with no meeting shows none", async () => {
     await renderScreen(<ActiveScreen />, { role: "clerk", path: routes.city.active(), demoToday: "2027-01-01" });
 
-    expect(screen.queryByText(/Meetings this week/)).not.toBeInTheDocument();
+    expect(document.querySelector('[data-kind="meeting"]')).toBeNull();
   });
 });
 

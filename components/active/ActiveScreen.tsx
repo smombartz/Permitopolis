@@ -6,23 +6,10 @@ import { Label } from "@/components/ui/label";
 import { PageHeader } from "@/components/ui/page-header";
 import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { addDaysISO } from "@/lib/dates";
 import { activePermits, useDemo } from "@/lib/state";
 import { routes, type ActiveView } from "@/lib/routes";
 import type { Dept, ISODate } from "@/lib/types";
-import {
-  activeCalendarItems,
-  activeListRows,
-  activeMapHighlights,
-  blackoutLabelOn,
-  closeoutRows,
-  meetingItems,
-  monthAnchorOf,
-  monthGridRange,
-  todayLine,
-  weekGridRange,
-  weekStartOf,
-} from "@/lib/view/active";
+import { activeCalendarItems, activeListRows, activeMapHighlights, blackoutLabelOn, closeoutRows, meetingCalendarItems, meetingItems, todayLine } from "@/lib/view/active";
 import { ActiveCalendarView, type CalendarSubView } from "./ActiveCalendarView";
 import { ActiveCloseoutView } from "./ActiveCloseoutView";
 import { ActiveListView } from "./ActiveListView";
@@ -104,14 +91,12 @@ export function ActiveScreen() {
   // nothing on screen, so there the click would be a dead one.
   const openDay = React.useCallback((next: ISODate) => setParams({ date: next === today ? null : next, view: "map" }), [setParams, today]);
 
-  // Meetings and walkthroughs, apart from the tier-colored items: the strip's own 8 days, and
-  // whichever range the calendar sub-view is currently drawing (PRD "Consultation").
-  const stripMeetings = React.useMemo(() => (showMeetings ? meetingItems(cases, { from: today, to: addDaysISO(today, 7) }) : []), [cases, today, showMeetings]);
-  const calendarRange = calSub === "month" ? monthGridRange(monthAnchorOf(date)) : weekGridRange(weekStartOf(date));
-  const calendarMeetings = React.useMemo(
-    () => (showMeetings ? meetingItems(cases, calendarRange) : []),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [cases, calendarRange.from, calendarRange.to, showMeetings],
+  // Meetings and walkthroughs (PRD "Consultation": on all three roles' calendars), each in its
+  // own day's cell beside the events, as a meeting and not as an event. The day strip, the month
+  // and the week each draw only the days they show, so one list serves all three.
+  const itemsWithMeetings = React.useMemo(
+    () => (showMeetings ? [...calendarItems, ...meetingCalendarItems(meetingItems(cases))] : calendarItems),
+    [calendarItems, cases, showMeetings],
   );
 
   return (
@@ -140,13 +125,11 @@ export function ActiveScreen() {
 
       <TodayStrip
         headline={headline}
-        items={calendarItems}
+        items={itemsWithMeetings}
         today={today}
         onSelectDay={openDay}
         selected={view === "list" || view === "closeout" ? undefined : date}
         onSelectCase={openCase}
-        meetings={stripMeetings}
-        showMeetings={showMeetings}
       />
 
       <Tabs value={view} onValueChange={(v) => setView(v as ActiveView)}>
@@ -171,7 +154,7 @@ export function ActiveScreen() {
 
         <TabsContent value="calendar" className="pt-4">
           <ActiveCalendarView
-            items={calendarItems}
+            items={itemsWithMeetings}
             cases={shown}
             today={today}
             role={role}
@@ -180,7 +163,6 @@ export function ActiveScreen() {
             subView={calSub}
             onSubViewChange={setCalSub}
             onSelectCase={openCase}
-            meetings={calendarMeetings}
             showMeetings={showMeetings}
           />
         </TabsContent>

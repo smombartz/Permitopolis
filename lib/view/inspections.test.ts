@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { DEFAULT_CONFIG, DEFAULT_DEMO_TODAY } from "@/lib/rules/config";
 import { buildSeed, transition } from "@/lib/state";
+import { makeCase, makeTask } from "@/lib/state/testSupport";
 import type { EventCase } from "@/lib/types";
 import { boothRowsFor, buildInspectionGroups, formatInspectionNote, groupsByBucket, parseInspectionNote } from "./inspections";
 
@@ -116,5 +117,17 @@ describe("groupsByBucket", () => {
     const split = groupsByBucket(groups);
     expect(split.today).toHaveLength(1);
     expect(split.upcoming).toHaveLength(0);
+  });
+});
+
+describe("a Draft is never on the inspections list", () => {
+  it("an applicant's draft with food vendors next week is the applicant's alone", () => {
+    const vendor = makeTask({ id: "PMT-27-0001:vendor_health_permit:1", catalogId: "vendor_health_permit", payload: { vendorName: "Taco Cart" } });
+    const schedule = { date: "2027-05-08", start: "11:00", end: "15:00", occurrences: [{ date: "2027-05-08", availability: { status: "open" as const }, billing: "upcoming" as const }] };
+    const draft = makeCase({ state: "draft", schedule, tasks: [vendor] });
+    expect(buildInspectionGroups([draft], "2027-05-03")).toEqual([]);
+    // The same plan once it is with the city is listed, named as every list names an event.
+    const submitted = { ...draft, state: "submitted" as const, name: "Spring cookout", applicantId: "maya-chen" };
+    expect(buildInspectionGroups([submitted], "2027-05-03")).toMatchObject([{ caseName: "Spring cookout", applicantName: "Maya Chen", tier: "instant", eventDate: "2027-05-08", bucket: "upcoming" }]);
   });
 });

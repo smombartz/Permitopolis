@@ -1,10 +1,9 @@
 "use client";
 
 import { cn } from "@/lib/utils";
-import { TIER_LABEL } from "@/lib/types";
-import { TIER_ICON } from "@/components/domain/icons";
+import { ItemMark, itemTitle, MEETING_ITEM_CLASS } from "./ItemMark";
 import { blackoutOn, dayOfMonth, groupItemsByDate, impactedOn, isSameMonth, monthGridDays, monthLabel } from "./utils";
-import { SELECTED_DAY, TIER_DOT_CLASS } from "./tierStyles";
+import { SELECTED_DAY } from "./tierStyles";
 import type { CalendarItem } from "./types";
 import type { ISODate } from "@/lib/types";
 
@@ -24,7 +23,7 @@ export interface MonthGridProps {
 
 const WEEKDAY_HEADS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
-/** A month of days, each cell listing the tier-colored items that land on it. */
+/** A month of days, each cell listing the items that land on it: events by tier, meetings outlined. */
 export function MonthGrid({ items, today, month, onSelectItem, onSelectDay, selected, className }: MonthGridProps) {
   const days = monthGridDays(month);
   const byDate = groupItemsByDate(items);
@@ -78,27 +77,24 @@ export function MonthGrid({ items, today, month, onSelectItem, onSelectDay, sele
                 </p>
               )}
               <ul className="space-y-0.5">
-                {dayItems.map((item) => {
-                  const TierIcon = TIER_ICON[item.tier];
-                  return (
-                    <li key={item.id}>
-                      <button
-                        type="button"
-                        onClick={() => onSelectItem?.(item.id)}
-                        title={`${TIER_LABEL[item.tier]}: ${item.label}`}
-                        className={cn(
-                          "flex w-full items-center gap-1 truncate rounded px-1 py-0.5 text-left text-[11px] text-fg-secondary hover:bg-surface-hover",
-                          FOCUS_RING,
-                        )}
-                      >
-                        <span aria-hidden className={cn("size-1.5 shrink-0 rounded-full", TIER_DOT_CLASS[item.tier])} />
-                        <TierIcon aria-hidden className="size-2.5 shrink-0" />
-                        <span className="sr-only">{TIER_LABEL[item.tier]}: </span>
-                        <span className="truncate">{item.label}</span>
-                      </button>
-                    </li>
-                  );
-                })}
+                {dayItems.map((item) => (
+                  <li key={item.id}>
+                    <button
+                      type="button"
+                      onClick={() => onSelectItem?.(item.id)}
+                      title={itemTitle(item)}
+                      data-kind={item.kind ?? "event"}
+                      className={cn(
+                        "flex w-full items-center gap-1 truncate rounded px-1 py-0.5 text-left text-[11px] text-fg-secondary hover:bg-surface-hover",
+                        item.kind === "meeting" && MEETING_ITEM_CLASS,
+                        FOCUS_RING,
+                      )}
+                    >
+                      <ItemMark item={item} />
+                      <span className="truncate">{item.label}</span>
+                    </button>
+                  </li>
+                ))}
               </ul>
             </div>
           );

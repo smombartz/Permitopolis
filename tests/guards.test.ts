@@ -86,3 +86,50 @@ describe("integration rule", () => {
     expect(offenders, offenders.join("\n")).toEqual([]);
   });
 });
+
+describe("every route is built", () => {
+  // Phases 2 to 4 kept a placeholder page for each route nobody had built yet. Phases 5 and 6
+  // built the last of them (the amendment, Payments, Closures and routes, Work orders,
+  // Verifications, Inspections, Settings), and a route added from here on is built with its page.
+  const pages = sourceFiles(join(ROOT, "app")).filter((file) => /[\\/]page\.tsx$/.test(file));
+
+  it("finds the app's pages: the 19 routes of the PRD's route map, the demo guide and the two dev pages", () => {
+    expect(pages.map((file) => relative(join(ROOT, "app"), file)).sort()).toEqual([
+      "apply/page.tsx",
+      "city/active/page.tsx",
+      "city/cases/[id]/page.tsx",
+      "city/cases/page.tsx",
+      "city/inspections/page.tsx",
+      "city/intake/page.tsx",
+      "city/map/page.tsx",
+      "city/payments/page.tsx",
+      "city/queue/page.tsx",
+      "city/settings/page.tsx",
+      "city/verifications/page.tsx",
+      "city/work-orders/page.tsx",
+      "demo/page.tsx",
+      "dev/kit/page.tsx",
+      "dev/map/page.tsx",
+      "events/[id]/amend/page.tsx",
+      "events/[id]/page.tsx",
+      "events/[id]/permit/page.tsx",
+      "events/[id]/quote/page.tsx",
+      "events/page.tsx",
+      "page.tsx",
+      "verify/[id]/page.tsx",
+    ]);
+  });
+
+  it("no page renders the placeholder screen", () => {
+    const offenders = pages.filter((file) => /PlaceholderScreen/.test(readFileSync(file, "utf8"))).map((file) => relative(ROOT, file));
+    expect(offenders, `Still a placeholder:\n${offenders.join("\n")}`).toEqual([]);
+  });
+
+  it("every page is the thin server component of the pattern: one client screen under Suspense", () => {
+    for (const file of pages) {
+      const text = readFileSync(file, "utf8");
+      expect(text, relative(ROOT, file)).toMatch(/<Suspense fallback=\{null\}>/);
+      expect(text, relative(ROOT, file)).not.toMatch(/["']use client["']/);
+    }
+  });
+});

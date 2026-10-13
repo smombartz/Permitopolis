@@ -15,12 +15,18 @@ interface WorkOrdersListProps {
   rows: WorkOrderRow[];
   today: ISODate;
   here: string;
+  /** Whether a filter is narrowing the list: an empty list then says so, and the bar above offers "Clear filters". */
+  filtered?: boolean;
 }
 
 /** Every work order, grouped by event and sorted by event date; each row links to its case. */
-function WorkOrdersList({ rows, today, here }: WorkOrdersListProps) {
+function WorkOrdersList({ rows, today, here, filtered = false }: WorkOrdersListProps) {
   if (rows.length === 0) {
-    return <EmptyState icon={ClipboardListIcon} title="No open work orders" text="Nothing matches these filters." />;
+    return filtered ? (
+      <EmptyState icon={ClipboardListIcon} title="No work orders match these filters" text="Try another status, kind or due date, or clear the filters." />
+    ) : (
+      <EmptyState icon={ClipboardListIcon} title="No work orders yet" text="A work order is created for each city service when a case's permit is issued." />
+    );
   }
 
   const groups = groupWorkOrdersByEvent(rows);

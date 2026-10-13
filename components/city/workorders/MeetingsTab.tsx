@@ -22,7 +22,7 @@ interface MeetingsTabProps {
 /** Every site walkthrough and coordination meeting: Schedule (or Reschedule) and Mark held. */
 function MeetingsTab({ rows, role, today, here }: MeetingsTabProps) {
   if (rows.length === 0) {
-    return <EmptyState icon={CalendarClockIcon} title="No meetings to show" text="Nothing matches these filters." />;
+    return <EmptyState icon={CalendarClockIcon} title="No walkthroughs or meetings" text="A Special event's coordination meeting and site walkthrough show up here once its application is in." />;
   }
 
   return (

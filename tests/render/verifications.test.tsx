@@ -13,7 +13,11 @@ describe("Verifications: the queue", () => {
   it("Health & Legal opens with its documents grouped by type, Insurance among them", async () => {
     await renderScreen(<VerificationsScreen />, { role: "hl", path: routes.city.verifications() });
     expect(screen.getByRole("heading", { name: "Verifications" })).toBeInTheDocument();
-    expect(screen.getByText(/^Insurance \(\d+\)$/)).toBeInTheDocument();
+    // A group heading with its count, as My queue's groups carry theirs.
+    const insurance = screen.getByRole("heading", { level: 2, name: /^Insurance\s*\d+$/ });
+    expect(insurance.querySelector('[data-slot="count-badge"]')).not.toBeNull();
+    // The Queue tab counts every document waiting, whatever the filters show.
+    expect(screen.getByRole("tab", { name: /^Queue\s*\d+$/ })).toHaveAttribute("aria-selected", "true");
     // The 5K's race-day certificate is in the queue, passing in full.
     expect(screen.getByText("Riverfront Summer 5K")).toBeInTheDocument();
   });
@@ -59,7 +63,7 @@ describe("Verifications: the queue", () => {
   it("grouping by event shows each case once, with its documents under it", async () => {
     const { user } = await renderScreen(<VerificationsScreen />, { role: "hl", path: routes.city.verifications() });
     await user.click(screen.getByRole("radio", { name: "By event" }));
-    expect(screen.getByText(/^Riverfront Summer 5K \(\d+\)$/)).toBeInTheDocument();
+    expect(screen.getByRole("heading", { level: 2, name: /^Riverfront Summer 5K\s*\d+$/ })).toBeInTheDocument();
   });
 
   it("another city role sees the shell's built-for panel, not the queue", async () => {

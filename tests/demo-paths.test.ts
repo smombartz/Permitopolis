@@ -38,7 +38,9 @@ import {
   type BoardColumn,
 } from "@/lib/state";
 import { EMPTY_ADDONS, type Dept, type EventAnswers, type EventCase, type FileRef, type ISODate, type Location, type Party, type Task } from "@/lib/types";
+import { DEMO_PATHS } from "@/lib/data/demoScript";
 import { queueReasonLine } from "@/lib/view/cityLists";
+import { pathProgress } from "@/lib/view/coach";
 
 const TODAY = DEFAULT_DEMO_TODAY;
 const S1 = "PMT-27-0109";
@@ -106,6 +108,17 @@ const queue = (role: Dept, id: string) =>
 const queueSizes = () => ({ clerk: queueFor(cases(), "clerk", TODAY).length, pws: queueFor(cases(), "pws", TODAY).length, hl: queueFor(cases(), "hl", TODAY).length });
 const active = () => activePermits(cases(), store().demoToday).map((c) => c.id);
 const panel = (id: string, role: Party, type: ActionType) => availableActions(get(id), role, ctx()).find((a) => a.type === type);
+/**
+ * What the demo coach says for a path right now ("Step 2 of 5: <the step's id>", or "Done"),
+ * read off the store as the coach strip and the demo guide read it (lib/view/coach.ts). Each
+ * path below asks after every step of the script, so the coach and the script cannot drift apart.
+ */
+function coach(pathId: number): string {
+  const path = DEMO_PATHS.find((p) => p.id === pathId)!;
+  const progress = pathProgress(path, { cases: cases(), role: store().role, personaId: store().personaId, today: store().demoToday });
+  return progress.done ? "Done" : `Step ${progress.stepIndex + 1} of ${progress.totalSteps}: ${progress.step.id}`;
+}
+
 /** What a new applicant would be told about this place and time. */
 const slot = (location: Location, date: ISODate, start = "00:00", end = "23:59") => availability(location, { date, start, end }, ctx());
 
@@ -166,6 +179,7 @@ describe("Path 1 · Instant in two minutes (S2)", () => {
 
     // As Sunrise Yoga Club: the persona opens its draft, in the wizard at step 3.
     as("applicant", "sunrise-yoga-club");
+    expect(coach(1)).toBe("Step 1 of 3: finish-wizard");
     expect(applicantCases(cases(), store().personaId).map((c) => c.id)).toEqual([S2]);
     expect(get(S2)).toMatchObject({ state: "draft", wizardStep: "when", tier: "instant" });
     expect(isVisibleToCity(get(S2))).toBe(false);
@@ -174,6 +188,7 @@ describe("Path 1 · Instant in two minutes (S2)", () => {
     store().updateDraft(S2, { wizardStep: "size" });
     store().updateDraft(S2, { wizardStep: "plan" });
     expect(get(S2)).toMatchObject({ state: "draft", wizardStep: "plan", tier: "instant", attendance: 20 });
+    expect(coach(1)).toBe("Step 2 of 3: pay-first-session");
 
     // The plan shows Instant, 13 sessions at $20.
     const cls = classify(get(S2), store().cfg);
@@ -186,6 +201,7 @@ describe("Path 1 · Instant in two minutes (S2)", () => {
 
     // Pay the first session; the series permit appears.
     act(S2, { type: "book_and_pay", method: "card" });
+    expect(coach(1)).toBe("Step 3 of 3: view-active-permits");
     const booked = get(S2);
     expect(booked).toMatchObject({ state: "permitted", tier: "instant", ending: null, permit: { issuedOn: TODAY, signature: null }, dateHold: { status: "held", placedOn: TODAY, expiresOn: null } });
     expect(booked.payments).toEqual([{ id: `${S2}:pay:1`, at: "2027-05-03T09:01", amount: 20, method: "card", kind: "booking" }]);
@@ -206,6 +222,7 @@ describe("Path 1 · Instant in two minutes (S2)", () => {
 
     // Switch to City Clerk: Active permits shows 13 Sundays on Field 4.
     as("clerk");
+    expect(coach(1)).toBe("Done");
     expect(isVisibleToCity(get(S2))).toBe(true);
     expect(active()).toEqual(expect.arrayContaining([...activeBefore, S2]));
     expect(active()).toHaveLength(activeBefore.length + 1);
@@ -235,14 +252,17 @@ describe("Path 2 · Watch the tier move (New applicant)", () => {
 
     as("applicant", "new");
     expect(applicantCases(cases(), "new")).toEqual([]);
+    expect(coach(2)).toBe("Step 1 of 4: pick-shelter");
     const id = store().createDraft("new", { eventType: "picnic_party", name: "Summer picnic" });
     expect(id).toBe("PMT-27-0143");
+    expect(coach(2)).toBe("Step 1 of 4: pick-shelter");
     expect(get(id)).toMatchObject({ state: "draft", tier: "instant", applicantId: "new", wizardStep: "what", triggers: [] });
 
     // Picnic or party at Shelter 2 for 40 people: Instant.
     store().updateDraft(id, { location: SHELTER_2, wizardStep: "where" });
     store().updateDraft(id, { schedule: { date: "2027-06-19", start: "11:00", end: "16:00", occurrences: [] }, wizardStep: "when" });
     store().updateDraft(id, { attendance: 40, wizardStep: "size" });
+    expect(coach(2)).toBe("Step 2 of 4: turn-on-alcohol");
     expect(get(id).schedule!.occurrences).toEqual([{ date: "2027-06-19", availability: { status: "open" }, billing: "upcoming" }]);
     expect(livePanel(id)).toEqual({ tier: "instant", classified: "instant", leadTimeDays: 10, triggers: [], reviewers: [], total: 125, whatIf: [] });
     expect(capacityWarning(get(id))).toBeNull();
@@ -256,6 +276,7 @@ describe("Path 2 · Watch the tier move (New applicant)", () => {
 
     // Turn on alcohol: Reviewed, and the what-if chip offers the way back.
     store().updateDraft(id, { addOns: { ...EMPTY_ADDONS, alcohol: true } });
+    expect(coach(2)).toBe("Step 3 of 4: two-main-blocks");
     expect(livePanel(id)).toEqual({
       tier: "reviewed",
       classified: "reviewed",
@@ -273,11 +294,15 @@ describe("Path 2 · Watch the tier move (New applicant)", () => {
     // Taking the way back, and coming forward again.
     store().updateDraft(id, { addOns: EMPTY_ADDONS });
     expect(livePanel(id)).toMatchObject({ tier: "instant", total: 125, reviewers: [], whatIf: [] });
+    // The coach reads the draft, not a count of clicks: the way back is a step back.
+    expect(coach(2)).toBe("Step 2 of 4: turn-on-alcohol");
     store().updateDraft(id, { addOns: { ...EMPTY_ADDONS, alcohol: true } });
     expect(get(id).tier).toBe("reviewed");
+    expect(coach(2)).toBe("Step 3 of 4: two-main-blocks");
 
     // Switch the location to two Main Street blocks: Special event.
     store().updateDraft(id, { location: TWO_MAIN_STREET_BLOCKS });
+    expect(coach(2)).toBe("Step 4 of 4: set-attendance-1200");
     expect(livePanel(id)).toEqual({
       tier: "special",
       classified: "special",
@@ -295,6 +320,7 @@ describe("Path 2 · Watch the tier move (New applicant)", () => {
 
     // Set attendance to 1,200 with no street: still Special.
     store().updateDraft(id, { location: SHELTER_2, attendance: 1200 });
+    expect(coach(2)).toBe("Done");
     expect(livePanel(id)).toEqual({
       tier: "special",
       classified: "special",
@@ -319,6 +345,7 @@ describe("Path 2 · Watch the tier move (New applicant)", () => {
     expect(get(id).tier).toBe("reviewed");
     store().updateDraft(id, { attendance: 1200 });
     expect(get(id).tier).toBe("special");
+    expect(coach(2)).toBe("Done");
 
     // None of this is the city's business yet: a Draft is the applicant's alone and holds no date.
     expect(isVisibleToCity(get(id))).toBe(false);
@@ -336,9 +363,11 @@ describe("Path 3 · Answer a request (S3)", () => {
 
     // As Downtown Arts Collective: open the pinned card, use the sample file, send.
     as("applicant", "downtown-arts-collective");
+    expect(coach(3)).toBe("Step 1 of 5: respond-to-request");
     expect(applicantCases(cases(), store().personaId).map((c) => c.id)).toEqual([S3]);
     expect(board(get(S3)).do_now).toEqual(["vendor_health_permit:1"]);
     act(S3, { type: "respond_to_request", taskId: healthPermit, files: [SAMPLE_FILE] });
+    expect(coach(3)).toBe("Step 2 of 5: verify-and-approve");
 
     // The card moves to With the city, and the move is Health & Legal's.
     expect(get(S3).state).toBe("in_review");
@@ -363,7 +392,10 @@ describe("Path 3 · Answer a request (S3)", () => {
     act(S3, { type: "verify_document", taskId: healthPermit });
     expect(task(get(S3), "vendor_health_permit:1").status).toBe("done");
     expect(get(S3).reviews.find((r) => r.dept === "hl")?.status).toBe("pending");
+    // Verified, and the step is still Health & Legal's: it has yet to approve the section.
+    expect(coach(3)).toBe("Step 2 of 5: verify-and-approve");
     act(S3, { type: "review_decide", decision: "approve", conditions: [], feeLines: [] });
+    expect(coach(3)).toBe("Step 3 of 5: send-quote");
     expect(get(S3).reviews.map((r) => [r.dept, r.status, r.decidedOn])).toEqual([
       ["pws", "approved_with_conditions", "2027-04-28"],
       ["hl", "approved", TODAY],
@@ -388,6 +420,7 @@ describe("Path 3 · Answer a request (S3)", () => {
       feeLines: reviewed.feeLines.map((line) => ({ dept: line.dept, label: line.label, qty: line.qty, unit: line.unit, unitPrice: line.unitPrice, kind: line.kind })),
     });
     const quoted = get(S3);
+    expect(coach(3)).toBe("Step 4 of 5: accept-sign-pay");
     expect(quoted.state).toBe("quote_sent");
     expect(quoted.conditions.map((cond) => [cond.dept, cond.text, cond.mergedByClerk, cond.acceptedByApplicant])).toEqual([
       ["pws", "Sound ends at 9 pm", true, false],
@@ -411,10 +444,13 @@ describe("Path 3 · Answer a request (S3)", () => {
     as("applicant");
     act(S3, { type: "accept_and_sign", signature: "Jordan Alvarez" });
     expect(get(S3).flags.signed).toBe(true);
+    // Signed and not yet paid: still the applicant's step.
+    expect(coach(3)).toBe("Step 4 of 5: accept-sign-pay");
     expect(get(S3).conditions.every((cond) => cond.acceptedByApplicant)).toBe(true);
     expect(board(get(S3)).do_now).toEqual(["pay_fees"]);
     act(S3, { type: "pay", amount: 715, method: "card", kind: "quote" });
     expect(caseTotals(get(S3))).toMatchObject({ paid: 715, due: 0 });
+    expect(coach(3)).toBe("Step 5 of 5: issue-permit");
     expect(board(get(S3)).do_now).toEqual([]);
     // Paid, so the date can no longer be lost.
     expect(get(S3).dateHold).toEqual({ status: "held", placedOn: "2027-04-19", expiresOn: null });
@@ -429,6 +465,7 @@ describe("Path 3 · Answer a request (S3)", () => {
     act(S3, { type: "issue_permit" });
     const permitted = get(S3);
     expect(permitted).toMatchObject({ state: "permitted", permit: { issuedOn: TODAY, signature: "Jordan Alvarez" } });
+    expect(coach(3)).toBe("Done");
     expect(active()).toEqual(expect.arrayContaining([...activeBefore, S3]));
     expect(permitSessions(cases()).filter((s) => s.case.id === S3).map((s) => s.date)).toEqual(["2027-06-18"]);
     expect(up(S3)).toEqual([]);
@@ -460,13 +497,16 @@ describe("Path 4 · Neighbors and the date hold (S4)", () => {
 
     // As the block captain: "Simulate a sign-off", three times.
     as("applicant", "maple-street-block-captain");
+    expect(coach(4)).toBe("Step 1 of 3: simulate-signoffs");
     act(S4, { type: "simulate_signoff" });
     expect(task(get(S4), "neighbor_signoff")).toMatchObject({ status: "todo", payload: { progress: { done: 10, total: 12 } } });
     expect(note(S4, "clerk")).toBe("Waiting on 2 neighbor sign-offs");
     expect(panel(S4, "clerk", "accept_complete")).toMatchObject({ enabled: false, reason: "Waiting on 2 neighbor sign-offs" });
     act(S4, { type: "simulate_signoff" });
     expect(note(S4, "clerk")).toBe("Waiting on 1 neighbor sign-off");
+    expect(coach(4)).toBe("Step 1 of 3: simulate-signoffs");
     act(S4, { type: "simulate_signoff" });
+    expect(coach(4)).toBe("Step 2 of 3: accept-and-route");
     expect(task(get(S4), "neighbor_signoff")).toMatchObject({ status: "done", payload: { progress: { done: 12, total: 12 } } });
     expect(refusal(S4, { type: "simulate_signoff" })).toBe("All neighbors have already signed off.");
     expect(board(get(S4))).toEqual({
@@ -487,6 +527,8 @@ describe("Path 4 · Neighbors and the date hold (S4)", () => {
     as("clerk");
     expect(panel(S4, "clerk", "accept_complete")).toMatchObject({ enabled: true, primary: true });
     act(S4, { type: "accept_complete" });
+    // Accepted and not yet routed: the Clerk's step has two halves.
+    expect(coach(4)).toBe("Step 2 of 3: accept-and-route");
     expect(get(S4)).toMatchObject({ state: "submitted", flags: { acceptedComplete: true }, dateHold: { status: "held", placedOn: TODAY, expiresOn: null } });
     expect(queue("clerk", S4)).toEqual(["confirm_routing"]);
     expect(slot(maple400, "2027-06-26")).toMatchObject({ status: "booked", reason: "Maple Street block party has this date held" });
@@ -505,6 +547,7 @@ describe("Path 4 · Neighbors and the date hold (S4)", () => {
     const reviewers = suggested.map((r) => ({ dept: r.dept, sections: r.sections, dueDate: due }));
     expect(refusal(S4, { type: "confirm_routing", reviewers: [...reviewers, reviewers[0]] })).toBe("Public Works & Safety is on the list twice; route each department once.");
     act(S4, { type: "confirm_routing", reviewers });
+    expect(coach(4)).toBe("Step 3 of 3: pws-queue");
 
     // The case moves to In review.
     const routed = get(S4);
@@ -520,6 +563,7 @@ describe("Path 4 · Neighbors and the date hold (S4)", () => {
 
     // Public Works & Safety's queue now shows the block party. So does Health & Legal's.
     as("pws");
+    expect(coach(4)).toBe("Done");
     expect(queueFor(cases(), "pws", TODAY).filter((item) => item.case.id === S4)).toMatchObject([{ task: { catalogId: "review:pws", title: "Review your sections", dueDate: "2027-05-17" }, group: "later", daysWaiting: 0 }]);
     expect(queue("hl", S4)).toEqual(["review:hl"]);
     expect(up(S4)).toEqual(["pws", "hl"]);
@@ -538,6 +582,7 @@ describe("Path 5 · Two parties up at once (S5)", () => {
 
     // As City Clerk, open the case: Who's up highlights both the applicant and Health & Legal.
     as("clerk");
+    expect(coach(5)).toBe("Step 1 of 5: open-case");
     expect(up(S5)).toEqual(["applicant", "hl"]);
     expect(waitingOn(get(S5), TODAY).map((p) => [p.party, p.status])).toEqual([
       ["applicant", "up_now"],
@@ -553,11 +598,13 @@ describe("Path 5 · Two parties up at once (S5)", () => {
 
     // As Health & Legal: verify the insurance.
     as("hl");
+    expect(coach(5)).toBe("Step 2 of 5: verify-insurance");
     expect(queue("hl", S5)).toEqual(["verify:insurance_certificate"]);
     // Public Works & Safety does not check insurance.
     expect(store().dispatch(S5, { type: "verify_document", taskId: insurance }, "pws")).toEqual({ ok: false, reason: "Health & Legal checks this card." });
     act(S5, { type: "verify_document", taskId: insurance });
     expect(task(get(S5), "insurance_certificate").status).toBe("done");
+    expect(coach(5)).toBe("Step 3 of 5: sign-and-pay");
     expect(task(get(S5), "verify:insurance_certificate").status).toBe("done");
     expect(queue("hl", S5)).toEqual([]);
     expect(up(S5)).toEqual(["applicant"]);
@@ -568,9 +615,11 @@ describe("Path 5 · Two parties up at once (S5)", () => {
     as("applicant", "riverfront-running-club");
     expect(applicantCases(cases(), store().personaId).map((c) => c.id)).toEqual([S5]);
     act(S5, { type: "accept_and_sign", signature: "Simone Dubois" });
+    expect(coach(5)).toBe("Step 3 of 5: sign-and-pay");
     expect(panel(S5, "clerk", "issue_permit")).toMatchObject({ enabled: false, reason: "Needs: payment (applicant)" });
     expect(task(get(S5), "pay_fees")).toMatchObject({ status: "todo", payload: { amount: 6530 } });
     act(S5, { type: "pay", amount: 6530, method: "card", kind: "quote" });
+    expect(coach(5)).toBe("Step 4 of 5: issue-permit");
     expect(caseTotals(get(S5))).toEqual({ fees: 5530, deposit: 1000, total: 6530, paid: 6530, due: 0 });
     expect(get(S5).dateHold).toEqual({ status: "held", placedOn: "2027-03-10", expiresOn: null });
     expect(up(S5)).toEqual(["clerk"]);
@@ -581,6 +630,7 @@ describe("Path 5 · Two parties up at once (S5)", () => {
     expect(panel(S5, "clerk", "issue_permit")).toMatchObject({ enabled: true });
     expect(queue("pws", S5)).toEqual([]);
     act(S5, { type: "issue_permit" });
+    expect(coach(5)).toBe("Step 5 of 5: new-plaza-event");
     const permitted = get(S5);
     expect(permitted).toMatchObject({ state: "permitted", permit: { issuedOn: TODAY, signature: "Simone Dubois" } });
     expect(active()).toContain(S5);
@@ -610,6 +660,8 @@ describe("Path 5 · Two parties up at once (S5)", () => {
 
     // Starting a new City Hall Plaza event on Jul 11 shows the Impacted warning. Impacted, not blocked.
     as("applicant", "new");
+    // Being the new applicant is not the step: the draft for Jul 11 is.
+    expect(coach(5)).toBe("Step 5 of 5: new-plaza-event");
     const id = store().createDraft("new", {
       eventType: "performance_rally",
       name: "Plaza brass band",
@@ -617,6 +669,7 @@ describe("Path 5 · Two parties up at once (S5)", () => {
       schedule: { date: "2027-07-11", start: "13:00", end: "15:00", occurrences: [] },
       attendance: 80,
     });
+    expect(coach(5)).toBe("Done");
     const warning = { status: "impacted", reason: "Riverfront Summer 5K closes Main Street 6 to 11:30 am that day" };
     expect(get(id).schedule!.occurrences).toEqual([{ date: "2027-07-11", availability: warning, billing: "upcoming" }]);
     expect(dateGate(get(id), classify(get(id)), ctx(), id)).toMatchObject({ ok: true, leadTimeOk: true, availability: warning, fixes: [] });
@@ -635,6 +688,7 @@ describe("Path 6 · Closeout (S6)", () => {
   it("Public Works & Safety passes the cleanup check and logs the hours; the Clerk reconciles $750 over and refunds $250; the applicant books again for Sat, Apr 22, 2028", () => {
     // As Public Works & Safety: pass the cleanup check, log 72 officer-hours and 4 crew-hours.
     as("pws");
+    expect(coach(6)).toBe("Step 1 of 3: log-cleanup");
     expect(queue("pws", S6)).toEqual(["cleanup_inspection", "log_actual_hours"]);
     expect(panel(S6, "pws", "log_closeout")).toMatchObject({ enabled: true, primary: true });
     expect(panel(S6, "clerk", "reconcile_close")).toMatchObject({ enabled: false, reason: "Waiting on Public Works & Safety to log hours." });
@@ -655,6 +709,7 @@ describe("Path 6 · Closeout (S6)", () => {
     expect(queue("pws", S6)).toEqual([]);
     // Then the Clerk reconciles.
     expect(up(S6)).toEqual(["clerk"]);
+    expect(coach(6)).toBe("Step 2 of 3: reconcile-close");
     expect(queue("clerk", S6)).toEqual(["reconcile"]);
 
     // As City Clerk: reconciliation shows $750 over the estimate.
@@ -664,6 +719,7 @@ describe("Path 6 · Closeout (S6)", () => {
     expect(panel(S6, "clerk", "reconcile_close")).toMatchObject({ enabled: true, primary: true });
     // Issue the $250 deposit refund and close.
     act(S6, { type: "reconcile_close" });
+    expect(coach(6)).toBe("Step 3 of 3: book-again");
     const closed = get(S6);
     expect(closed.state).toBe("closed");
     expect(closed.closeout).toMatchObject({ balance: 750, refund: 250 });
@@ -679,6 +735,7 @@ describe("Path 6 · Closeout (S6)", () => {
 
     // As the applicant: the board shows the refund, the feedback form and "Book again next year".
     as("applicant", "main-street-business-alliance");
+    expect(coach(6)).toBe("Done");
     expect(board(closed)).toMatchObject({ do_now: ["feedback", "book_again"], with_city: [], coming_up: [] });
     expect(task(closed, "final_bill_or_refund")).toMatchObject({ status: "done", payload: { amount: -250 } });
     expect(up(S6)).toEqual(["applicant"]);
@@ -724,6 +781,7 @@ describe("Path 7 · Amend up a tier (S1, P1)", () => {
     const queuesBefore = queueSizes();
 
     as("applicant", "maya-chen");
+    expect(coach(7)).toBe("Step 1 of 3: add-dj");
     const original = get(S1);
     expect(original).toMatchObject({ tier: "instant", state: "permitted", permit: { issuedOn: "2027-04-26", signature: null } });
     expect(panel(S1, "applicant", "amend")).toMatchObject({ enabled: true });
@@ -752,9 +810,14 @@ describe("Path 7 · Amend up a tier (S1, P1)", () => {
     // Without a fix the amendment does not go in, and the record is as it was.
     expect(refusal(S1, { type: "amend", answers: withDj })).toBe("Needs 30 days of notice; pick a later date or add the late fee.");
     expect(get(S1)).toEqual(original);
+    // Adding the DJ and choosing the late fee both happen in the wizard, on a copy of the
+    // answers: nothing reaches the store until she confirms, so the coach stays on the first step.
+    expect(coach(7)).toBe("Step 1 of 3: add-dj");
 
     // She chooses the late fee.
     act(S1, { type: "amend", answers: withDj, lateFee: true });
+    // One confirmation does all three: the tier, the late fee and the tagged cards.
+    expect(coach(7)).toBe("Done");
     const amended = get(S1);
     expect(amended).toMatchObject({ tier: "reviewed", addOns: { amplifiedSound: true }, flags: { amendmentPending: true, lateFee: true } });
     expect(amended.triggers.map((t) => t.id)).toEqual(["amplified_sound"]);
@@ -893,6 +956,8 @@ describe("Path 7 · Amend up a tier (S1, P1)", () => {
     ]);
     expect(up(S1)).toEqual([]);
     expect(panel(S1, "applicant", "amend")).toMatchObject({ enabled: true });
+    // The path ended when the cards appeared; everything since has left it done.
+    expect(coach(7)).toBe("Done");
   });
 
   it("the City Clerk can decline a submitted amendment instead: the original plan comes back and its cards are gone", () => {
@@ -935,5 +1000,7 @@ describe("Path 7 · Amend up a tier (S1, P1)", () => {
     expect(declined.tasks.some((t) => t.catalogId.startsWith("verify:"))).toBe(false);
     as("applicant", "maya-chen");
     expect(panel(S1, "applicant", "amend")).toMatchObject({ enabled: true });
+    // A declined amendment leaves nothing of the path behind: the coach is back on its first step.
+    expect(coach(7)).toBe("Step 1 of 3: add-dj");
   });
 });

@@ -1,5 +1,6 @@
 /**
- * The hand-offs between the Phase 3 surfaces. Each was built without sight of the others, so
+ * The hand-offs between the surfaces (Phase 3's seven, then Phase 4's role tools, then the
+ * Phase 5 and 6 pages under "(j)" at the end). Each was built without sight of the others, so
  * each surface's own tests stop at "the router was pushed to X". These go one step further:
  * they mount the app the way the App Router does (the real layouts and pages from `app/`,
  * chosen by the mocked location), act on one surface, and then look at the surface that
@@ -10,7 +11,7 @@
  * with it.
  */
 import type { ReactElement, ReactNode } from "react";
-import { fireEvent, screen, within } from "@testing-library/react";
+import { act, fireEvent, screen, within } from "@testing-library/react";
 import { usePathname } from "next/navigation";
 import { describe, expect, it } from "vitest";
 import ApplyLayout from "@/app/apply/layout";
@@ -42,6 +43,7 @@ import { routes } from "@/lib/routes";
 import { queueFor, useDemo } from "@/lib/state";
 import { PARTY_LABEL, type Dept, type Party } from "@/lib/types";
 import { queueWaitingOnOthers } from "@/lib/view/cityLists";
+import { CITY_CORE_LINKS, cityToolLinks } from "@/lib/view/shell";
 import { navState } from "./setup";
 import { navigate, renderScreen, storedCase, type RenderScreenOptions } from "./harness";
 
@@ -1253,4 +1255,544 @@ describe("(i) every role switch lands on a real screen", () => {
     expectRealScreen();
     expect(h1()).toBe("Riverfront Summer 5K");
   });
+});
+
+/* ------------------------------------------------------------------------ */
+/* (j) Phases 5 and 6: each role's tool pages, the coach, the palette,       */
+/*     Settings, and demo path 7                                             */
+/* ------------------------------------------------------------------------ */
+
+const ULTRA = "PMT-27-0030"; // Four Bridges Ultra: Special, Permitted, three open work orders
+const PARISH = "PMT-27-0012"; // St. Agnes Parish's festival: In review, food vendors, May 13
+
+/** Each role's own tools, as the sidebar names them, and the `<h1>` the page opens with. */
+const TOOL_PAGES: [role: Dept, label: string, href: string, title: string][] = [
+  ["clerk", "Intake", routes.city.intake(), "Intake queue"],
+  ["clerk", "Payments", routes.city.payments(), "Payments"],
+  ["clerk", "Settings", routes.city.settings(), "Settings"],
+  ["pws", "Closures and routes", routes.city.map(), "Closures and routes"],
+  ["pws", "Work orders", routes.city.workOrders(), "Work orders"],
+  ["hl", "Verifications", routes.city.verifications(), "Verifications"],
+  ["hl", "Inspections", routes.city.inspections(), "Inspections"],
+];
+
+describe("(j) no page is a placeholder any more: every tool link reaches a built page, for the role it belongs to", () => {
+  it("the sidebar offers each role exactly its own tools", () => {
+    for (const role of CITY_ROLES) {
+      expect(cityToolLinks(role).map((link) => [link.label, link.href])).toEqual(TOOL_PAGES.filter(([owner]) => owner === role).map(([, label, href]) => [label, href]));
+    }
+  });
+
+  it.each(TOOL_PAGES)("%s: the sidebar's %s link opens the page", async (role, label, href, title) => {
+    const { user } = await renderApp({ role, path: routes.city.queue() });
+    const sidebar = within(screen.getByRole("navigation", { name: "City" }));
+
+    await user.click(sidebar.getByRole("link", { name: label }));
+
+    expect(here()).toBe(href);
+    expectRealScreen();
+    expect(h1()).toBe(title);
+    expect(sidebar.getByRole("link", { name: label })).toHaveAttribute("aria-current", "page");
+  });
+
+  it.each(TOOL_PAGES)("%s's %s, typed in by another city role, offers the switch and then opens", async (role, _label, href, title) => {
+    const other = CITY_ROLES.find((r) => r !== role)!;
+    const { user } = await renderApp({ role: other, path: href });
+    expect(screen.getByText(`This screen is built for ${role === "clerk" ? "the City Clerk" : PARTY_LABEL[role]}.`)).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: `Switch to ${PARTY_LABEL[role]}` }));
+
+    expect(here()).toBe(href);
+    expectRealScreen();
+    expect(h1()).toBe(title);
+  });
+
+  it("the amendment page is the wizard reopened on the record, for the applicant", async () => {
+    await renderApp({ scenario: "S1", path: routes.amend(S1) });
+    expectRealScreen();
+    expect(h1()).toBe("Maya Chen's 40th birthday picnic");
+    expect(screen.getByText("Change your event")).toBeInTheDocument();
+  });
+});
+
+describe("(j) every new list opens the case, and the case comes back to that list as it was", () => {
+  it("Payments: a row opens the case, Record payment opens the payment panel, and Back returns to the tab and its filters", async () => {
+    const { user } = await renderApp({ role: "clerk", path: routes.city.payments() });
+
+    // Due: the 5K's quote.
+    const dueRow = within(screen.getByText("Riverfront Summer 5K").closest("tr") as HTMLElement);
+    await user.click(dueRow.getByRole("link", { name: "Record payment" }));
+    expect(here()).toBe(routes.city.case(S5, { task: "pay", from: routes.city.payments() }));
+    expectRealScreen();
+    expect(within(screen.getByRole("dialog")).getByRole("heading", { name: "Record an in-person payment" })).toBeInTheDocument();
+    expect(within(screen.getByRole("dialog")).getByText(/Quote balance/)).toBeInTheDocument();
+    expect(backLink()).toHaveTextContent("Back to Payments");
+    await closePanel(user);
+    await user.click(backLink());
+    expect(here()).toBe(routes.city.payments());
+    expectRealScreen();
+
+    // Received, filtered to card payments: the festival's row opens its case, and Back keeps the tab and the filter.
+    await user.click(screen.getByRole("tab", { name: /^Received/ }));
+    await user.selectOptions(screen.getByLabelText("Method"), "card");
+    const received = `${routes.city.payments()}?tab=received&method=card`;
+    expect(here()).toBe(received);
+    await user.click(within(screen.getByText("Main Street Food Truck Festival").closest("tr") as HTMLElement).getByRole("link"));
+    expect(navState.pathname).toBe(`/city/cases/${S6}`);
+    expectRealScreen();
+    expect(backLink()).toHaveTextContent("Back to Payments");
+    await user.click(backLink());
+    expect(here()).toBe(received);
+    expect(screen.getByRole("tab", { name: /^Received/ })).toHaveAttribute("aria-selected", "true");
+    expect(screen.getByLabelText("Method")).toHaveValue("card");
+
+    // Clear filters takes every filter off in one go.
+    fireEvent.change(screen.getByLabelText("From date"), { target: { value: "2027-01-01" } });
+    expect(here()).toBe(`${routes.city.payments()}?tab=received&method=card&start=2027-01-01`);
+    await user.click(screen.getByRole("button", { name: "Clear filters" }));
+    expect(here()).toBe(`${routes.city.payments()}?tab=received`);
+  });
+
+  it("Closures and routes: an event on the map's list opens its case, and Back returns to that day's map", async () => {
+    const jul11 = `${routes.city.map()}?mode=day&from=2027-07-11`;
+    const { user } = await renderApp({ role: "pws", path: jul11 });
+    expectRealScreen();
+
+    const list = within(screen.getByRole("list", { name: "What is on the map" }));
+    const row = list.getByRole("link", { name: /Riverfront Summer 5K/ });
+    expect(within(row).getByText("Date held")).toBeInTheDocument();
+    await user.click(row);
+
+    expect(navState.pathname).toBe(`/city/cases/${S5}`);
+    expectRealScreen();
+    expect(h1()).toBe("Riverfront Summer 5K");
+    expect(backLink()).toHaveTextContent("Back to Closures and routes");
+    await user.click(backLink());
+    expect(navState.pathname).toBe(routes.city.map());
+    // The day is back in the URL (Day is the default range, so it is not spelled out), and so is the event.
+    expect(here()).toBe(`${routes.city.map()}?from=2027-07-11`);
+    expectRealScreen();
+    expect(within(screen.getByRole("list", { name: "What is on the map" })).getByRole("link", { name: /Riverfront Summer 5K/ })).toBeInTheDocument();
+  });
+
+  it("Work orders: Mark done opens the work order on its case, and the list has it done on the way back; a meeting's Reschedule opens its panel", async () => {
+    const { user } = await renderApp({ role: "pws", path: routes.city.workOrders() });
+    const barricades = storedCase(ULTRA).tasks.find((t) => t.catalogId === "work_order:barricades")!;
+
+    const group = within(screen.getByRole("list", { name: "Four Bridges Ultra's work orders" }));
+    await user.click(group.getAllByRole("link", { name: "Mark done" })[0]);
+    expect(here()).toBe(routes.city.case(ULTRA, { task: barricades.id, from: routes.city.workOrders() }));
+    expectRealScreen();
+    const order = within(screen.getByRole("dialog"));
+    expect(order.getByRole("heading", { name: "Deliver barricades" })).toBeInTheDocument();
+    expect(order.getByText("30 barricades")).toBeInTheDocument();
+    await user.click(panelButton("Mark done"));
+    expect(storedCase(ULTRA).tasks.find((t) => t.id === barricades.id)!.status).toBe("done");
+
+    expect(backLink()).toHaveTextContent("Back to Work orders");
+    await user.click(backLink());
+    expect(here()).toBe(routes.city.workOrders());
+    expectRealScreen();
+    const after = within(screen.getByRole("list", { name: "Four Bridges Ultra's work orders" }));
+    expect(after.getAllByRole("link", { name: "Mark done" })).toHaveLength(2);
+    expect(after.getByText("Done")).toBeInTheDocument();
+
+    // The other tab: a walkthrough's Reschedule opens the Schedule panel on the case, and Back keeps the tab.
+    await user.click(screen.getByRole("tab", { name: /^Walkthroughs and meetings/ }));
+    const meetings = `${routes.city.workOrders()}?tab=meetings`;
+    expect(here()).toBe(meetings);
+    const walkthrough = screen.getByText("Site walkthrough · Scheduled for Fri, Aug 6, 2027").closest("li") as HTMLElement;
+    await user.click(within(walkthrough).getByRole("link", { name: "Reschedule" }));
+    expect(navState.pathname).toBe(`/city/cases/${ULTRA}`);
+    expectRealScreen();
+    expect(within(screen.getByRole("dialog")).getByLabelText(/Date/)).toHaveValue("2027-08-06");
+    await closePanel(user);
+    await user.click(backLink());
+    expect(here()).toBe(meetings);
+  });
+
+  it("Verifications: a row opens that document's check on its case; verified, it leaves the queue and joins Recently decided", async () => {
+    const byEvent = `${routes.city.verifications()}?group=event`;
+    const { user } = await renderApp({ role: "hl", path: byEvent });
+    expectRealScreen();
+
+    await user.click(screen.getByText("Riverfront Summer 5K", { selector: "a *" }).closest("a") as HTMLElement);
+    expect(here()).toBe(routes.city.case(S5, { tab: "documents", task: `verify_document:${S5}:insurance_certificate`, from: byEvent }));
+    expectRealScreen();
+    expect(within(screen.getByRole("dialog")).getByRole("heading", { name: "Verify: Certificate of insurance" })).toBeInTheDocument();
+    await user.click(panelButton("Verify"));
+    expect(storedCase(S5).tasks.find((t) => t.catalogId === "insurance_certificate")!.status).toBe("done");
+
+    expect(backLink()).toHaveTextContent("Back to Verifications");
+    await user.click(backLink());
+    expect(here()).toBe(byEvent);
+    expectRealScreen();
+    expect(screen.queryByRole("heading", { level: 2, name: /^Riverfront Summer 5K/ })).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole("tab", { name: "Recently decided" }));
+    const decided = screen.getAllByRole("link").find((a) => a.getAttribute("href")?.startsWith(`/city/cases/${S5}?`))!;
+    expect(within(decided).getByText("Verified")).toBeInTheDocument();
+    await user.click(decided);
+    expect(navState.pathname).toBe(`/city/cases/${S5}`);
+    expect(navState.search.get("tab")).toBe("documents");
+    expectRealScreen();
+    expect(backLink()).toHaveTextContent("Back to Verifications");
+  });
+
+  it("Inspections: an event opens its case, and Back returns to Inspections", async () => {
+    const { user } = await renderApp({ role: "hl", path: routes.city.inspections() });
+    expectRealScreen();
+
+    await user.click(screen.getByRole("link", { name: /St\. Agnes Parish/ }));
+    expect(here()).toBe(routes.city.case(PARISH, { from: routes.city.inspections() }));
+    expectRealScreen();
+    expect(backLink()).toHaveTextContent("Back to Inspections");
+    await user.click(backLink());
+    expect(here()).toBe(routes.city.inspections());
+    expectRealScreen();
+  });
+
+  it("Settings names the open Drafts an edit would move without linking to them: the city has no page for a Draft", async () => {
+    const { user } = await renderApp({ role: "clerk", path: routes.city.settings() });
+    const reviewedAt = screen.getByRole("spinbutton", { name: "Reviewed at" });
+    await user.clear(reviewedAt);
+    await user.type(reviewedAt, "15");
+
+    const panel = within(screen.getByRole("heading", { name: "What this changes" }).closest("aside") as HTMLElement);
+    // Sunrise Yoga Club's draft is 20 people: Reviewed from 15.
+    expect(panel.getByText("Sunrise Yoga Club weekly class")).toBeInTheDocument();
+    expect(panel.getByText(S2)).toBeInTheDocument();
+    expect(panel.queryByRole("link")).not.toBeInTheDocument();
+  });
+});
+
+describe("(j) Settings reach the wizard: a threshold the Clerk edits is the one a new draft is classified with", () => {
+  it("with Reviewed moved down to 30 people, a new applicant's picnic for 40 reads Reviewed in the live panel, and Instant again after Restore defaults", async () => {
+    const { user } = await renderApp({ role: "clerk", path: routes.city.settings() });
+    const reviewedAt = screen.getByRole("spinbutton", { name: "Reviewed at" });
+    await user.clear(reviewedAt);
+    await user.type(reviewedAt, "30");
+    expect(useDemo.getState().cfg.thresholds.reviewedAttendance).toBe(30);
+
+    // A new applicant plans a picnic for 40: the demo script's own Instant example.
+    await switchTo(user, "applicant");
+    await user.click(screen.getByRole("button", { name: "Switch applicant" }));
+    await user.click(screen.getByRole("menuitemradio", { name: "New applicant" }));
+    expect(here()).toBe("/apply");
+    await user.click(screen.getByRole("radio", { name: /^Picnic or party/ }));
+    await user.type(screen.getByLabelText(/Event name/), "Summer picnic");
+    await user.click(screen.getByRole("button", { name: "Next" }));
+    await user.click(screen.getByRole("button", { name: /^Shelter 2/ }));
+    await user.click(screen.getByRole("button", { name: "Next" }));
+    await user.click(screen.getByRole("button", { name: "Event date" }));
+    await user.click(screen.getByRole("button", { name: "Go to the Next Month" }));
+    await user.click(screen.getByRole("button", { name: /June 19th, 2027/ }));
+    await user.click(screen.getByRole("button", { name: "Next" }));
+    await user.type(screen.getByLabelText(/Expected attendance/), "40");
+
+    const livePanel = () => within(document.querySelector('[data-slot="wizard-result-panel"]') as HTMLElement);
+    expect(livePanel().getByText(/This is a Reviewed event/)).toBeInTheDocument();
+    expect(livePanel().getByText("40 people")).toBeInTheDocument();
+    const draftId = navState.search.get("case")!;
+    expect(storedCase(draftId)).toMatchObject({ state: "draft", tier: "reviewed" });
+
+    // The Clerk restores the defaults: the open draft is Instant again without being touched,
+    // in the store and in the wizard it is still open in.
+    await switchTo(user, "clerk");
+    await user.click(screen.getByRole("link", { name: "Settings" }));
+    await user.click(screen.getByRole("button", { name: "Restore defaults" }));
+    await user.click(within(screen.getByRole("dialog")).getByRole("button", { name: "Restore defaults" }));
+    expect(useDemo.getState().cfg.thresholds.reviewedAttendance).toBe(100);
+    expect(storedCase(draftId).tier).toBe("instant");
+
+    await switchTo(user, "applicant");
+    expect(navState.search.get("case")).toBe(draftId);
+    expect(livePanel().getByText(/This is an Instant event/)).toBeInTheDocument();
+  }, 30_000);
+});
+
+describe("(j) the demo coach and the command palette land on real screens", () => {
+  const STEPS = DEMO_PATHS.flatMap((p) => p.steps.map((step) => [p.id, step.id, step] as const));
+
+  it.each(STEPS)("path %i, %s: the page the coach sends this step's role to is a built page for that role", async (_pathId, _stepId, step) => {
+    await renderApp({ role: step.role, personaId: step.persona, path: step.page });
+    expectRealScreen();
+    expect(navState.pathname.startsWith("/city")).toBe(step.role !== "applicant");
+  });
+
+  it("the strip follows a path across pages and roles: path 6 from the guide, its switch to the Clerk, and its end on the applicant's board", async () => {
+    const { user } = await renderApp({ path: routes.demo() });
+    const card = screen.getByRole("heading", { name: "Closeout" }).closest('[data-slot="panel"]') as HTMLElement;
+    await user.click(within(card).getByRole("button", { name: "Start this path" }));
+    expect(here()).toBe(routes.city.case(S6));
+    expect(screen.getByText("Path 6 · Step 1 of 3")).toBeInTheDocument();
+
+    // Public Works & Safety logs the closeout from the case, as the path says.
+    await user.click(within(screen.getByRole("complementary", { name: "Your actions" })).getByRole("button", { name: "Log closeout" }));
+    await user.click(within(screen.getByRole("dialog")).getByRole("radio", { name: "Pass" }));
+    await user.click(panelButton("Log closeout"));
+    expect(storedCase(S6).closeout.hoursLoggedOn).toBe("2027-05-03");
+
+    // The coach is on the next step and offers the switch it needs.
+    expect(screen.getByText("Path 6 · Step 2 of 3")).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Switch to City Clerk" }));
+    expect(useDemo.getState().role).toBe("clerk");
+    expect(here()).toBe(routes.city.case(S6));
+    expectRealScreen();
+
+    // It stays with the presenter on a page that names no case.
+    await user.click(screen.getByRole("link", { name: /^My queue/ }));
+    expect(screen.getByText("Path 6 · Step 2 of 3")).toBeInTheDocument();
+
+    // Reconciled from the queue's row: the last step is the applicant's, on their board.
+    const reconcile = queueFor(useDemo.getState().cases, "clerk", useDemo.getState().demoToday).find((row) => row.case.id === S6)!;
+    await user.click(linkTo(routes.city.case(S6, { task: reconcile.task.id, from: routes.city.queue() })));
+    await user.click(panelButton("Reconcile and close"));
+    expect(storedCase(S6).state).toBe("closed");
+    expect(screen.getByText("Path 6 · Step 3 of 3")).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Switch to Applicant" }));
+    expect(here()).toBe(routes.event(S6));
+    expect(useDemo.getState()).toMatchObject({ role: "applicant", personaId: "main-street-business-alliance" });
+    expectRealScreen();
+    expect(screen.getByText("Path 6 · Done")).toBeInTheDocument();
+
+    // Dismissed, it stays dismissed when the other shell mounts.
+    await user.click(screen.getByRole("button", { name: "Dismiss the demo coach" }));
+    await switchTo(user, "clerk");
+    expect(screen.queryByText(/^Path 6/)).not.toBeInTheDocument();
+  }, 30_000);
+
+  it.each(CITY_ROLES)("%s: the palette's Go to reaches every page of the role, shared pages and its own tools", async (role) => {
+    const pages = [...CITY_CORE_LINKS, ...cityToolLinks(role)];
+    const { user } = await renderApp({ role, path: routes.city.queue() });
+
+    for (const page of pages) {
+      await user.keyboard("{Control>}k{/Control}");
+      const palette = within(screen.getByRole("dialog"));
+      await user.type(palette.getByRole("combobox"), page.label);
+      await user.click(within(palette.getByRole("group", { name: "Go to" })).getByRole("option", { name: page.label }));
+      expect(here(), page.label).toBe(page.href);
+      expectRealScreen();
+    }
+  }, 30_000);
+
+  it("the Applicant's palette reaches My events and the wizard, and a case by name", async () => {
+    const { user } = await renderApp({ scenario: "S1" });
+    for (const [label, href] of [["My events", routes.events()], ["Plan an event", routes.apply()]] as const) {
+      await user.keyboard("{Control>}k{/Control}");
+      await user.click(within(screen.getByRole("dialog")).getByRole("option", { name: label }));
+      expect(here()).toBe(href);
+      expectRealScreen();
+    }
+    await user.keyboard("{Control>}k{/Control}");
+    await user.type(within(screen.getByRole("dialog")).getByRole("combobox"), "birthday");
+    await user.click(within(screen.getByRole("dialog")).getByRole("option", { name: /Maya Chen's 40th birthday picnic/ }));
+    expect(here()).toBe(routes.event(S1));
+    expectRealScreen();
+  });
+});
+
+describe("(j) demo path 7, clicked from first step to last, and then on through the city", () => {
+  it("Maya adds a DJ from her permit, takes the late fee, and the new cards appear tagged Amendment with the permit as it was; the departments check them, the Clerk approves, she signs and pays, and the permit covers the amended plan", async () => {
+    const { user } = await renderApp({ scenario: "S1" });
+    expect(here()).toBe(routes.permit(S1));
+    expectRealScreen();
+    // The scenario jump put the coach on path 7.
+    expect(screen.getByText("Path 7 · Step 1 of 3")).toBeInTheDocument();
+    const permit = () => within(document.getElementById("permit-print-area") as HTMLElement);
+    expect(permit().getByText("Instant")).toBeInTheDocument();
+    expect(permit().queryByText(/Amplified sound approval/)).not.toBeInTheDocument();
+
+    // Step 1: add a DJ. The permit links to the wizard reopened on the same record.
+    await user.click(screen.getByRole("link", { name: "Change your event" }));
+    expect(here()).toBe(routes.amend(S1));
+    expectRealScreen();
+    await user.click(screen.getByRole("button", { name: "Next" })); // what -> where
+    await user.click(screen.getByRole("button", { name: "Next" })); // where -> when
+    await user.click(screen.getByRole("button", { name: "Next" })); // when -> size
+    await user.click(screen.getByRole("switch", { name: "Amplified sound" }));
+    const diff = () => within(document.querySelector('[data-slot="amend-result-panel"]') as HTMLElement);
+    expect(diff().getByText(/This change makes your event Reviewed\. Everything you entered is kept; 4 new cards will be added\./)).toBeInTheDocument();
+    // Nothing has been sent yet: the record is as it was, and so is the coach.
+    expect(storedCase(S1)).toMatchObject({ tier: "instant", flags: { amendmentPending: false } });
+    expect(screen.getByText("Path 7 · Step 1 of 3")).toBeInTheDocument();
+
+    // Step 2: the date gate fires (19 days left, 30 needed); she takes the late fee.
+    await user.click(screen.getByRole("button", { name: "Next" })); // size -> review
+    // (The coach's own line names the same gate, so the words are on screen twice.)
+    expect(within(screen.getByRole("heading", { level: 2, name: "Review your change" }).closest("div")!.parentElement as HTMLElement).getByText(/19 days left, 30 needed/)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Confirm change" })).toBeDisabled();
+    await user.click(screen.getByRole("button", { name: /Pay a \$53\.75 late fee/ }));
+    await user.click(screen.getByRole("button", { name: "Confirm change" }));
+
+    // Step 3: the board has the new cards tagged Amendment, and the permit is as it was.
+    expect(here()).toBe(routes.event(S1));
+    expectRealScreen();
+    expect(screen.getByText("Path 7 · Done")).toBeInTheDocument();
+    expect(storedCase(S1)).toMatchObject({ tier: "reviewed", state: "permitted", flags: { amendmentPending: true, lateFee: true } });
+    expect(document.querySelector('[data-slot="amendment-pending"]')).toHaveTextContent("An amendment is pending. Finish the new cards below, then submit it; your current permit stays valid for the original plan until it is decided.");
+    const cardButton = (name: RegExp) => screen.getByRole("button", { name });
+    for (const name of [/Certificate of insurance/, /Sound details/, /Submit application/, /Accept conditions and sign/]) {
+      expect(within(cardButton(name)).getByText("Amendment")).toBeInTheDocument();
+    }
+    expect(within(cardButton(/Pay and book/)).queryByText("Amendment")).not.toBeInTheDocument();
+    // The board's menu says why the plan cannot be changed again yet.
+    await user.click(screen.getByRole("button", { name: "Board menu" }));
+    expect(screen.getByRole("menuitem", { name: "Change your event" })).toHaveAttribute("aria-disabled", "true");
+    await user.keyboard("{Escape}");
+
+    await user.click(screen.getByRole("link", { name: /View permit/ }));
+    expect(here()).toBe(routes.permit(S1));
+    expect(permit().getByText("An amendment is pending. This permit covers the original plan until it’s approved.")).toBeInTheDocument();
+    // The original plan, to the letter: Instant, with no sound approval on it.
+    expect(permit().getByText("Instant")).toBeInTheDocument();
+    expect(permit().queryByText("Reviewed")).not.toBeInTheDocument();
+    expect(permit().queryByText(/Amplified sound approval/)).not.toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "Change your event" })).not.toBeInTheDocument();
+    await user.click(permit().getByRole("link", { name: "Open the verification page" }));
+    expect(screen.getByRole("heading", { level: 1, name: "Valid" })).toBeInTheDocument();
+    expect(screen.getByText("A change to this event is pending. Until it is approved, the permit covers only what is shown here.")).toBeInTheDocument();
+
+    // Past the PRD's path: she finishes the two cards and submits the amendment.
+    navigate(routes.event(S1));
+    await user.click(cardButton(/Sound details/));
+    await user.type(within(screen.getByRole("dialog")).getByLabelText("Sound equipment"), "One DJ booth, two speakers");
+    fireEvent.change(within(screen.getByRole("dialog")).getByLabelText("Sound check time"), { target: { value: "10:30" } });
+    await user.click(panelButton("Send"));
+    await user.click(cardButton(/Certificate of insurance/));
+    await user.click(panelButton("Use sample file"));
+    await user.click(panelButton("Send"));
+    await user.click(cardButton(/Submit application/));
+    expect(within(screen.getByRole("dialog")).getByText(/This sends your amendment to the City Clerk for a decision/)).toBeInTheDocument();
+    await user.click(panelButton("Submit amendment"));
+    expect(document.querySelector('[data-slot="amendment-pending"]')).toHaveTextContent("An amendment is pending. Health & Legal and Public Works & Safety are checking its cards, then the City Clerk decides. Your current permit stays valid for the original plan until it is decided.");
+
+    // The city side. The Clerk's case says where the amendment stands; the decision waits.
+    await switchTo(user, "clerk");
+    expect(here()).toBe(routes.city.case(S1));
+    expectRealScreen();
+    const caseBanner = () => document.querySelector('[data-slot="amendment-pending"]') as HTMLElement;
+    expect(caseBanner()).toHaveTextContent("Amendment pending: Instant to Reviewed, 4 new cards. Health & Legal and Public Works & Safety are checking its cards, then the City Clerk decides.");
+    const whoIsUp = () => [...screen.getByRole("list", { name: "Who's up" }).querySelectorAll('[data-status="up_now"]')].map((row) => row.getAttribute("data-party"));
+    expect(whoIsUp()).toEqual(["pws", "hl"]);
+    const clerkActions = () => within(screen.getByRole("complementary", { name: "Your actions" }));
+    await user.click(clerkActions().getByRole("button", { name: "Decide amendment" }));
+    const waiting = within(screen.getByRole("dialog"));
+    expect(waiting.getByText("Amplified sound: added")).toBeInTheDocument();
+    expect(waiting.getByText('Health & Legal is still checking "Certificate of insurance", and 1 more card.')).toBeInTheDocument();
+    expect(panelButton("Approve amendment")).toBeDisabled();
+    await closePanel(user);
+    // Not in the Clerk's queue yet: the task is waiting on the two checks.
+    expect(queueFor(useDemo.getState().cases, "clerk", "2027-05-03").filter((row) => row.case.id === S1)).toEqual([]);
+
+    // Public Works & Safety checks the sound details, from its queue.
+    await switchTo(user, "pws");
+    await user.click(screen.getByRole("link", { name: /^My queue/ }));
+    const sound = queueFor(useDemo.getState().cases, "pws", "2027-05-03").find((row) => row.case.id === S1)!;
+    await user.click(linkTo(routes.city.case(S1, { task: sound.task.id, from: routes.city.queue() })));
+    expect(within(screen.getByRole("dialog")).getByRole("heading", { name: "Verify: Sound details" })).toBeInTheDocument();
+    await user.click(panelButton("Verify"));
+    // On the Documents tab the card carries the same chip the applicant's board gives it.
+    await user.click(screen.getByRole("tab", { name: "Documents" }));
+    expect(within(screen.getByTestId(`document-card-${S1}:sound_details`)).getByText("Amendment")).toBeInTheDocument();
+
+    // Health & Legal checks the certificate, from its Verifications page.
+    await switchTo(user, "hl");
+    await user.click(screen.getByRole("link", { name: "Verifications" }));
+    await user.click(screen.getByText("Maya Chen's 40th birthday picnic", { selector: "a *" }).closest("a") as HTMLElement);
+    expect(within(screen.getByRole("dialog")).getByRole("heading", { name: "Verify: Certificate of insurance" })).toBeInTheDocument();
+    await user.click(panelButton("Verify"));
+    expect(storedCase(S1).tasks.find((t) => t.catalogId === "decide_amendment")).toMatchObject({ status: "todo" });
+
+    // The Clerk: the decision is in the queue now, and its row opens the panel.
+    await switchTo(user, "clerk");
+    await user.click(screen.getByRole("link", { name: /^My queue/ }));
+    const decision = queueFor(useDemo.getState().cases, "clerk", "2027-05-03").find((row) => row.case.id === S1)!;
+    const decisionRow = linkTo(routes.city.case(S1, { task: decision.task.id, from: routes.city.queue() }));
+    expect(within(decisionRow).getByText("Decide amendment: approve or decline the change")).toBeInTheDocument();
+    expect(within(decisionRow).getByText("The amendment's cards are checked")).toBeInTheDocument();
+    await user.click(decisionRow);
+    expectRealScreen();
+    expect(caseBanner()).toHaveTextContent("Its cards are checked: the City Clerk decides.");
+    const decide = within(screen.getByRole("dialog"));
+    expect(decide.getByRole("heading", { name: "Decide amendment" })).toBeInTheDocument();
+    // Both of the amendment's documents are checked; its Submit card is in, and the signature waits for the decision.
+    expect(decide.getAllByText("Checked")).toHaveLength(2);
+    expect(decide.getByText("Submitted")).toBeInTheDocument();
+    expect(decide.getByText("Not open yet")).toBeInTheDocument();
+    expect(decide.getByText("$393.75")).toBeInTheDocument();
+    expect(decide.getByText("The applicant then signs and pays $393.75; the amended plan takes effect when they have. Nothing is charged now.")).toBeInTheDocument();
+    await user.click(panelButton("Approve amendment"));
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    expect(caseBanner()).toHaveTextContent("Approved. Waiting on the applicant to sign and pay $393.75.");
+    expect(whoIsUp()).toEqual(["applicant"]);
+    expect(storedCase(S1).payments).toHaveLength(1);
+
+    // The Clerk's Payments page has the difference as due, and its row is the case's own panel.
+    await user.click(screen.getByRole("link", { name: "Payments" }));
+    const due = within(screen.getByText("Maya Chen's 40th birthday picnic").closest("tr") as HTMLElement);
+    expect(due.getByText("Amendment balance")).toBeInTheDocument();
+    expect(due.getByText("$393.75")).toBeInTheDocument();
+
+    // Maya: the board's card opens the amendment's quote; she signs and pays the difference.
+    await switchTo(user, "applicant");
+    navigate(routes.event(S1));
+    expect(useDemo.getState().personaId).toBe("maya-chen");
+    expect(document.querySelector('[data-slot="amendment-pending"]')).toHaveTextContent("The City Clerk approved your amendment. Accept and sign, then pay $393.75, to put it into effect");
+    await user.click(cardButton(/Accept conditions and sign/));
+    expect(here()).toBe(routes.quote(S1));
+    expectRealScreen();
+    expect(document.querySelector('[data-slot="amendment-quote"]')).toHaveTextContent("The City Clerk approved your amendment.");
+    await user.type(screen.getByLabelText(/Type your full legal name/), "Maya Chen");
+    await user.click(screen.getByRole("checkbox", { name: /I have read and accept/ }));
+    await user.click(screen.getByRole("button", { name: "Accept and sign" }));
+    expect(storedCase(S1).flags).toMatchObject({ signed: true, amendmentPending: true });
+    await user.click(screen.getByRole("button", { name: "Pay $393.75" }));
+    await waitForPayment();
+
+    // In effect: the page says so and goes back to the board, and the permit now covers the amended plan.
+    expect(storedCase(S1).flags.amendmentPending).toBe(false);
+    expect(storedCase(S1).payments.at(-1)).toMatchObject({ amount: 393.75, kind: "quote", amendment: true });
+    expect(here()).toBe(routes.event(S1));
+    expectRealScreen();
+    expect(document.querySelector('[data-slot="amendment-pending"]')).toBeNull();
+    await user.click(screen.getByRole("link", { name: /View permit/ }));
+    expect(permit().getByText("Reviewed")).toBeInTheDocument();
+    expect(permit().getByText(/Amplified sound approval/)).toBeInTheDocument();
+    expect(permit().queryByText(/An amendment is pending/)).not.toBeInTheDocument();
+    // And it can be changed again.
+    expect(screen.getByRole("link", { name: "Change your event" })).toHaveAttribute("href", routes.amend(S1));
+  }, 90_000);
+
+  it("declined instead: the Clerk gives a reason, and the applicant's board and permit are as they were", async () => {
+    const { user } = await renderApp({ scenario: "S1", path: routes.event(S1) });
+    // The amendment, proposed and submitted, as the test above clicks it.
+    act(() => {
+      const store = useDemo.getState();
+      const s1 = storedCase(S1);
+      expect(store.dispatch(S1, { type: "amend", answers: { ...s1, addOns: { ...s1.addOns, amplifiedSound: true } }, lateFee: true }).ok).toBe(true);
+      expect(store.dispatch(S1, { type: "complete_task", taskId: `${S1}:sound_details`, form: { equipment: "One DJ booth" } }).ok).toBe(true);
+      expect(store.dispatch(S1, { type: "complete_task", taskId: `${S1}:insurance_certificate`, files: [{ name: "coi.pdf", size: 1000, type: "application/pdf" }] }).ok).toBe(true);
+      expect(store.dispatch(S1, { type: "submit" }).ok).toBe(true);
+    });
+
+    await switchTo(user, "clerk");
+    await user.click(within(screen.getByRole("complementary", { name: "Your actions" })).getByRole("button", { name: "Decide amendment" }));
+    await user.click(within(screen.getByRole("dialog")).getByRole("radio", { name: "Decline" }));
+    // Declining does not wait for the departments, but it needs a reason.
+    expect(panelButton("Decline amendment")).toBeDisabled();
+    await user.type(within(screen.getByRole("dialog")).getByLabelText(/Reason/), "No amplified sound at Shelter 3");
+    await user.click(panelButton("Decline amendment"));
+    expect(document.querySelector('[data-slot="amendment-pending"]')).toBeNull();
+    await user.click(screen.getByRole("tab", { name: "Activity" }));
+    expect(screen.getByText("Declined the amendment: No amplified sound at Shelter 3. The original plan stands.")).toBeInTheDocument();
+    // Nothing of it is left in any queue.
+    for (const role of CITY_ROLES) expect(queueFor(useDemo.getState().cases, role, "2027-05-03").filter((row) => row.case.id === S1)).toEqual([]);
+
+    await switchTo(user, "applicant");
+    expect(here()).toBe(routes.event(S1));
+    expect(document.querySelector('[data-slot="amendment-pending"]')).toBeNull();
+    expect(screen.queryByText("Amendment")).not.toBeInTheDocument();
+    expect(storedCase(S1)).toMatchObject({ tier: "instant", addOns: { amplifiedSound: false }, flags: { amendmentPending: false, lateFee: false } });
+  }, 30_000);
 });

@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button";
 import { CountBadge } from "@/components/ui/count-badge";
 import { EmptyState } from "@/components/ui/empty-state";
 import { FilterBar } from "@/components/ui/filter-bar";
+import { Input } from "@/components/ui/input";
 import { PageHeader } from "@/components/ui/page-header";
 import { Stat } from "@/components/ui/stat";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -39,8 +40,11 @@ import {
   type RefundOwedRow,
 } from "@/lib/view/payments";
 
-const SELECT_CLASS =
-  "h-8 shrink-0 rounded-control border border-line-subtle bg-surface-strong px-2.5 text-xs text-fg outline-none focus-visible:border-focus-ring focus-visible:shadow-focus-halo";
+const METHOD_OPTIONS = [
+  { value: "", label: "Any method" },
+  { value: "card", label: "Card" },
+  { value: "in_person", label: "In person" },
+];
 
 function isTab(value: string | null): value is PaymentsTab {
   return value === "due" || value === "received" || value === "refunds";
@@ -92,6 +96,9 @@ export function PaymentsScreen() {
   const setMethod = React.useCallback((next: string) => setParams({ method: next || null }), [setParams]);
   const setStart = React.useCallback((next: string) => setParams({ start: next || null }), [setParams]);
   const setEnd = React.useCallback((next: string) => setParams({ end: next || null }), [setParams]);
+  // One replace for all three: each setter above works from the URL as it was when this
+  // rendered, so three calls in a row would keep two of the filters.
+  const clearReceivedFilters = React.useCallback(() => setParams({ method: null, start: null, end: null }), [setParams]);
 
   const due = React.useMemo(
     () => dueRows(cases, today, cfg).filter((r) => matchesPaymentsQuery(r.eventName, r.applicantName, r.caseId, q)),
@@ -151,28 +158,16 @@ export function PaymentsScreen() {
 
         <TabsContent value="received" className="pt-4">
           <div className="flex flex-col gap-4">
-            <FilterBar>
-              <select aria-label="Method" value={method ?? ""} onChange={(e) => setMethod(e.target.value)} className={SELECT_CLASS}>
-                <option value="">Any method</option>
-                <option value="card">Card</option>
-                <option value="in_person">In person</option>
-              </select>
-              <input aria-label="From date" type="date" value={start ?? ""} onChange={(e) => setStart(e.target.value)} className={SELECT_CLASS} />
-              <input aria-label="To date" type="date" value={end ?? ""} onChange={(e) => setEnd(e.target.value)} className={SELECT_CLASS} />
-              {method || start || end ? (
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => {
-                    setMethod("");
-                    setStart("");
-                    setEnd("");
-                  }}
-                >
-                  Clear filters
-                </Button>
-              ) : null}
+            {/* The shared filter row: its own select and "Clear filters", and the date fields the other tool pages use. */}
+            <FilterBar
+              selectLabel="Method"
+              selectValue={method ?? ""}
+              selectOptions={METHOD_OPTIONS}
+              onSelectChange={setMethod}
+              onClear={method || start || end ? clearReceivedFilters : undefined}
+            >
+              <Input type="date" aria-label="From date" value={start ?? ""} onChange={(e) => setStart(e.target.value)} className="h-8 w-36 text-xs" />
+              <Input type="date" aria-label="To date" value={end ?? ""} onChange={(e) => setEnd(e.target.value)} className="h-8 w-36 text-xs" />
             </FilterBar>
             <ReceivedTable groups={receivedGroups} total={receivedTotal(filteredReceived)} from={here} query={q} hasFilters={Boolean(method || start || end)} />
           </div>
@@ -229,7 +224,7 @@ function DueTable({ rows, today, from, query }: { rows: DueRow[]; today: ISODate
               <TableCell numeric>
                 <Money amount={row.amount} />
               </TableCell>
-              <TableCell>{row.dueDate ? <DueDate date={row.dueDate} today={today} /> : <span className="text-sm text-fg-secondary">Not provided</span>}</TableCell>
+              <TableCell>{row.dueDate ? <DueDate date={row.dueDate} today={today} /> : <span className="text-xs text-fg-secondary">No due date</span>}</TableCell>
               <TableCell>
                 <Button asChild variant="secondary" size="sm">
                   <Link href={routes.city.case(row.caseId, { task: "pay", from })}>Record payment</Link>
@@ -396,7 +391,10 @@ function RefundsTable({
   return (
     <div className="flex flex-col gap-6">
       <div className="flex flex-col gap-2">
-        <h3 className="text-sm font-semibold text-fg">Owed</h3>
+        <h2 className="flex items-center gap-2 text-eyebrow font-bold tracking-[.12em] text-fg-label uppercase">
+          Owed
+          <CountBadge count={owed.length} />
+        </h2>
         {owed.length === 0 ? (
           <p className="text-sm text-fg-secondary">Nothing is waiting to be refunded.</p>
         ) : (
@@ -432,7 +430,10 @@ function RefundsTable({
       </div>
 
       <div className="flex flex-col gap-2">
-        <h3 className="text-sm font-semibold text-fg">Issued</h3>
+        <h2 className="flex items-center gap-2 text-eyebrow font-bold tracking-[.12em] text-fg-label uppercase">
+          Issued
+          <CountBadge count={issued.length} />
+        </h2>
         {issued.length === 0 ? (
           <p className="text-sm text-fg-secondary">No refund has gone out yet.</p>
         ) : (

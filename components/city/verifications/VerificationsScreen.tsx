@@ -4,6 +4,7 @@ import * as React from "react"
 import Link from "next/link"
 import { usePathname, useRouter, useSearchParams } from "next/navigation"
 import { FileCheckIcon } from "lucide-react"
+import { CountBadge } from "@/components/ui/count-badge"
 import { PageHeader } from "@/components/ui/page-header"
 import { FilterBar, FilterChip } from "@/components/ui/filter-bar"
 import { SegmentedControl } from "@/components/ui/segmented-control"
@@ -78,9 +79,14 @@ function QueueRow({ row, from, today }: { row: VerificationQueueRow; from: strin
   )
 }
 
-function DecidedRowItem({ row }: { row: DecidedRow }) {
+/** A decided document is a row like a waiting one: it opens its case on the Documents tab, and the case comes back here. */
+function DecidedRowItem({ row, from }: { row: DecidedRow; from: string }) {
   return (
-    <li className="flex flex-col gap-2 rounded-panel border border-line-subtle bg-surface-1 p-3 sm:flex-row sm:items-center sm:justify-between">
+    <li>
+      <Link
+        href={routes.city.case(row.caseId, { tab: "documents", from })}
+        className="flex flex-col gap-2 rounded-panel border border-line-subtle bg-surface-1 p-3 outline-none transition-colors duration-[var(--dur-fast)] ease-frost hover:bg-surface-2 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring sm:flex-row sm:items-center sm:justify-between"
+      >
       <div className="flex min-w-0 flex-1 items-center gap-3">
         <div className="flex min-w-0 flex-col gap-0.5">
           <EventTitle name={row.caseName} applicantName={row.applicantName} className="min-w-0" />
@@ -98,6 +104,7 @@ function DecidedRowItem({ row }: { row: DecidedRow }) {
           {row.decidedBy ? ` · ${PARTY_LABEL[row.decidedBy]}` : ""}
         </span>
       </div>
+      </Link>
     </li>
   )
 }
@@ -154,8 +161,12 @@ function VerificationsScreen() {
       />
 
       <Tabs value={filters.tab} onValueChange={(v) => setFilters({ tab: v === "decided" ? "decided" : "queue" })}>
-        <TabsList variant="line">
-          <TabsTrigger value="queue">Queue{allQueueRows.length > 0 ? ` (${allQueueRows.length})` : ""}</TabsTrigger>
+        {/* A list split into sub-lists, like Intake and Payments: the plain tab list, each tab with its count. */}
+        <TabsList>
+          <TabsTrigger value="queue">
+            Queue
+            <CountBadge count={allQueueRows.length} />
+          </TabsTrigger>
           <TabsTrigger value="decided">Recently decided</TabsTrigger>
         </TabsList>
 
@@ -223,8 +234,9 @@ function VerificationsScreen() {
               <div className="flex flex-col gap-6">
                 {typeGroups.map((group) => (
                   <section key={group.type} className="flex flex-col gap-2">
-                    <h2 className="text-eyebrow font-bold tracking-[.12em] text-fg-label uppercase">
-                      {DOC_TYPE_LABEL[group.type]} ({group.rows.length})
+                    <h2 className="flex items-center gap-2 text-eyebrow font-bold tracking-[.12em] text-fg-label uppercase">
+                      {DOC_TYPE_LABEL[group.type]}
+                      <CountBadge count={group.rows.length} />
                     </h2>
                     <ul className="flex flex-col gap-2">
                       {group.rows.map((row) => (
@@ -238,8 +250,9 @@ function VerificationsScreen() {
               <div className="flex flex-col gap-6">
                 {eventGroups.map((group) => (
                   <section key={group.caseId} className="flex flex-col gap-2">
-                    <h2 className="text-eyebrow font-bold tracking-[.12em] text-fg-label uppercase">
-                      {group.caseName} ({group.rows.length})
+                    <h2 className="flex items-center gap-2 text-eyebrow font-bold tracking-[.12em] text-fg-label uppercase">
+                      {group.caseName}
+                      <CountBadge count={group.rows.length} />
                     </h2>
                     <ul className="flex flex-col gap-2">
                       {group.rows.map((row) => (
@@ -259,7 +272,7 @@ function VerificationsScreen() {
           ) : (
             <ul className="flex flex-col gap-2">
               {decidedRows.map((row) => (
-                <DecidedRowItem key={row.taskId} row={row} />
+                <DecidedRowItem key={row.taskId} row={row} from={from} />
               ))}
             </ul>
           )}

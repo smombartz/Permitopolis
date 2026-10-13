@@ -1,10 +1,9 @@
 "use client";
 
 import { cn } from "@/lib/utils";
-import { TIER_LABEL } from "@/lib/types";
-import { TIER_ICON } from "@/components/domain/icons";
+import { ItemMark, itemTitle, MEETING_ITEM_CLASS } from "./ItemMark";
 import { blackoutOn, dayOfMonth, groupItemsByDate, impactedOn, weekDays, weekdayShortLabel } from "./utils";
-import { SELECTED_DAY, TIER_DOT_CLASS } from "./tierStyles";
+import { SELECTED_DAY } from "./tierStyles";
 import type { CalendarItem } from "./types";
 import type { ISODate } from "@/lib/types";
 
@@ -61,35 +60,32 @@ export function WeekGrid({ items, today, weekStart, onSelectItem, onSelectDay, s
               </p>
             )}
             <ul className="space-y-1">
-              {dayItems.map((item) => {
-                const TierIcon = TIER_ICON[item.tier];
-                return (
-                  <li key={item.id}>
-                    <button
-                      type="button"
-                      onClick={() => onSelectItem?.(item.id)}
-                      title={`${TIER_LABEL[item.tier]}: ${item.label}`}
-                      className={cn(
-                        "flex w-full flex-col gap-0.5 truncate rounded px-1.5 py-1 text-left text-[11px] text-fg-secondary hover:bg-surface-hover",
-                        FOCUS_RING,
-                      )}
-                    >
-                      <span className="flex items-center gap-1">
-                        <span aria-hidden className={cn("size-1.5 shrink-0 rounded-full", TIER_DOT_CLASS[item.tier])} />
-                        <TierIcon aria-hidden className="size-2.5 shrink-0" />
-                        <span className="sr-only">{TIER_LABEL[item.tier]}: </span>
-                        <span className="truncate font-medium text-fg">{item.label}</span>
+              {dayItems.map((item) => (
+                <li key={item.id}>
+                  <button
+                    type="button"
+                    onClick={() => onSelectItem?.(item.id)}
+                    title={itemTitle(item)}
+                    data-kind={item.kind ?? "event"}
+                    className={cn(
+                      "flex w-full flex-col gap-0.5 truncate rounded px-1.5 py-1 text-left text-[11px] text-fg-secondary hover:bg-surface-hover",
+                      item.kind === "meeting" && MEETING_ITEM_CLASS,
+                      FOCUS_RING,
+                    )}
+                  >
+                    <span className="flex items-center gap-1">
+                      <ItemMark item={item} />
+                      <span className="truncate font-medium text-fg">{item.label}</span>
+                    </span>
+                    {(item.start || item.end) && (
+                      <span className="pl-2.5 text-fg-secondary">
+                        {item.start}
+                        {item.end ? `–${item.end}` : ""}
                       </span>
-                      {(item.start || item.end) && (
-                        <span className="pl-2.5 text-fg-secondary">
-                          {item.start}
-                          {item.end ? `–${item.end}` : ""}
-                        </span>
-                      )}
-                    </button>
-                  </li>
-                );
-              })}
+                    )}
+                  </button>
+                </li>
+              ))}
             </ul>
           </div>
         );

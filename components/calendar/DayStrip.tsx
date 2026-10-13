@@ -2,10 +2,9 @@
 
 import { cn } from "@/lib/utils";
 import { fmtDateShort, plural } from "@/lib/format";
-import { TIER_LABEL } from "@/lib/types";
-import { TIER_ICON } from "@/components/domain/icons";
+import { eventCount, ItemMark, itemTitle, MEETING_ITEM_CLASS } from "./ItemMark";
 import { groupItemsByDate, nextDays } from "./utils";
-import { SELECTED_DAY, TIER_DOT_CLASS } from "./tierStyles";
+import { SELECTED_DAY } from "./tierStyles";
 import type { CalendarItem } from "./types";
 import type { ISODate } from "@/lib/types";
 
@@ -53,31 +52,28 @@ export function DayStrip({ items, today, onSelectItem, onSelectDay, selected, cl
               aria-pressed={selected === undefined ? undefined : date === selected}
               className={cn("block w-full rounded px-1 text-left text-xs font-medium text-fg-label", FOCUS_RING, date === selected && SELECTED_DAY)}
             >
-              {fmtDateShort(date)}: {summary(dayItems.length, isToday)}
+              {fmtDateShort(date)}: {summary(eventCount(dayItems), isToday)}
             </button>
             {dayItems.length > 0 && (
               <ul className="mt-1 space-y-0.5">
-                {dayItems.slice(0, 3).map((item) => {
-                  const TierIcon = TIER_ICON[item.tier];
-                  return (
-                    <li key={item.id}>
-                      <button
-                        type="button"
-                        onClick={() => onSelectItem?.(item.id)}
-                        title={`${TIER_LABEL[item.tier]}: ${item.label}`}
-                        className={cn(
-                          "flex w-full items-center gap-1 truncate rounded px-1 py-0.5 text-left text-[11px] text-fg-secondary hover:bg-surface-hover",
-                          FOCUS_RING,
-                        )}
-                      >
-                        <span aria-hidden className={cn("size-1.5 shrink-0 rounded-full", TIER_DOT_CLASS[item.tier])} />
-                        <TierIcon aria-hidden className="size-2.5 shrink-0" />
-                        <span className="sr-only">{TIER_LABEL[item.tier]}: </span>
-                        <span className="truncate">{item.label}</span>
-                      </button>
-                    </li>
-                  );
-                })}
+                {dayItems.slice(0, 3).map((item) => (
+                  <li key={item.id}>
+                    <button
+                      type="button"
+                      onClick={() => onSelectItem?.(item.id)}
+                      title={itemTitle(item)}
+                      data-kind={item.kind ?? "event"}
+                      className={cn(
+                        "flex w-full items-center gap-1 truncate rounded px-1 py-0.5 text-left text-[11px] text-fg-secondary hover:bg-surface-hover",
+                        item.kind === "meeting" && MEETING_ITEM_CLASS,
+                        FOCUS_RING,
+                      )}
+                    >
+                      <ItemMark item={item} />
+                      <span className="truncate">{item.label}</span>
+                    </button>
+                  </li>
+                ))}
                 {dayItems.length > 3 && (
                   <li className="px-1 text-[11px] text-fg-secondary">+{dayItems.length - 3} more</li>
                 )}

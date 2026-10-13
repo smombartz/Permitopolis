@@ -1,6 +1,6 @@
 "use client";
 
-import { ChevronLeftIcon, ChevronRightIcon } from "lucide-react";
+import { CalendarClockIcon, ChevronLeftIcon, ChevronRightIcon } from "lucide-react";
 import { MonthGrid, WeekGrid, type CalendarItem } from "@/components/calendar";
 import { TierLegend } from "@/components/domain";
 import { monthLabel } from "@/components/calendar/utils";
@@ -9,8 +9,7 @@ import { SegmentedControl } from "@/components/ui/segmented-control";
 import { StickyAside } from "@/components/ui/sticky-aside";
 import { fmtDateShort } from "@/lib/format";
 import type { Dept, EventCase, ISODate } from "@/lib/types";
-import { monthAnchorOf, shiftMonth, shiftWeek, weekStartOf, type MeetingItem } from "@/lib/view/active";
-import { MeetingsList } from "./MeetingsList";
+import { monthAnchorOf, shiftMonth, shiftWeek, weekStartOf } from "@/lib/view/active";
 import { RoleOverlaySidePanel } from "./RoleOverlay";
 
 export type CalendarSubView = "month" | "week";
@@ -27,13 +26,12 @@ interface ActiveCalendarViewProps {
   subView: CalendarSubView;
   onSubViewChange: (next: CalendarSubView) => void;
   onSelectCase: (caseId: string) => void;
-  /** Every scheduled meeting and walkthrough in the visible month or week, "Show meetings" permitting. */
-  meetings: MeetingItem[];
+  /** Whether `items` carries the scheduled meetings and walkthroughs too: the legend then says how one is drawn. */
   showMeetings: boolean;
 }
 
-/** Calendar: month and week, every series session shown, tier-colored with a legend. */
-export function ActiveCalendarView({ items, cases, today, role, date, onDateChange, subView, onSubViewChange, onSelectCase, meetings, showMeetings }: ActiveCalendarViewProps) {
+/** Calendar: month and week, every series session shown, tier-colored with a legend; meetings in their own day's cell. */
+export function ActiveCalendarView({ items, cases, today, role, date, onDateChange, subView, onSubViewChange, onSelectCase, showMeetings }: ActiveCalendarViewProps) {
   const monthAnchor = monthAnchorOf(date);
   const weekStart = weekStartOf(date);
 
@@ -75,13 +73,20 @@ export function ActiveCalendarView({ items, cases, today, role, date, onDateChan
             ]}
           />
         </div>
-        <TierLegend aria-label="Calendar legend: tiers" />
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
+          <TierLegend aria-label="Calendar legend: tiers" />
+          {showMeetings ? (
+            <span data-slot="meeting-legend" className="inline-flex items-center gap-1.5 text-xs text-fg-secondary">
+              <CalendarClockIcon className="size-3.5 text-fg-label" aria-hidden="true" />
+              Meeting or walkthrough
+            </span>
+          ) : null}
+        </div>
         {subView === "month" ? (
           <MonthGrid items={items} today={today} month={monthAnchor} onSelectItem={onSelectItem} onSelectDay={onDateChange} selected={date} />
         ) : (
           <WeekGrid items={items} today={today} weekStart={weekStart} onSelectItem={onSelectItem} onSelectDay={onDateChange} selected={date} />
         )}
-        {showMeetings ? <MeetingsList meetings={meetings} onSelectCase={onSelectCase} heading={subView === "month" ? "Meetings this month" : "Meetings this week"} /> : null}
       </div>
       <StickyAside>
         <RoleOverlaySidePanel role={role} cases={cases} today={today} date={date} />

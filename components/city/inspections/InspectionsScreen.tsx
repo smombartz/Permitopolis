@@ -10,8 +10,7 @@ import { EmptyState } from "@/components/ui/empty-state"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
-import { CaseId, DateText } from "@/components/domain"
-import { Truncate } from "@/components/ui/truncate"
+import { CaseId, DateText, EventTitle, TierBadge } from "@/components/domain"
 import { useDemo } from "@/lib/state"
 import { routes } from "@/lib/routes"
 import type { Dept, Party } from "@/lib/types"
@@ -97,14 +96,18 @@ function EventGroupCard({ group }: { group: InspectionEventGroup }) {
   return (
     <div className="flex flex-col gap-3 rounded-panel border border-line-subtle bg-surface-2 p-4">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <Link
-          href={routes.city.case(group.caseId, { from: routes.city.inspections() })}
-          className="min-w-0 rounded-control text-sm font-semibold text-fg outline-none hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring"
-        >
-          <Truncate text={group.caseName} />
-        </Link>
-        <div className="flex items-center gap-2 text-xs text-fg-secondary">
+        {/* The event as every list names one: its name over its applicant, the id and the tier. */}
+        <div className="flex min-w-0 items-center gap-3">
+          <Link
+            href={routes.city.case(group.caseId, { from: routes.city.inspections() })}
+            className="min-w-0 rounded-control outline-none hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring"
+          >
+            <EventTitle name={group.caseName} applicantName={group.applicantName} className="min-w-0" />
+          </Link>
           <CaseId id={group.caseId} />
+          <TierBadge tier={group.tier} />
+        </div>
+        <div className="flex shrink-0 items-center gap-2 text-xs text-fg-secondary">
           <span>Event day</span>
           <DateText date={group.eventDate} short />
         </div>

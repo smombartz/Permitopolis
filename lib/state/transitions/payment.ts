@@ -16,9 +16,14 @@ export function pay(c: EventCase, action: PayAction, actor: Actor, ctx: RulesCtx
   const check = checkPay(c, action, ctx.cfg);
   if (!check.ok) return check;
 
+  // A "quote" payment on a case that already has its permit is for what an amendment added.
+  const forAmendment = action.kind === "quote" && c.state !== "quote_sent";
   let next: EventCase = {
     ...c,
-    payments: [...c.payments, { id: taskId(c.id, "pay", c.payments.length + 1), at: nowOf(ctx), amount: action.amount, method: action.method, kind: action.kind, occurrenceDate: action.occurrenceDate }],
+    payments: [
+      ...c.payments,
+      { id: taskId(c.id, "pay", c.payments.length + 1), at: nowOf(ctx), amount: action.amount, method: action.method, kind: action.kind, occurrenceDate: action.occurrenceDate, ...(forAmendment ? { amendment: true as const } : {}) },
+    ],
   };
 
   if (action.kind === "quote") {

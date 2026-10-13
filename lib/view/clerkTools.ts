@@ -418,7 +418,10 @@ export function paymentRows(c: EventCase): PaymentRow[] {
       at: p.at,
       amount: p.amount,
       method: p.method,
-      // A session is named by its day, written as every other date on the screen is.
-      label: p.occurrenceDate ? `${PAYMENT_KIND_LABEL[p.kind] ?? "Payment"}: ${fmtDateShort(p.occurrenceDate)}` : PAYMENT_KIND_LABEL[p.kind] ?? "Payment",
+      // A session is named by its day, written as every other date on the screen is. What an
+      // amendment added or gave back says so: the case never had a quote, or has paid it already.
+      label: p.amendment
+        ? p.kind === "refund" ? "Amendment refund" : "Amendment payment"
+        : p.occurrenceDate ? `${PAYMENT_KIND_LABEL[p.kind] ?? "Payment"}: ${fmtDateShort(p.occurrenceDate)}` : PAYMENT_KIND_LABEL[p.kind] ?? "Payment",
     }));
 }

@@ -12,7 +12,7 @@ import { citywideBlackoutOn } from "@/lib/rules";
 import { CITY_STAFF_BY_DEPT } from "@/lib/data/people";
 import { activePermits, eventDate, holdsDateAtQuote, isOpen, permitSessions, sessionDates, waitingOn } from "@/lib/state";
 import { isHoldExpiringTomorrow } from "@/lib/view/caseDetail";
-import type { Dept, EventCase, ISODate, Location, Party, Tier } from "@/lib/types";
+import { PARTY_LABEL, type Dept, type EventCase, type ISODate, type Location, type Party, type Tier } from "@/lib/types";
 
 /* ---------- month/week navigation: string and integer math only, no new Date() ---------- */
 
@@ -119,6 +119,10 @@ export interface ActiveCalendarItem {
   label: string;
   tier: Tier;
   status?: string;
+  /** A meeting is drawn apart from the events (`components/calendar`'s `CalendarItem.kind`). */
+  kind?: "event" | "meeting";
+  /** A meeting's tooltip: what it is, which event it is for, who attends. */
+  detail?: string;
 }
 
 /**
@@ -213,6 +217,8 @@ export interface MeetingItem {
   /** The meeting's own title: "Pre-application meeting", "Coordination meeting", "Site walkthrough". */
   label: string;
   eventName: string;
+  /** The tier of the event the meeting is for. */
+  tier: Tier;
   /** Who attends, applicant first: the parties the catalogue's own "why" names for this meeting. */
   attendees: Party[];
   held: boolean;
@@ -229,7 +235,8 @@ const MEETING_ATTENDEES: Record<string, Party[]> = {
  * Every meeting card with a scheduled date, on any open case: the pre-application meeting, the
  * coordination meeting and the site walkthrough, whether or not the card has unlocked yet (a
  * meeting is scheduled while its card is still locked, see "How the engine behaves"). This is
- * the readme's "appears on all three calendars": one list, shown by every city role.
+ * the PRD's "appears on all three calendars": one list, shown by every city role, drawn in the
+ * calendar's own day cells by `meetingCalendarItems()`.
  */
 export function meetingItems(cases: EventCase[], options: { from?: ISODate; to?: ISODate } = {}): MeetingItem[] {
   const items: MeetingItem[] = [];
@@ -247,12 +254,29 @@ export function meetingItems(cases: EventCase[], options: { from?: ISODate; to?:
         date,
         label: t.title,
         eventName: c.name,
+        tier: c.tier,
         attendees: MEETING_ATTENDEES[t.catalogId] ?? ["applicant"],
         held: t.status === "done",
       });
     }
   }
   return items.sort((a, b) => a.date.localeCompare(b.date) || a.id.localeCompare(b.id));
+}
+
+/**
+ * The same meetings as items for the calendar grid and the day strip: each lands in its own
+ * day's cell, as a meeting (an outlined item with a meeting icon, never a tier's color), naming
+ * the event it is for. The id is the meeting card's, so a click opens its case like any item's.
+ */
+export function meetingCalendarItems(meetings: MeetingItem[]): ActiveCalendarItem[] {
+  return meetings.map((m) => ({
+    id: m.id,
+    date: m.date,
+    label: `${m.label}${m.held ? " (held)" : ""}: ${m.eventName}`,
+    tier: m.tier,
+    kind: "meeting" as const,
+    detail: `Meeting: ${m.label}${m.held ? " (held)" : ""} · ${m.eventName} · ${m.attendees.map((p) => PARTY_LABEL[p]).join(", ")}`,
+  }));
 }
 
 /* ---------- role overlays ---------- */

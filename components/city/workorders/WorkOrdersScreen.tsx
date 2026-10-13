@@ -1,6 +1,7 @@
 "use client";
 
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { CountBadge } from "@/components/ui/count-badge";
 import { PageHeader } from "@/components/ui/page-header";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { FilterBar, FilterChip } from "@/components/ui/filter-bar";
@@ -71,9 +72,16 @@ function WorkOrdersScreen() {
       <TodayPanel cases={todays} here={here} />
 
       <Tabs value={filters.tab} onValueChange={(tab) => go({ tab: tab as typeof filters.tab })}>
-        <TabsList variant="line">
-          <TabsTrigger value="orders">Work orders</TabsTrigger>
-          <TabsTrigger value="meetings">Walkthroughs and meetings</TabsTrigger>
+        {/* A list split into sub-lists, like Intake and Payments: the plain tab list, each tab with its count. */}
+        <TabsList>
+          <TabsTrigger value="orders">
+            Work orders
+            <CountBadge count={allOrders.filter((row) => row.status !== "done").length} />
+          </TabsTrigger>
+          <TabsTrigger value="meetings">
+            Walkthroughs and meetings
+            <CountBadge count={meetings.filter((row) => !row.held).length} />
+          </TabsTrigger>
         </TabsList>
 
         <TabsContent value="orders" className="flex flex-col gap-4 pt-4">
@@ -108,7 +116,7 @@ function WorkOrdersScreen() {
               className="h-8 w-36 text-xs"
             />
           </FilterBar>
-          <WorkOrdersList rows={filteredOrders} today={today} here={here} />
+          <WorkOrdersList rows={filteredOrders} today={today} here={here} filtered={Boolean(filters.status || filters.kind || filters.from || filters.to)} />
         </TabsContent>
 
         <TabsContent value="meetings" className="pt-4">

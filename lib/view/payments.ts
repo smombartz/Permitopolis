@@ -8,7 +8,7 @@
 import { classify, estimateFees } from "@/lib/rules";
 import { round2 } from "@/lib/rules/shared";
 import type { RulesConfig } from "@/lib/rules/types";
-import { caseTotals, closeoutSettlement, quoteBalance } from "@/lib/state";
+import { amendmentPaymentDue, caseTotals, closeoutSettlement, quoteBalance } from "@/lib/state";
 import { applicantNameOf } from "@/lib/data/people";
 import { fmtDateShort, plural } from "@/lib/format";
 import type { EventCase, ISODate, Payment } from "@/lib/types";
@@ -47,8 +47,8 @@ export interface DueRow {
   caseId: string;
   eventName: string;
   applicantName: string;
-  kind: "quote" | "session" | "final_invoice";
-  /** "Quote balance", "Session: Thu, Jun 10", "Final bill". */
+  kind: "quote" | "amendment" | "session" | "final_invoice";
+  /** "Quote balance", "Amendment balance", "Session: Thu, Jun 10", "Final bill". */
   label: string;
   amount: number;
   dueDate: ISODate | null;
@@ -58,8 +58,11 @@ export interface DueRow {
 
 /**
  * Every amount owed now, across every open case: a quote awaiting payment (its pay-by date is
- * the hold's expiry), a series session whose day has come and is still unpaid, and a final bill
- * after closeout. An ended case owes nothing (see "How the engine behaves"), so it is left out.
+ * the hold's expiry), what an amendment added to a plan that was already paid (the payment card
+ * open again on a permitted case), a series session whose day has come and is still unpaid, and
+ * a final bill after closeout. An ended case owes nothing (see "How the engine behaves"), so it
+ * is left out. A row's "Record payment" opens the case's own payment panel, which takes the same
+ * amount under the same name.
  */
 export function dueRows(cases: EventCase[], today: ISODate, cfg: RulesConfig): DueRow[] {
   const rows: DueRow[] = [];
@@ -82,6 +85,21 @@ export function dueRows(cases: EventCase[], today: ISODate, cfg: RulesConfig): D
           holdExpiresOn: c.dateHold.status === "held" ? c.dateHold.expiresOn : null,
         });
       }
+    }
+
+    const amendmentDue = amendmentPaymentDue(c, cfg);
+    if (amendmentDue > 0) {
+      rows.push({
+        key: `${c.id}:amendment`,
+        caseId: c.id,
+        eventName: c.name,
+        applicantName,
+        kind: "amendment",
+        label: "Amendment balance",
+        amount: amendmentDue,
+        dueDate: c.tasks.find((t) => t.catalogId === "pay_fees")?.dueDate ?? null,
+        holdExpiresOn: null,
+      });
     }
 
     if (c.schedule?.recurrence && (c.state === "permitted" || c.state === "event_day")) {
@@ -164,9 +182,11 @@ export function receivedRows(cases: EventCase[]): ReceivedRow[] {
     const applicantName = applicantNameOf(c);
     for (const p of c.payments) {
       if (p.kind === "refund") continue;
-      const label = p.occurrenceDate
-        ? `${RECEIVED_KIND_LABEL[p.kind] ?? "Payment"}: ${fmtDateShort(p.occurrenceDate)}`
-        : RECEIVED_KIND_LABEL[p.kind] ?? "Payment";
+      const label = p.amendment
+        ? "Amendment payment"
+        : p.occurrenceDate
+          ? `${RECEIVED_KIND_LABEL[p.kind] ?? "Payment"}: ${fmtDateShort(p.occurrenceDate)}`
+          : RECEIVED_KIND_LABEL[p.kind] ?? "Payment";
       rows.push({
         key: p.id,
         caseId: c.id,
@@ -267,7 +287,9 @@ function ruleFromEndingReason(reason: string | null): string | null {
   return match ? match[1] : reason;
 }
 
-function refundRule(c: EventCase): string {
+function refundRule(c: EventCase, p: Payment): string {
+  // What an amended plan gave back, on a permit that is still live: no cancellation, no closeout.
+  if (p.amendment) return "Amended plan costs less";
   if (c.ending === "cancelled" || c.ending === "withdrawn") {
     return ruleFromEndingReason(c.endingReason) ?? (c.ending === "cancelled" ? "Cancellation" : "Withdrawal");
   }
@@ -283,7 +305,7 @@ export interface RefundIssuedRow {
   /** Positive: what went back. */
   amount: number;
   method: "card" | "in_person";
-  /** The rule that produced it: the cancellation band, "Withdrawal", or "Deposit refund after closeout". */
+  /** The rule that produced it: the cancellation band, "Withdrawal", "Deposit refund after closeout", or "Amended plan costs less". */
   rule: string;
 }
 
@@ -302,7 +324,7 @@ export function refundsIssuedRows(cases: EventCase[]): RefundIssuedRow[] {
         at: p.at,
         amount: round2(-p.amount),
         method: p.method,
-        rule: refundRule(c),
+        rule: refundRule(c, p),
       });
     }
   }

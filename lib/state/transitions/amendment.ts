@@ -226,7 +226,7 @@ function settleDifference(c: EventCase, ctx: RulesCtx): EventCase {
   const payId = taskId(c.id, "pay_fees");
   const payCard = findTask(c, payId);
   if (balance < 0) {
-    const next: EventCase = { ...c, payments: [...c.payments, { id: taskId(c.id, "pay", c.payments.length + 1), at: nowOf(ctx), amount: balance, method: "card", kind: "refund" }] };
+    const next: EventCase = { ...c, payments: [...c.payments, { id: taskId(c.id, "pay", c.payments.length + 1), at: nowOf(ctx), amount: balance, method: "card", kind: "refund", amendment: true }] };
     return payCard ? patchTask(next, payId, { payload: { ...payCard.payload, amount: totalPaid(next) } }) : next;
   }
   if (balance === 0 || !payCard) return c;
