@@ -1,14 +1,30 @@
 "use client"
 
+import * as React from "react"
 import { Button } from "@/components/ui/button"
 import { Section } from "@/components/ui/section"
 import { EmptyState } from "@/components/ui/empty-state"
 import { Badge } from "@/components/ui/badge"
+import { FilterChip } from "@/components/ui/filter-bar"
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion"
+import { Progress } from "@/components/ui/progress"
 import { FormAnswers, TaskKindLabel } from "@/components/domain"
 import { FileQuestionIcon } from "lucide-react"
-import { fmtFileSize, plural } from "@/lib/format"
-import { PARTY_LABEL, type EventCase, type Party, type Task, type TaskStatus } from "@/lib/types"
+import { fmtDate, fmtFileSize, plural } from "@/lib/format"
+import { useDemo } from "@/lib/state"
+import { PARTY_LABEL, type EventCase, type ISODate, type Party, type Task, type TaskStatus } from "@/lib/types"
 import { documentGroups } from "@/lib/view/caseDetail"
+import {
+  canActOn,
+  daysWaiting,
+  decidedOn,
+  groupDocumentsForDisplay,
+  orderGroupsForViewer,
+  rowNeedsViewerCheck,
+  sortDocumentRowsForViewer,
+  submittedOn,
+  type DocumentRow,
+} from "@/lib/view/verify"
 
 const STATUS_BADGE: Record<TaskStatus, { variant: "secondary" | "default" | "warning" | "success"; text: string }> = {
   locked: { variant: "secondary", text: "Locked" },
@@ -18,10 +34,35 @@ const STATUS_BADGE: Record<TaskStatus, { variant: "secondary" | "default" | "war
   done: { variant: "success", text: "Verified" },
 }
 
-function DocumentCard({ task, role, onOpen }: { task: Task; role: Party; onOpen: (key: string) => void }) {
+/** "Submitted Fri, Apr 30 · waiting 3 days" or what became of a decided card, from its own history. */
+function HistoryLine({ task, today }: { task: Task; today: ISODate }) {
+  const decided = decidedOn(task)
+  if (decided) return <p className="text-xs text-fg-label">{decided.verb} {fmtDate(decided.date)}.</p>
+  const on = submittedOn(task)
+  if (!on) return null
+  const waiting = daysWaiting(task, today)
+  return (
+    <p className="text-xs text-fg-label">
+      Submitted {fmtDate(on)}{waiting !== null ? ` · waiting ${plural(waiting, "day")}` : ""}
+    </p>
+  )
+}
+
+function RequestThread({ task }: { task: Task }) {
+  if (!task.request) return null
+  return (
+    <p className="text-xs text-fg-secondary">
+      <span className="font-semibold text-fg">{PARTY_LABEL[task.request.from]} asked:</span> {task.request.message}
+      {task.request.resolved ? null : " (waiting on the applicant)"}
+    </p>
+  )
+}
+
+function DocumentCard({ task, role, today, onOpen }: { task: Task; role: Party; today: ISODate; onOpen: (key: string) => void }) {
   const files = task.payload.files ?? []
   const badge = STATUS_BADGE[task.status]
-  const canAct = task.status === "submitted" && (task.reviewer === role || task.request?.from === role)
+  const canAct = canActOn(task, role)
+  const readOnly = task.reviewer !== null && task.reviewer !== role
 
   return (
     <div data-testid={`document-card-${task.id}`} className="flex flex-col gap-2.5 rounded-panel border border-line-subtle bg-surface-1 p-3.5">
@@ -33,8 +74,9 @@ function DocumentCard({ task, role, onOpen }: { task: Task; role: Party; onOpen:
         <Badge variant={badge.variant}>{badge.text}</Badge>
       </div>
       <p className="text-xs text-fg-secondary">
-        {task.reviewer ? `Checked by ${PARTY_LABEL[task.reviewer]}` : "Nobody has to check this card"}
+        {task.reviewer ? `Checked by ${PARTY_LABEL[task.reviewer]}${readOnly ? " (not yours to check)" : ""}` : "Nobody has to check this card"}
       </p>
+      <HistoryLine task={task} today={today} />
       {files.length > 0 ? (
         <ul className="flex flex-col gap-1">
           {files.map((f, i) => (
@@ -48,11 +90,7 @@ function DocumentCard({ task, role, onOpen }: { task: Task; role: Party; onOpen:
         </ul>
       ) : null}
       <FormAnswers task={task} size="xs" />
-      {task.request && !task.request.resolved ? (
-        <p className="text-xs text-fg-secondary">
-          <span className="font-semibold text-fg">{PARTY_LABEL[task.request.from]} asked:</span> {task.request.message}
-        </p>
-      ) : null}
+      <RequestThread task={task} />
       {task.status === "changes_requested" && task.payload.rejectedReason ? (
         <p className="text-xs text-fg-secondary">
           <span className="font-semibold text-fg">Sent back:</span> {String(task.payload.rejectedReason)}
@@ -63,11 +101,50 @@ function DocumentCard({ task, role, onOpen }: { task: Task; role: Party; onOpen:
           <Button type="button" size="sm" onClick={() => onOpen(`verify_document:${task.id}`)}>
             Verify
           </Button>
-          <Button type="button" variant="secondary" size="sm" onClick={() => onOpen(`reject_document:${task.id}`)}>
-            Send back
-          </Button>
         </div>
       ) : null}
+    </div>
+  )
+}
+
+function VendorGroupCard({
+  row,
+  role,
+  today,
+  onOpen,
+}: {
+  row: Extract<DocumentRow, { kind: "vendor_group" }>
+  role: Party
+  today: ISODate
+  onOpen: (key: string) => void
+}) {
+  // Open by default while there is something here for the viewer to check, so S3's one vendor
+  // permit (and any case with a handful still pending) is not hidden a click away; a group
+  // that is all decided, like S6's 25 verified permits, starts collapsed.
+  const defaultOpen = row.tasks.some((task) => canActOn(task, role))
+
+  return (
+    <div className="lg:col-span-2">
+      {/* Keyed on defaultOpen: an uncontrolled Accordion ignores a later defaultValue change,
+          and a card answering a request can flip this group from nothing-to-check to
+          something-to-check without the page remounting around it. */}
+      <Accordion key={String(defaultOpen)} type="single" collapsible defaultValue={defaultOpen ? row.catalogId : undefined}>
+        <AccordionItem value={row.catalogId} className="rounded-panel border border-line-subtle bg-surface-1 px-3.5">
+          <AccordionTrigger className="py-3">
+            <div className="flex w-full flex-col gap-2 pr-2">
+              <span className="text-sm font-semibold text-fg">{row.title}</span>
+              <Progress value={row.verifiedCount} max={row.total} label={`${row.verifiedCount} of ${plural(row.total, "vendor")} verified`} />
+            </div>
+          </AccordionTrigger>
+          <AccordionContent>
+            <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
+              {row.tasks.map((task) => (
+                <DocumentCard key={task.id} task={task} role={role} today={today} onOpen={onOpen} />
+              ))}
+            </div>
+          </AccordionContent>
+        </AccordionItem>
+      </Accordion>
     </div>
   )
 }
@@ -78,7 +155,16 @@ interface DocumentsTabProps {
   onOpen: (key: string) => void
 }
 
+/**
+ * Documents grouped by the department that checks them (workstream 4D): the viewer's own
+ * department first, its own actionable cards first within it, Verify as the only entry point
+ * (it offers Send back itself once a checklist item fails). A department that is not the
+ * card's reviewer sees the same cards read-only, with who checks them. Per-vendor health
+ * permits collapse into one row with its progress, expanding to each vendor's own card.
+ */
 function DocumentsTab({ c, role, onOpen }: DocumentsTabProps) {
+  const today = useDemo((s) => s.demoToday)
+  const [onlyMine, setOnlyMine] = React.useState(false)
   const groups = documentGroups(c)
 
   if (groups.length === 0) {
@@ -91,17 +177,45 @@ function DocumentsTab({ c, role, onOpen }: DocumentsTabProps) {
     )
   }
 
+  const ordered = orderGroupsForViewer(groups, role)
+  const sections = ordered
+    .map((group) => {
+      const rows = sortDocumentRowsForViewer(groupDocumentsForDisplay(group.cards), role)
+      const visible = onlyMine ? rows.filter((row) => rowNeedsViewerCheck(row, role)) : rows
+      return { group, rows: visible }
+    })
+    .filter((section) => section.rows.length > 0)
+
   return (
-    <div className="flex flex-col gap-8">
-      {groups.map((group) => (
-        <Section key={group.dept} title={PARTY_LABEL[group.dept]} description={plural(group.cards.length, "card")}>
-          <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
-            {group.cards.map((task) => (
-              <DocumentCard key={task.id} task={task} role={role} onOpen={onOpen} />
-            ))}
-          </div>
-        </Section>
-      ))}
+    <div className="flex flex-col gap-6">
+      <div className="flex items-center gap-2">
+        <FilterChip active={onlyMine} aria-pressed={onlyMine} onClick={() => setOnlyMine((v) => !v)}>
+          Needs my check
+        </FilterChip>
+      </div>
+      {sections.length === 0 ? (
+        <EmptyState icon={FileQuestionIcon} title="Nothing needs your check" text="Every card you review is already decided, or nothing has been submitted to you yet." />
+      ) : (
+        <div className="flex flex-col gap-8">
+          {sections.map(({ group, rows }) => (
+            <Section
+              key={group.dept}
+              title={PARTY_LABEL[group.dept]}
+              description={group.dept === role ? "Your department's documents." : `Checked by ${PARTY_LABEL[group.dept]}; yours to view only.`}
+            >
+              <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
+                {rows.map((row) =>
+                  row.kind === "single" ? (
+                    <DocumentCard key={row.task.id} task={row.task} role={role} today={today} onOpen={onOpen} />
+                  ) : (
+                    <VendorGroupCard key={row.catalogId} row={row} role={role} today={today} onOpen={onOpen} />
+                  ),
+                )}
+              </div>
+            </Section>
+          ))}
+        </div>
+      )}
     </div>
   )
 }
