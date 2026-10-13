@@ -19,6 +19,7 @@ function CaseNotFound({ id, backHref, backLabel = "Back" }: CaseNotFoundProps) {
       <EmptyState
         icon={FileQuestionIcon}
         title="Case not found"
+        headingLevel={1}
         text={`There's no case ${id} in this demo.`}
         action={
           <Button asChild variant="secondary">

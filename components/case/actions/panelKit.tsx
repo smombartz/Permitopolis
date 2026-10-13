@@ -22,16 +22,31 @@ export function useCaseContext(caseId: string): { c: EventCase | undefined; toda
   return { c: cases.find((candidate) => candidate.id === caseId), today, cfg, cases }
 }
 
+/** How many dispatches have raised a toast: see `toastedDispatchCount()`. */
+let toastedDispatches = 0
+
+/**
+ * A toast is read out by the toaster's own live region. The case screen has a status line of
+ * its own for a change of state; it reads this count so that an action which changed the state
+ * and raised a toast is announced once, by the toast, not twice.
+ */
+export function toastedDispatchCount(): number {
+  return toastedDispatches
+}
+
 /**
  * Dispatches an action against a case and reports the result: a toast in plain words on
- * success (the screen's own aria-live region picks up the state change separately), or the
- * engine's reason, returned so the panel can show it inline and never fail silently.
+ * success (which is also what a screen reader hears), or the engine's reason, returned so the
+ * panel can show it inline and never fail silently.
  */
 export function useCaseDispatch(caseId: string) {
   return React.useCallback(
     (action: Action, successMessage: string): { ok: boolean; reason?: string } => {
       const result = useDemo.getState().dispatch(caseId, action);
-      if (result.ok) toast.success(successMessage);
+      if (result.ok) {
+        toastedDispatches += 1;
+        toast.success(successMessage);
+      }
       return result;
     },
     [caseId],
@@ -73,7 +88,10 @@ interface PanelActionsProps {
 function PanelActions({ error, onCancel, submitLabel, submitVariant = "primary", disabled, onSubmit }: PanelActionsProps) {
   return (
     <SheetFooter>
-      {error ? <InlineAlert variant="danger">{error}</InlineAlert> : null}
+      {/* Always in the DOM, so a refusal that arrives is read out once, politely. Empty, it takes back the footer's gap. */}
+      <div data-slot="panel-error" aria-live="polite" className="empty:-mt-2">
+        {error ? <InlineAlert variant="danger">{error}</InlineAlert> : null}
+      </div>
       <div className="flex items-center justify-end gap-2">
         <Button type="button" variant="secondary" onClick={onCancel}>
           Cancel

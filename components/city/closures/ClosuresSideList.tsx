@@ -64,6 +64,7 @@ function ClosuresSideList({ items, overlaps, here }: ClosuresSideListProps) {
               <Link
                 href={routes.city.case(item.case.id, { from: here })}
                 className={cn(
+                  // guard-allow-outline: the ring is FOCUS_RING, the next argument
                   "flex flex-col gap-2 rounded-panel border bg-surface-1 p-3 outline-none transition-colors duration-[var(--dur-fast)] ease-frost hover:bg-surface-2",
                   FOCUS_RING,
                   overlapping ? "border-danger-border" : "border-line-subtle",

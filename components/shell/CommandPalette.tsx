@@ -100,7 +100,7 @@ function CommandPalette({ open, onOpenChange }: CommandPaletteProps) {
     <>
       <CommandDialog open={open} onOpenChange={handleOpenChange} title="Command palette" description="Search cases and jump around the prototype.">
         <Command shouldFilter={false}>
-          <CommandInput placeholder="Search cases, pages, roles…" value={query} onValueChange={setQuery} />
+          <CommandInput aria-label="Search cases, pages and roles" placeholder="Search cases, pages, roles…" value={query} onValueChange={setQuery} />
           <CommandList>
             <CommandEmpty>Nothing matches &ldquo;{query}&rdquo;.</CommandEmpty>
             {groups.map((group, index) => (

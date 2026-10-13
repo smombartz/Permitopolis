@@ -105,7 +105,7 @@ describe("switching role", () => {
       personaId: "downtown-art-walk-committee",
     });
 
-    await userEvent.click(screen.getByRole("button", { name: "Switch applicant" }));
+    await userEvent.click(screen.getByRole("button", { name: /^Switch applicant: / }));
 
     expectPersonaOptions(["Downtown Art Walk Committee", ...PICKABLE_PERSONA_IDS.map((id) => PERSONA_BY_ID[id].name)]);
     expect(screen.getByRole("menuitemradio", { name: "Downtown Art Walk Committee" })).toBeChecked();
@@ -199,7 +199,7 @@ describe("persona picker", () => {
   it("offers the six scenario organizers and New applicant", async () => {
     await renderScreen(<AppShell>my events</AppShell>, { path: "/events" });
 
-    await userEvent.click(screen.getByRole("button", { name: "Switch applicant" }));
+    await userEvent.click(screen.getByRole("button", { name: /^Switch applicant: / }));
 
     expectPersonaOptions([
       "Maya Chen",
@@ -220,7 +220,7 @@ describe("persona picker", () => {
   ])("picking %s sets the persona and opens their page", async (name, personaId, path) => {
     await renderScreen(<AppShell>board</AppShell>, { scenario: "S3" });
 
-    await userEvent.click(screen.getByRole("button", { name: "Switch applicant" }));
+    await userEvent.click(screen.getByRole("button", { name: /^Switch applicant: / }));
     await userEvent.click(screen.getByRole("menuitemradio", { name }));
 
     expect(useDemo.getState().personaId).toBe(personaId);
@@ -230,7 +230,7 @@ describe("persona picker", () => {
   it("picking New applicant opens a blank wizard", async () => {
     await renderScreen(<AppShell>board</AppShell>, { scenario: "S3" });
 
-    await userEvent.click(screen.getByRole("button", { name: "Switch applicant" }));
+    await userEvent.click(screen.getByRole("button", { name: /^Switch applicant: / }));
     await userEvent.click(screen.getByRole("menuitemradio", { name: "New applicant" }));
 
     expect(useDemo.getState().personaId).toBe("new");
@@ -400,7 +400,7 @@ describe("storage banner", () => {
     const message = await screen.findByText(/Your browser is blocking storage/);
     expect(message).toBeInTheDocument();
 
-    await userEvent.click(screen.getByRole("button", { name: "Dismiss" }));
+    await userEvent.click(screen.getByRole("button", { name: "Dismiss the storage warning" }));
     expect(screen.queryByText(/Your browser is blocking storage/)).not.toBeInTheDocument();
   });
 

@@ -65,7 +65,13 @@
   /* ---- pills, focus, glows ---- */
   --pill-fill: #5157d817;
   --pill-border: #5157d838;
-  --focus-ring: #5157d8b3;
+  /*
+   * The design doc's ring is indigo-500 at 70% (#5157d8b3): 2.95:1 on the page ground and as low
+   * as 2.67:1 on a tinted row, under the 3:1 WCAG 1.4.11 asks of a focus indicator. Opaque it is
+   * 5.07:1 on the page and 4.3:1 or better on every tint (lib/contrast.test.ts). On the night
+   * surface the ring is the mint accent instead (app/globals.css).
+   */
+  --focus-ring: var(--indigo-500);
   --focus-halo: #5157d829;
   --selection-glow: #5157d85c;
   --accent-glow: #5157d847;

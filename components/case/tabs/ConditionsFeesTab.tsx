@@ -69,7 +69,7 @@ function ConditionsFeesTab({ c }: ConditionsFeesTabProps) {
       )}
       {c.payments.length > 0 ? (
         <Section title="Payments and refunds">
-          <Table>
+          <Table aria-label="Payments and refunds">
             <TableHeader>
               <TableRow>
                 <TableHead>Date</TableHead>

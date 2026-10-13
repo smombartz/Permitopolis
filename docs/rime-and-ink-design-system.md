@@ -55,7 +55,7 @@ Text and border colors are ink tones with alpha baked into 8-digit hex, so they 
 ### Pills and focus
 
 - Pill fill `#5157d817`, pill border `#5157d838`
-- Focus ring `#5157d8b3`; soft focus halo `#5157d829`
+- Focus ring `#5157d8b3`; soft focus halo `#5157d829`. In the Permitopolis app the ring is opaque indigo-500 (`#5157d8`): at 70% it is 2.95:1 on the page ground and 2.67:1 on a tinted row, under the 3:1 a focus indicator needs (WCAG 1.4.11). On the night surface the ring is the mint accent.
 - Selection glow `#5157d85c`; accent glow `#5157d847`
 
 ### Borders

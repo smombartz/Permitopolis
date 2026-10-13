@@ -30,18 +30,29 @@ const ICONS = {
   danger: OctagonXIcon,
 } as const
 
+interface InlineAlertProps extends React.ComponentProps<"div">, VariantProps<typeof inlineAlertVariants> {
+  /**
+   * Set it on a message that appears in answer to something the person just did (a form sent
+   * back with an error, "Posted."): it is then a polite status, read out once. Without it the
+   * message is content with no live role: a note that is there when the page or the sheet opens
+   * must not interrupt a screen reader, and a `role="alert"` on each one did.
+   */
+  live?: boolean
+}
+
 function InlineAlert({
   className,
   variant = "info",
+  live = false,
   children,
   ...props
-}: React.ComponentProps<"div"> & VariantProps<typeof inlineAlertVariants>) {
+}: InlineAlertProps) {
   const Icon = ICONS[variant ?? "info"]
   return (
     <div
       data-slot="inline-alert"
       data-variant={variant}
-      role={variant === "danger" || variant === "warning" ? "alert" : "status"}
+      role={live ? "status" : undefined}
       className={cn(inlineAlertVariants({ variant }), className)}
       {...props}
     >

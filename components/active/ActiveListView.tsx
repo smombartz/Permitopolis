@@ -52,7 +52,7 @@ export function ActiveListView({ rows, today, role, includeHolds, expandSessions
           text={includeHolds ? "Nothing is permitted, on event day, in closeout, or holding a date." : "Nothing is permitted, on event day or in closeout. Try including held dates."}
         />
       ) : (
-        <Table>
+        <Table aria-label="Active permits">
           <TableHeader>
             <TableRow>
               <TableHead>Event</TableHead>

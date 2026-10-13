@@ -13,11 +13,11 @@ const DAY_PICKER_CLASS_NAMES = {
   month_caption: "flex items-center justify-center pb-2 text-sm font-semibold text-fg",
   nav: "flex items-center justify-between",
   weekdays: "flex",
-  weekday: "size-8 text-center text-[11px] font-bold text-fg-label uppercase",
+  weekday: "size-8 pointer-coarse:w-11 text-center text-[11px] font-bold text-fg-label uppercase",
   week: "flex",
-  day: "size-8 p-0 text-center text-sm",
+  day: "size-8 pointer-coarse:size-11 p-0 text-center text-sm",
   day_button:
-    "size-8 rounded-control text-fg hover:bg-surface-2 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring",
+    "size-8 pointer-coarse:size-11 rounded-control text-fg hover:bg-surface-2 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring",
   selected: "[&>button]:bg-indigo-650 [&>button]:text-fg-on-accent [&>button]:hover:bg-indigo-500",
   today: "[&>button]:font-bold",
   outside: "text-fg-tertiary", // guard-allow-tertiary: days outside the month are decoration, not content to read

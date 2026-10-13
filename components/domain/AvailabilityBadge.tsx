@@ -44,7 +44,7 @@ function AvailabilityBadge({ availability, className, ...props }: AvailabilityBa
       <Icon className="size-3.5 shrink-0" aria-hidden="true" />
       {AVAILABILITY_LABEL[availability.status]}
       {availability.reason ? (
-        <span className="font-normal text-current/85 normal-case">· {availability.reason}</span>
+        <span className="font-normal normal-case">· {availability.reason}</span>
       ) : null}
     </span>
   )

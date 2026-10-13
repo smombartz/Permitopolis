@@ -36,7 +36,7 @@ function PersonaPicker({ personaId, onChange, className }: PersonaPickerProps) {
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button variant="secondary" size="sm" className={className} aria-label="Switch applicant">
+        <Button variant="secondary" size="sm" className={className} aria-label={`Switch applicant: ${current?.name ?? PERSONA_BY_ID[NEW_PERSONA_ID].name}`}>
           {current && current.id !== NEW_PERSONA_ID ? (
             <PersonaAvatar name={current.name} size="sm" data-icon="inline-start" aria-hidden="true" />
           ) : (

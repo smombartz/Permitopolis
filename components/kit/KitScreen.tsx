@@ -475,7 +475,7 @@ function KitScreen() {
 
   return (
     <TooltipProvider>
-      <div data-slot="kit-screen" className="min-h-screen app-ground">
+      <main data-slot="kit-screen" className="min-h-screen app-ground">
         {/* ---- Atmosphere: the full landing-page chrome, shown once ---- */}
         <div className="page-atmosphere relative border-b border-line-subtle">
           <div className="page-container flex flex-col gap-4 py-16">
@@ -762,7 +762,7 @@ function KitScreen() {
         {/* ---- Table ---- */}
         <KitSection id="table" title="Table" description="Dense rows, sticky uppercase header, mono numeric cells.">
           <Panel variant="plain" className="overflow-hidden p-0">
-            <Table>
+            <Table aria-label="Sample cases">
               <TableHeader>
                 <TableRow>
                   <TableHead>Case</TableHead>
@@ -1322,7 +1322,7 @@ function KitScreen() {
         </KitSection>
 
         <Toaster />
-      </div>
+      </main>
     </TooltipProvider>
   );
 }

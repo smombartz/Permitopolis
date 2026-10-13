@@ -29,7 +29,7 @@ function InventorySection() {
     <Section title="Inventory and rates" description="Every bookable space and area, with its capacity, amenities and rate.">
       <InlineAlert variant="info">Inventory is fixed in the prototype. Edit a rate in Fees and deposits above.</InlineAlert>
 
-      <Table>
+      <Table aria-label="Inventory and rates">
         <TableHeader>
           <TableRow>
             <TableHead>Space</TableHead>

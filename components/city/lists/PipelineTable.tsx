@@ -61,7 +61,7 @@ function PipelineTable({ rows, today, sort, dir, onSort, from, columns, density 
 
   return (
     <div ref={containerRef}>
-    <Table>
+    <Table aria-label="Cases">
       <TableHeader>
         <TableRow>
           {visible.map((id) => {

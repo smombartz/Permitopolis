@@ -7,10 +7,13 @@ interface EmptyStateProps extends React.ComponentProps<"div"> {
   title: string
   text?: string
   action?: React.ReactNode
+  /** Renders the title as a heading of this level: 1 when the empty state is the whole page (a case that does not exist). */
+  headingLevel?: 1 | 2 | 3
 }
 
 /** A role's empty queue, a filter with no result, a case with nothing yet. */
-function EmptyState({ icon: Icon, title, text, action, className, ...props }: EmptyStateProps) {
+function EmptyState({ icon: Icon, title, text, action, headingLevel, className, ...props }: EmptyStateProps) {
+  const Title = headingLevel ? (`h${headingLevel}` as const) : "p"
   return (
     <div
       data-slot="empty-state"
@@ -24,7 +27,7 @@ function EmptyState({ icon: Icon, title, text, action, className, ...props }: Em
         <Icon className="size-5" aria-hidden="true" />
       </div>
       <div className="flex flex-col gap-1">
-        <p className="text-sm font-semibold text-fg">{title}</p>
+        <Title className="text-sm font-semibold text-fg">{title}</Title>
         {text ? <p className="max-w-sm text-sm text-fg-secondary">{text}</p> : null}
       </div>
       {action ? <div className="mt-1">{action}</div> : null}

@@ -69,14 +69,17 @@ function TopBarControls() {
         </>
       )}
 
-      {compactDate ? (
-        <span className="whitespace-nowrap font-mono text-xs text-fg-label">
-          <span aria-hidden="true">{fmtMonthDay(demoToday)}</span>
-          <span className="sr-only">{dateText}</span>
-        </span>
-      ) : (
-        <span className="whitespace-nowrap font-mono text-xs text-fg-label">{dateText}</span>
-      )}
+      {/* Polite: a date jump from the Demo menu or the palette is read out, once. */}
+      <span className="whitespace-nowrap font-mono text-xs text-fg-label" aria-live="polite">
+        {compactDate ? (
+          <>
+            <span aria-hidden="true">{fmtMonthDay(demoToday)}</span>
+            <span className="sr-only">{dateText}</span>
+          </>
+        ) : (
+          dateText
+        )}
+      </span>
       <CommandCenter />
       <DemoMenu />
     </div>

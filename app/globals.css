@@ -71,6 +71,19 @@
   body {
     @apply bg-background text-foreground;
   }
+  html {
+    /* The sticky top bar is 56px: what focus scrolls into view lands clear of it (WCAG 2.4.11). */
+    scroll-padding-top: 5rem;
+  }
+  /*
+   * The system focus ring (Rime & Ink, "Focus-visible"), for anything focusable that names no
+   * ring of its own: a bare link, a summary, a tab panel. A field opts out with `outline-none`
+   * and shows its focus on its border and halo instead.
+   */
+  :focus-visible {
+    outline: 2px solid var(--focus-ring);
+    outline-offset: 2px;
+  }
   button:not(:disabled),
   [role="button"]:not(:disabled) {
     cursor: pointer;
@@ -91,6 +104,25 @@
       scroll-behavior: auto !important;
     }
   }
+}
+
+/*
+ * Focus rings, part two. The app writes a ring as
+ * `outline-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring`.
+ * In Tailwind 4 `outline-none` sets `--tw-outline-style: none` on the element and
+ * `focus-visible:outline-2` draws `outline-style: var(--tw-outline-style)`, so the pair drew
+ * nothing at all: no button, link, tab or row in the app showed keyboard focus. This puts the
+ * style back while the element has focus. It is outside every layer on purpose: an unlayered
+ * rule outranks the utilities layer, where `outline-none` lives. An element with `outline-none`
+ * and no `focus-visible:outline-*` width keeps `outline-style: none` and stays ringless.
+ * tests/guards.test.ts holds this rule in place.
+ */
+:focus-visible {
+  --tw-outline-style: solid;
+}
+/* On the night surface the indigo ring is 2.1:1; the mint accent is 10:1. */
+[data-tone="night"] :focus-visible {
+  outline-color: var(--night-accent);
 }
 
 /*

@@ -67,7 +67,7 @@ function PipelineBoard({ columns, today, from, showStateChip = false }: { column
         // (cards truncate); the row still scrolls sideways when they cannot.
         <div key={column.key} data-state={column.key} className="flex min-w-44 flex-1 basis-0 flex-col gap-2 rounded-panel border border-line-subtle bg-surface-2 p-2">
           <div className="flex items-center justify-between gap-2 px-1 pt-1">
-            <h3 className="text-eyebrow font-bold tracking-[.12em] text-fg-label uppercase">{column.label}</h3>
+            <h2 className="text-eyebrow font-bold tracking-[.12em] text-fg-label uppercase">{column.label}</h2>
             <CountBadge count={column.cases.length} />
           </div>
           <ul className="flex max-h-[70vh] flex-col gap-2 overflow-y-auto">

@@ -17,6 +17,7 @@ import { ENDING_LABEL, STATE_LABEL, type Dept, type Party } from "@/lib/types"
 import { amendmentHeadline, amendmentReview } from "@/lib/view/amend"
 import { CASE_TABS, CASE_TAB_LABEL, caseBackLink, headerReviewClock, isCaseTab, isHoldExpiringTomorrow, ownTaskRows, resolveOpenKey } from "@/lib/view/caseDetail"
 import { ActionSheet } from "./ActionSheet"
+import { toastedDispatchCount } from "./actions/panelKit"
 import { ActionsPanel } from "./ActionsPanel"
 import { ActivityTab } from "./tabs/ActivityTab"
 import { ConditionsFeesTab } from "./tabs/ConditionsFeesTab"
@@ -47,15 +48,24 @@ function CaseDetailScreen() {
 
   const c = cases.find((candidate) => candidate.id === id)
 
+  // A change of state is read out once. An action taken on this screen raises a toast, and the
+  // toaster reads that out; this line is for a change nothing toasted (the demo date moving a
+  // case on to Event day, a hold expiring), so the two never say the same thing twice.
   const announcementRef = React.useRef<string | undefined>(undefined)
+  const toastsSeen = React.useRef(toastedDispatchCount())
   const [announcement, setAnnouncement] = React.useState("")
   React.useEffect(() => {
     if (!c) return
     const label = c.ending ? ENDING_LABEL[c.ending] : STATE_LABEL[c.state]
-    if (announcementRef.current !== undefined && announcementRef.current !== label) setAnnouncement(`${c.name}: now ${label}.`)
+    const toasted = toastedDispatchCount() !== toastsSeen.current
+    if (announcementRef.current !== undefined && announcementRef.current !== label) setAnnouncement(toasted ? "" : `${c.name}: now ${label}.`)
     announcementRef.current = label
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [c?.state, c?.ending])
+  // After the effect above, on every render: a toast for an action that left the state alone is not held against the next change.
+  React.useEffect(() => {
+    toastsSeen.current = toastedDispatchCount()
+  })
 
   if (!c) {
     return <CaseNotFound id={id} backHref={routes.city.cases()} backLabel="Back to cases" />
@@ -171,7 +181,7 @@ function CaseDetailScreen() {
 
       <ActionSheet caseId={c.id} openKey={openKey} role={role} onOpenChange={(open) => !open && go({ task: null })} />
 
-      <div aria-live="polite" role="status" className="sr-only">
+      <div role="status" data-slot="case-state-announcement" className="sr-only">
         {announcement}
       </div>
     </div>

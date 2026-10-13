@@ -198,7 +198,7 @@ function DueTable({ rows, today, from, query }: { rows: DueRow[]; today: ISODate
 
   return (
     <div className="flex flex-col gap-2">
-      <Table>
+      <Table aria-label="Payments due">
         <TableHeader>
           <TableRow>
             <TableHead>Event</TableHead>
@@ -271,7 +271,7 @@ function ReceivedTable({ groups, total, from, query, hasFilters }: { groups: Rec
 
   return (
     <div className="flex flex-col gap-2">
-      <Table>
+      <Table aria-label="Payments received">
         <TableHeader>
           <TableRow>
             <TableHead>Event</TableHead>
@@ -398,7 +398,7 @@ function RefundsTable({
         {owed.length === 0 ? (
           <p className="text-sm text-fg-secondary">Nothing is waiting to be refunded.</p>
         ) : (
-          <Table>
+          <Table aria-label="Refunds owed">
             <TableHeader>
               <TableRow>
                 <TableHead>Event</TableHead>
@@ -437,7 +437,7 @@ function RefundsTable({
         {issued.length === 0 ? (
           <p className="text-sm text-fg-secondary">No refund has gone out yet.</p>
         ) : (
-          <Table>
+          <Table aria-label="Refunds issued">
             <TableHeader>
               <TableRow>
                 <TableHead>Event</TableHead>

@@ -942,7 +942,7 @@ describe("the demo paths that cross surfaces have a control for every step", () 
 
     // A new applicant starting a City Hall Plaza event on Jul 11 is warned, not blocked.
     await switchTo(user, "applicant");
-    await user.click(screen.getByRole("button", { name: "Switch applicant" }));
+    await user.click(screen.getByRole("button", { name: /^Switch applicant: / }));
     await user.click(screen.getByRole("menuitemradio", { name: "New applicant" }));
     expect(here()).toBe("/apply");
     expectRealScreen();
@@ -1476,7 +1476,7 @@ describe("(j) Settings reach the wizard: a threshold the Clerk edits is the one 
 
     // A new applicant plans a picnic for 40: the demo script's own Instant example.
     await switchTo(user, "applicant");
-    await user.click(screen.getByRole("button", { name: "Switch applicant" }));
+    await user.click(screen.getByRole("button", { name: /^Switch applicant: / }));
     await user.click(screen.getByRole("menuitemradio", { name: "New applicant" }));
     expect(here()).toBe("/apply");
     await user.click(screen.getByRole("radio", { name: /^Picnic or party/ }));

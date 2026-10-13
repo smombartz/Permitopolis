@@ -5,6 +5,7 @@ import { cn } from "cn"
 import { Dialog as DialogPrimitive } from "radix-ui"
 
 import { Button } from "@/components/ui/button"
+import { OpenerProbe, useReturnFocus } from "@/components/ui/return-focus"
 import { XIcon } from "lucide-react"
 
 function Dialog({
@@ -51,10 +52,13 @@ function DialogContent({
   className,
   children,
   showCloseButton = true,
+  onCloseAutoFocus,
   ...props
 }: React.ComponentProps<typeof DialogPrimitive.Content> & {
   showCloseButton?: boolean
 }) {
+  // Focus goes back to whatever opened the dialog: see components/ui/return-focus.tsx.
+  const returnFocus = useReturnFocus(onCloseAutoFocus)
   return (
     <DialogPortal>
       <DialogOverlay />
@@ -65,7 +69,9 @@ function DialogContent({
           className
         )}
         {...props}
+        onCloseAutoFocus={returnFocus.onCloseAutoFocus}
       >
+        <OpenerProbe openerRef={returnFocus.opener} />
         {children}
         {showCloseButton && (
           <DialogPrimitive.Close data-slot="dialog-close" asChild>

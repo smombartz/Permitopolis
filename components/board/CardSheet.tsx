@@ -299,7 +299,7 @@ function CityRequestBody({ task, dispatch, onClose }: BodyProps) {
       </InlineAlert>
       <FileDrop sample={SAMPLE_FILE} onFiles={setFiles} hint="PDF, up to 10MB" />
       {files.length > 0 ? <FileList files={files} /> : null}
-      <Textarea placeholder="A note back (optional)" value={message} onChange={(e) => setMessage(e.target.value)} />
+      <Textarea aria-label="A note back to the reviewer (optional)" placeholder="A note back (optional)" value={message} onChange={(e) => setMessage(e.target.value)} />
       <Button
         type="button"
         disabled={files.length === 0}
@@ -455,7 +455,7 @@ function FeedbackBody({ task, dispatch, onClose }: BodyProps) {
           </button>
         ))}
       </div>
-      <Textarea placeholder="Anything else?" value={comment} onChange={(e) => setComment(e.target.value)} disabled={done} />
+      <Textarea aria-label="Anything else to tell the city (optional)" placeholder="Anything else?" value={comment} onChange={(e) => setComment(e.target.value)} disabled={done} />
       {done ? (
         <InlineAlert variant="success">Thank you for the feedback.</InlineAlert>
       ) : (

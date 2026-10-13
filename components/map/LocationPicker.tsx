@@ -149,6 +149,8 @@ function AvailabilityNote({
  * view and the value never disagree. Each tab remembers what was last chosen on it.
  */
 export function LocationPicker({ value, onChange, eventType, availabilityOf, className }: LocationPickerProps) {
+  // Unique per picker: two on one page (the dev page shows several) must not share field ids.
+  const fieldId = React.useId();
   // The tab in view while nothing is chosen. With a value, the tab is the value's own.
   const [emptyMode, setEmptyMode] = React.useState<LocationPickerMode>(
     () => (eventType ? STARTING_MODE[eventType] : undefined) ?? "inventory",
@@ -348,9 +350,9 @@ export function LocationPicker({ value, onChange, eventType, availabilityOf, cla
           </svg>
           <div className="flex flex-1 flex-col gap-3 md:w-1/3">
             <div className="flex flex-col gap-1.5">
-              <Label htmlFor="location-picker-area">Area</Label>
+              <Label htmlFor={`${fieldId}-area`}>Area</Label>
               <Select value={areaId} onValueChange={(next) => handleAreaIdChange(next as AreaId)}>
-                <SelectTrigger id="location-picker-area" className="w-full">
+                <SelectTrigger id={`${fieldId}-area`} className="w-full">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -361,9 +363,9 @@ export function LocationPicker({ value, onChange, eventType, availabilityOf, cla
             </div>
             <div className="flex gap-3">
               <div className="flex flex-1 flex-col gap-1.5">
-                <Label htmlFor="location-picker-width">Width (ft)</Label>
+                <Label htmlFor={`${fieldId}-width`}>Width (ft)</Label>
                 <Input
-                  id="location-picker-width"
+                  id={`${fieldId}-width`}
                   type="number"
                   min={1}
                   max={area.w}
@@ -372,9 +374,9 @@ export function LocationPicker({ value, onChange, eventType, availabilityOf, cla
                 />
               </div>
               <div className="flex flex-1 flex-col gap-1.5">
-                <Label htmlFor="location-picker-length">Length (ft)</Label>
+                <Label htmlFor={`${fieldId}-length`}>Length (ft)</Label>
                 <Input
-                  id="location-picker-length"
+                  id={`${fieldId}-length`}
                   type="number"
                   min={1}
                   max={area.h}

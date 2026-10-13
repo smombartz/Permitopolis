@@ -98,10 +98,13 @@ export function MapDevScreen() {
         </p>
       </header>
 
-      <section className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-        {MODE_DEMOS.map((demo) => (
-          <LocationDemo key={demo.key} title={demo.title} eventType={demo.eventType} />
-        ))}
+      <section className="flex flex-col gap-2">
+        <h2 className="text-lg font-semibold text-fg">LocationPicker</h2>
+        <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+          {MODE_DEMOS.map((demo) => (
+            <LocationDemo key={demo.key} title={demo.title} eventType={demo.eventType} />
+          ))}
+        </div>
       </section>
 
       <section className="flex flex-col gap-2">

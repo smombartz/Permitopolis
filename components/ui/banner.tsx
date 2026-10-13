@@ -27,23 +27,36 @@ const ICONS = {
   danger: OctagonXIcon,
 } as const
 
+interface BannerProps extends React.ComponentProps<"div">, VariantProps<typeof bannerVariants> {
+  /**
+   * Set it on a banner that appears in answer to something the person just did (a date picked,
+   * a form sent): it is then a polite status, read out once. Without it a banner is page
+   * content with no live role. Most banners are on the page when it opens, and a `role="alert"`
+   * on each of those interrupted a screen reader on arrival and again on every remount.
+   */
+  live?: boolean
+}
+
+/** A page-level message: an icon, a tint and the words. The icon and the words carry it, never the tint alone. */
 function Banner({
   className,
   variant = "info",
+  live = false,
   children,
   ...props
-}: React.ComponentProps<"div"> & VariantProps<typeof bannerVariants>) {
+}: BannerProps) {
   const Icon = ICONS[variant ?? "info"]
   return (
     <div
       data-slot="banner"
       data-variant={variant}
-      role={variant === "danger" || variant === "warning" ? "alert" : "status"}
+      role={live ? "status" : undefined}
       className={cn(bannerVariants({ variant }), className)}
       {...props}
     >
       <Icon className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
-      <div className="min-w-0 flex-1 [&_p]:text-current/85 [&_strong]:text-current">{children}</div>
+      {/* Full strength: at 85% the success and warning inks are 3.9:1 on their tints (lib/contrast.test.ts). */}
+      <div className="min-w-0 flex-1">{children}</div>
     </div>
   )
 }

@@ -2,6 +2,7 @@
 
 import * as React from "react";
 import { PageSkeleton } from "@/components/ui/page-skeleton";
+import { MAIN_CONTENT_ID, SkipLink } from "@/components/ui/skip-link";
 import { TopBar } from "@/components/shell/TopBar";
 import { StorageBanner } from "@/components/shell/StorageBanner";
 import { SwitchRolePanel } from "@/components/shell/SwitchRolePanel";
@@ -16,8 +17,8 @@ interface AppShellProps {
 
 /**
  * The frame for every applicant screen (app/apply/layout.tsx, app/events/layout.tsx), on the
- * .app-ground: the top bar, a skeleton until the store is hydrated, the storage banner, and
- * the page itself inside the page container. A screen starts with its PageHeader and never
+ * .app-ground: a skip link, the top bar, and the `<main>` landmark holding a skeleton until the
+ * store is hydrated, then the storage banner and the page itself inside the page container. A screen starts with its PageHeader and never
  * adds `page-container` of its own. If a city role is current, the page is swapped for a
  * panel offering to switch to the Applicant, since every screen under here is built for that
  * role.
@@ -30,29 +31,29 @@ function AppShell({ children }: AppShellProps) {
 
   return (
     <div className="app-ground flex min-h-dvh flex-col">
+      <SkipLink />
       <TopBar />
-      {!hydrated ? (
-        <PageSkeleton />
-      ) : (
-        <main className="flex-1">
-          {!storageOk ? <StorageBanner /> : null}
-          <CoachStrip />
-          {role === "applicant" ? (
-            <>
-              <React.Suspense fallback={null}>
-                <RememberPath role={role} />
-              </React.Suspense>
-              <div className="page-container py-6">{children}</div>
-            </>
-          ) : (
-            <SwitchRolePanel
-              message="This screen is built for the Applicant."
-              targets={["applicant"]}
-              onSwitch={switchTo}
-            />
-          )}
-        </main>
-      )}
+      {/* The skip link lands here. guard-allow-outline: no ring, it is the whole page, not a control. */}
+      <main id={MAIN_CONTENT_ID} tabIndex={-1} aria-busy={!hydrated} className="flex-1 outline-none">
+        {!hydrated ? (
+          <PageSkeleton />
+        ) : (
+          <>
+            {!storageOk ? <StorageBanner /> : null}
+            <CoachStrip />
+            {role === "applicant" ? (
+              <>
+                <React.Suspense fallback={null}>
+                  <RememberPath role={role} />
+                </React.Suspense>
+                <div className="page-container py-6">{children}</div>
+              </>
+            ) : (
+              <SwitchRolePanel message="This screen is built for the Applicant." targets={["applicant"]} onSwitch={switchTo} />
+            )}
+          </>
+        )}
+      </main>
     </div>
   );
 }

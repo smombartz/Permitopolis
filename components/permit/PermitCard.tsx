@@ -72,7 +72,7 @@ function PermitCard({ c: record, today, cfg }: { c: EventCase; today: ISODate; c
       <Separator />
 
       <div className="flex flex-col items-center gap-3 sm:flex-row sm:justify-between">
-        <QRCodeSVG value={`${origin}${verifyPath}`} size={148} />
+        <QRCodeSVG value={`${origin}${verifyPath}`} size={148} title="QR code that opens this permit's verification page" />
         <div className="flex flex-col items-center gap-1 text-center sm:items-end sm:text-right">
           <p className="text-sm font-semibold text-fg">Scan to verify this permit</p>
           <p className="font-mono text-xs text-fg-secondary">{verifyPath}</p>

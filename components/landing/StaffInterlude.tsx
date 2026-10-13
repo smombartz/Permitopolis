@@ -44,7 +44,7 @@ function StaffInterlude({ seed }: StaffInterludeProps) {
   const logLines = fiveK ? [...fiveK.activity].slice(-5).reverse() : [];
 
   return (
-    <section className="relative isolate overflow-hidden bg-night py-[var(--section-space)]">
+    <section data-tone="night" className="relative isolate overflow-hidden bg-night py-[var(--section-space)]">
       <div
         aria-hidden="true"
         className="pointer-events-none absolute inset-0 -z-10"
@@ -88,7 +88,7 @@ function StaffInterlude({ seed }: StaffInterludeProps) {
               <span className="landing-live-pulse absolute inset-0 rounded-full bg-night-accent" />
               <span className="relative size-1.5 rounded-full bg-night-accent" />
             </span>
-            <span className="font-mono text-[11px] font-bold tracking-[.12em] text-night-fg-tertiary uppercase">Live activity</span>
+            <span className="font-mono text-[11px] font-bold tracking-[.12em] text-night-fg-secondary uppercase">Live activity</span>
           </div>
           <ul className="flex flex-col gap-2.5 pt-3 font-mono text-[12px] text-night-fg-secondary">
             {logLines.map((entry, index) => (

@@ -109,7 +109,7 @@ function IntakeTabTable({
   }
 
   return (
-    <Table>
+    <Table aria-label={`${INTAKE_TAB_LABEL[tab]} applications at intake`}>
       <TableHeader>
         <TableRow>
           <TableHead>Event</TableHead>
@@ -187,7 +187,7 @@ function InstantExceptionsTable({ cases, today, from }: { cases: EventCase[]; to
   }
 
   return (
-    <Table>
+    <Table aria-label="Instant events with a closeout exception">
       <TableHeader>
         <TableRow>
           <TableHead>Event</TableHead>

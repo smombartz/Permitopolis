@@ -36,7 +36,7 @@ function EndingBanner({ ending, reason, className, ...props }: EndingBannerProps
       <Icon className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
       <div className="min-w-0 flex-1">
         <p className="font-semibold text-current">{ENDING_LABEL[ending]}</p>
-        {reason ? <p className="text-current/85">{reason}</p> : null}
+        {reason ? <p>{reason}</p> : null}
       </div>
     </div>
   )

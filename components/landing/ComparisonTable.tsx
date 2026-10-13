@@ -20,7 +20,7 @@ function ComparisonTable() {
         lead="One trigger is enough to move an event up. Here's exactly what moves it, read straight off the rules engine."
       />
       <Panel variant="frosted" className="overflow-hidden p-0">
-        <Table>
+        <Table aria-label="Which tier each trigger sets">
           <TableHeader>
             <TableRow>
               <TableHead scope="col" className="sticky left-0 z-20 bg-surface-solid">

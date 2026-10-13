@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import { MAIN_CONTENT_ID, SkipLink } from "@/components/ui/skip-link";
 import { buildSeed } from "@/lib/state";
 import { Nav } from "./Nav";
 import { Hero } from "./Hero";
@@ -26,9 +27,11 @@ function LandingScreen() {
 
   return (
     <div className="page-atmosphere min-h-dvh">
+      <SkipLink />
       {/* The primary nav and the footer are landmarks of the page, so they sit beside <main>, not in it. */}
       <Nav />
-      <main>
+      {/* The skip link lands here. guard-allow-outline: no ring, it is the whole page, not a control. */}
+      <main id={MAIN_CONTENT_ID} tabIndex={-1} className="outline-none">
         <Hero />
         <HowItWorks seed={seed} />
         <EventTiers seed={seed} />

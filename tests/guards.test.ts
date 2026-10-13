@@ -67,6 +67,65 @@ describe("text contrast", () => {
   });
 });
 
+describe("focus rings", () => {
+  const css = readFileSync(join(ROOT, "app", "globals.css"), "utf8");
+  // The stylesheet with its comments and its @layer blocks taken out: what is left is unlayered.
+  const withoutComments = css.replace(/\/\*[\s\S]*?\*\//g, "");
+  const unlayered = withoutComments.replace(/@layer\s+[\w-]+\s*\{(?:[^{}]|\{(?:[^{}]|\{[^{}]*\})*\})*\}/g, "");
+
+  // In Tailwind 4 `outline-none` sets --tw-outline-style to none and `focus-visible:outline-2`
+  // draws `outline-style: var(--tw-outline-style)`: the app's ring, written as the pair, drew
+  // nothing. One rule outside every layer puts the style back; without it no control shows focus.
+  it("the rule that makes `outline-none focus-visible:outline-2` draw a ring is in place, outside every layer", () => {
+    expect(unlayered).toMatch(/(?:^|\})\s*:focus-visible\s*\{\s*--tw-outline-style:\s*solid;\s*\}/);
+  });
+
+  it("anything focusable with no ring of its own gets the system ring from the base layer", () => {
+    expect(withoutComments).toMatch(/:focus-visible\s*\{\s*outline:\s*2px solid var\(--focus-ring\);\s*outline-offset:\s*2px;\s*\}/);
+  });
+
+  it("the night surface has a ring of its own", () => {
+    expect(unlayered).toMatch(/\[data-tone="night"\]\s+:focus-visible\s*\{\s*outline-color:\s*var\(--night-accent\);\s*\}/);
+  });
+
+  // An element that takes its outline away says, in the same class string, how it shows focus
+  // instead: a ring, or the field treatment (border and halo). One that needs none says why, on
+  // its line or the line above.
+  const REMOVES_OUTLINE = /(?<![\w:-])outline-(?:none|hidden)\b/;
+  const SHOWS_FOCUS = /focus-visible:outline-|focus-visible:border-focus-ring|focus-visible\]:border-focus-ring|data-selected:outline-/;
+
+  it("no element drops its outline without another way to show focus", () => {
+    const offenders: string[] = [];
+    for (const file of UI_FILES) {
+      const lines = readFileSync(file, "utf8").split("\n");
+      lines.forEach((line, index) => {
+        if (!REMOVES_OUTLINE.test(line) || SHOWS_FOCUS.test(line)) return;
+        if (line.includes("guard-allow-outline") || lines[index - 1]?.includes("guard-allow-outline")) return;
+        offenders.push(`${relative(ROOT, file)}:${index + 1}`);
+      });
+    }
+    expect(offenders, `Add the system ring (focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring), or say why none is needed with guard-allow-outline:\n${offenders.join("\n")}`).toEqual([]);
+  });
+});
+
+describe("text at part opacity", () => {
+  // `text-current/85` on a success or a warning tint is 3.9:1: a color that passes AA stops
+  // passing once it is thinned. Text is drawn in a token at full strength.
+  const THINNED_TEXT = /(?<![\w-])(?:[\w-\[\]&>*]+:)*text-(?:current|fg[\w-]*|[\w-]+-fg)\/\d+/g;
+
+  it("no text color is thinned with an opacity modifier", () => {
+    const offenders: string[] = [];
+    for (const file of UI_FILES) {
+      readFileSync(file, "utf8")
+        .split("\n")
+        .forEach((line, index) => {
+          for (const match of line.matchAll(THINNED_TEXT)) offenders.push(`${relative(ROOT, file)}:${index + 1}  ${match[0]}`);
+        });
+    }
+    expect(offenders, `Use the token at full strength:\n${offenders.join("\n")}`).toEqual([]);
+  });
+});
+
 describe("integration rule", () => {
   // A surface may import shared folders only, never another surface.
   const SHARED = new Set(["ui", "domain", "map", "calendar", "shell"]);

@@ -160,7 +160,8 @@ function HowItWorks({ seed }: HowItWorksProps) {
         title="Five questions. One clear permit."
         lead="One wizard, five short steps. The result panel updates with every answer, so you always know what you're getting into."
       />
-      <ol className="relative flex flex-col gap-14 sm:gap-16">
+      {/* The scroll thread sits beside the list, not in it: an <ol> holds list items only. */}
+      <div className="relative">
         {!reducedMotion ? (
           <div className="absolute top-2 bottom-2 left-5 w-px bg-line-subtle" aria-hidden="true">
             <div
@@ -169,6 +170,7 @@ function HowItWorks({ seed }: HowItWorksProps) {
             />
           </div>
         ) : null}
+      <ol className="flex flex-col gap-14 sm:gap-16">
         {steps.map((step, index) => {
           const lit = index < litCount;
           return (
@@ -195,6 +197,7 @@ function HowItWorks({ seed }: HowItWorksProps) {
           );
         })}
       </ol>
+      </div>
     </section>
   );
 }

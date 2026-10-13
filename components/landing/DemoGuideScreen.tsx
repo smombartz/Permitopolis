@@ -246,7 +246,7 @@ function DemoGuideScreen() {
 
         <Section title="The six scenarios" description="S1 through S6, as the seed leaves them on May 3, 2027.">
           <Panel variant="frosted" className="overflow-hidden p-0">
-            <Table>
+            <Table aria-label="The six scenarios">
               <TableHeader>
                 <TableRow>
                   <TableHead>Scenario</TableHead>

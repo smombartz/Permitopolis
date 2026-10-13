@@ -138,7 +138,7 @@ describe("Cases pipeline", () => {
   it("with a State filter the board is that one column, so the matches are what is on screen", async () => {
     await renderScreen(<CasesScreen />, { role: "clerk", path: routes.city.cases({ state: "quote_sent" }) });
 
-    const headings = screen.getAllByRole("heading", { level: 3 }).map((h) => h.textContent);
+    const headings = screen.getAllByRole("heading", { level: 2 }).map((h) => h.textContent);
     expect(headings).toEqual(["Quote sent"]);
     expect(screen.queryByText("Nothing here")).not.toBeInTheDocument();
     expect(screen.getByText("Riverfront Summer 5K")).toBeInTheDocument();
@@ -147,7 +147,7 @@ describe("Cases pipeline", () => {
   it("without a State filter the board has its seven columns, each flexible so they share the width", async () => {
     await renderScreen(<CasesScreen />, { role: "clerk", path: routes.city.cases() });
 
-    const columns = Array.from(document.querySelectorAll<HTMLElement>("[data-state]")).filter((el) => el.querySelector("h3"));
+    const columns = Array.from(document.querySelectorAll<HTMLElement>("[data-state]")).filter((el) => el.querySelector("h2"));
     expect(columns.map((el) => el.dataset.state)).toEqual(["submitted", "in_review", "needs_info", "quote_sent", "permitted", "event_day", "closeout"]);
     for (const column of columns) {
       expect(column.className).toContain("flex-1");

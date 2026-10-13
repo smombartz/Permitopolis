@@ -12,7 +12,6 @@ function LeadTimeRisk({ risk, className, ...props }: LeadTimeRiskProps) {
   return (
     <span
       data-slot="lead-time-risk"
-      role="status"
       className={cn(
         "inline-flex h-6 w-fit shrink-0 items-center gap-1 rounded-full border border-danger-border bg-danger-surface px-2 text-[11px] font-semibold whitespace-nowrap text-danger-fg",
         className

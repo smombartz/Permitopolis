@@ -115,7 +115,8 @@ function FilterBar({
       </div>
       {resultCount !== undefined || onClear ? (
         <div className="flex items-center justify-between gap-3 text-xs text-fg-secondary">
-          {resultCount !== undefined ? <span>{plural(resultCount, resultNoun)}</span> : <span />}
+          {/* A status: a filter that changes the count has it read out, once. */}
+          {resultCount !== undefined ? <span role="status">{plural(resultCount, resultNoun)}</span> : <span />}
           {onClear ? (
             <Button type="button" variant="ghost" size="sm" onClick={onClear}>
               Clear filters

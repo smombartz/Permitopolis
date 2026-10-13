@@ -72,10 +72,11 @@ function CommandInput({
 }: React.ComponentProps<typeof CommandPrimitive.Input>) {
   return (
     <div data-slot="command-input-wrapper" className="p-1.5 pb-0">
-      <InputGroup className="h-10! rounded-control! border-line-subtle bg-surface-2 shadow-none! *:data-[slot=input-group-addon]:pl-3!">
+      <InputGroup className="h-10! rounded-control! border-line-subtle bg-surface-2 shadow-none! has-[[data-slot=command-input]:focus-visible]:border-focus-ring *:data-[slot=input-group-addon]:pl-3!">
         <CommandPrimitive.Input
           data-slot="command-input"
           className={cn(
+            // guard-allow-outline: the InputGroup around it shows the focus (border and halo)
             "w-full text-sm text-fg outline-hidden placeholder:text-fg-tertiary disabled:cursor-not-allowed disabled:opacity-50",
             className
           )}
@@ -97,6 +98,7 @@ function CommandList({
     <CommandPrimitive.List
       data-slot="command-list"
       className={cn(
+        // guard-allow-outline: the list is not a tab stop; the selected option carries the ring
         "no-scrollbar max-h-96 scroll-py-1 overflow-x-hidden overflow-y-auto p-1 outline-none",
         className
       )}
@@ -156,7 +158,7 @@ function CommandItem({
     <CommandPrimitive.Item
       data-slot="command-item"
       className={cn(
-        "group/command-item relative flex cursor-default items-center gap-2 rounded-row px-2.5 py-2 text-sm text-fg-secondary outline-hidden select-none in-data-[slot=dialog-content]:rounded-row! data-[disabled=true]:pointer-events-none data-[disabled=true]:opacity-50 data-selected:bg-surface-2 data-selected:text-fg [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4 data-selected:*:[svg]:text-fg",
+        "group/command-item relative flex cursor-default items-center gap-2 rounded-row px-2.5 py-2 text-sm text-fg-secondary outline-hidden select-none in-data-[slot=dialog-content]:rounded-row! data-[disabled=true]:pointer-events-none data-[disabled=true]:opacity-50 data-selected:bg-pill data-selected:text-fg data-selected:outline-solid data-selected:outline-2 data-selected:-outline-offset-2 data-selected:outline-focus-ring [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4 data-selected:*:[svg]:text-fg",
         className
       )}
       {...props}

@@ -12,6 +12,7 @@ import { Kbd } from "@/components/ui/kbd";
 import { PipelineBoard, type BoardColumnSpec } from "@/components/city/lists/PipelineBoard";
 import { PipelineTable } from "@/components/city/lists/PipelineTable";
 import { KeyboardFooter } from "@/components/city/lists/KeyboardFooter";
+import { isInsideOverlay, isPlainShortcut } from "@/lib/keyboard";
 import { useDemo } from "@/lib/state";
 import { STATE_LABEL, TIER_LABEL, PARTY_LABEL, type CaseState, type Party, type Tier } from "@/lib/types";
 import {
@@ -85,9 +86,8 @@ function CasesScreen() {
 
   React.useEffect(() => {
     function onKeyDown(event: KeyboardEvent) {
-      if (event.key !== "/") return;
-      const target = event.target as HTMLElement | null;
-      if (target && ["INPUT", "TEXTAREA", "SELECT"].includes(target.tagName)) return;
+      // Not while somebody is typing, with a modifier held, or from inside an open sheet or dialog.
+      if (event.key !== "/" || !isPlainShortcut(event) || isInsideOverlay(event.target)) return;
       const input = containerRef.current?.querySelector<HTMLInputElement>('input[aria-label="Search cases"]');
       if (input) {
         event.preventDefault();

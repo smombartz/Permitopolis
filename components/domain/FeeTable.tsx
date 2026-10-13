@@ -1,3 +1,4 @@
+import * as React from "react"
 import { cn } from "cn"
 import { Badge } from "@/components/ui/badge"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
@@ -55,9 +56,9 @@ function LineLabel({ line }: { line: FeeLine }) {
 }
 
 /** One department's lines in two columns: the line (wrapping) over "qty unit × price", and the amount. */
-function CompactLines({ lines, showActual }: { lines: FeeLine[]; showActual: boolean }) {
+function CompactLines({ lines, showActual, labelledBy }: { lines: FeeLine[]; showActual: boolean; labelledBy: string }) {
   return (
-    <Table data-layout="compact">
+    <Table data-layout="compact" aria-labelledby={labelledBy}>
       <TableHeader>
         <TableRow>
           <TableHead>Line</TableHead>
@@ -107,16 +108,21 @@ function FeeTable({ lines, showActual = false, compact = false, className, ...pr
   // What the event actually cost, to read against the subtotal of fees. The deposit is not a
   // cost: with it in, the row showed an amount nobody is charged ($10,395 on S6).
   const actualFees = showActual ? feeLines.reduce((sum, l) => sum + (l.actual ?? l.estimate), 0) : null
+  // Each department's table is named by the department printed above it.
+  const baseId = React.useId()
 
   return (
     <div data-slot="fee-table" className={cn("flex flex-col gap-5", className)} {...props}>
       {DEPTS.filter((dept) => (groups[dept]?.length ?? 0) > 0).map((dept) => (
         <div key={dept} className="flex flex-col gap-1.5">
-          <p className="text-eyebrow font-bold tracking-[.12em] text-fg-label uppercase">{PARTY_LABEL[dept]}</p>
+          <p id={`${baseId}-${dept}`} className="text-eyebrow font-bold tracking-[.12em] text-fg-label uppercase">
+            {PARTY_LABEL[dept]}
+            <span className="sr-only"> fees</span>
+          </p>
           {compact ? (
-            <CompactLines lines={groups[dept] ?? []} showActual={showActual} />
+            <CompactLines lines={groups[dept] ?? []} showActual={showActual} labelledBy={`${baseId}-${dept}`} />
           ) : (
-          <Table>
+          <Table aria-labelledby={`${baseId}-${dept}`}>
             <TableHeader>
               <TableRow>
                 <TableHead>Line</TableHead>

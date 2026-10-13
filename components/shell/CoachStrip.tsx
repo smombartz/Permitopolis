@@ -60,9 +60,10 @@ function CoachStrip() {
 
   return (
     <div className="page-container pt-4">
-      <Callout className="items-center" aria-live="polite">
+      <Callout className="items-center" role="region" aria-label="Demo coach">
         <div className="flex flex-wrap items-center justify-between gap-3">
-          <div className="flex min-w-0 flex-1 flex-wrap items-baseline gap-x-2 gap-y-1">
+          {/* The live part is the step alone, read whole when it changes; the buttons beside it are not announced with it. */}
+          <div className="flex min-w-0 flex-1 flex-wrap items-baseline gap-x-2 gap-y-1" role="status" aria-atomic="true">
             <p className="shrink-0 font-semibold text-fg-pill">{`Path ${path.id} · ${done ? "Done" : `Step ${stepIndex + 1} of ${totalSteps}`}`}</p>
             <p className="min-w-0 flex-1 text-fg-pill">{done ? `${path.title}: every step is done.` : step.text}</p>
           </div>

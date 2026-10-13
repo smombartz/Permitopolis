@@ -5,10 +5,37 @@ import { cn } from "cn"
 import { Select as SelectPrimitive } from "radix-ui"
 import { ChevronDownIcon, CheckIcon, ChevronUpIcon } from "lucide-react"
 
+/**
+ * What a `Field` hands the control inside it. The Select root renders no element of its own, so
+ * the id the label points at, the hint and error ids and the invalid and required flags all
+ * belong on the trigger: without this hand-off a `<Field><Select>` left its label pointing at
+ * nothing and its trigger with no name.
+ */
+interface SelectFieldProps {
+  id?: string
+  "aria-describedby"?: string
+  "aria-invalid"?: boolean | "true" | "false"
+  "aria-required"?: boolean | "true" | "false"
+}
+
+const SelectFieldContext = React.createContext<SelectFieldProps>({})
+
 function Select({
+  id,
+  "aria-describedby": describedBy,
+  "aria-invalid": invalid,
+  "aria-required": required,
   ...props
-}: React.ComponentProps<typeof SelectPrimitive.Root>) {
-  return <SelectPrimitive.Root data-slot="select" {...props} />
+}: React.ComponentProps<typeof SelectPrimitive.Root> & SelectFieldProps) {
+  const field = React.useMemo<SelectFieldProps>(
+    () => ({ id, "aria-describedby": describedBy, "aria-invalid": invalid, "aria-required": required }),
+    [id, describedBy, invalid, required]
+  )
+  return (
+    <SelectFieldContext.Provider value={field}>
+      <SelectPrimitive.Root data-slot="select" {...props} />
+    </SelectFieldContext.Provider>
+  )
 }
 
 function SelectGroup({
@@ -38,8 +65,10 @@ function SelectTrigger({
 }: React.ComponentProps<typeof SelectPrimitive.Trigger> & {
   size?: "sm" | "default"
 }) {
+  const field = React.useContext(SelectFieldContext)
   return (
     <SelectPrimitive.Trigger
+      {...field}
       data-slot="select-trigger"
       data-size={size}
       className={cn(
@@ -115,7 +144,7 @@ function SelectItem({
     <SelectPrimitive.Item
       data-slot="select-item"
       className={cn(
-        "relative flex w-full cursor-default items-center gap-1.5 rounded-row py-1.5 pr-8 pl-2 text-sm outline-hidden select-none data-focus:bg-surface-2 data-focus:text-fg data-disabled:pointer-events-none data-disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4 *:[span]:last:flex *:[span]:last:items-center *:[span]:last:gap-2",
+        "relative flex w-full cursor-default items-center gap-1.5 rounded-row py-1.5 pr-8 pl-2 text-sm outline-hidden select-none focus:bg-pill focus:text-fg focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-focus-ring pointer-coarse:min-h-11 data-disabled:pointer-events-none data-disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4 *:[span]:last:flex *:[span]:last:items-center *:[span]:last:gap-2",
         className
       )}
       {...props}

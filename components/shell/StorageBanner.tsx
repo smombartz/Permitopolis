@@ -13,7 +13,7 @@ function StorageBanner() {
     <div className="page-container pt-4">
       <Banner variant="warning" className="items-center">
         <p className="flex-1">Your browser is blocking storage, so changes last until you close this tab.</p>
-        <Button variant="ghost" size="icon-sm" aria-label="Dismiss" onClick={() => setDismissed(true)}>
+        <Button variant="ghost" size="icon-sm" aria-label="Dismiss the storage warning" onClick={() => setDismissed(true)}>
           <XIcon aria-hidden="true" />
         </Button>
       </Banner>

@@ -8,9 +8,13 @@ import { Slot } from "radix-ui"
  * Hover rises 2px, active compresses the shadow back to the resting plane, all
  * on the 180ms frost easing. Primary is the only filled, high-contrast variant;
  * "Indigo is the only action color" means every other variant stays quiet.
+ *
+ * The 36px sizes are drawn at 36px and take a tap over 44px: on a touch screen (`pointer-coarse`)
+ * an invisible `::after` reaches 4px past each edge. The button is `relative` for that; a
+ * caller's own `absolute` or `sticky` still wins, since `cn()` resolves the two.
  */
 const buttonVariants = cva(
-  "group/button inline-flex shrink-0 items-center justify-center gap-1.5 rounded-control border bg-clip-padding font-semibold whitespace-nowrap transition-all duration-[var(--dur-fast)] ease-frost outline-none select-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg]:stroke-[2px] [&_svg:not([class*='size-'])]:size-4",
+  "group/button relative inline-flex shrink-0 items-center justify-center gap-1.5 rounded-control border bg-clip-padding font-semibold whitespace-nowrap transition-all duration-[var(--dur-fast)] ease-frost outline-none select-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg]:stroke-[2px] [&_svg:not([class*='size-'])]:size-4",
   {
     variants: {
       variant: {
@@ -27,11 +31,11 @@ const buttonVariants = cva(
         link: "h-auto! border-transparent bg-transparent p-0! font-medium text-fg-accent underline-offset-4 hover:underline",
       },
       size: {
-        sm: "h-9 gap-1.5 px-3 text-xs has-data-[icon=inline-end]:pr-2.5 has-data-[icon=inline-start]:pl-2.5",
+        sm: "h-9 gap-1.5 px-3 text-xs pointer-coarse:after:absolute pointer-coarse:after:-inset-1 has-data-[icon=inline-end]:pr-2.5 has-data-[icon=inline-start]:pl-2.5",
         default: "h-11 gap-1.5 px-4 text-sm has-data-[icon=inline-end]:pr-3 has-data-[icon=inline-start]:pl-3",
         lg: "h-14 gap-2 px-5 text-base has-data-[icon=inline-end]:pr-4 has-data-[icon=inline-start]:pl-4",
         icon: "size-11 p-0",
-        "icon-sm": "size-9 p-0",
+        "icon-sm": "size-9 p-0 pointer-coarse:after:absolute pointer-coarse:after:-inset-1",
         "icon-lg": "size-14 p-0",
       },
     },

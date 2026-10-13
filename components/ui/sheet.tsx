@@ -5,6 +5,7 @@ import { cn } from "cn"
 import { Dialog as SheetPrimitive } from "radix-ui"
 
 import { Button } from "@/components/ui/button"
+import { OpenerProbe, useReturnFocus } from "@/components/ui/return-focus"
 import { XIcon } from "lucide-react"
 
 function Sheet({ ...props }: React.ComponentProps<typeof SheetPrimitive.Root>) {
@@ -55,11 +56,15 @@ function SheetContent({
   children,
   side = "right",
   showCloseButton = true,
+  onCloseAutoFocus,
   ...props
 }: React.ComponentProps<typeof SheetPrimitive.Content> & {
   side?: "top" | "right" | "bottom" | "left"
   showCloseButton?: boolean
 }) {
+  // A sheet here opens from the URL, with no trigger for Radix to hand focus back to: see
+  // components/ui/return-focus.tsx.
+  const returnFocus = useReturnFocus(onCloseAutoFocus)
   return (
     <SheetPortal>
       <SheetOverlay />
@@ -81,7 +86,9 @@ function SheetContent({
           className
         )}
         {...props}
+        onCloseAutoFocus={returnFocus.onCloseAutoFocus}
       >
+        <OpenerProbe openerRef={returnFocus.opener} />
         {children}
         {showCloseButton && (
           <SheetPrimitive.Close data-slot="sheet-close" asChild>

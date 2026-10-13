@@ -8,6 +8,7 @@ interface FieldControlProps {
   id?: string
   "aria-describedby"?: string
   "aria-invalid"?: boolean | "true" | "false"
+  "aria-required"?: boolean | "true" | "false"
 }
 
 interface FieldProps {
@@ -20,9 +21,9 @@ interface FieldProps {
 }
 
 /**
- * Wires a label, a hint and an error to one control by id and aria-describedby,
- * so every form field in the app gets the same accessible wiring without each
- * surface reinventing it. Pass the control (Input, Select, Textarea, ...) as
+ * Wires a label, a hint and an error to one control by id and aria-describedby
+ * (with aria-invalid, and aria-required when `required`), so every form field in
+ * the app gets the same accessible wiring without each surface reinventing it. Pass the control (Input, Select, Textarea, ...) as
  * the single child; Field assigns its id if it doesn't already have one.
  */
 function Field({ label, hint, error, required, className, children }: FieldProps) {
@@ -36,11 +37,14 @@ function Field({ label, hint, error, required, className, children }: FieldProps
     id,
     "aria-describedby": describedBy,
     "aria-invalid": error ? "true" : children.props["aria-invalid"],
+    // The asterisk is hidden from a screen reader; this is what says "required" there.
+    "aria-required": required ? "true" : children.props["aria-required"],
   })
 
   return (
     <div data-slot="field" className={cn("flex flex-col gap-1.5", className)}>
-      <Label htmlFor={id}>
+      {/* The id lets a control whose own text is its value (the date button) name itself "label, value". */}
+      <Label htmlFor={id} id={`${id}-label`}>
         {label}
         {required ? (
           <span className="text-danger" aria-hidden="true">
@@ -54,11 +58,19 @@ function Field({ label, hint, error, required, className, children }: FieldProps
           {hint}
         </p>
       ) : null}
-      {error ? (
-        <p id={errorId} role="alert" className="text-xs font-medium text-danger-fg">
-          {error}
-        </p>
-      ) : null}
+      {/*
+        Always in the DOM, so an error that arrives is an insertion into a live region: read out
+        once, politely, and again only if its words change. (It was `role="alert"`, which cut in
+        on every keystroke of a field that validates as it is typed in.) Empty, it takes back the
+        gap it would add.
+      */}
+      <div data-slot="field-error" aria-live="polite" className="empty:-mt-1.5">
+        {error ? (
+          <p id={errorId} className="text-xs font-medium text-danger-fg">
+            {error}
+          </p>
+        ) : null}
+      </div>
     </div>
   )
 }

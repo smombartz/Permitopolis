@@ -3,6 +3,7 @@
 import * as React from "react";
 import { usePathname } from "next/navigation";
 import { PageSkeleton } from "@/components/ui/page-skeleton";
+import { MAIN_CONTENT_ID, SkipLink } from "@/components/ui/skip-link";
 import { TopBar } from "@/components/shell/TopBar";
 import { StorageBanner } from "@/components/shell/StorageBanner";
 import { SwitchRolePanel } from "@/components/shell/SwitchRolePanel";
@@ -32,9 +33,10 @@ interface CityShellProps {
 }
 
 /**
- * The frame for every city screen (app/city/layout.tsx): AppShell's top bar plus a left
- * sidebar (My queue, Cases, Active permits, then the role's own tools), with the page beside
- * it, both inside the page container. A screen starts with its PageHeader and never adds
+ * The frame for every city screen (app/city/layout.tsx): AppShell's skip link and top bar plus
+ * a left sidebar (My queue, Cases, Active permits, then the role's own tools), with the page
+ * beside it, both inside the page container and the `<main>` landmark. The skip link lands on
+ * the page itself, past the sidebar. A screen starts with its PageHeader and never adds
  * `page-container` of its own. If the Applicant is current, the sidebar and page are swapped
  * for a panel offering to switch to a city role.
  *
@@ -52,36 +54,44 @@ function CityShell({ children }: CityShellProps) {
   const switchTo = useRoleSwitch();
   const toolOwner = cityToolOwner(pathname);
 
+  // The skip link lands on the page, past the sidebar; with no page beside a sidebar, on <main>.
+  const besideSidebar = hydrated && isCityRole(role);
+
   return (
     <div className="app-ground flex min-h-dvh flex-col">
+      <SkipLink />
       <TopBar />
-      {!hydrated ? (
-        <PageSkeleton />
-      ) : (
-        <main className="flex-1">
-          {!storageOk ? <StorageBanner /> : null}
-          <CoachStrip />
-          {isCityRole(role) ? (
-            <div className="page-container flex gap-6 py-6">
-              <CitySidebar role={role} pathname={pathname} queueCount={queueFor(cases, role, demoToday).length} />
-              {toolOwner === null || toolOwner === role ? (
-                <div className="min-w-0 flex-1">
-                  <React.Suspense fallback={null}>
-                    <RememberPath role={role} />
-                  </React.Suspense>
-                  {children}
+      {/* guard-allow-outline: no ring, it is the whole page, not a control. */}
+      <main id={besideSidebar ? undefined : MAIN_CONTENT_ID} tabIndex={besideSidebar ? undefined : -1} aria-busy={!hydrated} className="flex-1 outline-none">
+        {!hydrated ? (
+          <PageSkeleton />
+        ) : (
+          <>
+            {!storageOk ? <StorageBanner /> : null}
+            <CoachStrip />
+            {isCityRole(role) ? (
+              <div className="page-container flex gap-6 py-6">
+                <CitySidebar role={role} pathname={pathname} queueCount={queueFor(cases, role, demoToday).length} />
+                {/* guard-allow-outline: no ring, it is the whole page, not a control. */}
+                <div id={MAIN_CONTENT_ID} tabIndex={-1} className="min-w-0 flex-1 outline-none">
+                  {toolOwner === null || toolOwner === role ? (
+                    <>
+                      <React.Suspense fallback={null}>
+                        <RememberPath role={role} />
+                      </React.Suspense>
+                      {children}
+                    </>
+                  ) : (
+                    <SwitchRolePanel message={`This screen is built for ${OWNER_NAME[toolOwner]}.`} targets={[toolOwner]} onSwitch={switchTo} />
+                  )}
                 </div>
-              ) : (
-                <div className="min-w-0 flex-1">
-                  <SwitchRolePanel message={`This screen is built for ${OWNER_NAME[toolOwner]}.`} targets={[toolOwner]} onSwitch={switchTo} />
-                </div>
-              )}
-            </div>
-          ) : (
-            <SwitchRolePanel message="This screen is built for a city role." targets={CITY_ROLES} onSwitch={switchTo} />
-          )}
-        </main>
-      )}
+              </div>
+            ) : (
+              <SwitchRolePanel message="This screen is built for a city role." targets={CITY_ROLES} onSwitch={switchTo} />
+            )}
+          </>
+        )}
+      </main>
     </div>
   );
 }

@@ -17,7 +17,8 @@ function SwitchRolePanel({ message, targets, onSwitch }: SwitchRolePanelProps) {
   return (
     <div className="flex min-h-[50vh] items-center justify-center px-5 py-16">
       <Panel variant="plain" className="flex max-w-sm flex-col items-center gap-4 p-6 text-center">
-        <p className="text-sm text-fg-secondary">{message}</p>
+        {/* The page has no other title: the message is its h1. */}
+        <h1 className="text-sm text-fg-secondary">{message}</h1>
         <div className="flex flex-wrap items-center justify-center gap-2">
           {targets.map((role) => {
             const Icon = PARTY_ICON[role];
