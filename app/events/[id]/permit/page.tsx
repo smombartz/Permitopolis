@@ -1,10 +1,10 @@
 import { Suspense } from "react";
-import { PlaceholderScreen } from "@/components/shell/PlaceholderScreen";
+import { PermitScreen } from "@/components/permit/PermitScreen";
 
 export default function Page() {
   return (
     <Suspense fallback={null}>
-      <PlaceholderScreen route="/events/[id]/permit" />
+      <PermitScreen />
     </Suspense>
   );
 }
