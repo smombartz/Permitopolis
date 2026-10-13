@@ -61,15 +61,16 @@ describe("a waiting applicant's row says what their next card waits for", () => 
     makeTask({ id: `PMT-27-0001:${suffix}`, catalogId: suffix, status: "locked", unlocksOn });
   const applicant = (c: ReturnType<typeof makeCase>) => waitingOn(c, "2027-05-03").find((r) => r.party === "applicant");
 
+  // The row is read by city staff as well, so it says "the event", not "your event".
   it("a permitted picnic: Carry your permit is for the day of the event", () => {
     const paid = makeTask({ id: "PMT-27-0001:pay_fees", catalogId: "pay_fees", kind: "payment", status: "done" });
     const c = makeCase({ state: "permitted", tasks: [paid, locked("carry_permit", "event_day")] });
-    expect(applicant(c)).toMatchObject({ status: "waiting", note: "For the day of your event" });
+    expect(applicant(c)).toMatchObject({ status: "waiting", note: "For the day of the event" });
   });
 
   it("in review: the card that unlocks first is the one named, wherever it sits in the list", () => {
     const c = makeCase({ state: "in_review", tasks: [locked("carry_permit", "event_day"), locked("accept_and_sign", "quote_sent")] });
-    expect(applicant(c)?.note).toBe("Unlocks when your quote is ready");
+    expect(applicant(c)?.note).toBe("Unlocks when the quote is ready");
   });
 
   it("in closeout: the final bill or refund", () => {

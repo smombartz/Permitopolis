@@ -4,7 +4,6 @@
  */
 import { daysBetween } from "@/lib/dates";
 import { plural } from "@/lib/format";
-import { CARD_BY_ID, type CardSpec } from "@/lib/rules/catalog";
 import { ENDING_LABEL, PARTIES, PARTY_LABEL } from "@/lib/types";
 import type { EventCase, ISODate, Party, Task, UnlockEvent } from "@/lib/types";
 import { byDueDate, signoffsLeft, taskDueDate } from "./core";
@@ -97,7 +96,22 @@ function nextToUnlock(c: EventCase, party: Party): Task | undefined {
   return soonest;
 }
 
-/** What a waiting party's row says: what its locked task waits for, in the catalogue's own words for a card. */
+/**
+ * What a locked task waits for, by the event that unlocks it. Who's up is read by the applicant
+ * and by city staff alike, so these say "the quote", not "your quote" as the cards themselves do.
+ */
+const UNLOCK_NOTE: Partial<Record<UnlockEvent, string>> = {
+  presubmit_done: "Unlocks when every card before submitting is done",
+  accepted: "Unlocks when the City Clerk accepts the application",
+  quote_sent: "Unlocks when the quote is ready",
+  permitted: "Unlocks when the permit is issued",
+  event_day: "For the day of the event",
+  hours_logged: "Unlocks when hours are logged",
+  invoice_issued: "Unlocks when the City Clerk finishes reconciling costs",
+  closed: "Unlocks when the event is closed out",
+};
+
+/** What a waiting party's row says: what its locked task waits for. */
 function lockedNote(c: EventCase, party: Party, tasks: Task[]): string | undefined {
   if (tasks.some((t) => t.payload.awaitingAnswer === true)) return "Waiting on the applicant's response";
   if (tasks.some((t) => t.payload.awaitingSignoffs === true)) return `Waiting on ${plural(signoffsLeft(c), "neighbor sign-off")}`;
@@ -106,7 +120,7 @@ function lockedNote(c: EventCase, party: Party, tasks: Task[]): string | undefin
     if (hint) return hint;
   }
   const next = nextToUnlock(c, party);
-  return next ? (CARD_BY_ID as Record<string, CardSpec>)[next.catalogId]?.unlockHint : undefined;
+  return next?.unlocksOn ? UNLOCK_NOTE[next.unlocksOn] : undefined;
 }
 
 function decisionNote(c: EventCase, party: Party): string | undefined {
