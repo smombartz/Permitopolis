@@ -5,6 +5,8 @@ import { Field } from "@/components/ui/field"
 import { Input } from "@/components/ui/input"
 import { InlineAlert } from "@/components/ui/inline-alert"
 import { checkScheduleMeeting, meetingCardFor } from "@/lib/state"
+import { PARTY_LABEL } from "@/lib/types"
+import { meetingDateValid } from "@/lib/view/reviewTools"
 import { PanelActions, PanelBody, PanelHeader, useCaseContext, useCaseDispatch } from "../panelKit"
 import type { ActionPanelProps } from "../types"
 
@@ -18,6 +20,8 @@ function ScheduleMeetingPanel({ caseId, arg, role, onClose }: ActionPanelProps) 
   if (!c || !arg || !card) return null
 
   const check = checkScheduleMeeting(c, arg, role)
+  const dateCheck = meetingDateValid(c, date, today)
+  const attendees = [PARTY_LABEL.clerk, ...(card.reviewer && card.reviewer !== "clerk" ? [PARTY_LABEL[card.reviewer]] : []), PARTY_LABEL.applicant]
 
   function submit() {
     const result = dispatch({ type: "schedule_meeting", taskId: arg as string, date }, `Scheduled "${card!.title}".`)
@@ -30,11 +34,14 @@ function ScheduleMeetingPanel({ caseId, arg, role, onClose }: ActionPanelProps) 
       <PanelHeader title={card.title} description={card.why} />
       <PanelBody>
         {!check.ok ? <InlineAlert variant="warning">{check.reason}</InlineAlert> : null}
-        <Field label="Date">
+        <p className="text-sm text-fg-secondary">
+          <span className="font-semibold text-fg">Attends:</span> {attendees.join(", ")}
+        </p>
+        <Field label="Date" error={check.ok && !dateCheck.ok ? dateCheck.reason : undefined}>
           <Input type="date" value={date} onChange={(e) => setDate(e.target.value)} />
         </Field>
       </PanelBody>
-      <PanelActions error={error} onCancel={onClose} submitLabel="Schedule" disabled={!check.ok || !date} onSubmit={submit} />
+      <PanelActions error={error} onCancel={onClose} submitLabel="Schedule" disabled={!check.ok || !date || !dateCheck.ok} onSubmit={submit} />
     </>
   )
 }

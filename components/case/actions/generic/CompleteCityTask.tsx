@@ -4,11 +4,14 @@ import * as React from "react"
 import { Field } from "@/components/ui/field"
 import { Textarea } from "@/components/ui/textarea"
 import { InlineAlert } from "@/components/ui/inline-alert"
+import { KeyValueList } from "@/components/ui/key-value"
 import { checkCompleteCityTask } from "@/lib/state"
+import { fmtDate } from "@/lib/format"
+import { workOrderDetail } from "@/lib/view/reviewTools"
 import { PanelActions, PanelBody, PanelHeader, useCaseContext, useCaseDispatch } from "../panelKit"
 import type { ActionPanelProps } from "../types"
 
-/** Closes a work order, or a meeting already held. */
+/** Closes a work order (with its own detail: what, how many, for which event, due), or a meeting already held. */
 function CompleteCityTaskPanel({ caseId, arg, role, onClose }: ActionPanelProps) {
   const { c } = useCaseContext(caseId)
   const [note, setNote] = React.useState("")
@@ -19,6 +22,8 @@ function CompleteCityTaskPanel({ caseId, arg, role, onClose }: ActionPanelProps)
   const task = c.tasks.find((t) => t.id === arg)
   if (!task) return null
   const check = checkCompleteCityTask(c, arg, role)
+  const isWorkOrder = task.catalogId.startsWith("work_order:")
+  const detail = isWorkOrder ? workOrderDetail(c, task) : null
 
   function submit() {
     const result = dispatch({ type: "complete_city_task", taskId: arg as string, note: note.trim() || undefined }, `Marked "${task!.title}" done.`)
@@ -28,9 +33,21 @@ function CompleteCityTaskPanel({ caseId, arg, role, onClose }: ActionPanelProps)
 
   return (
     <>
-      <PanelHeader title={task.title} description={task.why || "Marks this task done."} />
+      <PanelHeader title={task.title} description={!isWorkOrder ? task.why || "Marks this task done." : undefined} />
       <PanelBody>
         {!check.ok ? <InlineAlert variant="warning">{check.reason}</InlineAlert> : null}
+        {detail ? (
+          <KeyValueList
+            items={[
+              { label: "For", value: detail.eventName },
+              { label: "Quantity", value: detail.quantity },
+              { label: "Event date", value: detail.eventDate ? fmtDate(detail.eventDate) : null },
+              { label: "Due", value: detail.due ? fmtDate(detail.due) : null },
+            ]}
+          />
+        ) : task.kind === "meeting" ? (
+          <p className="text-sm text-fg-secondary">{task.payload.scheduledFor ? `Scheduled for ${fmtDate(task.payload.scheduledFor)}.` : "Not yet scheduled."}</p>
+        ) : null}
         <Field label="Note" hint="Optional, kept on the task.">
           <Textarea rows={3} value={note} onChange={(e) => setNote(e.target.value)} />
         </Field>
