@@ -26,6 +26,8 @@ import {
   submittedOn,
   type DocumentRow,
 } from "@/lib/view/verify"
+import { vendorPermitGroup } from "@/lib/view/vendors"
+import { VendorsSection } from "@/components/case/vendors/VendorsSection"
 
 const STATUS_BADGE: Record<TaskStatus, { variant: "secondary" | "default" | "warning" | "success"; text: string }> = {
   locked: { variant: "secondary", text: "Locked" },
@@ -178,6 +180,9 @@ function DocumentsTab({ c, role, onOpen }: DocumentsTabProps) {
     )
   }
 
+  // Whether the case has food vendors at all (workstream 5D's "Vendors" group, appended below).
+  const hasVendors = vendorPermitGroup(c) !== null
+
   const ordered = orderGroupsForViewer(groups, role)
   const sections = ordered
     .map((group) => {
@@ -217,6 +222,7 @@ function DocumentsTab({ c, role, onOpen }: DocumentsTabProps) {
           ))}
         </div>
       )}
+      {hasVendors ? <VendorsSection c={c} /> : null}
     </div>
   )
 }
