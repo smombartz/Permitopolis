@@ -4,7 +4,7 @@
  * is enabled or disabled using the exact check transition() would run, so the reason always
  * matches what a dispatch would say.
  */
-import type { EventCase, Party } from "@/lib/types";
+import type { Dept, EventCase, Party } from "@/lib/types";
 import type { RulesCtx } from "@/lib/rules/types";
 import {
   checkAcceptAndSign,
@@ -19,6 +19,7 @@ import {
   checkIssuePermit,
   checkLogCloseout,
   checkReconcileClose,
+  checkRequestInfo,
   checkReviewDecide,
   checkSendQuote,
   checkSendToCommission,
@@ -67,17 +68,34 @@ function applicantActions(c: EventCase, ctx: RulesCtx): ActionAvailability[] {
   return items;
 }
 
+/**
+ * A department's own review: decide it, or ask the applicant for something while it is open.
+ * The Clerk has one too when the case is routed to it (the alcohol license).
+ */
+function reviewRows(c: EventCase, dept: Dept): ActionAvailability[] {
+  const review = c.reviews.find((r) => r.dept === dept);
+  if (!review) return [];
+  const items = [row("review_decide", "Decide your review", checkReviewDecide(c, dept), review.status === "pending")];
+  if (review.status === "pending" || review.status === "needs_info") items.push(row("request_info", "Request information", checkRequestInfo(c, dept)));
+  return items;
+}
+
 function clerkActions(c: EventCase, ctx: RulesCtx): ActionAvailability[] {
   const items: ActionAvailability[] = [];
   if (c.state === "submitted") {
     if (!c.flags.acceptedComplete) {
       items.push(row("accept_complete", "Accept as complete", checkAcceptComplete(c, ctx), true));
+      items.push(row("request_info", "Request information", checkRequestInfo(c, "clerk")));
       items.push(row("deny", "Deny", checkDeny(c)));
     } else {
       items.push(row("confirm_routing", "Confirm routing", checkConfirmRouting(c), true));
     }
   } else if (c.state === "in_review" || c.state === "needs_info") {
-    items.push(row("send_quote", "Send quote", checkSendQuote(c), true));
+    // The Clerk's own review comes before the quote, which waits for every review anyway.
+    const ownReview = c.reviews.find((r) => r.dept === "clerk");
+    const ownReviewOpen = ownReview?.status === "pending" || ownReview?.status === "needs_info";
+    if (ownReviewOpen) items.push(...reviewRows(c, "clerk"));
+    items.push(row("send_quote", "Send quote", checkSendQuote(c), !ownReviewOpen));
     items.push(row("send_to_commission", "Send to commission", checkSendToCommission(c)));
     items.push(row("deny", "Deny", checkDeny(c)));
     items.push(remindRow());
@@ -97,11 +115,8 @@ function clerkActions(c: EventCase, ctx: RulesCtx): ActionAvailability[] {
 }
 
 function reviewerActions(c: EventCase, role: "pws" | "hl"): ActionAvailability[] {
-  const items: ActionAvailability[] = [];
+  const items: ActionAvailability[] = reviewRows(c, role);
   const review = c.reviews.find((r) => r.dept === role);
-  if (review) {
-    items.push(row("review_decide", "Decide your review", checkReviewDecide(c, role), review.status === "pending"));
-  }
   if (role === "pws") {
     const canLogCloseout = checkLogCloseout(c);
     const hasCloseoutTasks = c.state === "closeout" || (c.tier === "instant" && c.state === "event_day");

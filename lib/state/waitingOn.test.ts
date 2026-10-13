@@ -56,6 +56,28 @@ describe("waitingOn", () => {
   });
 });
 
+describe("a waiting applicant's row says what their next card waits for", () => {
+  const locked = (suffix: string, unlocksOn: "quote_sent" | "event_day" | "invoice_issued" | "closed") =>
+    makeTask({ id: `PMT-27-0001:${suffix}`, catalogId: suffix, status: "locked", unlocksOn });
+  const applicant = (c: ReturnType<typeof makeCase>) => waitingOn(c, "2027-05-03").find((r) => r.party === "applicant");
+
+  it("a permitted picnic: Carry your permit is for the day of the event", () => {
+    const paid = makeTask({ id: "PMT-27-0001:pay_fees", catalogId: "pay_fees", kind: "payment", status: "done" });
+    const c = makeCase({ state: "permitted", tasks: [paid, locked("carry_permit", "event_day")] });
+    expect(applicant(c)).toMatchObject({ status: "waiting", note: "For the day of your event" });
+  });
+
+  it("in review: the card that unlocks first is the one named, wherever it sits in the list", () => {
+    const c = makeCase({ state: "in_review", tasks: [locked("carry_permit", "event_day"), locked("accept_and_sign", "quote_sent")] });
+    expect(applicant(c)?.note).toBe("Unlocks when your quote is ready");
+  });
+
+  it("in closeout: the final bill or refund", () => {
+    const c = makeCase({ state: "closeout", tasks: [locked("feedback", "closed"), locked("final_bill_or_refund", "invoice_issued")] });
+    expect(applicant(c)?.note).toBe("Unlocks when the City Clerk finishes reconciling costs");
+  });
+});
+
 describe("openTasks: oldest due first", () => {
   const card = (suffix: string, dueDate: string | null, extra: Partial<Parameters<typeof makeTask>[0]> = {}) =>
     makeTask({ id: `PMT-27-0001:${suffix}`, catalogId: suffix, title: suffix, dueDate, ...extra });
@@ -185,9 +207,26 @@ describe("nextMove: who goes after the party that is up", () => {
     expect(nextMove(c, "2027-05-03")).toBe("Next: Public Works & Safety inspects the cleanup, then City Clerk reconciles the costs and closes.");
   });
 
-  it("once the Clerk is up, the applicant's final bill is what follows", () => {
+  it("once the Clerk is up, the applicant's final bill or refund is what follows: nobody knows yet which", () => {
     const c = makeCase({ id: "PMT-27-0031", state: "closeout", tasks: [bill, feedback, { ...cleanup, status: "done" }, { ...reconcile, status: "todo", unlocksOn: null }] });
-    expect(nextMove(c, "2027-05-03")).toBe("Next: City Clerk reconciles the costs and closes, then The applicant pays the final bill.");
+    expect(nextMove(c, "2027-05-03")).toBe("Next: City Clerk reconciles the costs and closes, then The applicant gets the final bill or refund.");
+    // Once the Clerk has closed with a bill owed, the card is open and it is a bill to pay.
+    const billed = makeCase({ id: "PMT-27-0031", state: "closeout", tasks: [{ ...bill, status: "todo", unlocksOn: null }] });
+    expect(nextMove(billed, "2027-05-03")).toBe("Next: The applicant pays the final bill.");
+  });
+
+  it("a Draft with no board yet: the applicant finishes the plan", () => {
+    expect(nextMove(makeCase({ state: "draft" }), "2027-05-03", "Sunrise Yoga Club")).toBe("Next: Sunrise Yoga Club finishes the plan.");
+  });
+
+  it("three parties up at once read as a list", () => {
+    const permit = makeTask({ id: "PMT-27-0070:vendor_health_permit:1", catalogId: "vendor_health_permit", title: "Health permit: Market Stall 1" });
+    const pws = makeTask({ id: "PMT-27-0070:review:pws", catalogId: "review:pws", owner: "pws", kind: "review" });
+    const hl = makeTask({ id: "PMT-27-0070:review:hl", catalogId: "review:hl", owner: "hl", kind: "review" });
+    const c = makeCase({ id: "PMT-27-0070", state: "in_review", tasks: [permit, pws, hl] });
+    expect(nextMove(c, "2027-05-03")).toBe(
+      "Next: The applicant uploads the health permit: Market Stall 1, Public Works & Safety reviews its sections, and Health & Legal reviews its sections.",
+    );
   });
 
   it("a task parked on something specific (payment and verification) goes before one waiting on a later stage", () => {

@@ -198,6 +198,34 @@ describe("schedule_meeting and complete_city_task", () => {
     expect(result.case.tasks.find((t) => t.id === scheduler.id)?.status).toBe("done");
   });
 
+  it("a meeting can be moved to another day, and the scheduling is done only once", () => {
+    const meeting = makeTask({ id: "PMT-27-0001:pre_application_meeting", catalogId: "pre_application_meeting", kind: "meeting", reviewer: "clerk" });
+    const scheduler = makeTask({ id: "PMT-27-0001:schedule_pre_application_meeting", catalogId: "schedule_pre_application_meeting", owner: "clerk", kind: "meeting" });
+    const first = transition(makeCase({ state: "in_review", tasks: [meeting, scheduler] }), { type: "schedule_meeting", taskId: meeting.id, date: "2027-05-10" }, "clerk", makeCtx());
+    const moved = first.ok ? transition(first.case, { type: "schedule_meeting", taskId: meeting.id, date: "2027-05-12" }, "clerk", makeCtx()) : first;
+    expect(moved.ok).toBe(true);
+    if (!moved.ok) return;
+    expect(moved.case.tasks.find((t) => t.id === meeting.id)?.payload.scheduledFor).toBe("2027-05-12");
+    expect(moved.case.tasks.find((t) => t.id === scheduler.id)?.history.filter((h) => h.status === "done")).toHaveLength(1);
+
+    const held = transition(moved.case, { type: "complete_city_task", taskId: meeting.id }, "clerk", makeCtx());
+    expect(held.ok && held.case.tasks.find((t) => t.id === meeting.id)?.status).toBe("done");
+    expect(held.ok && transition(held.case, { type: "schedule_meeting", taskId: meeting.id, date: "2027-05-14" }, "clerk", makeCtx())).toEqual({ ok: false, reason: "That meeting has already been held." });
+  });
+
+  it("holding the pre-application meeting without scheduling it first still clears the Clerk's scheduling task", () => {
+    const meeting = makeTask({ id: "PMT-27-0001:pre_application_meeting", catalogId: "pre_application_meeting", kind: "meeting", reviewer: "clerk" });
+    const scheduler = makeTask({ id: "PMT-27-0001:schedule_pre_application_meeting", catalogId: "schedule_pre_application_meeting", owner: "clerk", kind: "meeting" });
+    const held = transition(makeCase({ state: "in_review", tasks: [meeting, scheduler] }), { type: "complete_city_task", taskId: meeting.id }, "clerk", makeCtx());
+    expect(held.ok).toBe(true);
+    if (!held.ok) return;
+    // A meeting that was held no longer needs a date: nothing is left in the Clerk's queue.
+    expect(held.case.tasks.map((t) => [t.catalogId, t.status])).toEqual([
+      ["pre_application_meeting", "done"],
+      ["schedule_pre_application_meeting", "done"],
+    ]);
+  });
+
   it("complete_city_task finishes a city-owned task", () => {
     const workOrder = makeTask({ id: "PMT-27-0097:work_order:barricades", catalogId: "work_order:barricades", owner: "pws", kind: "action" });
     const c = makeCase({ state: "permitted", tasks: [workOrder] });

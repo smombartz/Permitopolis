@@ -6,6 +6,7 @@ import { addDaysISO, daysBetween } from "@/lib/dates";
 import { fmtMoney } from "@/lib/format";
 import { cancellationRefund, classify, dueDate, estimateFees, requirements } from "@/lib/rules";
 import { CARD_BY_ID, type CardSpec } from "@/lib/rules/catalog";
+import { round2 } from "@/lib/rules/shared";
 import type { FeeEstimate, RulesCtx } from "@/lib/rules/types";
 import type { Actor, DateHold, EventAnswers, EventCase, Task } from "@/lib/types";
 import type { Action } from "../actions";
@@ -330,8 +331,8 @@ export function cancel(c: EventCase, _action: Extract_<"cancel">, actor: Actor, 
   const result = cancellationRefund(c, ctx.today, ctx.cfg);
   const depositPaid = c.feeLines.filter((f) => f.kind === "deposit").reduce((s, f) => s + f.estimate, 0);
   // The schedule works from the fee lines, which for a series cover sessions not yet paid for.
-  // A refund never exceeds what the applicant has paid.
-  const refund = Math.min(result.refund + depositPaid, Math.max(0, totalPaid(c)));
+  // A refund never exceeds what the applicant has paid. To the cent, like every amount.
+  const refund = Math.min(round2(result.refund + depositPaid), Math.max(0, totalPaid(c)));
   let next: EventCase = { ...c, ending: "cancelled", endingReason: result.rule, dateHold: releaseHold(c) };
   if (refund > 0) {
     next = {

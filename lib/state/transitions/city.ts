@@ -193,13 +193,18 @@ export function scheduleMeeting(c: EventCase, action: Extract_<"schedule_meeting
   // Always the applicant's meeting card, also when the Clerk's scheduler task was named.
   const task = meetingCardFor(c, action.taskId) as Task;
   let next = patchTask(c, task.id, { payload: { ...task.payload, scheduledFor: action.date } });
-  if (task.catalogId === "pre_application_meeting") {
-    const scheduler = findTask(next, taskId(next.id, "schedule_pre_application_meeting"));
-    // A meeting can be moved to another day; the scheduling itself is done only once.
-    if (scheduler && scheduler.status !== "done") next = moveTask(next, scheduler.id, "done", ctx, actor);
-  }
+  if (task.catalogId === "pre_application_meeting") next = finishScheduling(next, ctx, actor);
   next = appendActivity(next, actor, `Scheduled "${task.title}" for ${fmtDate(action.date)}.`, ctx);
   return { ok: true, case: next };
+}
+
+/**
+ * Closes the Clerk's "Schedule the pre-application meeting" task. A meeting can be moved to
+ * another day, so this is done only once, the first time it is scheduled (or held).
+ */
+function finishScheduling(c: EventCase, ctx: RulesCtx, actor: Actor): EventCase {
+  const scheduler = findTask(c, taskId(c.id, "schedule_pre_application_meeting"));
+  return scheduler && scheduler.status !== "done" ? moveTask(c, scheduler.id, "done", ctx, actor) : c;
 }
 
 export function completeCityTask(c: EventCase, action: Extract_<"complete_city_task">, actor: Actor, ctx: RulesCtx): TransitionResult {
@@ -211,6 +216,8 @@ export function completeCityTask(c: EventCase, action: Extract_<"complete_city_t
   // sits "With the city" with nobody tasked.
   const card = cardUnderVerification(next, task);
   if (card) next = acceptCard(next, card, ctx, actor);
+  // A pre-application meeting that was held needs no date any more, scheduled or not.
+  if (task.catalogId === "pre_application_meeting") next = finishScheduling(next, ctx, actor);
   next = appendActivity(next, actor, `Completed "${task.title}".`, ctx);
   return { ok: true, case: next };
 }
