@@ -26,6 +26,8 @@ describe("CheckoutScreen: BOOKING (demo path 1)", () => {
     expect(screen.getByText("Field reservation")).toBeInTheDocument();
     const payButton = screen.getByRole("button", { name: "Pay $20" });
     expect(payButton).toBeInTheDocument();
+    // What is charged now vs. later: the first session plus fees here, the other 12 on schedule.
+    expect(screen.getByText("Then $20 per session for the 12 remaining sessions, billed on their own date.")).toBeInTheDocument();
 
     await user.click(payButton);
     expect(screen.getByRole("button", { name: "Processing…" })).toBeInTheDocument();

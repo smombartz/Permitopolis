@@ -46,7 +46,7 @@ function VendorStackSheet({ stack, onSelectTask }: VendorStackSheetProps) {
               key={task.id}
               type="button"
               onClick={() => onSelectTask(task.id)}
-              className="flex items-center justify-between gap-2 rounded-control border border-line-subtle bg-surface-2 px-3 py-2.5 text-left text-sm outline-none transition-colors duration-[var(--dur-fast)] ease-frost hover:bg-surface-hover focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring"
+              className="flex min-h-11 items-center justify-between gap-2 rounded-control border border-line-subtle bg-surface-2 px-3 py-3 text-left text-sm outline-none transition-colors duration-[var(--dur-fast)] ease-frost hover:bg-surface-hover focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring"
             >
               <span className="flex min-w-0 items-center gap-2">
                 <Icon className={task.status === "done" ? "size-3.5 shrink-0 text-success-fg" : "size-3.5 shrink-0 text-fg-label"} aria-hidden="true" />

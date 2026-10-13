@@ -2,6 +2,7 @@
  * Pure view-models for My events (/events) and the applicant board (/events/[id]).
  * Nothing here reads the store or dispatches; screens pass in cases, today and cfg.
  */
+import { addDaysISO, daysBetween } from "@/lib/dates";
 import { fmtDate, fmtMoney } from "@/lib/format";
 import { classify, estimateFees } from "@/lib/rules";
 import { CARD_BY_ID, type CatalogId } from "@/lib/rules/catalog";
@@ -11,6 +12,8 @@ import {
   applicantCases,
   boardColumn,
   boardColumns,
+  cardUnderVerification,
+  closeoutSettlement,
   eventDate,
   hasActivePermit,
   taskDueDate,
@@ -337,6 +340,136 @@ export function unlockHintFor(catalogId: string): string | undefined {
 }
 
 /* ---------------------------------------------------------------------- */
+/* After the event: Closeout's "what's happening" line and the settlement  */
+/* ---------------------------------------------------------------------- */
+
+/**
+ * What is happening in Closeout before the Clerk reconciles (PRD "After the event"): the board
+ * says plainly who has the case next, instead of leaving it a silent wait. Null once reconciled
+ * (`closeoutSettlement` then has the answer) or outside Closeout altogether.
+ */
+export function closeoutStatusLine(c: EventCase): string | null {
+  if (c.state !== "closeout" || c.closeout.balance !== null) return null;
+  return c.closeout.hoursLoggedOn === null
+    ? "Public Works & Safety is checking cleanup; the City Clerk then reconciles costs."
+    : "Public Works & Safety logged the cleanup; the City Clerk is reconciling costs.";
+}
+
+export interface FinalSettlement {
+  /** "how it settled", in one sentence: a refund kept in part, or a balance owed. */
+  sentence: string;
+  /** When a balance is still owed and the final-bill card names a due date. */
+  due: ISODate | null;
+  /** Where to pay it, while the final-bill card is still open. Null once paid or refunded. */
+  payHref: string | null;
+}
+
+/**
+ * How Closeout settled (PRD "the final bill or refund card shows... how it settled"), from
+ * `closeoutSettlement()`: the deposit kept in part and the rest refunded, or a balance owed
+ * with its due date and the way to pay. Null until the Clerk reconciles.
+ */
+export function finalSettlement(c: EventCase): FinalSettlement | null {
+  if (c.closeout.balance === null) return null;
+  const s = closeoutSettlement(c);
+  if (s.refund !== null) {
+    const sentence =
+      s.over > 0
+        ? `Your event ran ${fmtMoney(s.over)} over the estimate, kept from your ${fmtMoney(s.deposit)} deposit; ${fmtMoney(s.refund)} was refunded.`
+        : `Your event came in at or under the estimate. Your full ${fmtMoney(s.deposit)} deposit was refunded.`;
+    return { sentence, due: null, payHref: null };
+  }
+  const billTask = c.tasks.find((t) => t.catalogId === "final_bill_or_refund");
+  const due = billTask ? taskDueDate(billTask) : null;
+  const owed = billTask?.status !== "done";
+  return {
+    sentence: `Your event ran ${fmtMoney(s.over)} over the estimate. Your ${fmtMoney(s.deposit)} deposit covered part of it; ${fmtMoney(s.bill ?? 0)} is${owed ? "" : " was"} still owed${due && owed ? ` by ${fmtDate(due)}` : ""}.`,
+    due,
+    payHref: owed ? routes.quote(c.id, { pay: "final" }) : null,
+  };
+}
+
+/** The date "Book again next year" drafts for: the same weekday a year later (`bookAgain()`'s own +364 days). */
+export function bookAgainDraftDate(c: EventCase): ISODate | null {
+  return c.schedule ? addDaysISO(c.schedule.date, 364) : null;
+}
+
+/* ---------------------------------------------------------------------- */
+/* "With the city": who has it, how long, and when it is expected back     */
+/* ---------------------------------------------------------------------- */
+
+export interface WithCityInfo {
+  dept: Dept;
+  deptLabel: string;
+  daysWaiting: number;
+  expectedBy: ISODate | null;
+  overdue: boolean;
+}
+
+/** The day a card most recently became "with the city": its last move to `submitted`. */
+function submittedOn(task: Task): ISODate | null {
+  return [...task.history].reverse().find((h) => h.status === "submitted")?.at.slice(0, 10) ?? null;
+}
+
+/**
+ * Who has a "With the city" card, how many days it has waited, and the expected-by date the
+ * reviewer's own task carries (the review's due date while its review is still open, or the
+ * card's own `verify:*` task's due date once the review has decided) — so "With the city" is
+ * never a black hole. Null for a card with nobody tasked yet (should not happen; see the
+ * readme, "A card 'With the city' always has someone tasked").
+ */
+export function withCityInfo(c: EventCase, task: Task, today: ISODate): WithCityInfo | null {
+  const dept = task.reviewer;
+  if (!dept) return null;
+  const since = submittedOn(task) ?? task.dueDate ?? today;
+  const daysWaiting = Math.max(0, daysBetween(since, today));
+
+  const verifyTask = c.tasks.find((t) => t.catalogId.startsWith("verify:") && cardUnderVerification(c, t)?.id === task.id);
+  let expectedBy: ISODate | null = null;
+  if (verifyTask) {
+    expectedBy = taskDueDate(verifyTask);
+  } else {
+    const review = c.reviews.find((r) => r.dept === dept);
+    if (review && (review.status === "pending" || review.status === "needs_info")) expectedBy = review.dueDate;
+  }
+
+  return {
+    dept,
+    deptLabel: PARTY_LABEL[dept],
+    daysWaiting,
+    expectedBy,
+    overdue: expectedBy !== null && expectedBy < today,
+  };
+}
+
+export interface WithCitySummaryRow {
+  dept: Dept;
+  deptLabel: string;
+  count: number;
+  /** The soonest expected-by date among this department's cards; null when none has one. */
+  expectedBy: ISODate | null;
+}
+
+/**
+ * The "With the city" column's own summary line, one row per department holding a card
+ * ("2 documents with Health & Legal, expected by Fri, May 7"), so the column says at a glance
+ * who has what and when it is expected back.
+ */
+export function withCityColumnSummary(c: EventCase, today: ISODate): WithCitySummaryRow[] {
+  const cards = boardColumns(c).with_city;
+  const byDept = new Map<Dept, { count: number; expectedBy: ISODate | null }>();
+  for (const task of cards) {
+    const info = withCityInfo(c, task, today);
+    if (!info) continue;
+    const row = byDept.get(info.dept) ?? { count: 0, expectedBy: null };
+    row.count += 1;
+    if (info.expectedBy && (!row.expectedBy || info.expectedBy < row.expectedBy)) row.expectedBy = info.expectedBy;
+    byDept.set(info.dept, row);
+  }
+  return DEPTS.filter((d) => byDept.has(d)).map((dept) => ({ dept, deptLabel: PARTY_LABEL[dept], ...byDept.get(dept)! }));
+}
+
+/* ---------------------------------------------------------------------- */
 /* Series session schedule                                                 */
 /* ---------------------------------------------------------------------- */
 
@@ -360,6 +493,20 @@ export function seriesSessions(c: EventCase, cfg: RulesConfig): SessionRow[] {
       amount: perSession,
       payHref: canPaySession(c, o.date) ? routes.quote(c.id, { pay: "session", date: o.date }) : null,
     }));
+}
+
+export interface SeriesTotals {
+  /** Every session already paid (the booking or quote's first session, plus each one paid since). */
+  paid: number;
+  /** Due and upcoming sessions together: what the series still asks for, skipped ones excluded. */
+  outstanding: number;
+}
+
+/** The series schedule's own totals (PRD "Series... with the total paid and outstanding"). */
+export function seriesTotals(c: EventCase, cfg: RulesConfig): SeriesTotals {
+  const rows = seriesSessions(c, cfg);
+  const sum = (billings: Occurrence["billing"][]) => rows.filter((r) => billings.includes(r.billing)).reduce((s, r) => s + r.amount, 0);
+  return { paid: sum(["paid"]), outstanding: sum(["due", "upcoming"]) };
 }
 
 /* ---------------------------------------------------------------------- */

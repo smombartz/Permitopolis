@@ -1,10 +1,12 @@
 "use client"
 
+import { cn } from "cn"
 import { useRouter } from "next/navigation"
 import { StackedTaskCard, TaskCard } from "@/components/domain/TaskCard"
 import { CountBadge } from "@/components/ui/count-badge"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { useIsNarrow } from "@/components/shell"
+import { fmtDateShort, plural } from "@/lib/format"
 import type { BoardColumn } from "@/lib/state/types"
 import type { EventCase, ISODate, Task } from "@/lib/types"
 import {
@@ -14,8 +16,11 @@ import {
   opensSessionSchedule,
   phaseGroups,
   unlockHintFor,
+  withCityColumnSummary,
+  withCityInfo,
   type ColumnEntry,
   type StackedCards,
+  type WithCityInfo,
 } from "@/lib/view/board"
 
 const COLUMN_ORDER: BoardColumn[] = ["do_now", "with_city", "coming_up", "done"]
@@ -27,6 +32,36 @@ const EMPTY_TEXT: Record<BoardColumn, string> = {
   done: "Nothing done yet.",
 }
 
+/**
+ * What a "With the city" card says under itself, so the column is never a black hole (PRD,
+ * "Where I'd push on the brief"): who has it, how long, and when it is expected back, or that
+ * there is no expected date yet.
+ */
+function WithCityNote({ info }: { info: WithCityInfo }) {
+  const waited = `${plural(info.daysWaiting, "day")} with ${info.deptLabel}`
+  const expected = info.expectedBy ? `expected by ${fmtDateShort(info.expectedBy)}` : "no expected date yet"
+  return (
+    <p className={cn("px-0.5 text-xs", info.overdue ? "font-semibold text-danger-fg" : "text-fg-secondary")}>
+      {info.overdue ? `Overdue with ${info.deptLabel} · ${expected}` : `${waited} · ${expected}`}
+    </p>
+  )
+}
+
+/** The "With the city" column's own summary line: who has what, and when it is expected back. */
+function WithCitySummary({ c, today }: { c: EventCase; today: ISODate }) {
+  const rows = withCityColumnSummary(c, today)
+  if (rows.length === 0) return null
+  return (
+    <div className="flex flex-col gap-0.5 rounded-control bg-surface-soft px-3 py-2 text-xs text-fg-secondary" data-slot="with-city-summary">
+      {rows.map((row) => (
+        <p key={row.dept}>
+          {plural(row.count, "card")} with {row.deptLabel}, {row.expectedBy ? `expected by ${fmtDateShort(row.expectedBy)}` : "no expected date yet"}
+        </p>
+      ))}
+    </div>
+  )
+}
+
 interface EntryListProps {
   entries: ColumnEntry[]
   today: ISODate
@@ -34,9 +69,11 @@ interface EntryListProps {
   onSelect: (task: Task) => void
   onSelectStack: (stack: StackedCards) => void
   grid?: boolean
+  /** Set only for the "With the city" column: annotates each card with who has it and for how long. */
+  cityInfoFor?: (task: Task) => WithCityInfo | null
 }
 
-function EntryList({ entries, today, emptyText, onSelect, onSelectStack, grid = false }: EntryListProps) {
+function EntryList({ entries, today, emptyText, onSelect, onSelectStack, grid = false, cityInfoFor }: EntryListProps) {
   if (entries.length === 0) {
     return <p className="rounded-panel border border-dashed border-line-subtle bg-surface-soft px-3 py-6 text-center text-xs text-fg-secondary">{emptyText}</p>
   }
@@ -46,13 +83,13 @@ function EntryList({ entries, today, emptyText, onSelect, onSelectStack, grid = 
         entry.kind === "stack" ? (
           <StackedTaskCard key={entry.catalogId} title={entry.title} done={entry.done} total={entry.total} onSelect={() => onSelectStack(entry)} />
         ) : (
-          <TaskCard
-            key={entry.task.id}
-            task={entry.task}
-            today={today}
-            unlockHint={unlockHintFor(entry.task.catalogId)}
-            onSelect={() => onSelect(entry.task)}
-          />
+          <div key={entry.task.id} className="flex flex-col gap-1.5">
+            <TaskCard task={entry.task} today={today} unlockHint={unlockHintFor(entry.task.catalogId)} onSelect={() => onSelect(entry.task)} />
+            {cityInfoFor ? (() => {
+              const info = cityInfoFor(entry.task)
+              return info ? <WithCityNote info={info} /> : null
+            })() : null}
+          </div>
         ),
       )}
     </div>
@@ -124,8 +161,16 @@ function BoardColumns({ c, today, grouping, activeTab, onActiveTabChange, onOpen
           ))}
         </TabsList>
         {COLUMN_ORDER.map((col) => (
-          <TabsContent key={col} value={col} className="pt-3">
-            <EntryList entries={grouped[col]} today={today} emptyText={EMPTY_TEXT[col]} onSelect={handleSelect} onSelectStack={onOpenStack} />
+          <TabsContent key={col} value={col} className="flex flex-col gap-3 pt-3">
+            {col === "with_city" ? <WithCitySummary c={c} today={today} /> : null}
+            <EntryList
+              entries={grouped[col]}
+              today={today}
+              emptyText={EMPTY_TEXT[col]}
+              onSelect={handleSelect}
+              onSelectStack={onOpenStack}
+              cityInfoFor={col === "with_city" ? (task) => withCityInfo(c, task, today) : undefined}
+            />
           </TabsContent>
         ))}
       </Tabs>
@@ -140,7 +185,15 @@ function BoardColumns({ c, today, grouping, activeTab, onActiveTabChange, onOpen
             <h3 className="text-sm font-bold text-fg">{COLUMN_LABEL[col]}</h3>
             <CountBadge count={grouped[col].length} />
           </div>
-          <EntryList entries={grouped[col]} today={today} emptyText={EMPTY_TEXT[col]} onSelect={handleSelect} onSelectStack={onOpenStack} />
+          {col === "with_city" ? <WithCitySummary c={c} today={today} /> : null}
+          <EntryList
+            entries={grouped[col]}
+            today={today}
+            emptyText={EMPTY_TEXT[col]}
+            onSelect={handleSelect}
+            onSelectStack={onOpenStack}
+            cityInfoFor={col === "with_city" ? (task) => withCityInfo(c, task, today) : undefined}
+          />
         </div>
       ))}
     </div>

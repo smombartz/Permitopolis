@@ -13,6 +13,7 @@ import { EndingBanner } from "@/components/domain/EndingBanner"
 import { PartyChip } from "@/components/domain/PartyChip"
 import { ReviewStatusDot } from "@/components/domain/ReviewStatusDot"
 import { CaseNotFound, useIsNarrow } from "@/components/shell"
+import { Banner } from "@/components/ui/banner"
 import { Button } from "@/components/ui/button"
 import { EmptyState } from "@/components/ui/empty-state"
 import { BackLink, PageHeader } from "@/components/ui/page-header"
@@ -25,6 +26,7 @@ import type { BoardColumn } from "@/lib/state/types"
 import type { EventCase } from "@/lib/types"
 import {
   boardColumnsGrouped,
+  closeoutStatusLine,
   dateHoldFootnote,
   isUnplannedDraft,
   permitHrefFor,
@@ -166,6 +168,7 @@ function BoardScreen() {
       />
 
       {c.ending ? <EndingBanner ending={c.ending} reason={c.endingReason} /> : <StatusStrip c={c} />}
+      {!c.ending && closeoutStatusLine(c) ? <Banner data-slot="closeout-status">{closeoutStatusLine(c)}</Banner> : null}
 
       {!c.ending ? (
         <div className="flex items-center justify-between gap-3">

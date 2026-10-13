@@ -231,21 +231,50 @@ describe("buildResultPanel and the late fee flag", () => {
 });
 
 describe("dateGateSatisfied", () => {
+  // S1's answers, 19 days out with amplified sound added: Reviewed needs 30 (same case
+  // lateFeeCarriesDate uses below), so the gate really does offer the late fee as a fix.
+  const tooClose: EventAnswers = {
+    ...baseAnswers,
+    addOns: { ...EMPTY_ADDONS, amplifiedSound: true },
+    schedule: { date: "2027-05-22", start: "11:00", end: "16:00", occurrences: [] },
+  };
+
   it("passes outright when the gate already passes", () => {
-    expect(dateGateSatisfied({ ok: true } as never, false)).toBe(true);
+    const gate = dateGate(baseAnswers, classify(baseAnswers, DEFAULT_CONFIG), ctx);
+    expect(gate.ok).toBe(true);
+    expect(dateGateSatisfied(gate, false)).toBe(true);
   });
 
   it("a lead-time-only failure clears once the late fee is chosen", () => {
-    const gate = { ok: false, availability: { status: "open" } } as never;
+    const gate = buildResultPanel(tooClose, ctx).dateGate;
+    expect(gate.fixes).toContain("late_fee");
     expect(dateGateSatisfied(gate, false)).toBe(false);
     expect(dateGateSatisfied(gate, true)).toBe(true);
   });
 
   it("a booked or blacked-out date never clears with the late fee alone", () => {
-    const booked = { ok: false, availability: { status: "booked" } } as never;
-    expect(dateGateSatisfied(booked, true)).toBe(false);
-    const blackout = { ok: false, availability: { status: "blackout" } } as never;
-    expect(dateGateSatisfied(blackout, true)).toBe(false);
+    // Shelter 2 is blacked out on this date in the seed (see the readme, "Where the seed
+    // differs from the PRD's wording"); the gate then offers only a new date.
+    const blackedOut: EventAnswers = {
+      ...baseAnswers,
+      location: { mode: "inventory", inventoryIds: ["shelter-2"], segmentIds: [], capacity: 40, label: "Shelter 2, Riverside Park" },
+      schedule: { date: "2027-05-31", start: "11:00", end: "16:00", occurrences: [] },
+    };
+    const gate = buildResultPanel(blackedOut, ctx).dateGate;
+    expect(gate.availability.status).toBe("blackout");
+    expect(gate.fixes).not.toContain("late_fee");
+    expect(dateGateSatisfied(gate, true)).toBe(false);
+  });
+
+  it("a date already in the past never clears with the late fee, even though nothing else is wrong with it", () => {
+    // Regression: the old check read the availability status alone and missed
+    // `cfg.lateFee.minDaysBeforeEvent`, so a stale or back-dated draft with the flag still on
+    // could slip through even though the real gate never offers the fee for it.
+    const inThePast: EventAnswers = { ...tooClose, schedule: { ...tooClose.schedule!, date: "2027-04-01" } };
+    const gate = buildResultPanel(inThePast, ctx).dateGate;
+    expect(gate.daysUntil).toBeLessThan(0);
+    expect(gate.fixes).not.toContain("late_fee");
+    expect(dateGateSatisfied(gate, true)).toBe(false);
   });
 });
 

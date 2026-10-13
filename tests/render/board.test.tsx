@@ -11,6 +11,7 @@ const S3 = "PMT-27-0118";
 const S4 = "PMT-27-0126";
 const S5 = "PMT-27-0097";
 const S6 = "PMT-27-0031";
+const B16 = "PMT-27-0034"; // Riverside Tai Chi Circle, Instant series, Event day today
 const WITHDRAWN = "PMT-27-0048";
 
 describe("the board (S3): one pinned request stands between it and its quote", () => {
@@ -97,6 +98,29 @@ describe("the board (S5): sign-off and payment cards link to the quote route", (
   });
 });
 
+describe("the board (B16): a series' session schedule", () => {
+  it("shows the total paid and outstanding, and a way to pay the session that is due", async () => {
+    const { user } = await renderScreen(<BoardScreen />, { role: "applicant", personaId: "riverside-tai-chi-circle", path: routes.event(B16) });
+
+    // Instant events show the payment card as "Pay and book"; it opens the schedule once paid.
+    await user.click(screen.getByRole("button", { name: /Pay and book/ }));
+
+    const dialog = screen.getByRole("dialog");
+    const stats = dialog.querySelectorAll('[data-slot="stat"]');
+    expect(Array.from(stats).map((s) => s.textContent)).toEqual([expect.stringContaining("Paid"), expect.stringContaining("Outstanding")]);
+    expect(within(dialog).getByRole("link", { name: /Pay the session due/ })).toBeInTheDocument();
+  });
+});
+
+describe('the board (S5): "With the city" is never a black hole', () => {
+  it("names Health & Legal, how many days it has waited, and the expected-by date", async () => {
+    await renderScreen(<BoardScreen />, { role: "applicant", personaId: "riverfront-running-club", path: routes.event(S5) });
+
+    expect(screen.getByText("1 card with Health & Legal, expected by Fri, May 7")).toBeInTheDocument();
+    expect(screen.getByText(/3 days with Health & Legal · expected by Fri, May 7/)).toBeInTheDocument();
+  });
+});
+
 describe("the board (S6): after the event", () => {
   it("shows the final bill and feedback coming up", async () => {
     await renderScreen(<BoardScreen />, { role: "applicant", personaId: "main-street-business-alliance", path: routes.event(S6) });
@@ -106,6 +130,57 @@ describe("the board (S6): after the event", () => {
     expect(within(comingUpColumn).getByText("Final bill or refund")).toBeInTheDocument();
     expect(within(comingUpColumn).getByText("Tell us how it went")).toBeInTheDocument();
   });
+
+  it("before the hours are logged, the board says plainly who has it", async () => {
+    await renderScreen(<BoardScreen />, { role: "applicant", personaId: "main-street-business-alliance", path: routes.event(S6) });
+    expect(screen.getByText("Public Works & Safety is checking cleanup; the City Clerk then reconciles costs.")).toBeInTheDocument();
+  });
+
+  it("demo path 6's applicant ending: the final refund, feedback, and book again to the Apr 22, 2028 draft", async () => {
+    const dialog = () => within(screen.getByRole("dialog"));
+    const { user } = await renderScreen(<BoardScreen />, { role: "applicant", personaId: "main-street-business-alliance", path: routes.event(S6) });
+
+    // Public Works & Safety logs 72 officer-hours and 4 crew-hours; the Clerk then reconciles
+    // $750 over the estimate and refunds $250 from the $1,000 deposit (the PRD's path 6).
+    const police = storedCase(S6).feeLines.find((f) => f.label === "Police")!;
+    act(() => {
+      useDemo.getState().dispatch(
+        S6,
+        {
+          type: "log_closeout",
+          cleanup: "pass",
+          actuals: [{ feeLineId: police.id, qty: 72 }],
+          extraLines: [{ dept: "pws", label: "Cleanup crew", qty: 4, unit: "worker-hour", unitPrice: useDemo.getState().cfg.fees.cleanupCrewPerWorkerHour }],
+        },
+        "pws",
+      );
+      useDemo.getState().dispatch(S6, { type: "reconcile_close" }, "clerk");
+    });
+    expect(storedCase(S6).closeout).toMatchObject({ balance: 750, refund: 250 });
+    expect(storedCase(S6).state).toBe("closed");
+
+    await user.click(screen.getByRole("button", { name: /Final bill or refund/ }));
+    expect(dialog().getByText("Your event ran $750 over the estimate, kept from your $1,000 deposit; $250 was refunded.")).toBeInTheDocument();
+    expect(dialog().getAllByRole("columnheader", { name: "Actual" }).length).toBeGreaterThan(0);
+    await user.click(screen.getByRole("button", { name: "Close" }));
+
+    await user.click(screen.getByRole("button", { name: /Tell us how it went/ }));
+    await user.click(dialog().getAllByRole("radio")[4]);
+    await user.click(dialog().getByRole("button", { name: "Send feedback" }));
+    expect(storedCase(S6).closeout.feedback).toMatchObject({ rating: 5 });
+
+    await user.click(screen.getByRole("button", { name: /Book again next year/ }));
+    expect(dialog().getByText(/drafted for Sat, Apr 22, 2028/)).toBeInTheDocument();
+    await user.click(dialog().getByRole("button", { name: "Book again next year" }));
+
+    const pushed = lastPush();
+    expect(pushed).toMatch(/^\/apply\?case=/);
+    const newId = new URLSearchParams(pushed!.split("?")[1]).get("case")!;
+    const draft = storedCase(newId);
+    expect(draft.clonedFrom).toBe(S6);
+    expect(draft.state).toBe("draft");
+    expect(draft.schedule?.date).toBe("2028-04-22");
+  }, 15000); // Many interactions in one flow, end to end; generous under load.
 });
 
 describe("the board's card sheet: a card the applicant no longer holds", () => {
