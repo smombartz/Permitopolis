@@ -1,6 +1,8 @@
 /**
  * dateGate(): the lead-time and availability gate, with the fixes to offer
- * when it fails.
+ * when it fails. A gate that passes offers none. A date that is too close offers
+ * a new date, dropping an add-on (when one lowers the tier far enough) and the
+ * late fee; a date that is booked or blacked out offers only a new date.
  */
 import { addDaysISO, daysBetween } from "@/lib/dates";
 import type { Availability, EventAnswers, ISODate } from "@/lib/types";
@@ -36,23 +38,30 @@ function earliestOpenDate(a: EventAnswers, cls: Classification, ctx: RulesCtx, i
 }
 
 export const dateGate = (a: EventAnswers, cls: Classification, ctx: RulesCtx, ignoreCaseId?: string): DateGate => {
-  const eventDate = a.schedule?.date ?? ctx.today;
-  const daysUntil = daysBetween(ctx.today, eventDate);
-  const leadTimeOk = daysUntil >= cls.leadTimeDays;
+  // With no date chosen yet there is nothing to measure: the gate neither passes a date nor
+  // fails one, and offers no fix. `daysUntil` is 0 then and means nothing.
+  const hasDate = !!a.schedule;
+  const daysUntil = a.schedule ? daysBetween(ctx.today, a.schedule.date) : 0;
+  const leadTimeOk = !hasDate || daysUntil >= cls.leadTimeDays;
 
   const occs = a.location && a.schedule ? occurrences(a.schedule, a.location, ctx, ignoreCaseId) : [];
   const availabilityResult = worstAvailability(occs);
   const availabilityOk = availabilityResult.status === "open" || availabilityResult.status === "impacted";
   const ok = leadTimeOk && availabilityOk;
 
-  const droppable = whatIf(a, ctx.cfg)
-    .filter((w) => daysUntil >= ctx.cfg.leadTimeDays[w.tier])
-    .map((w) => w.triggerId);
+  // Dropping an add-on and paying a late fee both answer a date that is too close. Neither
+  // frees a date that is booked or blacked out, so then only a new date is offered.
+  const tooCloseOnly = !leadTimeOk && availabilityOk;
+  const droppable = tooCloseOnly
+    ? whatIf(a, ctx.cfg)
+        .filter((w) => daysUntil >= ctx.cfg.leadTimeDays[w.tier])
+        .map((w) => w.triggerId)
+    : [];
 
   const fixes: DateFix[] = [];
   if (!ok) fixes.push("new_date");
   if (droppable.length > 0) fixes.push("drop_addon");
-  if (!leadTimeOk && availabilityOk && daysUntil >= ctx.cfg.lateFee.minDaysBeforeEvent) fixes.push("late_fee");
+  if (tooCloseOnly && daysUntil >= ctx.cfg.lateFee.minDaysBeforeEvent) fixes.push("late_fee");
 
   const feeLines = estimateFees(a, cls, ctx.cfg).lines.filter((l) => l.kind === "fee");
   const lateFeeAmount = round2(feeLines.reduce((sum, l) => sum + l.estimate, 0) * ctx.cfg.lateFee.rate);

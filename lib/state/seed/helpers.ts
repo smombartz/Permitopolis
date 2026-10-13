@@ -1,8 +1,9 @@
 /**
  * Builders for seed scripts. Keep every script short and readable: a script is pure data,
- * replayed by workstream 2A through the real engine, so these helpers never call into
- * lib/rules or lib/state (both still throw "not implemented" in this worktree). They only
- * reach into lib/data and lib/dates, which are plain reference data and pure date math.
+ * replayed through the real engine by ./replay, so these helpers never call into lib/rules or
+ * lib/state. They only reach into lib/data and lib/dates, which are plain reference data and
+ * pure date math. The session lists the schedule builders write are placeholders: the replay
+ * lists every schedule's sessions again through the rules engine.
  */
 import type { CatalogId } from "@/lib/rules/catalog";
 import { bookableSpaces, getSpace } from "@/lib/data/inventory";

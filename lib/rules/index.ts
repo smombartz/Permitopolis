@@ -10,7 +10,7 @@ export * from "./catalog";
 export { DEFAULT_CONFIG, DEFAULT_DEMO_TODAY, STORAGE_KEY } from "./config";
 
 export { classify, whatIf, isBlockPartyException } from "./classify";
-export { routing, buildRouting } from "./routing";
+export { routing, buildRouting, type RoutingBasis } from "./routing";
 export { requirements, permitComponents } from "./requirements";
 export { estimateFees } from "./fees";
 export { availability, occurrences } from "./availability";

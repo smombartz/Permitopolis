@@ -1,6 +1,7 @@
 /**
  * The one dispatcher behind transition(). A case with an ending accepts no action except
- * add_note; every other guard lives next to its handler in ./checks and ./transitions/*.
+ * add_note, and an action is refused when the actor is not a party that may raise it; every
+ * other guard lives next to its handler in ./checks and ./transitions/*.
  */
 import type { RulesCtx } from "@/lib/rules/types";
 import type { Actor, EventCase } from "@/lib/types";
@@ -33,6 +34,7 @@ import {
   verifyDocument,
 } from "./transitions/city";
 import { pay } from "./transitions/payment";
+import { checkActor } from "./checks";
 import { applyTick } from "./clock";
 import type { StateApi } from "./types";
 
@@ -40,6 +42,11 @@ export const transition: StateApi["transition"] = (c: EventCase, action: Action,
   if (c.ending && action.type !== "add_note") {
     return { ok: false, reason: `This case is ${c.ending.replace("_", " ")}.` };
   }
+  // Who is asking comes before what they ask for: the applicant cannot issue a permit, whatever
+  // state the case is in. Checks that depend on the card (its reviewer, its owner) are with the
+  // handlers.
+  const allowed = checkActor(action.type, actor);
+  if (!allowed.ok) return allowed;
 
   switch (action.type) {
     case "create_board":

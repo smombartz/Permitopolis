@@ -4,11 +4,13 @@
  */
 import { daysBetween } from "@/lib/dates";
 import { plural } from "@/lib/format";
+import { round2 } from "@/lib/rules/shared";
 import type { Dept, EventCase, ISODate, Party, Task } from "@/lib/types";
 import type { RulesConfig } from "@/lib/rules/types";
 import { sessionDates } from "./clock";
+import { byDueDate, sumFeeLines, totalPaid } from "./core";
 import type { BoardColumn, CaseTotals, QueueGroup, QueueItem, ReviewClockView, StateApi, WaitingOnOthersItem } from "./types";
-import { waitingOn } from "./waitingOn";
+import { involvement, waitingOn } from "./waitingOn";
 
 export const boardColumn: StateApi["boardColumn"] = (task: Task): BoardColumn => {
   if (task.status === "done") return "done";
@@ -17,15 +19,80 @@ export const boardColumn: StateApi["boardColumn"] = (task: Task): BoardColumn =>
   return "do_now";
 };
 
+/**
+ * The applicant's board: their cards by column. Do now is in the order the PRD gives it: a
+ * city request pinned on top, then Submit application once it has unlocked, then by due date.
+ * The other columns keep the order of the plan.
+ */
+export function boardColumns(c: EventCase): Record<BoardColumn, Task[]> {
+  const columns: Record<BoardColumn, Task[]> = { do_now: [], with_city: [], coming_up: [], done: [] };
+  for (const task of c.tasks) {
+    if (task.owner === "applicant") columns[boardColumn(task)].push(task);
+  }
+  const pin = (task: Task) => (task.request && !task.request.resolved ? 0 : task.catalogId === "submit_application" ? 1 : 2);
+  columns.do_now.sort((a, b) => pin(a) - pin(b) || byDueDate(a, b));
+  return columns;
+}
+
+/** The parties that are up now, in the order applicant, clerk, pws, hl. Empty when nobody is. */
+export function whoIsUp(c: EventCase, today: ISODate): Party[] {
+  return waitingOn(c, today)
+    .filter((p) => p.status === "up_now")
+    .map((p) => p.party);
+}
+
 export const isOpen: StateApi["isOpen"] = (c: EventCase) => c.ending === null && c.state !== "closed";
+
+/** A permit that is live: Permitted, on Event day or in Closeout, and not cancelled. */
+export function hasActivePermit(c: EventCase): boolean {
+  return c.ending === null && (c.state === "permitted" || c.state === "event_day" || c.state === "closeout");
+}
+
+/** Quote sent and holding its date: what the "holds" toggle on Active permits adds. */
+export function holdsDateAtQuote(c: EventCase): boolean {
+  return c.ending === null && c.state === "quote_sent" && c.dateHold.status === "held";
+}
+
+/**
+ * The Active permits list: every live permit, by event date (the next session, or the last one
+ * once all have passed), soonest first. `includeHolds` adds the Quote sent cases holding a date.
+ */
+export function activePermits(cases: EventCase[], today: ISODate, options: { includeHolds?: boolean } = {}): EventCase[] {
+  const listed = cases.filter((c) => hasActivePermit(c) || (options.includeHolds === true && holdsDateAtQuote(c)));
+  const dateOf = (c: EventCase) => eventDate(c, today) ?? "";
+  return listed.sort((a, b) => dateOf(a).localeCompare(dateOf(b)) || a.id.localeCompare(b.id));
+}
+
+export interface PermitSession {
+  case: EventCase;
+  date: ISODate;
+}
+
+/**
+ * The Active permits calendar and map: one entry for each date an active permit is held, so a
+ * series shows every session (a session skipped for a blackout is not one). In date order.
+ * `from` and `to` are inclusive.
+ */
+export function permitSessions(cases: EventCase[], options: { from?: ISODate; to?: ISODate; includeHolds?: boolean } = {}): PermitSession[] {
+  const sessions: PermitSession[] = [];
+  for (const c of cases) {
+    if (!hasActivePermit(c) && !(options.includeHolds === true && holdsDateAtQuote(c))) continue;
+    for (const date of sessionDates(c)) {
+      if (options.from !== undefined && date < options.from) continue;
+      if (options.to !== undefined && date > options.to) continue;
+      sessions.push({ case: c, date });
+    }
+  }
+  return sessions.sort((a, b) => a.date.localeCompare(b.date) || a.case.id.localeCompare(b.case.id));
+}
 
 export const isVisibleToCity: StateApi["isVisibleToCity"] = (c: EventCase) => c.state !== "draft";
 
-export const involves: StateApi["involves"] = (c: EventCase, role: Party) => {
-  if (role === "applicant") return true;
-  if (role === "clerk") return isVisibleToCity(c);
-  return c.reviews.some((r) => r.dept === role) || c.tasks.some((t) => t.owner === role || t.reviewer === role);
-};
+/**
+ * Never a Draft for a city role. A department is involved once it is routed or holds a task,
+ * and before routing when a card names it as reviewer (it reads "Waiting" in Who's up then).
+ */
+export const involves: StateApi["involves"] = (c: EventCase, role: Party) => involvement(c, role) !== "none";
 
 export const applicantCases: StateApi["applicantCases"] = (cases: EventCase[], applicantId: string) =>
   cases.filter((c) => c.applicantId === applicantId);
@@ -53,7 +120,8 @@ export const queueFor: StateApi["queueFor"] = (cases: EventCase[], role: Dept, t
       items.push({ case: c, task, group: dueGroup(task.dueDate, today), daysWaiting: daysActionable(task, today) });
     }
   }
-  return items;
+  // My queue reads oldest due first, within each group and across them.
+  return items.sort((a, b) => byDueDate(a.task, b.task));
 };
 
 export const waitingOnOthers: StateApi["waitingOnOthers"] = (cases: EventCase[], role: Dept, today: ISODate): WaitingOnOthersItem[] => {
@@ -96,15 +164,16 @@ export const daysUntilEvent: StateApi["daysUntilEvent"] = (c: EventCase, today: 
 };
 
 export const caseTotals: StateApi["caseTotals"] = (c: EventCase): CaseTotals => {
-  const fees = c.feeLines.filter((f) => f.kind === "fee" || f.kind === "late_fee").reduce((s, f) => s + (f.actual ?? f.estimate), 0);
+  // Every figure is to the cent (see lineAmount() in ./core).
+  const fees = sumFeeLines(c, ["fee", "late_fee"]);
   // Reconciling settles the deposit: it has covered any overage and the rest has gone back, so
   // it is no longer part of what the event costs or of what is owed.
   const settled = c.closeout.balance !== null;
-  const deposit = settled ? 0 : c.feeLines.filter((f) => f.kind === "deposit").reduce((s, f) => s + (f.actual ?? f.estimate), 0);
-  const total = fees + deposit;
-  const paid = c.payments.reduce((s, p) => s + p.amount, 0);
+  const deposit = settled ? 0 : sumFeeLines(c, ["deposit"]);
+  const total = round2(fees + deposit);
+  const paid = totalPaid(c);
   // A case that ended early owes nothing more; its refund, if any, is already among the payments.
-  const due = c.ending ? 0 : Math.max(0, total - paid);
+  const due = c.ending ? 0 : Math.max(0, round2(total - paid));
   return { fees, deposit, total, paid, due };
 };
 

@@ -1,7 +1,7 @@
 /**
- * Static checks on the seed scripts themselves (not on the engine, which does not exist in
- * this worktree). Verifies the data workstream 2A will replay: shape, dates, reserved slots,
- * the background set's counts and plan 6.2's stress rows.
+ * Static checks on the seed scripts as data, with no engine involved: shape, dates, reserved
+ * slots, the background set's counts and plan 6.2's stress rows. What the scripts produce when
+ * they are replayed is in ./replay.test.ts and tests/seed.test.ts.
  */
 import { describe, expect, it } from "vitest";
 import { getSpace } from "@/lib/data/inventory";

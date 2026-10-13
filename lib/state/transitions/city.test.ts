@@ -172,6 +172,18 @@ describe("review_decide", () => {
     const result = transition(c, { type: "review_decide", decision: "approve", conditions: [], feeLines: [] }, "pws", makeCtx());
     expect(result.ok).toBe(false);
   });
+
+  it("prices a reviewer's fee lines to the cent", () => {
+    const review = { dept: "pws" as const, sections: ["Route"], status: "pending" as const, dueDate: "2027-05-17", decidedOn: null, clock: { startedOn: "2027-04-19", pausedSince: null, pausedDays: 0, allowedDays: 21 }, internalNote: "", messageToApplicant: "" };
+    const c = makeCase({ state: "in_review", reviews: [review] });
+    const feeLines = [
+      { dept: "pws" as const, label: "Route closure", qty: 3.1, unit: "mile", unitPrice: 400 },
+      { dept: "pws" as const, label: "Police", qty: 1.1, unit: "officer-hour", unitPrice: 85 },
+    ];
+    const result = transition(c, { type: "review_decide", decision: "approve", conditions: [], feeLines }, "pws", makeCtx());
+    // 3.1 * 400 is 1240.0000000000002 and 1.1 * 85 is 93.50000000000001 in floating point.
+    expect(result.ok && result.case.feeLines.map((line) => line.estimate)).toEqual([1240, 93.5]);
+  });
 });
 
 describe("schedule_meeting and complete_city_task", () => {
@@ -184,6 +196,34 @@ describe("schedule_meeting and complete_city_task", () => {
     if (!result.ok) return;
     expect(result.case.tasks.find((t) => t.id === meeting.id)?.payload.scheduledFor).toBe("2027-05-10");
     expect(result.case.tasks.find((t) => t.id === scheduler.id)?.status).toBe("done");
+  });
+
+  it("a meeting can be moved to another day, and the scheduling is done only once", () => {
+    const meeting = makeTask({ id: "PMT-27-0001:pre_application_meeting", catalogId: "pre_application_meeting", kind: "meeting", reviewer: "clerk" });
+    const scheduler = makeTask({ id: "PMT-27-0001:schedule_pre_application_meeting", catalogId: "schedule_pre_application_meeting", owner: "clerk", kind: "meeting" });
+    const first = transition(makeCase({ state: "in_review", tasks: [meeting, scheduler] }), { type: "schedule_meeting", taskId: meeting.id, date: "2027-05-10" }, "clerk", makeCtx());
+    const moved = first.ok ? transition(first.case, { type: "schedule_meeting", taskId: meeting.id, date: "2027-05-12" }, "clerk", makeCtx()) : first;
+    expect(moved.ok).toBe(true);
+    if (!moved.ok) return;
+    expect(moved.case.tasks.find((t) => t.id === meeting.id)?.payload.scheduledFor).toBe("2027-05-12");
+    expect(moved.case.tasks.find((t) => t.id === scheduler.id)?.history.filter((h) => h.status === "done")).toHaveLength(1);
+
+    const held = transition(moved.case, { type: "complete_city_task", taskId: meeting.id }, "clerk", makeCtx());
+    expect(held.ok && held.case.tasks.find((t) => t.id === meeting.id)?.status).toBe("done");
+    expect(held.ok && transition(held.case, { type: "schedule_meeting", taskId: meeting.id, date: "2027-05-14" }, "clerk", makeCtx())).toEqual({ ok: false, reason: "That meeting has already been held." });
+  });
+
+  it("holding the pre-application meeting without scheduling it first still clears the Clerk's scheduling task", () => {
+    const meeting = makeTask({ id: "PMT-27-0001:pre_application_meeting", catalogId: "pre_application_meeting", kind: "meeting", reviewer: "clerk" });
+    const scheduler = makeTask({ id: "PMT-27-0001:schedule_pre_application_meeting", catalogId: "schedule_pre_application_meeting", owner: "clerk", kind: "meeting" });
+    const held = transition(makeCase({ state: "in_review", tasks: [meeting, scheduler] }), { type: "complete_city_task", taskId: meeting.id }, "clerk", makeCtx());
+    expect(held.ok).toBe(true);
+    if (!held.ok) return;
+    // A meeting that was held no longer needs a date: nothing is left in the Clerk's queue.
+    expect(held.case.tasks.map((t) => [t.catalogId, t.status])).toEqual([
+      ["pre_application_meeting", "done"],
+      ["schedule_pre_application_meeting", "done"],
+    ]);
   });
 
   it("complete_city_task finishes a city-owned task", () => {
@@ -220,6 +260,21 @@ describe("log_closeout (S6)", () => {
     expect(result.case.tasks.find((t) => t.catalogId === "cleanup_inspection")?.status).toBe("done");
     expect(result.case.tasks.find((t) => t.catalogId === "log_actual_hours")?.status).toBe("done");
     expect(result.case.tasks.find((t) => t.catalogId === "reconcile")?.status).toBe("todo");
+  });
+
+  it("prices actuals and extra lines to the cent", () => {
+    const c = makeCase({
+      id: "PMT-27-0200",
+      state: "closeout",
+      feeLines: [{ id: "f1", dept: "clerk", label: "Route closure", qty: 3, unit: "mile", unitPrice: 400, estimate: 1200, actual: null, kind: "fee" }],
+    });
+    const result = transition(
+      c,
+      { type: "log_closeout", cleanup: "pass", actuals: [{ feeLineId: "f1", qty: 3.1 }], extraLines: [{ dept: "pws", label: "Overtime police", qty: 1.1, unit: "officer-hour", unitPrice: 85 }] },
+      "pws",
+      makeCtx(),
+    );
+    expect(result.ok && result.case.feeLines.map((line) => line.actual)).toEqual([1240, 93.5]);
   });
 
   it("fails when there is nothing to close out yet", () => {

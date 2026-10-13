@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { MAIN_1ST_TO_4TH, RIVERFRONT_5K_ROUTE } from "@/lib/data/streets";
 import { classify, isBlockPartyException, whatIf } from "./classify";
 import { DEFAULT_CONFIG } from "./config";
+import { routing } from "./routing";
 import { answers, addOns, areaLocation, inventoryLocation, routeLocation, schedule, streetsLocation } from "./test-helpers";
 
 describe("classify: section 6.1 scenarios", () => {
@@ -19,21 +20,23 @@ describe("classify: section 6.1 scenarios", () => {
     expect(cls.reviewers).toEqual([]);
   });
 
-  it("S2 weekly class at Field 4 is Instant", () => {
-    const cls = classify(
-      answers({
-        eventType: "class_meetup",
-        location: inventoryLocation(["field-4"]),
-        schedule: schedule({
-          date: "2027-06-06",
-          start: "08:00",
-          end: "09:00",
-          recurrence: { frequency: "weekly", weekday: 0, until: "2027-08-29" },
-        }),
-        attendance: 20,
+  it("S2 weekly class at Field 4 is Instant, 10-day lead time, no reviewers", () => {
+    const a = answers({
+      eventType: "class_meetup",
+      location: inventoryLocation(["field-4"]),
+      schedule: schedule({
+        date: "2027-06-06",
+        start: "08:00",
+        end: "09:00",
+        recurrence: { frequency: "weekly", weekday: 0, until: "2027-08-29" },
       }),
-    );
+      attendance: 20,
+    });
+    const cls = classify(a);
     expect(cls.tier).toBe("instant");
+    expect(cls.leadTimeDays).toBe(10);
+    expect(cls.reviewers).toEqual([]);
+    expect(routing(a, cls)).toEqual([]);
   });
 
   it("S3 performance at City Hall Plaza is Reviewed with Public Works & Safety and Health & Legal, 30-day lead time", () => {
@@ -64,6 +67,7 @@ describe("classify: section 6.1 scenarios", () => {
     );
     expect(cls.blockPartyException).toBe(true);
     expect(cls.tier).toBe("reviewed");
+    expect(cls.leadTimeDays).toBe(30);
     expect(cls.triggers.map((t) => t.id)).toContain("block_party");
     expect(cls.triggers.map((t) => t.id)).not.toContain("street");
     expect(cls.reviewers.map((r) => r.dept)).toEqual(["pws", "hl"]);
@@ -101,6 +105,7 @@ describe("classify: section 6.1 scenarios", () => {
       }),
     );
     expect(cls.tier).toBe("special");
+    expect(cls.leadTimeDays).toBe(60);
     expect(cls.reviewers.map((r) => r.dept)).toEqual(["clerk", "pws", "hl"]);
   });
 });

@@ -3,8 +3,10 @@
  *
  * lib/rules and lib/state were each built and unit-tested against a mock of the other. This
  * file checks the places where one calls into the other: create_board, book_and_pay,
- * accept_complete, cancel and closeout. It borrows the answers of a few seed scripts but runs
- * none of their histories: the seed replay and the demo paths have their own tests.
+ * accept_complete, cancel, closeout and amend. Its first half borrows the answers of a few seed
+ * scripts and runs none of their histories; its second half starts from seeded cases and takes
+ * them further. What the seed itself must hold on the demo date is in tests/seed.test.ts, and
+ * the PRD's demo script is in tests/demo-paths.test.ts.
  */
 import { describe, expect, it } from "vitest";
 import { CARD_BY_ID, DEFAULT_CONFIG, availability, classify, routing, type CatalogId, type RulesCtx } from "@/lib/rules";
@@ -22,10 +24,10 @@ import {
   waitingOn,
   type Action,
 } from "@/lib/state";
+import { replayScripts } from "@/lib/state/seed/replay";
 import { F5, S1, S2, S3, S6 } from "@/lib/state/seed/scenarios";
 import { SEED_SCRIPTS } from "@/lib/state/seed/scripts";
 import type { Actor, EventAnswers, EventCase, ISODate } from "@/lib/types";
-import { replay } from "./replay";
 
 const FILE = { name: "sample.pdf", size: 240_000, type: "application/pdf" };
 
@@ -274,31 +276,25 @@ describe("closeout (S6)", () => {
 
 const TODAY = "2027-05-03";
 const APPROVE: Action = { type: "review_decide", decision: "approve", conditions: [], feeLines: [] };
-const seed = replay(SEED_SCRIPTS);
+/** The seed as the store loads it. replayScripts() throws if the engine refuses any step. */
+const seed = replayScripts(SEED_SCRIPTS);
 
 function seeded(key: string): EventCase {
   const script = SEED_SCRIPTS.find((s) => s.key === key)!;
-  return seed.cases.find((c) => c.id === script.id)!;
+  return seed.find((c) => c.id === script.id)!;
 }
 
 /** Every other seeded case, for the transitions that look at who holds which date. */
-const othersOf = (c: EventCase) => seed.cases.filter((other) => other.id !== c.id);
+const othersOf = (c: EventCase) => seed.filter((other) => other.id !== c.id);
 const standing = (c: EventCase, today: ISODate = TODAY) => Object.fromEntries(waitingOn(c, today).map((p) => [p.party, p.status]));
 
-describe("the seed scripts, replayed through both engines", () => {
-  it("every script reaches its expected tier, state and ending, and no step is refused", () => {
-    expect(seed.refused).toEqual([]);
-    for (const script of SEED_SCRIPTS) {
-      const c = seeded(script.key);
-      expect([script.key, c.tier, c.state, c.ending]).toEqual([script.key, script.expect.tier, script.expect.state, script.expect.ending ?? null]);
-    }
-  });
+describe("seeded cases, taken further through both engines", () => {
 
   it("S4: the next move is the neighbors', not the Clerk's, until all 12 have signed", () => {
     let s4 = seeded("S4");
     expect(standing(s4)).toMatchObject({ applicant: "up_now", clerk: "waiting" });
     expect(waitingOn(s4, TODAY).find((p) => p.party === "clerk")?.note).toBe("Waiting on 3 neighbor sign-offs");
-    expect(queueFor(seed.cases, "clerk", TODAY).filter((q) => q.case.id === s4.id)).toEqual([]);
+    expect(queueFor(seed, "clerk", TODAY).filter((q) => q.case.id === s4.id)).toEqual([]);
     expect(nextMove(s4, TODAY, "Maple Street block captain")).toBe(
       "Next: Maple Street block captain collects the neighbor sign-offs, then City Clerk checks the application is complete.",
     );
@@ -310,7 +306,7 @@ describe("the seed scripts, replayed through both engines", () => {
   });
 
   it("a block party with every sign-off in before it is submitted goes straight to the Clerk (F4's history)", () => {
-    const f4 = replay(SEED_SCRIPTS, "2027-04-09").cases.find((c) => c.id === "PMT-27-0080")!;
+    const f4 = replayScripts(SEED_SCRIPTS, { until: "2027-04-09" }).find((c) => c.id === "PMT-27-0080")!;
     expect(f4.state).toBe("submitted");
     expect(task(f4, "intake_check")).toMatchObject({ status: "todo", dueDate: "2027-04-12" });
   });
@@ -319,7 +315,7 @@ describe("the seed scripts, replayed through both engines", () => {
     const b11 = seeded("B11");
     expect(standing(b11)).toMatchObject({ applicant: "done_for_now", clerk: "waiting", hl: "up_now" });
     expect(task(b11, "issue_permit")?.status).toBe("locked");
-    expect(queueFor(seed.cases, "clerk", TODAY).filter((q) => q.case.id === b11.id)).toEqual([]);
+    expect(queueFor(seed, "clerk", TODAY).filter((q) => q.case.id === b11.id)).toEqual([]);
 
     const verified = run(b11, { type: "verify_document", taskId: `${b11.id}:insurance_certificate` }, "hl", TODAY);
     expect(task(verified, "issue_permit")?.status).toBe("todo");
@@ -330,7 +326,7 @@ describe("the seed scripts, replayed through both engines", () => {
     const b05 = seeded("B05");
     expect(b05.state).toBe("in_review");
     expect(leadTimeRisk(b05, TODAY, DEFAULT_CONFIG)).toBe("at_risk");
-    expect(queueFor(seed.cases, "pws", TODAY).find((q) => q.case.id === b05.id)).toMatchObject({ group: "overdue", task: { catalogId: "review:pws" } });
+    expect(queueFor(seed, "pws", TODAY).find((q) => q.case.id === b05.id)).toMatchObject({ group: "overdue", task: { catalogId: "review:pws" } });
     expect(seeded("B01").activity).toEqual([{ at: "2027-05-01T10:00", actor: "applicant", text: "Started a draft." }]);
   });
 
@@ -462,6 +458,89 @@ describe("the date gate's lead time", () => {
     const flagged = { ...draft("PMT-27-0152", later, TODAY), flags: { sentToCommission: false, lateFee: true, signed: false, acceptedComplete: false, amendmentPending: false } };
     const board = run(flagged, { type: "create_board" }, "applicant", TODAY);
     expect(board.feeLines.some((line) => line.kind === "late_fee")).toBe(false);
+  });
+});
+
+describe("amend: Maya adds a DJ to her permitted picnic on May 3 (demo path 7)", () => {
+  const withDj: EventAnswers = { ...S1.answers, addOns: { ...S1.answers.addOns, amplifiedSound: true } };
+  const cards = (c: EventCase) => c.tasks.map((t) => [t.catalogId, t.status, t.tags.join()]);
+
+  it("the date gate runs again: 19 days left of the 30 a Reviewed event needs, so the amendment waits for a fix", () => {
+    const s1 = seeded("S1");
+    expect(reasonFor(s1, { type: "amend", answers: withDj }, "applicant", TODAY, othersOf(s1))).toBe("Needs 30 days of notice; pick a later date or add the late fee.");
+  });
+
+  it("with the late fee it goes through: Reviewed, new cards tagged, the new plan's fees, and the permit as it was", () => {
+    const s1 = seeded("S1");
+    const amended = run(s1, { type: "amend", answers: withDj, lateFee: true }, "applicant", TODAY, othersOf(s1));
+
+    expect(amended).toMatchObject({ tier: "reviewed", state: "permitted", ending: null, permit: s1.permit, dateHold: s1.dateHold });
+    expect(amended.flags).toMatchObject({ amendmentPending: true, lateFee: true });
+    expect(amended.triggers.map((t) => t.id)).toEqual(["amplified_sound"]);
+    expect(cards(amended)).toEqual([
+      ["pay_fees", "done", ""],
+      ["carry_permit", "locked", ""],
+      ["insurance_certificate", "todo", "amendment"],
+      ["sound_details", "todo", "amendment"],
+      ["submit_application", "locked", "amendment"],
+      ["accept_and_sign", "locked", "amendment"],
+    ]);
+    expect(amended.feeLines.map((line) => [line.label, line.estimate])).toEqual([
+      ["Shelter reservation", 125],
+      ["Amplified sound", 40],
+      ["Application fee", 50],
+      ["Refundable cleanup deposit", 250],
+      ["Late fee", 53.75],
+    ]);
+    expect(new Set(amended.feeLines.map((line) => line.id)).size).toBe(5);
+    // What she paid for the original plan stays paid; the rest comes with the amendment's quote.
+    expect(caseTotals(amended)).toMatchObject({ total: 518.75, paid: 125, due: 393.75 });
+    expect(amended.activity.at(-1)?.text).toBe("Amended the plan: This is a Reviewed event: about 3 weeks, $465 estimated. Late fee: $53.75.");
+    // The slot is still hers.
+    expect(availability(S1.answers.location!, SHELTER_3_WINDOW, ctx(TODAY, [amended])).status).toBe("booked");
+  });
+
+  it("an amendment that neither raises the tier nor moves the date needs no notice and no late fee", () => {
+    // A week before the picnic, five more guests: still Instant, still May 22.
+    const s1 = seeded("S1");
+    const amended = run(s1, { type: "amend", answers: { ...S1.answers, attendance: 50 }, lateFee: true }, "applicant", "2027-05-15", othersOf(s1));
+    expect(amended).toMatchObject({ tier: "instant", attendance: 50, state: "permitted" });
+    expect(amended.feeLines.map((line) => line.label)).toEqual(["Shelter reservation"]);
+    expect(cards(amended)).toEqual(cards(s1));
+  });
+
+  it("moving to a slot another case holds is refused with that case's name", () => {
+    // Shelter 1 on Tue, May 25 is the church potluck's, held since its application was accepted.
+    const s1 = seeded("S1");
+    const moved: EventAnswers = { ...S1.answers, location: seeded("B07").location, schedule: { ...S1.answers.schedule!, date: "2027-05-25", occurrences: [] } };
+    expect(reasonFor(s1, { type: "amend", answers: moved }, "applicant", TODAY, othersOf(s1))).toBe("East End Baptist Church fellowship potluck has this date held");
+  });
+
+  it("takes the answers only: a stale copy of the record cannot roll its history back", () => {
+    const s1 = seeded("S1");
+    const stale = { ...s1, state: "draft", payments: [], permit: null, tasks: [], attendance: 50 } as EventCase;
+    const amended = run(s1, { type: "amend", answers: stale }, "applicant", TODAY, othersOf(s1));
+    expect(amended).toMatchObject({ attendance: 50, state: "permitted", permit: s1.permit, payments: s1.payments });
+    expect(amended.tasks.map((t) => t.id)).toEqual(s1.tasks.map((t) => t.id));
+  });
+
+  it("keeps the lines a reviewer added, and lists the sessions of a new schedule itself", () => {
+    // The farmers market, with a fire-watch line from Public Works & Safety, ends a month early.
+    let f2 = seeded("F2");
+    f2 = run(f2, { type: "review_decide", decision: "approve", conditions: [], feeLines: [{ dept: "pws", label: "Fire watch", qty: 2, unit: "hour", unitPrice: 60 }] }, "pws", TODAY);
+    const shorter: EventAnswers = { ...f2, schedule: { ...f2.schedule!, recurrence: { ...f2.schedule!.recurrence!, until: "2027-08-28" }, occurrences: [] } };
+    const amended = run(f2, { type: "amend", answers: shorter }, "applicant", TODAY, othersOf(f2));
+
+    expect(amended.schedule!.occurrences).toHaveLength(13);
+    expect(amended.feeLines.map((line) => [line.label, line.estimate])).toEqual([
+      ["Great Lawn reservation", 2600],
+      ["Application fee", 50],
+      ["Food or vendor permit", 900],
+      ["Structure fire inspection", 720],
+      ["Refundable cleanup deposit", 250],
+      ["Fire watch", 120],
+    ]);
+    expect(amended.state).toBe("in_review");
   });
 });
 

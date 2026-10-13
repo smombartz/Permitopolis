@@ -5,8 +5,8 @@
 import { daysBetween } from "@/lib/dates";
 import { plural } from "@/lib/format";
 import { ENDING_LABEL, PARTIES, PARTY_LABEL } from "@/lib/types";
-import type { EventCase, ISODate, Party, Task } from "@/lib/types";
-import { signoffsLeft, taskDueDate } from "./core";
+import type { EventCase, ISODate, Party, Task, UnlockEvent } from "@/lib/types";
+import { byDueDate, signoffsLeft, taskDueDate } from "./core";
 import type { PartyStanding, PartyStatus, StateApi } from "./types";
 
 const DEFAULT_SCOPE: Record<Party, string> = {
@@ -15,6 +15,9 @@ const DEFAULT_SCOPE: Record<Party, string> = {
   pws: "Streets, structures and safety",
   hl: "Insurance, food and accessibility",
 };
+
+/** The row of a department that is named on the applicant's cards but has no review yet. */
+export const AWAITING_ROUTING_NOTE = "Starts when the City Clerk routes the case";
 
 const CITY_UNLOCK_HINT: Record<string, string> = {
   issue_permit: "Unlocks when paid and verified",
@@ -29,10 +32,23 @@ function scopeFor(c: EventCase, party: Party): string {
   return DEFAULT_SCOPE[party];
 }
 
-function involvedLocal(c: EventCase, party: Party): boolean {
-  if (party === "applicant") return true;
-  if (party === "clerk") return c.state !== "draft";
-  return c.reviews.some((r) => r.dept === party) || c.tasks.some((t) => t.owner === party || t.reviewer === party);
+/**
+ * How a party stands to a case, before looking at what it has to do.
+ * - 'active': it has work on this case, now or earlier.
+ * - 'awaiting_routing': a department named as reviewer on a card of a case the Clerk has not
+ *   routed yet. It is expected, but it has not started and may still be left out.
+ * - 'none': not part of this case. A Draft is the applicant's alone; a department the Clerk
+ *   routed the case without, and that holds no task, is not part of it either.
+ */
+export type Involvement = "active" | "awaiting_routing" | "none";
+
+export function involvement(c: EventCase, party: Party): Involvement {
+  if (party === "applicant") return "active";
+  if (c.state === "draft") return "none";
+  if (party === "clerk") return "active";
+  if (c.reviews.some((r) => r.dept === party) || c.tasks.some((t) => t.owner === party)) return "active";
+  const notRoutedYet = c.reviews.length === 0 && (c.state === "submitted" || c.state === "needs_info");
+  return notRoutedYet && c.tasks.some((t) => t.reviewer === party) ? "awaiting_routing" : "none";
 }
 
 function daysActionable(tasks: Task[], today: ISODate): number {
@@ -45,14 +61,66 @@ function daysActionable(tasks: Task[], today: ISODate): number {
   return Math.max(0, max);
 }
 
-function lockedNote(c: EventCase, tasks: Task[]): string | undefined {
+/** The stages of a case in the order they happen, as the events that unlock tasks. */
+const UNLOCK_ORDER: UnlockEvent[] = [
+  "presubmit_done",
+  "submitted",
+  "accepted",
+  "routed",
+  "quote_sent",
+  "signed",
+  "paid",
+  "permitted",
+  "event_day",
+  "closeout",
+  "hours_logged",
+  "invoice_issued",
+  "closed",
+];
+
+/**
+ * How soon a locked task opens. A task with no unlock event is parked on something specific
+ * that a party up now is doing (the sign-offs, payment and verification), so it comes first.
+ */
+function unlockRank(task: Task): number {
+  return task.unlocksOn ? UNLOCK_ORDER.indexOf(task.unlocksOn) : -1;
+}
+
+/** This party's locked task that opens first; the earlier-created one when two open together. */
+function nextToUnlock(c: EventCase, party: Party): Task | undefined {
+  let soonest: Task | undefined;
+  for (const t of c.tasks) {
+    if (t.owner !== party || t.status !== "locked") continue;
+    if (!soonest || unlockRank(t) < unlockRank(soonest)) soonest = t;
+  }
+  return soonest;
+}
+
+/**
+ * What a locked task waits for, by the event that unlocks it. Who's up is read by the applicant
+ * and by city staff alike, so these say "the quote", not "your quote" as the cards themselves do.
+ */
+const UNLOCK_NOTE: Partial<Record<UnlockEvent, string>> = {
+  presubmit_done: "Unlocks when every card before submitting is done",
+  accepted: "Unlocks when the City Clerk accepts the application",
+  quote_sent: "Unlocks when the quote is ready",
+  permitted: "Unlocks when the permit is issued",
+  event_day: "For the day of the event",
+  hours_logged: "Unlocks when hours are logged",
+  invoice_issued: "Unlocks when the City Clerk finishes reconciling costs",
+  closed: "Unlocks when the event is closed out",
+};
+
+/** What a waiting party's row says: what its locked task waits for. */
+function lockedNote(c: EventCase, party: Party, tasks: Task[]): string | undefined {
   if (tasks.some((t) => t.payload.awaitingAnswer === true)) return "Waiting on the applicant's response";
   if (tasks.some((t) => t.payload.awaitingSignoffs === true)) return `Waiting on ${plural(signoffsLeft(c), "neighbor sign-off")}`;
   for (const t of tasks) {
     const hint = CITY_UNLOCK_HINT[t.catalogId];
     if (hint) return hint;
   }
-  return undefined;
+  const next = nextToUnlock(c, party);
+  return next?.unlocksOn ? UNLOCK_NOTE[next.unlocksOn] : undefined;
 }
 
 function decisionNote(c: EventCase, party: Party): string | undefined {
@@ -68,7 +136,7 @@ export const waitingOn: StateApi["waitingOn"] = (c: EventCase, today: ISODate): 
   if (c.ending) {
     return PARTIES.map((party) => ({
       party,
-      status: (involvedLocal(c, party) ? "done_for_now" : "not_involved") as PartyStanding,
+      status: (involvement(c, party) !== "none" ? "done_for_now" : "not_involved") as PartyStanding,
       openTasks: [],
       oldestDue: null,
       daysHolding: 0,
@@ -78,33 +146,38 @@ export const waitingOn: StateApi["waitingOn"] = (c: EventCase, today: ISODate): 
   }
 
   return PARTIES.map((party) => {
-    const open = c.tasks.filter((t) => t.owner === party && (t.status === "todo" || t.status === "changes_requested"));
+    const open = c.tasks.filter((t) => t.owner === party && (t.status === "todo" || t.status === "changes_requested")).sort(byDueDate);
     const ownedTasks = c.tasks.filter((t) => t.owner === party);
     const locked = ownedTasks.filter((t) => t.status === "locked");
-    const involved = involvedLocal(c, party);
+    const standing = involvement(c, party);
 
     let status: PartyStanding;
     if (party === "applicant" && c.state === "draft" && open.length === 0) {
       status = "up_now";
     } else if (open.length > 0) {
       status = "up_now";
-    } else if (!involved) {
+    } else if (standing === "none") {
       status = "not_involved";
+    } else if (standing === "awaiting_routing") {
+      // Not "Done for now": it has done nothing yet. Its turn starts with the Clerk's routing.
+      status = "waiting";
     } else if (locked.length > 0 && ownedTasks.every((t) => t.status === "locked" || t.status === "done")) {
       status = "waiting";
     } else {
       status = "done_for_now";
     }
 
-    const dueDates = open.map(taskDueDate).filter((d): d is ISODate => d !== null).sort();
-    const oldestDue = dueDates[0] ?? null;
+    // `open` is sorted, so its first dated task is the oldest due.
+    const oldestDue = open.map(taskDueDate).find((d): d is ISODate => d !== null) ?? null;
     const daysHolding = status === "up_now" ? daysActionable(open, today) : 0;
 
     let note: string;
     if (status === "up_now") {
       note = open[0]?.title ? `Up: ${open[0].title}` : "Working on the plan";
+    } else if (standing === "awaiting_routing") {
+      note = AWAITING_ROUTING_NOTE;
     } else if (status === "waiting") {
-      note = lockedNote(c, locked) ?? "Waiting on an earlier step";
+      note = lockedNote(c, party, locked) ?? "Waiting on an earlier step";
     } else if (status === "done_for_now") {
       note = decisionNote(c, party) ?? "Nothing due right now";
     } else {
@@ -152,6 +225,8 @@ function lowerFirst(text: string): string {
 function verbPhrase(task: Task): string {
   // After a department denies its section the Clerk's task is to deny the application, not to quote it.
   if (task.catalogId === "consolidate" && task.payload.denied === true) return "acts on a reviewer's denial";
+  // Until the Clerk reconciles, nobody knows whether the event ends in a bill or a refund.
+  if (task.catalogId === "final_bill_or_refund" && task.status === "locked") return "gets the final bill or refund";
   const known = PHRASE[task.catalogId];
   if (known) return known;
   if (task.catalogId.startsWith("review:")) return "reviews its sections";
@@ -190,17 +265,25 @@ export const nextMove: StateApi["nextMove"] = (c: EventCase, today: ISODate, app
   const upNow = statuses.filter((s) => s.status === "up_now");
   if (upNow.length === 0) return "Next: nothing is actionable right now.";
 
-  const parts = upNow.map((s) => `${partyName(s.party, applicantName)} ${s.openTasks[0] ? verbPhrase(s.openTasks[0]) : "acts"}`);
-  let sentence = `Next: ${parts.join(", and ")}`;
+  // An applicant who is up with no card open is still in the wizard: a Draft before its board.
+  const parts = upNow.map((s) => `${partyName(s.party, applicantName)} ${s.openTasks[0] ? verbPhrase(s.openTasks[0]) : "finishes the plan"}`);
+  // "A, and B" for two; "A, B, and C" for three or more.
+  let sentence = `Next: ${parts.length > 2 ? `${parts.slice(0, -1).join(", ")}, and ${parts.at(-1)}` : parts.join(", and ")}`;
 
-  // A department parked on the applicant's answer goes next; otherwise whoever is waiting on an earlier step.
+  // A department parked on the applicant's answer goes next. Otherwise it is the waiting party
+  // whose locked task unlocks soonest: after closeout hours are logged the Clerk reconciles,
+  // and only then does the applicant's final bill open. A department still waiting to be
+  // routed has no task to name, so the sentence stops before it.
   const reReviewer = statuses.find((s) => s.status === "waiting" && c.tasks.some((t) => t.owner === s.party && t.payload.awaitingAnswer === true));
-  const waitingParty = reReviewer ?? statuses.find((s) => s.status === "waiting");
-  if (waitingParty) {
-    const lockedTask = c.tasks.find((t) => t.owner === waitingParty.party && t.status === "locked");
-    const then = reReviewer ? "re-reviews" : lockedTask ? verbPhrase(lockedTask) : "acts";
-    sentence += `, then ${partyName(waitingParty.party, applicantName)} ${then}`;
+  if (reReviewer) return `${sentence}, then ${partyName(reReviewer.party, applicantName)} re-reviews.`;
+
+  let next: { party: Party; task: Task } | undefined;
+  for (const s of statuses) {
+    if (s.status !== "waiting") continue;
+    const task = nextToUnlock(c, s.party);
+    if (task && (!next || unlockRank(task) < unlockRank(next.task))) next = { party: s.party, task };
   }
+  if (next) sentence += `, then ${partyName(next.party, applicantName)} ${verbPhrase(next.task)}`;
 
   return `${sentence}.`;
 };

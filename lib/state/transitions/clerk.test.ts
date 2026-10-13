@@ -115,12 +115,30 @@ describe("send_quote and issue_permit (S5)", () => {
     expect(result.case.tasks.find((t) => t.catalogId === "issue_permit")?.status).toBe("locked");
   });
 
+  it("send_quote prices each merged line to the cent (3.1 miles at $400 is $1,240, not $1,240.0000000000002)", () => {
+    const result = transition(
+      routedCase(),
+      {
+        type: "send_quote",
+        conditions: [],
+        feeLines: [
+          { dept: "clerk", label: "Route closure", qty: 3.1, unit: "mile", unitPrice: 400 },
+          { dept: "pws", label: "Police", qty: 1.1, unit: "officer-hour", unitPrice: 85 },
+        ],
+      },
+      "clerk",
+      makeCtx(),
+    );
+    expect(result.ok && result.case.feeLines.map((line) => line.estimate)).toEqual([1240, 93.5]);
+    expect(result.ok && result.case.tasks.find((t) => t.catalogId === "pay_fees")?.payload.amount).toBe(1333.5);
+  });
+
   it("issue_permit is disabled naming both missing items, then enabled (S5)", () => {
     const quoteSent = transition(routedCase(), { type: "send_quote", conditions: [], feeLines: [] }, "clerk", makeCtx());
     expect(quoteSent.ok).toBe(true);
     if (!quoteSent.ok) return;
     let c = quoteSent.case;
-    const insurance = makeTask({ id: `${c.id}:insurance_certificate`, catalogId: "insurance_certificate", status: "submitted" });
+    const insurance = makeTask({ id: `${c.id}:insurance_certificate`, catalogId: "insurance_certificate", reviewer: "hl", status: "submitted" });
     c = { ...c, tasks: [...c.tasks, insurance] };
 
     const disabled = transition(c, { type: "issue_permit" }, "clerk", makeCtx());
@@ -150,9 +168,34 @@ describe("send_quote and issue_permit (S5)", () => {
     expect(issued.case.permit?.issuedOn).toBe("2027-05-03");
     // ...and issuing it takes the task back out.
     expect(issued.case.tasks.find((t) => t.catalogId === "issue_permit")?.status).toBe("done");
-    // The pay-by deadline is gone: the date is held, with no expiry left to show.
-    expect(verified.case.dateHold.expiresOn).not.toBeNull();
+    // The pay-by deadline went when the quote was paid: the date is held, with no expiry left to show.
+    expect(signed.case.dateHold.expiresOn).toBe("2027-05-17");
+    expect(paid.case.dateHold).toMatchObject({ status: "held", expiresOn: null });
     expect(issued.case.dateHold).toMatchObject({ status: "held", expiresOn: null });
+  });
+});
+
+describe("confirm_routing: the list the Clerk confirms", () => {
+  const accepted = () => {
+    const routing = makeTask({ id: "PMT-27-0001:confirm_routing", catalogId: "confirm_routing", owner: "clerk", kind: "action" });
+    return makeCase({ state: "submitted", flags: { sentToCommission: false, lateFee: false, signed: false, acceptedComplete: true, amendmentPending: false }, tasks: [routing] });
+  };
+  const hl = { dept: "hl" as const, sections: ["Certificate of insurance"], dueDate: "2027-05-17" };
+
+  it("refuses an empty list: the case would sit In review with nobody reviewing", () => {
+    const result = transition(accepted(), { type: "confirm_routing", reviewers: [] }, "clerk", makeCtx());
+    expect(result).toEqual({ ok: false, reason: "Choose at least one reviewer." });
+  });
+
+  it("refuses a department listed twice, instead of giving it two reviews and one task id", () => {
+    const result = transition(accepted(), { type: "confirm_routing", reviewers: [hl, { ...hl, sections: ["Vendor list"] }] }, "clerk", makeCtx());
+    expect(result).toEqual({ ok: false, reason: "Health & Legal is on the list twice; route each department once." });
+  });
+
+  it("a list with each department once goes through", () => {
+    const result = transition(accepted(), { type: "confirm_routing", reviewers: [{ dept: "pws", sections: ["Sound details"], dueDate: "2027-05-17" }, hl] }, "clerk", makeCtx());
+    expect(result.ok && result.case.reviews.map((r) => r.dept)).toEqual(["pws", "hl"]);
+    expect(result.ok && new Set(result.case.tasks.map((t) => t.id)).size).toBe(3);
   });
 });
 

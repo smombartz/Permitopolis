@@ -5,6 +5,7 @@ import type { RulesCtx } from "@/lib/rules/types";
 import { PARTY_LABEL, type Actor, type Condition, type Dept, type EventCase, type FeeLine, type Task } from "@/lib/types";
 import type { Action } from "../actions";
 import {
+  cardUnderVerification,
   checkCompleteCityTask,
   checkLogCloseout,
   checkRequestInfo,
@@ -12,8 +13,9 @@ import {
   checkScheduleMeeting,
   checkSendToCommission,
   checkVerifyOrReject,
+  meetingCardFor,
 } from "../checks";
-import { addTask, appendActivity, applyUnlockEvent, findTask, moveTask, newTask, parkTasksAwaitingAnswer, patchTask, taskId } from "../core";
+import { addTask, appendActivity, applyUnlockEvent, findTask, lineAmount, moveTask, newTask, parkTasksAwaitingAnswer, patchTask, taskId } from "../core";
 import type { TransitionResult } from "../types";
 import { maybeUnlockIssuePermit } from "./shared";
 
@@ -61,19 +63,22 @@ export function requestInfo(c: EventCase, action: Extract_<"request_info">, acto
 }
 
 export function verifyDocument(c: EventCase, action: Extract_<"verify_document">, actor: Actor, ctx: RulesCtx): TransitionResult {
-  const check = checkVerifyOrReject(c, action.taskId);
+  const check = checkVerifyOrReject(c, action.taskId, actor);
   if (!check.ok) return check;
   const card = findTask(c, action.taskId) as Task;
+  return { ok: true, case: appendActivity(acceptCard(c, card, ctx, actor), actor, `Verified "${card.title}".`, ctx) };
+}
+
+/** Accepts a submitted card and closes the check that was open on it. */
+function acceptCard(c: EventCase, card: Task, ctx: RulesCtx, actor: Actor): EventCase {
   let next = moveTask(c, card.id, "done", ctx, actor);
   next = finishVerifyTaskFor(next, card, ctx, actor);
   // Verifying the insurance can be the last of the three things Issue permit waits for.
-  next = maybeUnlockIssuePermit(next, ctx);
-  next = appendActivity(next, actor, `Verified "${card.title}".`, ctx);
-  return { ok: true, case: next };
+  return maybeUnlockIssuePermit(next, ctx);
 }
 
 export function rejectDocument(c: EventCase, action: Extract_<"reject_document">, actor: Actor, ctx: RulesCtx): TransitionResult {
-  const check = checkVerifyOrReject(c, action.taskId);
+  const check = checkVerifyOrReject(c, action.taskId, actor);
   if (!check.ok) return check;
   const card = findTask(c, action.taskId) as Task;
   let next = moveTask(c, card.id, "changes_requested", ctx, actor, { payload: { ...card.payload, rejectedReason: action.reason } });
@@ -133,7 +138,7 @@ export function reviewDecide(c: EventCase, action: Extract_<"review_decide">, ac
     qty: fl.qty,
     unit: fl.unit,
     unitPrice: fl.unitPrice,
-    estimate: fl.qty * fl.unitPrice,
+    estimate: lineAmount(fl.qty, fl.unitPrice),
     actual: null,
     kind: fl.kind ?? "fee",
   }));
@@ -183,23 +188,37 @@ export function sendToCommission(c: EventCase, _action: Extract_<"send_to_commis
 }
 
 export function scheduleMeeting(c: EventCase, action: Extract_<"schedule_meeting">, actor: Actor, ctx: RulesCtx): TransitionResult {
-  const check = checkScheduleMeeting(c, action.taskId);
+  const check = checkScheduleMeeting(c, action.taskId, actor);
   if (!check.ok) return check;
-  const task = findTask(c, action.taskId) as Task;
+  // Always the applicant's meeting card, also when the Clerk's scheduler task was named.
+  const task = meetingCardFor(c, action.taskId) as Task;
   let next = patchTask(c, task.id, { payload: { ...task.payload, scheduledFor: action.date } });
-  if (task.catalogId === "pre_application_meeting") {
-    const schedulerId = taskId(next.id, "schedule_pre_application_meeting");
-    if (findTask(next, schedulerId)) next = moveTask(next, schedulerId, "done", ctx, actor);
-  }
+  if (task.catalogId === "pre_application_meeting") next = finishScheduling(next, ctx, actor);
   next = appendActivity(next, actor, `Scheduled "${task.title}" for ${fmtDate(action.date)}.`, ctx);
   return { ok: true, case: next };
 }
 
+/**
+ * Closes the Clerk's "Schedule the pre-application meeting" task. A meeting can be moved to
+ * another day, so this is done only once, the first time it is scheduled (or held).
+ */
+function finishScheduling(c: EventCase, ctx: RulesCtx, actor: Actor): EventCase {
+  const scheduler = findTask(c, taskId(c.id, "schedule_pre_application_meeting"));
+  return scheduler && scheduler.status !== "done" ? moveTask(c, scheduler.id, "done", ctx, actor) : c;
+}
+
 export function completeCityTask(c: EventCase, action: Extract_<"complete_city_task">, actor: Actor, ctx: RulesCtx): TransitionResult {
-  const check = checkCompleteCityTask(c, action.taskId);
+  const check = checkCompleteCityTask(c, action.taskId, actor);
   if (!check.ok) return check;
   const task = findTask(c, action.taskId) as Task;
-  const next = appendActivity(moveTask(c, task.id, "done", ctx, actor, { payload: { ...task.payload, note: action.note } }), actor, `Completed "${task.title}".`, ctx);
+  let next = moveTask(c, task.id, "done", ctx, actor, { payload: { ...task.payload, note: action.note } });
+  // A re-review closed with no change accepts the card it was checking, so the card never
+  // sits "With the city" with nobody tasked.
+  const card = cardUnderVerification(next, task);
+  if (card) next = acceptCard(next, card, ctx, actor);
+  // A pre-application meeting that was held needs no date any more, scheduled or not.
+  if (task.catalogId === "pre_application_meeting") next = finishScheduling(next, ctx, actor);
+  next = appendActivity(next, actor, `Completed "${task.title}".`, ctx);
   return { ok: true, case: next };
 }
 
@@ -209,7 +228,7 @@ export function logCloseout(c: EventCase, action: Extract_<"log_closeout">, acto
   const actualsByLine = new Map(action.actuals.map((a) => [a.feeLineId, a.qty]));
   const feeLines = c.feeLines.map((line) => {
     const qty = actualsByLine.get(line.id);
-    return qty !== undefined ? { ...line, actual: qty * line.unitPrice } : { ...line, actual: line.estimate };
+    return qty !== undefined ? { ...line, actual: lineAmount(qty, line.unitPrice) } : { ...line, actual: line.estimate };
   });
   const extraLines: FeeLine[] = action.extraLines.map((fl, i) => ({
     id: taskId(c.id, "fee", feeLines.length + i + 1),
@@ -219,7 +238,7 @@ export function logCloseout(c: EventCase, action: Extract_<"log_closeout">, acto
     unit: fl.unit,
     unitPrice: fl.unitPrice,
     estimate: 0,
-    actual: fl.qty * fl.unitPrice,
+    actual: lineAmount(fl.qty, fl.unitPrice),
     kind: fl.kind ?? "fee",
   }));
 

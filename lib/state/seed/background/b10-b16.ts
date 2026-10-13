@@ -170,7 +170,9 @@ export const B13: SeedScript = {
 };
 
 /** B14 · Cascade Trail Runners: Permitted Special event with work orders. Stress rows: a route
- *  over 10 miles (four laps of the Riverfront loop) and 30+ activity entries. */
+ *  over 10 miles (four laps of the Riverfront loop) and 30+ activity entries. Its history holds
+ *  the pre-application meeting and the community notice, so the only open work is what a
+ *  permitted event still has ahead of it. */
 const CASE14 = "PMT-27-0030";
 const FOUR_LAPS = [...RIVERFRONT_5K_ROUTE, ...RIVERFRONT_5K_ROUTE, ...RIVERFRONT_5K_ROUTE, ...RIVERFRONT_5K_ROUTE];
 
@@ -256,8 +258,20 @@ export const B14: SeedScript = {
       ],
     }),
     b14Notes("pws", "Coordinating with Police traffic unit on lap-start staggering", "2027-02-15T09:00"),
+    step("2027-02-16T09:00", "clerk", {
+      type: "schedule_meeting",
+      taskId: taskId(CASE14, "pre_application_meeting"),
+      date: "2027-02-19",
+    }),
     b14Notes("pws", "Confirmed aid station placement at each bridge crossing", "2027-02-18T09:00"),
+    step("2027-02-19T14:00", "clerk", { type: "complete_city_task", taskId: taskId(CASE14, "pre_application_meeting") }),
     b14Notes("hl", "Insurance carrier confirmed, pending final review", "2027-02-20T09:00"),
+    step("2027-02-22T09:00", "applicant", {
+      type: "complete_task",
+      taskId: taskId(CASE14, "community_notification"),
+      files: [sampleFile("four-bridges-ultra-posted-notice.jpg", { type: "image/jpeg", size: 1_010_000 })],
+    }),
+    step("2027-02-23T09:00", "clerk", { type: "verify_document", taskId: taskId(CASE14, "community_notification") }),
     step("2027-02-25T09:00", "pws", {
       type: "review_decide",
       decision: "approve_with_conditions",
@@ -274,7 +288,18 @@ export const B14: SeedScript = {
     b14Notes("pws", "Work order: 30 barricades staged at the start/finish", "2027-03-02T09:00"),
     b14Notes("pws", "Work order: 6 officers confirmed for lap crossings", "2027-03-02T09:05"),
     b14Notes("clerk", "Day-of contact card printed for the organizer", "2027-03-03T09:00"),
-    b14Notes("pws", "Walkthrough of the finish-line area completed", "2027-03-10T09:00"),
+    // Both meetings are on the calendar and still to come: the race is on Aug 14.
+    step("2027-03-04T09:00", "clerk", {
+      type: "schedule_meeting",
+      taskId: taskId(CASE14, "coordination_meeting"),
+      date: "2027-07-23",
+    }),
+    step("2027-03-04T09:05", "pws", {
+      type: "schedule_meeting",
+      taskId: taskId(CASE14, "site_walkthrough"),
+      date: "2027-08-06",
+    }),
+    b14Notes("pws", "Early look at the finish-line area with the organizer; the full walkthrough is set for Aug 6", "2027-03-10T09:00"),
     b14Notes("hl", "Accessible viewing area confirmed near the finish", "2027-03-11T09:00"),
     b14Notes("clerk", "Reminder sent: permit packet available for pickup", "2027-03-12T09:00"),
     b14Notes("pws", "Road paint for lap markers scheduled", "2027-03-14T09:00"),
@@ -283,7 +308,8 @@ export const B14: SeedScript = {
     b14Notes("hl", "Medical tent staffing plan received and filed", "2027-03-21T09:00"),
   ],
   expect: { tier: "special", state: "permitted" },
-  notes: "Stress rows: a 12.4-mile route and 30+ activity entries.",
+  notes:
+    "Stress rows: a 12.4-mile route and 30+ activity entries. The Special event with work orders: its three work orders are open, its coordination meeting and walkthrough are scheduled, and everything before the permit is done.",
 };
 
 /** B15 · Pine Street Neighborhood Association: Permitted, a plain filler. */

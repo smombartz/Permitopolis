@@ -1,11 +1,10 @@
 /** `pay`: the applicant pays by card, or the Clerk records an in-person payment. */
 import { fmtMoney } from "@/lib/format";
-import { round2 } from "@/lib/rules/shared";
 import type { RulesCtx } from "@/lib/rules/types";
 import type { Actor, EventCase } from "@/lib/types";
 import type { Action } from "../actions";
 import { fail, OK, type CheckResult } from "../checks";
-import { appendActivity, dueAtQuote, findTask, moveTask, nowOf, patchTask, taskId, totalPaid } from "../core";
+import { appendActivity, findTask, moveTask, nowOf, patchTask, quoteBalance, taskId, totalPaid } from "../core";
 import type { TransitionResult } from "../types";
 import { maybeUnlockIssuePermit } from "./shared";
 
@@ -49,7 +48,7 @@ export function pay(c: EventCase, action: PayAction, actor: Actor, ctx: RulesCtx
   if (action.kind === "quote") {
     // The card is done only when the quote is covered. A part payment (the Clerk records
     // whatever was handed over) leaves it open for the balance, so the applicant is still up.
-    const remaining = round2(dueAtQuote(next, ctx.cfg) - totalPaid(next));
+    const remaining = quoteBalance(next, ctx.cfg);
     const payFees = findTask(next, taskId(next.id, "pay_fees"));
     if (payFees && payFees.status !== "done") {
       next =
@@ -57,7 +56,12 @@ export function pay(c: EventCase, action: PayAction, actor: Actor, ctx: RulesCtx
           ? patchTask(next, payFees.id, { payload: { ...payFees.payload, amount: remaining } })
           : moveTask(next, payFees.id, "done", ctx, actor, { payload: { ...payFees.payload, amount: totalPaid(next) } });
     }
-    if (remaining <= 0) next = payFirstSession(next);
+    if (remaining <= 0) {
+      next = payFirstSession(next);
+      // The hold's expiry was the deadline for this payment. A paid quote can no longer lose its
+      // date, so the deadline goes: nothing should read "held until" a day that has passed.
+      if (next.dateHold.status === "held") next = { ...next, dateHold: { ...next.dateHold, expiresOn: null } };
+    }
     next = maybeUnlockIssuePermit(next, ctx);
   }
 

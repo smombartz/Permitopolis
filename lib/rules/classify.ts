@@ -83,7 +83,7 @@ export const classify = (a: EventAnswers, cfg: RulesConfig = DEFAULT_CONFIG): Cl
   const blockPartyException = isBlockPartyException(a, cfg);
   const triggers = buildTriggers(a, cfg, blockPartyException);
   const t = highestTier(triggers);
-  const reviewers = buildRouting(a, triggers, t, { includeClerkForSpecial: true });
+  const reviewers = buildRouting(a, { tier: t, triggers, blockPartyException }, { includeClerkForSpecial: true, cfg });
   const components = permitComponents(a, triggers, blockPartyException);
 
   const article = t === "instant" ? "an" : "a";

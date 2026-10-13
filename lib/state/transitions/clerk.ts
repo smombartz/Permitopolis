@@ -3,12 +3,13 @@ import { addDaysISO } from "@/lib/dates";
 import { fmtMoney } from "@/lib/format";
 import { dueDate } from "@/lib/rules";
 import { CARD_BY_ID } from "@/lib/rules/catalog";
+import { round2 } from "@/lib/rules/shared";
 import type { RulesCtx } from "@/lib/rules/types";
 import type { Actor, Condition, EventCase, FeeLine, Review } from "@/lib/types";
 import type { Action } from "../actions";
 import { checkAcceptComplete, checkConfirmRouting, checkDeny, checkIssuePermit, checkReconcileClose, checkSendQuote } from "../checks";
 import { lastSessionDate } from "../clock";
-import { addTask, addTasks, appendActivity, applyUnlockEvent, dueAtQuote, findTask, moveTask, newTask, nowOf, patchTask, taskId } from "../core";
+import { addTask, addTasks, appendActivity, applyUnlockEvent, dueAtQuote, findTask, lineAmount, moveTask, newTask, nowOf, patchTask, taskId } from "../core";
 import type { TransitionResult } from "../types";
 
 type Extract_<T extends Action["type"]> = Extract<Action, { type: T }>;
@@ -52,7 +53,7 @@ export function acceptComplete(c: EventCase, _action: Extract_<"accept_complete"
 }
 
 export function confirmRouting(c: EventCase, action: Extract_<"confirm_routing">, actor: Actor, ctx: RulesCtx): TransitionResult {
-  const check = checkConfirmRouting(c);
+  const check = checkConfirmRouting(c, action.reviewers);
   if (!check.ok) return check;
   const reviews: Review[] = action.reviewers.map((r) => ({
     dept: r.dept,
@@ -111,7 +112,7 @@ export function sendQuote(c: EventCase, action: Extract_<"send_quote">, actor: A
       qty: fl.qty,
       unit: fl.unit,
       unitPrice: fl.unitPrice,
-      estimate: fl.qty * fl.unitPrice,
+      estimate: lineAmount(fl.qty, fl.unitPrice),
       actual: null,
       kind: fl.kind ?? "fee",
     }));
@@ -181,10 +182,10 @@ function workOrdersFor(c: EventCase, ctx: RulesCtx) {
 export function reconcileClose(c: EventCase, _action: Extract_<"reconcile_close">, actor: Actor, ctx: RulesCtx): TransitionResult {
   const check = checkReconcileClose(c);
   if (!check.ok) return check;
-  const balance = c.feeLines.filter((f) => f.kind !== "deposit").reduce((s, f) => s + ((f.actual ?? f.estimate) - f.estimate), 0);
-  const depositPaid = c.feeLines.filter((f) => f.kind === "deposit").reduce((s, f) => s + f.estimate, 0);
-  const refund = balance <= depositPaid ? depositPaid - balance : null;
-  const owed = refund === null ? balance - depositPaid : null;
+  const balance = round2(c.feeLines.filter((f) => f.kind !== "deposit").reduce((s, f) => s + ((f.actual ?? f.estimate) - f.estimate), 0));
+  const depositPaid = round2(c.feeLines.filter((f) => f.kind === "deposit").reduce((s, f) => s + f.estimate, 0));
+  const refund = balance <= depositPaid ? round2(depositPaid - balance) : null;
+  const owed = refund === null ? round2(balance - depositPaid) : null;
 
   let next: EventCase = { ...c, closeout: { ...c.closeout, balance, refund } };
   const billId = taskId(next.id, "final_bill_or_refund");

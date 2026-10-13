@@ -54,6 +54,19 @@ export function taskDueDate(task: Task): ISODate | null {
   return task.request && !task.request.resolved ? task.request.dueDate : task.dueDate;
 }
 
+/**
+ * Sort order for tasks: oldest due first, by the date that applies now (see taskDueDate). A
+ * task with no due date goes last; ties keep the order they had, which is the order of creation.
+ */
+export function byDueDate(a: Task, b: Task): number {
+  const dueA = taskDueDate(a);
+  const dueB = taskDueDate(b);
+  if (dueA === dueB) return 0;
+  if (dueA === null) return 1;
+  if (dueB === null) return -1;
+  return dueA < dueB ? -1 : 1;
+}
+
 /** `ctx.now`, defaulting to 9am on `ctx.today`. transition() never reads the real clock. */
 export function nowOf(ctx: RulesCtx): ISODateTime {
   return ctx.now ?? `${ctx.today}T09:00`;
@@ -240,13 +253,22 @@ export function reviewFor(c: EventCase, dept: Dept) {
   return c.reviews.find((r) => r.dept === dept);
 }
 
+/**
+ * What a fee line comes to. Money is kept to the cent everywhere: 3.1 miles at $400 is
+ * 1240.0000000000002 in floating point, and a sum of cent amounts drifts the same way, so every
+ * product and every total is rounded before it is stored or compared.
+ */
+export function lineAmount(qty: number, unitPrice: number): number {
+  return round2(qty * unitPrice);
+}
+
 /** Sum of fee-line estimates (or actuals once closeout has filled them in), by kind. */
 export function sumFeeLines(c: EventCase, kinds: Array<"fee" | "deposit" | "late_fee">): number {
-  return c.feeLines.filter((f) => kinds.includes(f.kind)).reduce((s, f) => s + (f.actual ?? f.estimate), 0);
+  return round2(c.feeLines.filter((f) => kinds.includes(f.kind)).reduce((s, f) => s + (f.actual ?? f.estimate), 0));
 }
 
 export function totalPaid(c: EventCase): number {
-  return c.payments.reduce((s, p) => s + p.amount, 0);
+  return round2(c.payments.reduce((s, p) => s + p.amount, 0));
 }
 
 export function caseTotal(c: EventCase): number {
@@ -268,7 +290,12 @@ export function dueAtQuote(c: EventCase, cfg: RulesConfig): number {
   return Math.max(0, round2(total - laterSessions * (estimate.perSession ?? 0)));
 }
 
+/** What is still owed on the quote, to the cent. Zero or less once it is covered. */
+export function quoteBalance(c: EventCase, cfg: RulesConfig): number {
+  return round2(dueAtQuote(c, cfg) - totalPaid(c));
+}
+
 /** The applicant has paid what the quote asks for now. Issue permit and the date hold both turn on it. */
 export function quotePaid(c: EventCase, cfg: RulesConfig): boolean {
-  return totalPaid(c) >= dueAtQuote(c, cfg);
+  return quoteBalance(c, cfg) <= 0;
 }

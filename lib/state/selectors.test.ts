@@ -2,18 +2,23 @@ import { describe, expect, it } from "vitest";
 import { DEFAULT_CONFIG } from "@/lib/rules/config";
 import { makeCase, makeTask } from "./testSupport";
 import {
+  activePermits,
   applicantCases,
   boardColumn,
+  boardColumns,
   caseTotals,
   daysUntilEvent,
   eventDate,
+  hasActivePermit,
   involves,
   isOpen,
   isVisibleToCity,
   leadTimeRisk,
   nextCaseId,
+  permitSessions,
   queueFor,
   reviewClock,
+  whoIsUp,
 } from "./selectors";
 
 describe("boardColumn", () => {
@@ -46,6 +51,118 @@ describe("isOpen / isVisibleToCity / involves", () => {
   });
 });
 
+describe("boardColumns", () => {
+  const card = (suffix: string, extra: Partial<Parameters<typeof makeTask>[0]> = {}) => makeTask({ id: `PMT-27-0001:${suffix}`, catalogId: suffix, ...extra });
+  const request = { from: "hl" as const, message: "Please upload it.", at: "2027-04-30T09:05", dueDate: "2027-05-05", resolved: false };
+
+  it("sorts the applicant's cards into the four columns and leaves the city's tasks out", () => {
+    const c = makeCase({
+      state: "needs_info",
+      tasks: [
+        card("insurance_certificate", { status: "done" }),
+        card("vendor_list", { status: "submitted" }),
+        card("vendor_health_permit", { status: "todo" }),
+        card("accept_and_sign", { status: "locked" }),
+        card("sound_details", { status: "changes_requested" }),
+        card("review:hl", { owner: "hl", kind: "review" }),
+      ],
+    });
+    const columns = boardColumns(c);
+    expect(Object.fromEntries(Object.entries(columns).map(([column, tasks]) => [column, tasks.map((t) => t.catalogId)]))).toEqual({
+      do_now: ["vendor_health_permit", "sound_details"],
+      with_city: ["vendor_list"],
+      coming_up: ["accept_and_sign"],
+      done: ["insurance_certificate"],
+    });
+  });
+
+  it("Do now: a city request is pinned on top, then Submit application once it unlocks, then by due date", () => {
+    const c = makeCase({
+      state: "draft",
+      tasks: [
+        card("no_date", { dueDate: null }),
+        card("later", { dueDate: "2027-06-04" }),
+        card("sooner", { dueDate: "2027-05-10" }),
+        card("submit_application", { dueDate: "2027-05-19" }),
+        card("asked_for", { dueDate: "2027-06-30", request }),
+      ],
+    });
+    expect(boardColumns(c).do_now.map((t) => t.catalogId)).toEqual(["asked_for", "submit_application", "sooner", "later", "no_date"]);
+  });
+
+  it("an answered request no longer pins its card", () => {
+    const c = makeCase({ tasks: [card("sooner", { dueDate: "2027-05-10" }), card("answered", { dueDate: "2027-06-04", status: "changes_requested", request: { ...request, resolved: true } })] });
+    expect(boardColumns(c).do_now.map((t) => t.catalogId)).toEqual(["sooner", "answered"]);
+  });
+});
+
+describe("whoIsUp", () => {
+  it("names the parties that are up now, in the order applicant, clerk, pws, hl", () => {
+    const sign = makeTask({ id: "PMT-27-0097:accept_and_sign", catalogId: "accept_and_sign", kind: "sign_off" });
+    const verify = makeTask({ id: "PMT-27-0097:verify:insurance_certificate", catalogId: "verify:insurance_certificate", owner: "hl", kind: "review" });
+    const issue = makeTask({ id: "PMT-27-0097:issue_permit", catalogId: "issue_permit", owner: "clerk", kind: "action", status: "locked" });
+    expect(whoIsUp(makeCase({ state: "quote_sent", tasks: [verify, issue, sign] }), "2027-05-03")).toEqual(["applicant", "hl"]);
+    expect(whoIsUp(makeCase({ state: "permitted" }), "2027-05-03")).toEqual([]);
+    expect(whoIsUp(makeCase({ state: "submitted", ending: "withdrawn", tasks: [sign] }), "2027-05-03")).toEqual([]);
+  });
+});
+
+describe("active permits", () => {
+  const on = (date: string, billing: "paid" | "upcoming" | "skipped" = "upcoming") => ({ date, availability: { status: "open" as const }, billing });
+  const single = (id: string, date: string, extra: Partial<Parameters<typeof makeCase>[0]> = {}) =>
+    makeCase({ id, state: "permitted", schedule: { date, start: "11:00", end: "16:00", occurrences: [on(date)] }, ...extra });
+  const held = { status: "held" as const, placedOn: "2027-04-19", expiresOn: "2027-05-14" };
+
+  const picnic = single("PMT-27-0109", "2027-05-22");
+  const festival = single("PMT-27-0031", "2027-04-24", { state: "closeout" });
+  const taiChi = makeCase({
+    id: "PMT-27-0034",
+    state: "event_day",
+    schedule: {
+      date: "2027-05-24",
+      start: "07:00",
+      end: "08:00",
+      recurrence: { frequency: "weekly", weekday: 1, until: "2027-06-07" },
+      occurrences: [on("2027-05-24", "paid"), on("2027-05-31", "skipped"), on("2027-06-07")],
+    },
+  });
+  const quoted = single("PMT-27-0097", "2027-07-11", { state: "quote_sent", dateHold: held });
+  const others = [
+    single("PMT-27-0050", "2027-06-15", { ending: "cancelled" }),
+    single("PMT-27-0044", "2027-03-01", { state: "closed" }),
+    single("PMT-27-0118", "2027-06-18", { state: "needs_info", dateHold: { ...held, expiresOn: null } }),
+    single("PMT-27-0052", "2027-07-01", { state: "quote_sent", ending: "hold_expired", dateHold: { ...held, status: "expired" } }),
+    makeCase({ id: "PMT-27-0142", state: "draft" }),
+  ];
+  const cases = [quoted, picnic, ...others, taiChi, festival];
+
+  it("hasActivePermit: Permitted, Event day or Closeout, and not ended", () => {
+    expect(cases.filter(hasActivePermit).map((c) => c.id)).toEqual(["PMT-27-0109", "PMT-27-0034", "PMT-27-0031"]);
+  });
+
+  it("activePermits lists them by event date, soonest first", () => {
+    expect(activePermits(cases, "2027-05-03").map((c) => c.id)).toEqual(["PMT-27-0031", "PMT-27-0109", "PMT-27-0034"]);
+  });
+
+  it("with holds: Quote sent cases that hold their date join the list, and only those", () => {
+    expect(activePermits(cases, "2027-05-03", { includeHolds: true }).map((c) => c.id)).toEqual(["PMT-27-0031", "PMT-27-0109", "PMT-27-0034", "PMT-27-0097"]);
+  });
+
+  it("permitSessions gives the calendar one entry per session held, in date order, without skipped sessions", () => {
+    expect(permitSessions(cases).map((s) => [s.case.id, s.date])).toEqual([
+      ["PMT-27-0031", "2027-04-24"],
+      ["PMT-27-0109", "2027-05-22"],
+      ["PMT-27-0034", "2027-05-24"],
+      ["PMT-27-0034", "2027-06-07"],
+    ]);
+  });
+
+  it("permitSessions takes a date range and the holds toggle", () => {
+    expect(permitSessions(cases, { from: "2027-05-22", to: "2027-05-31" }).map((s) => s.date)).toEqual(["2027-05-22", "2027-05-24"]);
+    expect(permitSessions(cases, { from: "2027-07-01", includeHolds: true }).map((s) => [s.case.id, s.date])).toEqual([["PMT-27-0097", "2027-07-11"]]);
+  });
+});
+
 describe("applicantCases", () => {
   it("filters by applicantId", () => {
     const mine = makeCase({ id: "PMT-27-0001", applicantId: "maya" });
@@ -70,6 +187,17 @@ describe("queueFor", () => {
     const task = makeTask({ id: "a", catalogId: "x", owner: "pws" });
     const c = makeCase({ state: "closed", tasks: [task] });
     expect(queueFor([c], "pws", "2027-05-03")).toEqual([]);
+  });
+
+  it("lists the tasks oldest due first across cases, with undated tasks last", () => {
+    const first = makeCase({ id: "PMT-27-0001", state: "in_review", tasks: [makeTask({ id: "a", catalogId: "later", owner: "hl", dueDate: "2027-06-01" }), makeTask({ id: "b", catalogId: "undated", owner: "hl" })] });
+    const second = makeCase({ id: "PMT-27-0002", state: "in_review", tasks: [makeTask({ id: "c", catalogId: "overdue", owner: "hl", dueDate: "2027-04-10" }), makeTask({ id: "d", catalogId: "soon", owner: "hl", dueDate: "2027-05-07" })] });
+    expect(queueFor([first, second], "hl", "2027-05-03").map((item) => [item.task.catalogId, item.group])).toEqual([
+      ["overdue", "overdue"],
+      ["soon", "this_week"],
+      ["later", "later"],
+      ["undated", "later"],
+    ]);
   });
 });
 
@@ -133,6 +261,14 @@ describe("caseTotals", () => {
       payments: [{ id: "p1", at: "2027-05-01T09:00", amount: 50, method: "card", kind: "quote" }],
     });
     expect(caseTotals(c)).toEqual({ fees: 50, deposit: 250, total: 300, paid: 50, due: 250 });
+  });
+
+  it("adds up to the cent: 62.1 + 62.2 + 62.3 is $186.60, and $124.50 is due after the first", () => {
+    const c = makeCase({
+      feeLines: [62.1, 62.2, 62.3].map((amount, i) => ({ id: `f${i}`, dept: "clerk" as const, label: `Line ${i}`, qty: 1, unit: "flat", unitPrice: amount, estimate: amount, actual: null, kind: "fee" as const })),
+      payments: [{ id: "p1", at: "2027-05-01T09:00", amount: 62.1, method: "card", kind: "quote" }],
+    });
+    expect(caseTotals(c)).toEqual({ fees: 186.6, deposit: 0, total: 186.6, paid: 62.1, due: 124.5 });
   });
 
   it("after reconciling, the deposit is settled: a refunded case owes nothing (S6)", () => {
