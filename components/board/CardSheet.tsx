@@ -12,6 +12,7 @@ import { PartyChip } from "@/components/domain/PartyChip"
 import { TaskKindLabel } from "@/components/domain/TaskKindLabel"
 import { MapThumbnail } from "@/components/map"
 import { CityServicesForm, SimpleCardForm, VendorListForm } from "@/components/board/CardForms"
+import { useIsNarrow } from "@/components/shell"
 import { Button } from "@/components/ui/button"
 import { CopyButton } from "@/components/ui/copy-button"
 import { FileDrop } from "@/components/ui/file-drop"
@@ -251,11 +252,14 @@ function FormBody({ c, task, dispatch, onClose }: BodyProps) {
 function RecordBody({ c, task }: BodyProps) {
   const record = cardRecord(c, task)
   const settlement = task.catalogId === "final_bill_or_refund" ? finalSettlement(c) : null
+  // A sheet is full-width under 640px, about 335px once its padding is out, narrower than the
+  // four-column table's comfortable width.
+  const phone = useIsNarrow("(max-width: 639px)")
   return (
     <div className="flex flex-col gap-4">
       {settlement ? (
         <>
-          <FeeTable lines={c.feeLines} showActual />
+          <FeeTable lines={c.feeLines} showActual compact={phone} />
           <InlineAlert variant={settlement.payHref ? "warning" : "success"}>{settlement.sentence}</InlineAlert>
           {settlement.payHref ? (
             <Button asChild className="self-start">
@@ -440,7 +444,7 @@ function FeedbackBody({ task, dispatch, onClose }: BodyProps) {
             aria-checked={rating === n}
             onClick={() => setRating(n)}
             disabled={done}
-            className="rounded-control p-1 text-2xl outline-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring disabled:opacity-60"
+            className="flex size-11 shrink-0 items-center justify-center rounded-control text-2xl outline-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring disabled:opacity-60"
           >
             {n <= rating ? "★" : "☆"}
           </button>

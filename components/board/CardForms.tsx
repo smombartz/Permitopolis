@@ -106,22 +106,25 @@ function VendorListForm({ initial, vendorCount, onSubmit }: VendorListFormProps)
     >
       <div className="flex flex-col gap-3">
         {rows.map((row, index) => (
-          <div key={index} className="flex items-end gap-2 rounded-control border border-line-subtle bg-surface-2 p-3">
-            <Field label="Vendor name" className="flex-1">
+          <div key={index} className="flex flex-col gap-2 rounded-control border border-line-subtle bg-surface-2 p-3 sm:flex-row sm:items-end">
+            <Field label="Vendor name" className="w-full sm:flex-1">
               <Input value={row.name} onChange={(e) => updateRow(index, { name: e.target.value })} placeholder="Rolling Dumpling Co." />
             </Field>
-            <Field label="Serves" className="flex-1">
-              <Input value={row.serves} onChange={(e) => updateRow(index, { serves: e.target.value })} placeholder="Dumplings and noodle bowls" />
-            </Field>
-            <Button
-              type="button"
-              variant="ghost"
-              size="icon-sm"
-              onClick={() => setRows((r) => r.filter((_, i) => i !== index))}
-              aria-label="Remove vendor"
-            >
-              <Trash2Icon />
-            </Button>
+            <div className="flex items-end gap-2">
+              <Field label="Serves" className="w-full sm:flex-1">
+                <Input value={row.serves} onChange={(e) => updateRow(index, { serves: e.target.value })} placeholder="Dumplings and noodle bowls" />
+              </Field>
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon-sm"
+                className="shrink-0"
+                onClick={() => setRows((r) => r.filter((_, i) => i !== index))}
+                aria-label="Remove vendor"
+              >
+                <Trash2Icon />
+              </Button>
+            </div>
           </div>
         ))}
       </div>
