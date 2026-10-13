@@ -6,14 +6,7 @@ import Link from "next/link";
 import { toast } from "sonner";
 import { CalendarIcon, LightbulbIcon, RotateCcwIcon, SettingsIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import {
   DropdownMenu,
   DropdownMenuCheckboxItem,
@@ -25,8 +18,10 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { DemoDatePicker } from "@/components/shell/DemoDatePicker";
 import { useDemo } from "@/lib/state";
-import { SCENARIO_JUMPS } from "@/lib/data/demoScript";
-import { routes } from "@/lib/routes";
+import { SCENARIO_JUMPS, type ScenarioJump } from "@/lib/data/demoScript";
+import { fmtDate } from "@/lib/format";
+import { homeFor, routes } from "@/lib/routes";
+import { DEFAULT_DEMO_TODAY } from "@/lib/rules/config";
 import type { ISODate } from "@/lib/types";
 
 /** The top bar's Demo menu: reset, set demo date, scenario jumps, hints, and the demo guide. */
@@ -43,9 +38,14 @@ function DemoMenu() {
   const [resetOpen, setResetOpen] = React.useState(false);
   const [dateOpen, setDateOpen] = React.useState(false);
 
+  /**
+   * Reset puts the role switcher back on the Applicant, so the page has to follow: a city
+   * page would otherwise show its "built for a city role" panel, and an event made during
+   * the demo no longer exists.
+   */
   function handleReset() {
     reset();
-    setResetOpen(false);
+    router.push(homeFor(useDemo.getState().role));
     toast.success("Demo data restored");
   }
 
@@ -54,9 +54,10 @@ function DemoMenu() {
     setDateOpen(false);
   }
 
-  function handleScenarioJump(jump: (typeof SCENARIO_JUMPS)[number]) {
+  /** A jump names its own page, so it sets the role and persona itself and skips useRoleSwitch(). */
+  function handleScenarioJump(jump: ScenarioJump) {
     setRole(jump.role);
-    if (jump.personaId) setPersona(jump.personaId);
+    setPersona(jump.personaId);
     router.push(jump.path);
   }
 
@@ -98,22 +99,15 @@ function DemoMenu() {
 
       <DemoDatePicker open={dateOpen} onOpenChange={setDateOpen} demoToday={demoToday} onSelect={handleSetDemoToday} />
 
-      <Dialog open={resetOpen} onOpenChange={setResetOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Reset the demo?</DialogTitle>
-            <DialogDescription>
-              This restores every case, the demo date and the role switcher to the seed exactly as it was on Mon, May 3,
-              2027. There is no undo.
-            </DialogDescription>
-          </DialogHeader>
-          <DialogFooter showCloseButton>
-            <Button variant="destructive" onClick={handleReset}>
-              Reset demo data
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <ConfirmDialog
+        open={resetOpen}
+        onOpenChange={setResetOpen}
+        title="Reset the demo?"
+        body={`This restores every case, the demo date and the role switcher to the seed exactly as it was on ${fmtDate(DEFAULT_DEMO_TODAY)}. There is no undo.`}
+        confirmLabel="Reset demo data"
+        destructive
+        onConfirm={handleReset}
+      />
     </div>
   );
 }

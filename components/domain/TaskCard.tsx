@@ -5,6 +5,7 @@ import { Money } from "@/components/domain/Money"
 import { PartyChip } from "@/components/domain/PartyChip"
 import { TaskKindLabel } from "@/components/domain/TaskKindLabel"
 import { Progress } from "@/components/ui/progress"
+import { taskDueDate } from "@/lib/state"
 import { PARTY_LABEL, type ISODate, type Task } from "@/lib/types"
 
 const INTERACTIVE_FOCUS =
@@ -29,7 +30,8 @@ function TaskCard({ task, today, unlockHint, onSelect, className }: TaskCardProp
   const locked = task.status === "locked"
   const done = task.status === "done"
   const pinned = Boolean(task.request) && task.request?.resolved === false
-  const dueDate = pinned ? task.request?.dueDate : task.dueDate
+  // A pinned request carries its own, sooner date; the engine's helper knows which one applies.
+  const dueDate = taskDueDate(task)
   const interactive = Boolean(onSelect)
   const progress = task.kind === "sign_off" ? task.payload.progress : undefined
   const amount = task.kind === "payment" ? task.payload.amount : undefined

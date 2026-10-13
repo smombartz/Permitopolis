@@ -11,7 +11,8 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { PICKABLE_PERSONA_IDS, PERSONA_BY_ID } from "@/lib/data/people";
+import { PersonaAvatar } from "@/components/domain/PersonaAvatar";
+import { NEW_PERSONA_ID, PICKABLE_PERSONA_IDS, PERSONA_BY_ID } from "@/lib/data/people";
 import { routes } from "@/lib/routes";
 
 interface PersonaPickerProps {
@@ -23,8 +24,9 @@ interface PersonaPickerProps {
 /**
  * The applicant-role persona picker: the six scenario personas plus "New applicant", with
  * "My events" and "Plan an event" below. If the store's current persona isn't one of the
- * pickable ones (a filler-case applicant reached some other way), it still shows as the
- * current choice instead of silently picking "New applicant".
+ * pickable ones (a filler or background case's applicant, reached by following its case from
+ * a city role), it still shows as the current choice instead of silently picking "New
+ * applicant". `onChange` is the top bar's usePersonaSwitch(): picking also navigates.
  */
 function PersonaPicker({ personaId, onChange, className }: PersonaPickerProps) {
   const current = PERSONA_BY_ID[personaId];
@@ -35,8 +37,12 @@ function PersonaPicker({ personaId, onChange, className }: PersonaPickerProps) {
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
         <Button variant="secondary" size="sm" className={className} aria-label="Switch applicant">
-          <UserIcon data-icon="inline-start" aria-hidden="true" />
-          <span className="max-w-32 truncate">{current?.name ?? "New applicant"}</span>
+          {current && current.id !== NEW_PERSONA_ID ? (
+            <PersonaAvatar name={current.name} size="sm" data-icon="inline-start" aria-hidden="true" />
+          ) : (
+            <UserIcon data-icon="inline-start" aria-hidden="true" />
+          )}
+          <span className="max-w-32 truncate">{current?.name ?? PERSONA_BY_ID[NEW_PERSONA_ID].name}</span>
           <ChevronDownIcon data-icon="inline-end" aria-hidden="true" />
         </Button>
       </DropdownMenuTrigger>
@@ -45,7 +51,13 @@ function PersonaPicker({ personaId, onChange, className }: PersonaPickerProps) {
         <DropdownMenuRadioGroup value={personaId} onValueChange={onChange}>
           {options.map((p) => (
             <DropdownMenuRadioItem key={p.id} value={p.id}>
-              {p.id === "new" ? <PlusIcon aria-hidden="true" /> : null}
+              {p.id === NEW_PERSONA_ID ? (
+                <span className="flex size-6 shrink-0 items-center justify-center">
+                  <PlusIcon aria-hidden="true" />
+                </span>
+              ) : (
+                <PersonaAvatar name={p.name} size="sm" aria-hidden="true" />
+              )}
               {p.name}
             </DropdownMenuRadioItem>
           ))}

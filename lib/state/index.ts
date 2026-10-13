@@ -33,32 +33,38 @@ export {
   reviewClock,
   waitingOnOthers,
   whoIsUp,
-  type PermitSession,
 } from "./selectors";
 export { demoToday, resetDemoStoreForTests, useDemo, useHydrated } from "./store";
 export { transition } from "./transition";
-export { involvement, isStalled, nextMove, waitingOn, type Involvement } from "./waitingOn";
+export { involvement, isStalled, nextMove, waitingOn } from "./waitingOn";
 
 import { availableActions } from "./availableActions";
+import { actorsFor } from "./checks";
 import { advanceClock } from "./clock";
 import { newCase } from "./newCase";
 import {
+  activePermits,
   applicantCases,
   boardColumn,
+  boardColumns,
   caseTotals,
   daysUntilEvent,
   eventDate,
+  hasActivePermit,
+  holdsDateAtQuote,
   involves,
   isOpen,
   isVisibleToCity,
   leadTimeRisk,
   nextCaseId,
+  permitSessions,
   queueFor,
   reviewClock,
   waitingOnOthers,
+  whoIsUp,
 } from "./selectors";
 import { transition } from "./transition";
-import { nextMove, waitingOn } from "./waitingOn";
+import { involvement, nextMove, waitingOn } from "./waitingOn";
 
 export const state = {
   newCase,
@@ -67,10 +73,14 @@ export const state = {
   waitingOn,
   nextMove,
   boardColumn,
+  boardColumns,
+  whoIsUp,
+  actorsFor,
   advanceClock,
   isOpen,
   isVisibleToCity,
   involves,
+  involvement,
   applicantCases,
   queueFor,
   waitingOnOthers,
@@ -80,4 +90,8 @@ export const state = {
   caseTotals,
   leadTimeRisk,
   nextCaseId,
+  hasActivePermit,
+  holdsDateAtQuote,
+  activePermits,
+  permitSessions,
 } satisfies StateApi;

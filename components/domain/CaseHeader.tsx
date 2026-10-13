@@ -20,12 +20,16 @@ interface CaseHeaderProps extends React.ComponentProps<"div"> {
   tier: Tier
   caseId: string
   applicantName: string
-  eventDate: ISODate
+  /** `eventDate(c, today)`: the next session, or the last one once all have passed. Null for a Draft with no date yet. */
+  eventDate: ISODate | null
   today: ISODate
   state: CaseState
   ending?: Ending | null
   hold: DateHold
-  /** Omit when no department's review clock applies yet (before routing, or after Quote sent). */
+  /**
+   * Omit when no department's review clock applies yet (before routing, or after Quote sent).
+   * Map it from `reviewClock(c, dept, today)`: `{ dayCount: rc.day, allowedDays: rc.of, paused: rc.paused, pausedDays: rc.pausedDays }`.
+   */
   reviewClock?: CaseHeaderReviewClock | null
   /** The role's primary actions, right-aligned next to the title. */
   actions?: React.ReactNode
@@ -60,9 +64,15 @@ function CaseHeader({
             <span aria-hidden="true">·</span>
             <span>{applicantName}</span>
             <span aria-hidden="true">·</span>
-            <DateText date={eventDate} />
-            <span aria-hidden="true">·</span>
-            <span>{fmtDaysToGo(eventDate, today)}</span>
+            {eventDate ? (
+              <>
+                <DateText date={eventDate} />
+                <span aria-hidden="true">·</span>
+                <span>{fmtDaysToGo(eventDate, today)}</span>
+              </>
+            ) : (
+              <span>No date yet</span>
+            )}
           </div>
         </div>
         {actions ? <div className="flex shrink-0 flex-wrap items-center gap-2">{actions}</div> : null}

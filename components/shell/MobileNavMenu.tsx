@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { MenuIcon } from "lucide-react";
+import { MenuIcon, PlusIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -12,8 +12,9 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { PARTY_ICON } from "@/components/domain/icons";
+import { PersonaAvatar } from "@/components/domain/PersonaAvatar";
 import { PARTIES, PARTY_LABEL, type Party } from "@/lib/types";
-import { PICKABLE_PERSONA_IDS, PERSONA_BY_ID } from "@/lib/data/people";
+import { NEW_PERSONA_ID, PICKABLE_PERSONA_IDS, PERSONA_BY_ID } from "@/lib/data/people";
 import { routes } from "@/lib/routes";
 
 interface MobileNavMenuProps {
@@ -62,6 +63,13 @@ function MobileNavMenu({ role, onRoleChange, personaId, onPersonaChange }: Mobil
             <DropdownMenuRadioGroup value={personaId} onValueChange={onPersonaChange}>
               {options.map((p) => (
                 <DropdownMenuRadioItem key={p.id} value={p.id}>
+                  {p.id === NEW_PERSONA_ID ? (
+                    <span className="flex size-6 shrink-0 items-center justify-center">
+                      <PlusIcon aria-hidden="true" />
+                    </span>
+                  ) : (
+                    <PersonaAvatar name={p.name} size="sm" aria-hidden="true" />
+                  )}
                   {p.name}
                 </DropdownMenuRadioItem>
               ))}

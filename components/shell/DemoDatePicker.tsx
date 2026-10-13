@@ -3,14 +3,10 @@
 import { DayPicker } from "react-day-picker";
 import { Popover, PopoverAnchor, PopoverContent } from "@/components/ui/popover";
 import { Button } from "@/components/ui/button";
+import { DEMO_DATE_JUMPS } from "@/lib/data/demoScript";
 import { toDate, toISO } from "@/lib/dates";
+import { fmtDate } from "@/lib/format";
 import type { ISODate } from "@/lib/types";
-
-const QUICK_JUMPS: { date: ISODate; label: string }[] = [
-  { date: "2027-05-03", label: "Mon, May 3 (start)" },
-  { date: "2027-06-18", label: "Fri, Jun 18 (Jazz in the Plaza)" },
-  { date: "2027-07-11", label: "Sun, Jul 11 (Riverfront Summer 5K)" },
-];
 
 const DAY_PICKER_CLASS_NAMES = {
   months: "flex flex-col gap-2",
@@ -35,7 +31,7 @@ interface DemoDatePickerProps {
   onSelect: (date: ISODate) => void;
 }
 
-/** "Set demo date": react-day-picker inside a popover, plus the PRD's three quick jumps. */
+/** "Set demo date": react-day-picker inside a popover, plus the demo script's date jumps (lib/data/demoScript.ts). */
 function DemoDatePicker({ open, onOpenChange, demoToday, onSelect }: DemoDatePickerProps) {
   return (
     <Popover open={open} onOpenChange={onOpenChange}>
@@ -46,15 +42,17 @@ function DemoDatePicker({ open, onOpenChange, demoToday, onSelect }: DemoDatePic
         <div className="flex flex-col gap-3">
           <div className="flex flex-col gap-1">
             <p className="mb-1 text-[11px] font-bold tracking-[.12em] text-fg-label uppercase">Quick jumps</p>
-            {QUICK_JUMPS.map((jump) => (
+            {DEMO_DATE_JUMPS.map((jump) => (
               <Button
                 key={jump.date}
                 variant={jump.date === demoToday ? "secondary" : "ghost"}
                 size="sm"
                 className="justify-start"
+                aria-pressed={jump.date === demoToday}
                 onClick={() => onSelect(jump.date)}
               >
-                {jump.label}
+                <span className="font-mono">{fmtDate(jump.date)}</span>
+                <span className="font-normal text-fg-secondary">{jump.note}</span>
               </Button>
             ))}
           </div>
@@ -62,6 +60,8 @@ function DemoDatePicker({ open, onOpenChange, demoToday, onSelect }: DemoDatePic
             mode="single"
             selected={toDate(demoToday)}
             defaultMonth={toDate(demoToday)}
+            // Without this the picker marks the real today, which the demo never shows.
+            today={toDate(demoToday)}
             onSelect={(date) => {
               if (date) onSelect(toISO(date));
             }}

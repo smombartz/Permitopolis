@@ -9,10 +9,13 @@ interface CaseNotFoundProps {
   backLabel?: string;
 }
 
-/** An unknown case id: later screens (the board, the case detail) reuse this. */
+/**
+ * An unknown case id: later screens (the board, the case detail) reuse this. It fills the
+ * column the shell gives a screen, so it works under AppShell and CityShell alike.
+ */
 function CaseNotFound({ id, backHref, backLabel = "Back" }: CaseNotFoundProps) {
   return (
-    <div className="page-container flex min-h-[55vh] items-center justify-center py-16">
+    <div className="flex min-h-[55vh] items-center justify-center py-10">
       <EmptyState
         icon={FileQuestionIcon}
         title="Case not found"

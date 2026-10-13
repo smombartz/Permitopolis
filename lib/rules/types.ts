@@ -161,15 +161,23 @@ export interface FeeEstimate {
 export type DateFix = "new_date" | "drop_addon" | "late_fee";
 
 export interface DateGate {
+  /** The worst of the sessions' availabilities. Open when no place or no date is chosen yet. */
   availability: Availability;
+  /** Days from today to the first session. 0, and meaningless, when no date is chosen yet. */
   daysUntil: number;
+  /** True when the tier's lead time is met, and when no date is chosen yet. */
   leadTimeOk: boolean;
-  /** True when the date is open or impacted and the lead time is met. */
+  /** True when the date is open or impacted and the lead time is met. With no date yet, nothing fails. */
   ok: boolean;
   /** The earliest date that meets the lead time and is open. */
   earliestDate: ISODate;
+  /**
+   * What to offer, in this order. Empty when the gate passes. A date that is only too close
+   * offers a new date, dropping an add-on (when `droppable` has one) and the late fee. A date
+   * that is booked or blacked out offers a new date and nothing else.
+   */
   fixes: DateFix[];
-  /** Triggers whose removal lowers the tier far enough to meet the lead time. */
+  /** Triggers whose removal lowers the tier far enough to meet the lead time. Empty when the gate passes. */
   droppable: TriggerId[];
   /** What the late fee would add. */
   lateFeeAmount: number;
@@ -197,8 +205,11 @@ export interface RulesApi {
   classify(answers: EventAnswers, cfg?: RulesConfig): Classification;
   /** One entry per trigger whose removal alone lowers the tier, found by re-running classify without it. */
   whatIf(answers: EventAnswers, cfg?: RulesConfig): WhatIf[];
-  /** Suggested reviewers with reasons. The Clerk can adjust them. */
-  routing(answers: EventAnswers, cls: Classification): RoutingSuggestion[];
+  /**
+   * Suggested reviewers with reasons. The Clerk can adjust them. Pass the config when it is not
+   * the default: the crowd reason quotes the configured Special threshold.
+   */
+  routing(answers: EventAnswers, cls: Classification, cfg?: RulesConfig): RoutingSuggestion[];
   /**
    * The applicant's cards for this plan, all created up front. Cards for later stages are
    * 'locked' with `unlocksOn`. Task ids are `${caseId}:${catalogId}` (plus `:${n}` when repeated).

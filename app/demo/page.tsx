@@ -4,7 +4,7 @@ import { PlaceholderScreen } from "@/components/shell/PlaceholderScreen";
 export default function Page() {
   return (
     <Suspense fallback={null}>
-      <PlaceholderScreen route="/demo" />
+      <PlaceholderScreen route="/demo" standalone />
     </Suspense>
   );
 }

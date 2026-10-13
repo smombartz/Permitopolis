@@ -1,76 +1,116 @@
 /**
- * The demo script: the Demo menu's scenario jump list, and the seven rehearsed paths the
- * demo guide (`/demo`) and "Demo hints" walk a presenter through. Pure data, no React.
+ * The demo script: the Demo menu's scenario jump list and date jumps, and the seven rehearsed
+ * paths the demo guide (`/demo`) and "Demo hints" walk a presenter through. Pure data, no React.
  * Links are built with `lib/routes.ts` so a route change here never drifts from the real
- * ones. Case ids follow `docs/spec/prd.md`'s "Seed data" table and plan 3.3.
+ * ones. Case ids follow `docs/spec/prd.md`'s "Seed data" table and plan 3.3;
+ * `tests/seed.test.ts` checks every jump against the seed itself.
  *
  * Owned by workstream 2B (components/shell, lib/view/shell.ts).
  */
 import { routes } from "@/lib/routes";
-import type { Party } from "@/lib/types";
+import { DEFAULT_DEMO_TODAY } from "@/lib/rules/config";
+import type { ISODate, Party } from "@/lib/types";
 
 export type ScenarioKey = "S1" | "S2" | "S3" | "S4" | "S5" | "S6";
 
 export interface ScenarioJump {
   id: ScenarioKey;
-  /** Shown in the Demo menu's jump list, e.g. "S1 · Maya Chen". */
+  /** Shown in the Demo menu's jump list: the persona for an applicant jump, the event for a city one. */
   label: string;
+  /** The seeded case the jump opens. */
+  caseId: string;
   role: Party;
-  /** Set only when `role` is the Applicant: which persona the jump opens. */
-  personaId?: string;
+  /**
+   * The case's applicant. Set on every jump, city ones included, so that switching to the
+   * Applicant afterwards shows this scenario's organizer and not whoever was picked before.
+   */
+  personaId: string;
   path: string;
   /** The PRD's "Up on May 3" line: what is waiting when the jump lands. */
   state: string;
 }
 
+const S1 = "PMT-27-0109";
+const S2 = "PMT-27-0142";
+const S3 = "PMT-27-0118";
+const S4 = "PMT-27-0126";
+const S5 = "PMT-27-0097";
+const S6 = "PMT-27-0031";
+
 export const SCENARIO_JUMPS: ScenarioJump[] = [
   {
     id: "S1",
     label: "S1 · Maya Chen",
+    caseId: S1,
     role: "applicant",
     personaId: "maya-chen",
-    path: routes.permit("PMT-27-0109"),
+    path: routes.permit(S1),
     state: "Nobody; permit active",
   },
   {
     id: "S2",
     label: "S2 · Sunrise Yoga Club",
+    caseId: S2,
     role: "applicant",
     personaId: "sunrise-yoga-club",
-    path: routes.apply({ caseId: "PMT-27-0142", step: "when" }),
+    path: routes.apply({ caseId: S2, step: "when" }),
     state: "Applicant, in the wizard",
   },
   {
     id: "S3",
     label: "S3 · Downtown Arts Collective",
+    caseId: S3,
     role: "applicant",
     personaId: "downtown-arts-collective",
-    path: routes.event("PMT-27-0118"),
+    path: routes.event(S3),
     state: "Applicant: upload the food truck's health permit, due Wed, May 5",
   },
   {
     id: "S4",
     label: "S4 · Maple Street block captain",
+    caseId: S4,
     role: "applicant",
     personaId: "maple-street-block-captain",
-    path: routes.event("PMT-27-0126"),
+    path: routes.event(S4),
     state: "Applicant: 3 of 12 neighbor sign-offs",
   },
   {
     id: "S5",
     label: "S5 · Riverfront Summer 5K",
+    caseId: S5,
     role: "clerk",
-    path: routes.city.case("PMT-27-0097"),
+    personaId: "riverfront-running-club",
+    path: routes.city.case(S5),
     state:
       "Applicant: accept, sign and pay $6,530 by Fri, May 14. Health & Legal: verify the race-day insurance certificate.",
   },
   {
     id: "S6",
     label: "S6 · Main Street Food Truck Festival",
+    caseId: S6,
     role: "pws",
-    path: routes.city.case("PMT-27-0031"),
+    personaId: "main-street-business-alliance",
+    path: routes.city.case(S6),
     state: "Public Works & Safety: cleanup check and actual hours, due Fri, May 7",
   },
+];
+
+export interface DemoDateJump {
+  date: ISODate;
+  /** What the date is for, shown after the formatted date. */
+  note: string;
+  /** The scenario whose event falls on this date, if any. */
+  scenario?: ScenarioKey;
+}
+
+/**
+ * "Set demo date" quick jumps: the seed date, then the two event days the demo script visits.
+ * Jumping to Jun 18 puts Jazz in the Plaza on Event day once it has been permitted.
+ */
+export const DEMO_DATE_JUMPS: DemoDateJump[] = [
+  { date: DEFAULT_DEMO_TODAY, note: "Start of the demo" },
+  { date: "2027-06-18", note: "Jazz in the Plaza", scenario: "S3" },
+  { date: "2027-07-11", note: "Riverfront Summer 5K", scenario: "S5" },
 ];
 
 export type DemoPathPriority = "P0" | "P1";

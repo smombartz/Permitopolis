@@ -9,7 +9,7 @@ import type { Dept, EventCase, ISODate, Party, Task } from "@/lib/types";
 import type { RulesConfig } from "@/lib/rules/types";
 import { sessionDates } from "./clock";
 import { byDueDate, sumFeeLines, totalPaid } from "./core";
-import type { BoardColumn, CaseTotals, QueueGroup, QueueItem, ReviewClockView, StateApi, WaitingOnOthersItem } from "./types";
+import type { BoardColumn, CaseTotals, PermitSession, QueueGroup, QueueItem, ReviewClockView, StateApi, WaitingOnOthersItem } from "./types";
 import { involvement, waitingOn } from "./waitingOn";
 
 export const boardColumn: StateApi["boardColumn"] = (task: Task): BoardColumn => {
@@ -24,7 +24,7 @@ export const boardColumn: StateApi["boardColumn"] = (task: Task): BoardColumn =>
  * city request pinned on top, then Submit application once it has unlocked, then by due date.
  * The other columns keep the order of the plan.
  */
-export function boardColumns(c: EventCase): Record<BoardColumn, Task[]> {
+export const boardColumns: StateApi["boardColumns"] = (c: EventCase): Record<BoardColumn, Task[]> => {
   const columns: Record<BoardColumn, Task[]> = { do_now: [], with_city: [], coming_up: [], done: [] };
   for (const task of c.tasks) {
     if (task.owner === "applicant") columns[boardColumn(task)].push(task);
@@ -32,48 +32,46 @@ export function boardColumns(c: EventCase): Record<BoardColumn, Task[]> {
   const pin = (task: Task) => (task.request && !task.request.resolved ? 0 : task.catalogId === "submit_application" ? 1 : 2);
   columns.do_now.sort((a, b) => pin(a) - pin(b) || byDueDate(a, b));
   return columns;
-}
+};
 
 /** The parties that are up now, in the order applicant, clerk, pws, hl. Empty when nobody is. */
-export function whoIsUp(c: EventCase, today: ISODate): Party[] {
+export const whoIsUp: StateApi["whoIsUp"] = (c: EventCase, today: ISODate): Party[] => {
   return waitingOn(c, today)
     .filter((p) => p.status === "up_now")
     .map((p) => p.party);
-}
+};
 
 export const isOpen: StateApi["isOpen"] = (c: EventCase) => c.ending === null && c.state !== "closed";
 
 /** A permit that is live: Permitted, on Event day or in Closeout, and not cancelled. */
-export function hasActivePermit(c: EventCase): boolean {
+export const hasActivePermit: StateApi["hasActivePermit"] = (c: EventCase): boolean => {
   return c.ending === null && (c.state === "permitted" || c.state === "event_day" || c.state === "closeout");
-}
+};
 
 /** Quote sent and holding its date: what the "holds" toggle on Active permits adds. */
-export function holdsDateAtQuote(c: EventCase): boolean {
+export const holdsDateAtQuote: StateApi["holdsDateAtQuote"] = (c: EventCase): boolean => {
   return c.ending === null && c.state === "quote_sent" && c.dateHold.status === "held";
-}
+};
 
 /**
  * The Active permits list: every live permit, by event date (the next session, or the last one
  * once all have passed), soonest first. `includeHolds` adds the Quote sent cases holding a date.
  */
-export function activePermits(cases: EventCase[], today: ISODate, options: { includeHolds?: boolean } = {}): EventCase[] {
+export const activePermits: StateApi["activePermits"] = (cases: EventCase[], today: ISODate, options: { includeHolds?: boolean } = {}): EventCase[] => {
   const listed = cases.filter((c) => hasActivePermit(c) || (options.includeHolds === true && holdsDateAtQuote(c)));
   const dateOf = (c: EventCase) => eventDate(c, today) ?? "";
   return listed.sort((a, b) => dateOf(a).localeCompare(dateOf(b)) || a.id.localeCompare(b.id));
-}
-
-export interface PermitSession {
-  case: EventCase;
-  date: ISODate;
-}
+};
 
 /**
  * The Active permits calendar and map: one entry for each date an active permit is held, so a
  * series shows every session (a session skipped for a blackout is not one). In date order.
  * `from` and `to` are inclusive.
  */
-export function permitSessions(cases: EventCase[], options: { from?: ISODate; to?: ISODate; includeHolds?: boolean } = {}): PermitSession[] {
+export const permitSessions: StateApi["permitSessions"] = (
+  cases: EventCase[],
+  options: { from?: ISODate; to?: ISODate; includeHolds?: boolean } = {},
+): PermitSession[] => {
   const sessions: PermitSession[] = [];
   for (const c of cases) {
     if (!hasActivePermit(c) && !(options.includeHolds === true && holdsDateAtQuote(c))) continue;
@@ -84,7 +82,7 @@ export function permitSessions(cases: EventCase[], options: { from?: ISODate; to
     }
   }
   return sessions.sort((a, b) => a.date.localeCompare(b.date) || a.case.id.localeCompare(b.case.id));
-}
+};
 
 export const isVisibleToCity: StateApi["isVisibleToCity"] = (c: EventCase) => c.state !== "draft";
 

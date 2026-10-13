@@ -7,7 +7,7 @@ import { plural } from "@/lib/format";
 import { ENDING_LABEL, PARTIES, PARTY_LABEL } from "@/lib/types";
 import type { EventCase, ISODate, Party, Task, UnlockEvent } from "@/lib/types";
 import { byDueDate, signoffsLeft, taskDueDate } from "./core";
-import type { PartyStanding, PartyStatus, StateApi } from "./types";
+import type { Involvement, PartyStanding, PartyStatus, StateApi } from "./types";
 
 const DEFAULT_SCOPE: Record<Party, string> = {
   applicant: "Describing the event, documents and payment",
@@ -32,24 +32,15 @@ function scopeFor(c: EventCase, party: Party): string {
   return DEFAULT_SCOPE[party];
 }
 
-/**
- * How a party stands to a case, before looking at what it has to do.
- * - 'active': it has work on this case, now or earlier.
- * - 'awaiting_routing': a department named as reviewer on a card of a case the Clerk has not
- *   routed yet. It is expected, but it has not started and may still be left out.
- * - 'none': not part of this case. A Draft is the applicant's alone; a department the Clerk
- *   routed the case without, and that holds no task, is not part of it either.
- */
-export type Involvement = "active" | "awaiting_routing" | "none";
-
-export function involvement(c: EventCase, party: Party): Involvement {
+/** How a party stands to a case, before looking at what it has to do (see `Involvement`). */
+export const involvement: StateApi["involvement"] = (c: EventCase, party: Party): Involvement => {
   if (party === "applicant") return "active";
   if (c.state === "draft") return "none";
   if (party === "clerk") return "active";
   if (c.reviews.some((r) => r.dept === party) || c.tasks.some((t) => t.owner === party)) return "active";
   const notRoutedYet = c.reviews.length === 0 && (c.state === "submitted" || c.state === "needs_info");
   return notRoutedYet && c.tasks.some((t) => t.reviewer === party) ? "awaiting_routing" : "none";
-}
+};
 
 function daysActionable(tasks: Task[], today: ISODate): number {
   let max = 0;

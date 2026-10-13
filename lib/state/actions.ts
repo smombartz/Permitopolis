@@ -34,7 +34,10 @@ export type Action =
   | { type: "book_and_pay"; method: "card" }
   /** Upload, submit a form or finish an action. The card goes to 'submitted' when a reviewer must check it, else 'done'. */
   | { type: "complete_task"; taskId: string; files?: FileRef[]; form?: Record<string, unknown>; note?: string }
-  /** Demo only: one more neighbor signs. The sign-off card is done when everyone has. */
+  /**
+   * Demo only: one more neighbor signs. The sign-off card is done when everyone has. Raised by a
+   * neighbor, or by the applicant: the demo button sits on the block captain's own card.
+   */
   | { type: "simulate_signoff" }
   /** Draft to Submitted. Needs every pre-submit card done. Creates the Clerk's intake task. */
   | { type: "submit" }
@@ -51,13 +54,23 @@ export type Action =
   | { type: "submit_feedback"; rating: number; comment?: string }
   /** Clones the record as a new Draft on the same weekday a year later (returned in `spawned`). */
   | { type: "book_again" }
-  /** P1. Re-classifies the same record with new answers; new cards are tagged 'amendment'. */
+  /**
+   * P1. Re-classifies the same record with new answers; new cards are tagged 'amendment'. Only
+   * the answer fields of `answers` are used (a whole case may be passed). The new schedule's
+   * sessions are listed and the date gate runs again: a place that is no longer free is refused,
+   * and so is an amendment that raises the tier or moves the date inside the new tier's lead
+   * time, unless `lateFee` is true. The plan's fee lines are replaced; lines a reviewer added,
+   * the state, the permit and the hold stay as they are.
+   */
   | { type: "amend"; answers: EventAnswers; lateFee?: boolean }
 
   /* ---- City Clerk ---- */
   /** Places the date hold if the slot is free (first complete application wins). Block parties need every sign-off. */
   | { type: "accept_complete" }
-  /** Submitted to In review. Creates one review task per department and starts its clock. */
+  /**
+   * Submitted to In review. Creates one review task per department and starts its clock. Needs
+   * at least one reviewer, and each department once.
+   */
   | { type: "confirm_routing"; reviewers: RoutedReviewer[] }
   | { type: "send_to_commission" }
   /** In review to Quote sent. Needs every routed review approved. Replaces conditions and fee lines with the merged ones. */
@@ -75,9 +88,9 @@ export type Action =
    * "Respond to a request" card titled from `item`. Pauses the asking department's review clock.
    */
   | { type: "request_info"; taskId?: string; item?: string; message: string; dueDate?: ISODate }
-  /** Accepts an applicant's submitted card. */
+  /** Accepts an applicant's submitted card. For the card's reviewer, or the department whose request the card answers. */
   | { type: "verify_document"; taskId: string }
-  /** Sends a submitted card back as 'changes requested'. */
+  /** Sends a submitted card back as 'changes requested'. Same actors as verify_document. */
   | { type: "reject_document"; taskId: string; reason: string }
   /** The actor's department decides its review. */
   | {
@@ -88,8 +101,20 @@ export type Action =
       internalNote?: string;
       message?: string;
     }
+  /**
+   * Sets the meeting card's `scheduledFor`; a meeting can be moved until it is held. For the
+   * department that holds the meeting, or the Clerk. `taskId` is the applicant's meeting card,
+   * or the Clerk's own `schedule_pre_application_meeting` task, which stands for that card: the
+   * date goes on the card the applicant sees and the Clerk's task is done.
+   */
   | { type: "schedule_meeting"; taskId: string; date: ISODate }
-  /** Marks a city-owned task done: a work order, a meeting held, a re-review with no change. */
+  /**
+   * Closes a work order (its owner), a meeting that was held (its department or the Clerk), or
+   * a `verify:*` re-check with no change, which also accepts the card it was checking. Nothing
+   * else: a city task with an action of its own (intake check, routing, a review, the quote,
+   * Issue permit, the closeout tasks, reconciliation) is finished by that action, and the
+   * refusal names it.
+   */
   | { type: "complete_city_task"; taskId: string; note?: string }
   /** Public Works & Safety at closeout. Fills actuals and creates the Clerk's reconciliation task. */
   | {
@@ -99,7 +124,9 @@ export type Action =
       actuals: { feeLineId: string; qty: number }[];
       extraLines: FeeLineDraft[];
     }
+  /** City roles only: an activity entry and nothing else. */
   | { type: "add_note"; text: string }
+  /** City roles only. */
   | { type: "remind"; party: Party }
 
   /* ---- system ---- */

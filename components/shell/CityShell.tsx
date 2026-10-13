@@ -7,6 +7,7 @@ import { TopBar } from "@/components/shell/TopBar";
 import { StorageBanner } from "@/components/shell/StorageBanner";
 import { SwitchRolePanel } from "@/components/shell/SwitchRolePanel";
 import { CitySidebar } from "@/components/shell/CitySidebar";
+import { RememberPath } from "@/components/shell/RememberPath";
 import { useRoleSwitch } from "@/components/shell/useRoleSwitch";
 import { queueFor, useDemo, useHydrated } from "@/lib/state";
 import type { Dept, Party } from "@/lib/types";
@@ -23,8 +24,10 @@ interface CityShellProps {
 
 /**
  * The frame for every city screen (app/city/layout.tsx): AppShell's top bar plus a left
- * sidebar (My queue, Cases, Active permits, then the role's own tools). If the Applicant is
- * current, the sidebar and page are swapped for a panel offering to switch to a city role.
+ * sidebar (My queue, Cases, Active permits, then the role's own tools), with the page beside
+ * it, both inside the page container. A screen starts with its PageHeader and never adds
+ * `page-container` of its own. If the Applicant is current, the sidebar and page are swapped
+ * for a panel offering to switch to a city role.
  */
 function CityShell({ children }: CityShellProps) {
   const hydrated = useHydrated();
@@ -32,13 +35,8 @@ function CityShell({ children }: CityShellProps) {
   const storageOk = useDemo((s) => s.storageOk);
   const cases = useDemo((s) => s.cases);
   const demoToday = useDemo((s) => s.demoToday);
-  const rememberPath = useDemo((s) => s.rememberPath);
   const pathname = usePathname();
   const switchTo = useRoleSwitch();
-
-  React.useEffect(() => {
-    if (hydrated && isCityRole(role)) rememberPath(role, pathname);
-  }, [hydrated, role, pathname, rememberPath]);
 
   return (
     <div className="app-ground flex min-h-dvh flex-col">
@@ -50,6 +48,9 @@ function CityShell({ children }: CityShellProps) {
           {!storageOk ? <StorageBanner /> : null}
           {isCityRole(role) ? (
             <div className="page-container flex gap-6 py-6">
+              <React.Suspense fallback={null}>
+                <RememberPath role={role} />
+              </React.Suspense>
               <CitySidebar role={role} pathname={pathname} queueCount={queueFor(cases, role, demoToday).length} />
               <div className="min-w-0 flex-1">{children}</div>
             </div>

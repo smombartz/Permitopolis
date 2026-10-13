@@ -50,6 +50,16 @@ export interface PartyStatus {
   scope: string;
 }
 
+/**
+ * How a party stands to a case, before looking at what it has to do.
+ * - 'active': it has work on this case, now or earlier.
+ * - 'awaiting_routing': a department named as reviewer on a card of a case the Clerk has not
+ *   routed yet. It is expected, but it has not started and may still be left out.
+ * - 'none': not part of this case. A Draft is the applicant's alone; a department the Clerk
+ *   routed the case without, and that holds no task, is not part of it either.
+ */
+export type Involvement = "active" | "awaiting_routing" | "none";
+
 export type QueueGroup = "overdue" | "this_week" | "later";
 
 export interface QueueItem {
@@ -75,6 +85,12 @@ export interface ReviewClockView {
   label: string;
 }
 
+/** One held date of an active permit: a series has one entry per session. */
+export interface PermitSession {
+  case: EventCase;
+  date: ISODate;
+}
+
 export interface CaseTotals {
   fees: number;
   deposit: number;
@@ -97,7 +113,11 @@ export interface DemoState {
 }
 
 export interface DemoActions {
-  /** Applies an action through transition() and stores the result. Actor defaults to the current role. */
+  /**
+   * Applies an action through transition() and stores the result. Actor defaults to the current
+   * role. An action the actor may not raise is refused with a reason ("Only the City Clerk can
+   * issue the permit."), and the case is left as it was: see `actorsFor()`.
+   */
   dispatch(caseId: string, action: Action, actor?: Actor): { ok: boolean; reason?: string; spawnedIds?: string[] };
   /** Creates a Draft and returns its id. */
   createDraft(applicantId: string, answers?: Partial<EventAnswers>): string;
@@ -197,6 +217,16 @@ export interface StateApi {
    */
   nextMove(c: EventCase, today: ISODate, applicantName?: string): string;
   boardColumn(task: Task): BoardColumn;
+  /**
+   * The applicant's board: their cards by column. Do now is in the PRD's order: a city request
+   * pinned on top, then Submit application once it has unlocked, then by due date. The other
+   * columns keep the order of the plan.
+   */
+  boardColumns(c: EventCase): Record<BoardColumn, Task[]>;
+  /** The parties that are up now, in the order applicant, clerk, pws, hl. Empty when nobody is. */
+  whoIsUp(c: EventCase, today: ISODate): Party[];
+  /** The parties that may raise this action, e.g. ['applicant', 'clerk'] for `pay`. transition() refuses anyone else. */
+  actorsFor(type: ActionType): Actor[];
   /** Applies the system transitions for every day from `from` (exclusive) to `to` (inclusive). */
   advanceClock(cases: EventCase[], from: ISODate, to: ISODate, cfg: RulesConfig): EventCase[];
 
@@ -205,10 +235,19 @@ export interface StateApi {
   isOpen(c: EventCase): boolean;
   /** Drafts are the applicant's alone. */
   isVisibleToCity(c: EventCase): boolean;
-  /** The Clerk is involved in every non-draft case; a reviewing department when it is routed or holds a task. */
+  /**
+   * The Clerk is involved in every non-draft case; a reviewing department when it is routed or
+   * holds a task, and before routing when a card names it as reviewer (it reads "Waiting" in
+   * Who's up then). Never true for a Draft and a city role. Same as `involvement() !== 'none'`.
+   */
   involves(c: EventCase, role: Party): boolean;
+  /** How a party stands to a case: see `Involvement`. */
+  involvement(c: EventCase, party: Party): Involvement;
   applicantCases(cases: EventCase[], applicantId: string): EventCase[];
-  /** Tasks this role can act on now, across cases, grouped for My queue. */
+  /**
+   * Tasks this role can act on now, across open cases, each with its My queue group. Sorted
+   * oldest due first, across the groups as well as within them; a task with no date goes last.
+   */
   queueFor(cases: EventCase[], role: Dept, today: ISODate): QueueItem[];
   /** Cases this role is involved in where the move is someone else's. */
   waitingOnOthers(cases: EventCase[], role: Dept, today: ISODate): WaitingOnOthersItem[];
@@ -221,4 +260,21 @@ export interface StateApi {
   leadTimeRisk(c: EventCase, today: ISODate, cfg: RulesConfig): "ok" | "at_risk";
   /** The next 'PMT-27-####' after the highest in use. */
   nextCaseId(cases: EventCase[]): string;
+
+  /* active permits */
+  /** A permit that is live: Permitted, on Event day or in Closeout, and not cancelled. */
+  hasActivePermit(c: EventCase): boolean;
+  /** Quote sent and holding its date: what the "holds" toggle on Active permits adds. */
+  holdsDateAtQuote(c: EventCase): boolean;
+  /**
+   * The Active permits list: every live permit, by event date (the next session, or the last
+   * one once all have passed), soonest first. `includeHolds` adds the Quote sent cases holding a date.
+   */
+  activePermits(cases: EventCase[], today: ISODate, options?: { includeHolds?: boolean }): EventCase[];
+  /**
+   * The Active permits calendar and map: one entry for each date an active permit is held, so a
+   * series shows every session (a session skipped for a blackout is not one). In date order.
+   * `from` and `to` are inclusive.
+   */
+  permitSessions(cases: EventCase[], options?: { from?: ISODate; to?: ISODate; includeHolds?: boolean }): PermitSession[];
 }

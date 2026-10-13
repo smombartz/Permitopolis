@@ -1,5 +1,124 @@
 # Change log
 
+## 2026-10-12 - Phase 2 merge: the seed, the shell and the shared components wired together
+
+**What Changed:**
+- Merged `phase2/seed`, `phase2/blocks` and `phase2/shell` into `build` (no conflicts; the gate passed on the merged tree before any change) and removed `tests/replay.ts`, the Phase 1 replay helper nothing imports any more
+- The shell against the real seed: `tests/seed.test.ts` now checks every Demo menu jump (the case exists, in the state the PRD's seed table gives it, with the role, page and persona of the demo script's first step), the persona picker's seven entries and the date jumps; `tests/render/shell.test.tsx` runs on the 38 seeded cases (queue counts for all three roles, every jump, the persona picker, Reset)
+- `lib/data/demoScript.ts`: each scenario jump carries its `caseId` and always a `personaId` (the case's applicant, also for the two city jumps); the "Set demo date" quick jumps moved here as `DEMO_DATE_JUMPS` and are formatted with `fmtDate`; the two block captain personas are spelled as the PRD spells them
+- Role and persona switching (`lib/view/shell.ts`, `components/shell/useRoleSwitch.ts`): picking a persona navigates (a blank wizard for a new applicant, the wizard at its step for someone whose only event is a draft, My events otherwise); landing on the Applicant sets the persona of the case the page is about, also when returning to a remembered page; a Draft is not followed to a city role; two city roles keep the URL with its query string (nothing is pushed); a role's remembered page includes its query string (`components/shell/RememberPath.tsx`)
+- Shell layout: `AppShell` and `CityShell` both put the screen inside the page container, so `PlaceholderScreen` and `CaseNotFound` no longer add `page-container` (inside the city layout they were wider than their column by the sidebar's width); `PlaceholderScreen` takes `standalone` for the two routes with no shell
+- Demo menu: Reset goes to the Applicant's home afterwards (it resets the role, so a city page was left showing its "built for a city role" panel); the day picker marks the demo date as today, not the real date
+- The shell uses the shared components where it had its own: `ConfirmDialog` for Reset, `PageHeader` on the placeholder and the 404 page, `PersonaAvatar` in the persona picker and mobile menu, `CountBadge` on My queue (read out as "My queue, 8 tasks to do"); sidebar links and the wordmark carry the system focus ring; Cases stays current on a case's own page
+- Render harness (`tests/render/harness.tsx`): defaults to the real seed; new `scenario` option (a Demo menu jump); a query string in `path` becomes the search params; `params.id` is read off the path; returns a `user` session; new `storedCase(id)`; uses testing-library's `act`
+- Shared components against the seed: new `tests/render/blocks-seed.test.tsx` renders the case components for all 38 seeded cases. `WhoIsUp` now lists every open action of a party with its own due date (it showed only the first; S5's applicant has two) and no longer reads the party name twice to a screen reader; `CaseHeader` accepts a Draft with no date; `TaskCard` and `WhoIsUp` take the due date from `taskDueDate()`; `PageHeader`'s back link is a `next/link`
+- Contract changes applied: `StateApi` lists `boardColumns`, `whoIsUp`, `involvement`, `actorsFor`, `hasActivePermit`, `holdsDateAtQuote`, `activePermits` and `permitSessions`, with the `Involvement` and `PermitSession` types (`lib/state/types.ts`); `RulesApi.routing` takes an optional config; the Security and medical plan card follows the tier instead of a hardcoded 1,000, and its reason no longer quotes the number (`lib/rules/catalog.ts`); comments on `DateGate`, `involves`, `queueFor`, `dispatch` and six actions now say what the engine does; plan 5.4 lists the applicant as an actor for `simulate_signoff`
+- Contract change declined: `DateGate.daysUntil` as `number | null` (it would break every caller for a state the wizard never shows; the comment now says it is 0 when no date is chosen)
+- `docs/readme.md`: new section "Building a screen (Phase 2)"; the engine notes cover who may act, the seed and the open items
+- Set the Dropbox ignore attribute on `node_modules` again; it was missing on the main tree
+
+**Why:**
+- The three workstreams were built apart: the shell against an empty seed, the shared components against hand-made fixtures, the seed without a screen. This is the first tree where they meet, and the seven screen builders of Phase 3 start from it
+
+**Files Modified:**
+- `lib/data/demoScript.ts`, `lib/data/people.ts`, `lib/view/shell.ts`, `lib/view/shell.test.ts`
+- `components/shell/{AppShell,CityShell,CitySidebar,TopBar,DemoMenu,DemoDatePicker,PersonaPicker,MobileNavMenu,PlaceholderScreen,CaseNotFound}.tsx`, `components/shell/useRoleSwitch.ts`, `components/shell/index.ts`, `components/shell/RememberPath.tsx` (new)
+- `app/not-found.tsx`, `app/demo/page.tsx`, `app/verify/[id]/page.tsx`
+- `components/domain/{WhoIsUp,CaseHeader,TaskCard}.tsx`, `components/domain/WhoIsUp.test.tsx`, `components/ui/page-header.tsx`
+- `lib/rules/catalog.ts`, `lib/rules/types.ts`, `lib/state/types.ts`, `lib/state/actions.ts` (contracts)
+- `lib/state/index.ts`, `lib/state/selectors.ts`, `lib/state/waitingOn.ts`, `lib/rules/requirements.test.ts`
+- `tests/render/harness.tsx`, `tests/render/shell.test.tsx`, `tests/render/blocks-seed.test.tsx` (new), `tests/seed.test.ts`, `tests/replay.ts` (removed)
+- `docs/log.md`, `docs/readme.md`, `docs/plans/2026-10-12-permitopolis-prototype.md`
+
+---
+
+## 2026-10-12 - Phase 2B: App shell and demo controls
+
+**What Changed:**
+- Added `components/shell/**`: `AppShell` and `CityShell` (sibling top-level shells sharing `TopBar`, `StorageBanner`, `SwitchRolePanel`, the hydration/skeleton gate and one `useRoleSwitch()` hook), `CitySidebar` (My queue with a live `queueFor()` count, Cases, Active permits, then the role's own tools), `RoleSwitcher`, `PersonaPicker`, `MobileNavMenu` (the <768px collapse, driven by `useIsNarrow()`'s real `matchMedia` check, not CSS alone), `DemoMenu` + `DemoDatePicker` (Reset with a confirming Dialog, Set demo date via a react-day-picker Popover with the PRD's 3 quick jumps, the S1-S6 scenario jumps, a hints toggle, a `/demo` link), `PlaceholderScreen`, `CaseNotFound`.
+- Added `lib/view/shell.ts` + `shell.test.ts`: the pure `resolveRoleSwitch()` rule (two city roles keep the URL; Applicant <-> a city role follows a case on screen and sets its persona; otherwise the role's remembered path, then its home) plus `cityToolLinks`/`CITY_CORE_LINKS`.
+- Added `lib/data/demoScript.ts`: `SCENARIO_JUMPS` (S1-S6) and `DEMO_PATHS` (the PRD's 7 demo-script paths as data) for the Demo menu, the later demo guide and demo hints.
+- Added `app/apply/layout.tsx`, `app/events/layout.tsx`, `app/city/layout.tsx`, `app/not-found.tsx`, and 19 placeholder `page.tsx` files for every route not yet built, each rendering `PlaceholderScreen` inside the required `<Suspense>` boundary.
+- Updated `tests/render/setup.ts` with a `next/navigation` + `next/link` mock (`navState`/`resetNavState`); added `tests/render/harness.tsx` (`renderScreen`, `lastPush`, `lastReplace`, `switchRole`) and `tests/render/shell.test.tsx` (11 tests).
+
+**Why:**
+- Phase 2, workstream 2B: every later screen needs a shell to mount inside, a role-switch rule that matches the PRD exactly, the demo controls (reset/date/scenario jumps/hints), and a shared render-test harness so later workstreams don't each reinvent next/navigation mocking.
+
+**Files Modified:**
+- `lib/view/shell.ts`, `lib/view/shell.test.ts`
+- `lib/data/demoScript.ts`
+- `components/shell/AppShell.tsx`, `CityShell.tsx`, `CitySidebar.tsx`, `TopBar.tsx`, `RoleSwitcher.tsx`, `PersonaPicker.tsx`, `MobileNavMenu.tsx`, `DemoMenu.tsx`, `DemoDatePicker.tsx`, `SwitchRolePanel.tsx`, `StorageBanner.tsx`, `PlaceholderScreen.tsx`, `CaseNotFound.tsx`, `useRoleSwitch.ts`, `useIsNarrow.ts`, `index.ts`
+- `app/apply/layout.tsx`, `app/apply/page.tsx`
+- `app/events/layout.tsx`, `app/events/page.tsx`, `app/events/[id]/page.tsx`, `app/events/[id]/quote/page.tsx`, `app/events/[id]/permit/page.tsx`, `app/events/[id]/amend/page.tsx`
+- `app/verify/[id]/page.tsx`
+- `app/demo/page.tsx`
+- `app/city/layout.tsx`, `app/city/queue/page.tsx`, `app/city/cases/page.tsx`, `app/city/cases/[id]/page.tsx`, `app/city/active/page.tsx`, `app/city/intake/page.tsx`, `app/city/payments/page.tsx`, `app/city/settings/page.tsx`, `app/city/map/page.tsx`, `app/city/work-orders/page.tsx`, `app/city/verifications/page.tsx`, `app/city/inspections/page.tsx`
+- `app/not-found.tsx`
+- `tests/render/setup.ts`, `tests/render/harness.tsx`, `tests/render/shell.test.tsx`
+
+---
+
+## 2026-10-12 - Workstream 2D: shared building blocks and Phase 1 polish
+
+**What Changed:**
+- Phase 1 review fixes: PartyChip's party hue confined to its avatar tile (neutral chip surface, ink text); tier icon/label added next to the tier dot in MonthGrid, WeekGrid, DayStrip, PermitopolisMap (plus a new legend) and MapThumbnail; StateStepper's compact mode gained a visible current-state label and every marker an accessible name; the system focus ring added to every previously-unstyled raw button in LocationPicker's keyboard lists, the PermitopolisMap list, and the calendar day/item buttons; LocationPicker's area drag now uses pointer capture and ends on both pointerup and pointercancel.
+- New `components/ui` primitives: PageHeader, Section, KeyValueList, ConfirmDialog, WizardStepper, FilterBar/FilterChip, CountBadge, Toolbar, Progress, InlineAlert, StickyAside, Truncate, CopyButton.
+- New `components/domain` components: PersonaAvatar, TaskKindLabel, AvailabilityBadge, EndingBanner, EventTitle, LeadTimeRisk, DeptStatusDots, CaseHeader, ActivityTimeline, FeeTable, ConditionList, WhoIsUp, TaskCard, StackedTaskCard — all presentational, typed against the real `lib/types.ts`/`lib/state/types.ts` contracts, exported from `components/domain/index.ts`.
+- `components/kit/KitScreen.tsx`: ten new sections demonstrating every component above in its interesting states, including a 101-character event name, an 80-character organization name, "Not provided" for missing fields, an overdue task and an ended (Denied) case.
+- New tests: `components/domain/{PartyChip,StateStepper,FeeTable,ConditionList,WhoIsUp,TaskCard,ActivityTimeline}.test.tsx`, `components/ui/truncate.test.tsx`, and expanded `tests/render/{kit,map,location-picker}.test.tsx`.
+
+**Why:**
+- Seven builders build the city/applicant screens next in parallel; this gives them a complete, consistent shared vocabulary so they don't each invent cards, headers, fee tables and filter bars differently, and fixes the Phase 1 review findings scoped to this workstream (party-chip tinting, tier-by-dot-alone, unlabeled compact stepper, missing focus rings, and the area-drag pointer-capture bug).
+
+**Files Modified:**
+- `components/domain/PartyChip.tsx`, `components/domain/StateStepper.tsx`, `components/domain/index.ts`
+- `components/calendar/MonthGrid.tsx`, `components/calendar/WeekGrid.tsx`, `components/calendar/DayStrip.tsx`
+- `components/map/PermitopolisMap.tsx`, `components/map/MapThumbnail.tsx`, `components/map/LocationPicker.tsx`
+- `components/kit/KitScreen.tsx`
+- `components/ui/{page-header,section,key-value,confirm-dialog,wizard-stepper,filter-bar,count-badge,toolbar,progress,inline-alert,sticky-aside,truncate,copy-button}.tsx` (new)
+- `components/domain/{PersonaAvatar,TaskKindLabel,AvailabilityBadge,EndingBanner,EventTitle,LeadTimeRisk,DeptStatusDots,CaseHeader,ActivityTimeline,FeeTable,ConditionList,WhoIsUp,TaskCard}.tsx` (new)
+- `tests/render/kit.test.tsx`, `tests/render/map.test.tsx`, `tests/render/location-picker.test.tsx`
+- `components/domain/{PartyChip,StateStepper,FeeTable,ConditionList,WhoIsUp,TaskCard,ActivityTimeline}.test.tsx`, `components/ui/truncate.test.tsx` (new)
+
+---
+
+## 2026-10-12 - Phase 2A: seed by replay, demo-path tests and engine hardening
+
+**What Changed:**
+- `lib/state/seed/replay.ts` (new): `replayScripts()` replays every seed script through the real engine, all cases interleaved in time order, with the clock advanced for every case between steps and on to the demo date. A refused step throws a `SeedReplayError` naming the script, the step and the reason.
+- `lib/state/seed/index.ts`: `buildSeed()` returns all 38 cases as they stand on Mon, May 3, 2027. The replay runs once and each call gets a deep copy. `seedFingerprint()` is new.
+- `lib/state/store.ts`: the demo is stored under the seed's fingerprint, so a demo saved by an earlier build is dropped on load. The storage key is unchanged.
+- `tests/seed.test.ts` (new, 94 tests): the PRD seed table, the seven fillers, the background set, the stress rows and the reserved slots of plan 6.2.
+- `tests/demo-paths.test.ts` (new, 8 tests): the PRD's seven demo paths through the store, with `reset()` checked against a fresh seed after each.
+- Seed scripts B14, B18 and B19: pre-application meetings, community notices, later meetings and work orders added to their histories.
+- Review finding (a): `transition()` rejects an action from a party that may not take it. `verify_document`, `reject_document`, `schedule_meeting` and `complete_city_task` also check the card's reviewer or owner.
+- Review finding (b): `confirm_routing` refuses an empty or duplicated reviewer list.
+- Review finding (c): `dateGate()` offers only the fixes that help, and reports no failure when there is no date yet.
+- Review finding (d): every fee line, total and paid-in-full comparison is to the cent.
+- Review finding (e): paying a quote in full clears the hold's expiry.
+- Review finding (f): `waitingOn().openTasks` is oldest due first, and a department not yet routed reads Waiting.
+- Review finding (g): `routing()` reads the block-party exception from the classification and the crowd threshold from the config.
+- Review finding (h): plan 6.1's missing assertions added (S2, S4 and S6 lead times and reviewers; the late-fee case's exact fixes and amount).
+- `amend` (for demo path 7): takes only the answers, runs the date gate again, charges the late fee, replaces the plan's fee lines and keeps lines a reviewer added.
+- `nextMove()` names the waiting party whose task unlocks soonest. `availableActions()` offers Request information and the Clerk's own review.
+- New selectors exported from `lib/state`: `boardColumns`, `whoIsUp`, `hasActivePermit`, `holdsDateAtQuote`, `activePermits`, `permitSessions`, `involvement`, `actorsFor`, `buildSeed`.
+- `tests/replay.ts` is now a deprecated wrapper over `replayScripts()`.
+
+**Why:**
+- Workstream 2A of the build plan: the engine has to be proven on the seed and on all demo paths before any screen is built on it, and the Phase 1 review left eight engine findings open.
+- The PRD's seed table said "then the Clerk reconciles" for S6 where the engine named the applicant; the engine was fixed, not the assertion.
+
+**Files Modified:**
+- `lib/state/seed/replay.ts`, `lib/state/seed/replay.test.ts`, `lib/state/actors.test.ts`, `lib/state/persist.test.ts`, `tests/seed.test.ts`, `tests/demo-paths.test.ts` (new)
+- `lib/state/seed/index.ts`, `lib/state/seed/scripts.ts`, `lib/state/seed/helpers.ts`, `lib/state/seed/scripts.test.ts`, `lib/state/seed/background/b10-b16.ts`, `lib/state/seed/background/b17-b21.ts`
+- `lib/state/checks.ts`, `lib/state/core.ts`, `lib/state/transition.ts`, `lib/state/transitions/applicant.ts`, `lib/state/transitions/city.ts`, `lib/state/transitions/clerk.ts`, `lib/state/transitions/payment.ts`
+- `lib/state/waitingOn.ts`, `lib/state/selectors.ts`, `lib/state/availableActions.ts`, `lib/state/store.ts`, `lib/state/index.ts`
+- `lib/state/waitingOn.test.ts`, `lib/state/selectors.test.ts`, `lib/state/availableActions.test.ts`, `lib/state/store.test.ts`, `lib/state/transitions/city.test.ts`, `lib/state/transitions/clerk.test.ts`, `lib/state/transitions/payment.test.ts`
+- `lib/rules/routing.ts`, `lib/rules/classify.ts`, `lib/rules/dateGate.ts`, `lib/rules/index.ts`, `lib/rules/routing.test.ts`, `lib/rules/classify.test.ts`, `lib/rules/dateGate.test.ts`
+- `tests/engines.test.ts`, `tests/replay.ts`
+
+---
+
 ## 2026-10-12 - Phase 1 review fixes
 
 **What Changed:**

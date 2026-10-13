@@ -1,4 +1,5 @@
 import * as React from "react"
+import Link from "next/link"
 import { cn } from "cn"
 import { ArrowLeftIcon } from "lucide-react"
 import { Eyebrow } from "@/components/ui/eyebrow"
@@ -12,7 +13,7 @@ interface PageHeaderProps extends Omit<React.ComponentProps<"header">, "title"> 
   description?: React.ReactNode
   /** Buttons or other controls, right-aligned next to the title. */
   actions?: React.ReactNode
-  /** Renders a back link as an <a>. Use `onBack` instead when there is no URL to go to. */
+  /** Renders a back link (a next/link, so the store stays in memory). Use `onBack` instead when there is no URL to go to. */
   backHref?: string
   onBack?: () => void
   backLabel?: React.ReactNode
@@ -35,10 +36,10 @@ function PageHeader({
     <header data-slot="page-header" className={cn("flex flex-col gap-3", className)} {...props}>
       {showBack ? (
         backHref ? (
-          <a href={backHref} className={BACK_LINK_CLASS}>
+          <Link href={backHref} className={BACK_LINK_CLASS}>
             <ArrowLeftIcon className="size-4" aria-hidden="true" />
             {backLabel}
-          </a>
+          </Link>
         ) : (
           <button type="button" onClick={onBack} className={BACK_LINK_CLASS}>
             <ArrowLeftIcon className="size-4" aria-hidden="true" />

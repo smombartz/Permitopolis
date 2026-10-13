@@ -7,10 +7,12 @@
  * Where the PRD names a card, a column, a date or an amount, it is asserted as the PRD has it.
  */
 import { describe, expect, it } from "vitest";
+import { DEMO_DATE_JUMPS, DEMO_PATHS, SCENARIO_JUMPS, type ScenarioKey } from "@/lib/data/demoScript";
 import { MAIN_1ST_TO_4TH } from "@/lib/data/streets";
-import { PERSONAS } from "@/lib/data/people";
+import { PERSONAS, PERSONA_BY_ID, PICKABLE_PERSONA_IDS } from "@/lib/data/people";
 import { addDaysISO, dateOf, datesEvery, daysBetween, weekdayOf } from "@/lib/dates";
 import { fmtDate } from "@/lib/format";
+import { routes } from "@/lib/routes";
 import { DEFAULT_CONFIG, DEFAULT_DEMO_TODAY, availability, cancellationRefund, classify, dateGate, estimateFees, routing, type RulesCtx } from "@/lib/rules";
 import {
   activePermits,
@@ -20,6 +22,7 @@ import {
   buildSeed,
   caseTotals,
   daysUntilEvent,
+  eventDate,
   hasActivePermit,
   involves,
   isSessionDate,
@@ -41,6 +44,7 @@ import {
   type QueueItem,
 } from "@/lib/state";
 import { SEED_SCRIPTS } from "@/lib/state/seed";
+import { applicantCaseIdFromHref, caseIdFromPath, pathForPersona } from "@/lib/view/shell";
 import { PARTIES, type Actor, type CaseState, type Dept, type Ending, type EventCase, type ISODate, type Location, type Party, type Task } from "@/lib/types";
 
 const TODAY = DEFAULT_DEMO_TODAY;
@@ -1046,5 +1050,114 @@ describe("reserved slots: what the demo paths need is free", () => {
     expect(wholeDay(space("shelter-3"), "2027-05-22")).toMatchObject({ status: "booked", reason: "Maya Chen's 40th birthday picnic has this date held" });
     const plaza: Location = { mode: "area", inventoryIds: [], areaId: "city-hall-plaza", segmentIds: [], label: "City Hall Plaza" };
     expect(wholeDay(plaza, "2027-07-11")).toEqual({ status: "impacted", reason: "Riverfront Summer 5K closes Main Street 6 to 11:30 am that day" });
+  });
+});
+
+describe("the Demo menu against the seed (lib/data/demoScript.ts)", () => {
+  /**
+   * Where each scenario stands on May 3 (the PRD's "Seed data" table), and the role and page
+   * that open it: the first step of its path in the PRD's "Demo script".
+   */
+  const OPENS: Record<ScenarioKey, { role: Party; page: (id: string) => string; state: CaseState; up: Party[] }> = {
+    S1: { role: "applicant", page: (id) => routes.permit(id), state: "permitted", up: [] },
+    S2: { role: "applicant", page: (id) => routes.apply({ caseId: id, step: "when" }), state: "draft", up: ["applicant"] },
+    S3: { role: "applicant", page: (id) => routes.event(id), state: "needs_info", up: ["applicant"] },
+    S4: { role: "applicant", page: (id) => routes.event(id), state: "submitted", up: ["applicant"] },
+    S5: { role: "clerk", page: (id) => routes.city.case(id), state: "quote_sent", up: ["applicant", "hl"] },
+    S6: { role: "pws", page: (id) => routes.city.case(id), state: "closeout", up: ["pws"] },
+  };
+
+  it("offers S1 to S6, once each and in order", () => {
+    expect(SCENARIO_JUMPS.map((jump) => jump.id)).toEqual(["S1", "S2", "S3", "S4", "S5", "S6"]);
+  });
+
+  it.each(SCENARIO_JUMPS)("$id opens a seeded case, as the role and on the page the PRD gives it", (jump) => {
+    const c = seeded(jump.id);
+    const opens = OPENS[jump.id];
+
+    // The case exists in the seed, and is the one its scenario's script builds.
+    expect(jump.caseId).toBe(c.id);
+    expect(c.state).toBe(opens.state);
+    expect(c.ending).toBeNull();
+    expect(whoIsUp(c, TODAY)).toEqual(opens.up);
+
+    // The role and the page.
+    expect(jump.role).toBe(opens.role);
+    expect(jump.path).toBe(opens.page(c.id));
+    if (jump.role === "applicant") {
+      expect(applicantCaseIdFromHref(jump.path)).toBe(c.id);
+    } else {
+      // A city role can open it: not a Draft, and this department is part of the case.
+      expect(caseIdFromPath(jump.path, jump.role)).toBe(c.id);
+      expect(isVisibleToCity(c)).toBe(true);
+      expect(involves(c, jump.role)).toBe(true);
+    }
+
+    // The persona is the case's own applicant, one the picker offers for this scenario.
+    expect(jump.personaId).toBe(c.applicantId);
+    expect(PICKABLE_PERSONA_IDS).toContain(jump.personaId);
+    expect(PERSONA_BY_ID[jump.personaId].scenario).toBe(jump.id);
+
+    // The label names what the jump opens: the organizer for an applicant jump, the event for a city one.
+    expect(jump.label).toBe(`${jump.id} · ${jump.role === "applicant" ? PERSONA_BY_ID[jump.personaId].name : c.name}`);
+  });
+
+  it("S1's jump lands on a live permit, and S2's on the wizard step its draft was left at", () => {
+    expect(hasActivePermit(seeded("S1"))).toBe(true);
+    expect(seeded("S1").permit).not.toBeNull();
+    expect(seeded("S2").wizardStep).toBe("when");
+  });
+
+  it("the persona picker offers the six scenario organizers and New applicant, each landing on a page of their own", () => {
+    expect(PICKABLE_PERSONA_IDS.map((id) => PERSONA_BY_ID[id].name)).toEqual([
+      "Maya Chen",
+      "Sunrise Yoga Club",
+      "Downtown Arts Collective",
+      "Maple Street block captain",
+      "Riverfront Running Club",
+      "Main Street Business Alliance",
+      "New applicant",
+    ]);
+    for (const personaId of PICKABLE_PERSONA_IDS) {
+      const own = applicantCases(seed, personaId);
+      const lands = pathForPersona(personaId, seed);
+      if (personaId === "new") {
+        expect(own).toEqual([]);
+        expect(lands).toBe(routes.apply());
+      } else if (personaId === "sunrise-yoga-club") {
+        // The PRD's seed table: "Persona opens the wizard at step 3".
+        expect(lands).toBe(routes.apply({ caseId: seeded("S2").id, step: "when" }));
+      } else {
+        expect(own).toHaveLength(1);
+        expect(lands).toBe(routes.events());
+      }
+    }
+  });
+
+  it("the date jumps are the seed date and the event days of the scenarios they name", () => {
+    expect(DEMO_DATE_JUMPS[0].date).toBe(TODAY);
+    expect(DEMO_DATE_JUMPS.map((jump) => fmtDate(jump.date))).toEqual(["Mon, May 3, 2027", "Fri, Jun 18, 2027", "Sun, Jul 11, 2027"]);
+    for (const jump of DEMO_DATE_JUMPS) {
+      if (!jump.scenario) continue;
+      expect(eventDate(seeded(jump.scenario), TODAY), jump.scenario).toBe(jump.date);
+      expect(seeded(jump.scenario).name).toBe(jump.note);
+    }
+  });
+
+  it("every demo path starts where its scenario's jump lands, with personas from the people list", () => {
+    expect(DEMO_PATHS.map((path) => path.id)).toEqual([1, 2, 3, 4, 5, 6, 7]);
+    for (const path of DEMO_PATHS) {
+      const jump = SCENARIO_JUMPS.find((j) => j.id === path.scenario);
+      if (path.scenario) {
+        expect(jump, `path ${path.id}`).toBeDefined();
+        expect(path.steps[0].role, `path ${path.id}`).toBe(jump!.role);
+      } else {
+        expect(path.steps[0]).toMatchObject({ role: "applicant", persona: "new" });
+      }
+      for (const step of path.steps) {
+        if (step.persona) expect(PERSONA_BY_ID[step.persona], step.persona).toBeDefined();
+        if (step.persona && jump) expect(step.persona).toBe(jump.personaId);
+      }
+    }
   });
 });

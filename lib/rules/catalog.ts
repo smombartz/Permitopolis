@@ -260,11 +260,13 @@ export const CARD_CATALOG: CardSpec[] = [
     id: "security_medical_plan",
     kind: "document",
     title: "Security and medical plan",
-    why: "Special events and crowds of 1,000 or more need one",
+    why: "Special events need a security and medical plan",
     reviewer: "pws",
     phase: "before_submitting",
     stage: "plan",
-    when: (a, cls) => cls.tier === "special" || (a.attendance ?? 0) >= 1000,
+    // A crowd at the configured Special threshold (1,000 by default) already makes the tier
+    // Special, so the tier carries the PRD's "Special event or 1,000+ people".
+    when: special,
     unlocksOn: null,
     due: { type: "submit_by" },
     preSubmit: true,

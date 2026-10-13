@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { classify } from "./classify";
+import { DEFAULT_CONFIG } from "./config";
 import { requirements } from "./requirements";
+import type { RulesConfig } from "./types";
 import { answers, addOns, areaLocation, inventoryLocation, streetsLocation } from "./test-helpers";
 
 describe("requirements: S3 (Jazz in the Plaza)", () => {
@@ -132,5 +134,41 @@ describe("requirements: why", () => {
     const tasks = requirements(a, cls, { caseId: "PMT-27-0001", today: "2027-01-01" });
     for (const task of tasks) expect(task.why.length).toBeGreaterThan(0);
     expect(tasks.find((t) => t.catalogId === "sound_details")!.why).toMatch(/sound/i);
+  });
+});
+
+describe("requirements: the Security and medical plan follows the configured Special threshold", () => {
+  const withThreshold = (specialAttendance: number): RulesConfig => ({
+    ...DEFAULT_CONFIG,
+    thresholds: { ...DEFAULT_CONFIG.thresholds, specialAttendance },
+  });
+  const crowdOf = (attendance: number) => answers({ location: areaLocation("great-lawn"), attendance });
+  const cards = (attendance: number, cfg: RulesConfig) => {
+    const a = crowdOf(attendance);
+    return requirements(a, classify(a, cfg), { caseId: "PMT-27-0001", today: "2027-01-04", cfg }).map((t) => t.catalogId);
+  };
+
+  it("1,000 people is Special by default, and gets the card (the PRD's \"Special event or 1,000+ people\")", () => {
+    expect(classify(crowdOf(1000)).tier).toBe("special");
+    expect(cards(1000, DEFAULT_CONFIG)).toContain("security_medical_plan");
+    expect(cards(999, DEFAULT_CONFIG)).not.toContain("security_medical_plan");
+  });
+
+  it("raising the threshold to 2,000 leaves a crowd of 1,200 Reviewed, with no card", () => {
+    const cfg = withThreshold(2000);
+    expect(classify(crowdOf(1200), cfg).tier).toBe("reviewed");
+    expect(cards(1200, cfg)).not.toContain("security_medical_plan");
+  });
+
+  it("lowering it to 500 makes a crowd of 600 Special, with the card", () => {
+    const cfg = withThreshold(500);
+    expect(classify(crowdOf(600), cfg).tier).toBe("special");
+    expect(cards(600, cfg)).toContain("security_medical_plan");
+  });
+
+  it("the card's reason does not quote a number that the Clerk can change in Settings", () => {
+    const a = crowdOf(1200);
+    const card = requirements(a, classify(a), { caseId: "PMT-27-0001", today: "2027-01-04" }).find((t) => t.catalogId === "security_medical_plan");
+    expect(card?.why).toBe("Special events need a security and medical plan");
   });
 });

@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 import { WhoIsUp } from "@/components/domain/WhoIsUp";
@@ -88,6 +88,48 @@ describe("WhoIsUp (docs/spec/img/wireframe-case-s5.png)", () => {
     expect(screen.getByText("Sign and pay $6,530")).toBeInTheDocument();
     // Both the applicant and Health & Legal rows hold 3 days in this fixture.
     expect(screen.getAllByText("3 days holding").length).toBe(2);
+  });
+
+  it("lists every open action of a party, each with its own due date", () => {
+    const two: PartyStatus[] = [
+      {
+        ...ITEMS[0],
+        openTasks: [
+          task({ id: "PMT-27-0097:accept_and_sign", title: "Accept conditions and sign", dueDate: "2027-05-07" }),
+          task(),
+        ],
+        oldestDue: "2027-05-07",
+      },
+      ...ITEMS.slice(1),
+    ];
+    render(<WhoIsUp items={two} today={TODAY} nextMove="Next: ..." />);
+    const applicantRow = screen.getAllByRole("listitem")[0];
+    expect(within(applicantRow).getByText("Accept conditions and sign")).toBeInTheDocument();
+    expect(within(applicantRow).getByText("Sign and pay $6,530")).toBeInTheDocument();
+    expect(within(applicantRow).getByText(/Fri, May 7/)).toBeInTheDocument();
+    expect(within(applicantRow).getByText(/Fri, May 14/)).toBeInTheDocument();
+    expect(within(applicantRow).getAllByText("3 days holding")).toHaveLength(1);
+  });
+
+  it("takes a pinned request's due date over the card's own", () => {
+    const pinned: PartyStatus[] = [
+      {
+        ...ITEMS[0],
+        openTasks: [
+          task({
+            id: "PMT-27-0118:vendor_health_permit:1",
+            title: "Vendor health permit",
+            dueDate: "2027-06-04",
+            request: { from: "hl", message: "Please upload the food truck's health permit.", dueDate: "2027-05-05", at: "2027-04-30T10:00", resolved: false },
+          }),
+        ],
+      },
+      ...ITEMS.slice(1),
+    ];
+    render(<WhoIsUp items={pinned} today={TODAY} nextMove="Next: ..." />);
+    const applicantRow = screen.getAllByRole("listitem")[0];
+    expect(within(applicantRow).getByText(/Wed, May 5/)).toBeInTheDocument();
+    expect(within(applicantRow).queryByText(/Jun 4/)).not.toBeInTheDocument();
   });
 
   it("falls back to the row's note when there is no open task", () => {

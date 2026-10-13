@@ -38,7 +38,7 @@ export const PERSONAS: Persona[] = [
   },
   {
     id: "maple-street-block-captain",
-    name: "Maple Street Block Captain",
+    name: "Maple Street block captain",
     contactName: "Felix Nakamura",
     email: "felix.nakamura@example.com",
     phone: "(555) 040-4482",
@@ -92,7 +92,7 @@ export const PERSONAS: Persona[] = [
   },
   {
     id: "oak-avenue-block-captain",
-    name: "Oak Avenue Block Captain",
+    name: "Oak Avenue block captain",
     contactName: "Reggie Soto",
     email: "reggie.soto@example.com",
     phone: "(555) 041-1305",
