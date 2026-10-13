@@ -27,6 +27,8 @@ const B22 = "PMT-27-0046"; // Redline Motorsports Expo: Denied
 const B23 = "PMT-27-0048"; // Sunnyvale Block Association: Withdrawn
 const B24 = "PMT-27-0050"; // Evergreen Wedding Planners: Cancelled, after a permit was issued
 const B25 = "PMT-27-0052"; // North Permitopolis Chamber: Hold expired, quote never paid
+const B05 = "PMT-27-0012"; // St. Agnes Parish, In review; the seed's 90+ character event name
+const B09 = "PMT-27-0020"; // Permitopolis Metro Interfaith Council, needs_info; the 60+ character org name
 
 describe("My events: nothing yet", () => {
   it("a persona with no events gets the empty state and a way to start one", async () => {
@@ -316,5 +318,40 @@ describe("Payment and signature forms with invalid or empty input", () => {
   it("an empty signature cannot be submitted (Accept and sign stays disabled)", async () => {
     await renderScreen(<CheckoutScreen />, { role: "applicant", personaId: "riverfront-running-club", path: routes.quote(S5) });
     expect(screen.getByRole("button", { name: "Accept and sign" })).toBeDisabled();
+  });
+});
+
+describe("A 90-character event name and a 60-character organization name, on every applicant screen", () => {
+  it("the board header carries the full 90+ character event name", async () => {
+    const name = storedCase(B05).name;
+    expect(name.length).toBeGreaterThan(90);
+    await renderScreen(<BoardScreen />, { role: "applicant", personaId: "st-agnes-parish", path: routes.event(B05) });
+    expect(screen.getByRole("heading", { level: 1, name })).toBeInTheDocument();
+  });
+
+  it("checkout's not-ready header carries it too", async () => {
+    const name = storedCase(B05).name;
+    await renderScreen(<CheckoutScreen />, { role: "applicant", personaId: "st-agnes-parish", path: routes.quote(B05) });
+    expect(screen.getByText(name)).toBeInTheDocument();
+  });
+
+  it("the permit page's header carries it, even with no permit yet", async () => {
+    const name = storedCase(B05).name;
+    await renderScreen(<PermitScreen />, { role: "applicant", personaId: "st-agnes-parish", path: routes.permit(B05) });
+    expect(screen.getByText(name)).toBeInTheDocument();
+  });
+
+  it("My events truncates it with the full text still available (title attribute)", async () => {
+    const name = storedCase(B05).name;
+    await renderScreen(<MyEventsScreen />, { role: "applicant", personaId: "st-agnes-parish", path: routes.events() });
+    const truncated = screen.getByText(name, { selector: '[data-slot="truncate"]' });
+    expect(truncated).toHaveAttribute("title", name);
+  });
+
+  it("the board header also carries the 60+ character organization name", async () => {
+    const orgName = "Permitopolis Metropolitan Area Interfaith Council for Community Events";
+    expect(orgName.length).toBeGreaterThan(60);
+    await renderScreen(<BoardScreen />, { role: "applicant", personaId: "permitopolis-metro-interfaith-council", path: routes.event(B09) });
+    expect(screen.getByText(orgName)).toBeInTheDocument();
   });
 });
