@@ -2,11 +2,16 @@
 
 import * as React from "react";
 import { cn } from "@/lib/utils";
-import { TIER_LABEL } from "@/lib/types";
+import { TIER_LABEL, type Tier } from "@/lib/types";
+import { TIER_ICON } from "@/components/domain/icons";
 import { VIEWBOX } from "@/lib/data/mapGeometry";
 import { CityBackground } from "./CityBackground";
 import { lineMidpoint, occupiedIds, rectCenter, resolveLocationShapes } from "./geometry";
 import type { MapHighlight } from "./types";
+
+const FOCUS_RING =
+  "outline-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring";
+const TIERS: Tier[] = ["instant", "reviewed", "special"];
 
 export type { MapHighlight };
 
@@ -70,6 +75,18 @@ export function PermitopolisMap({ highlights, selectedId, onSelect, className }:
 
   return (
     <div className={cn("flex flex-col gap-3", className)}>
+      <ul className="flex flex-wrap items-center gap-x-4 gap-y-1" aria-label="Map legend: tiers">
+        {TIERS.map((tier) => {
+          const TierIcon = TIER_ICON[tier];
+          return (
+            <li key={tier} className="flex items-center gap-1.5 text-xs text-fg-secondary">
+              <span aria-hidden className={cn("size-2 shrink-0 rounded-full", TIER_DOT[tier])} />
+              <TierIcon aria-hidden className="size-3 shrink-0" />
+              {TIER_LABEL[tier]}
+            </li>
+          );
+        })}
+      </ul>
       <svg
         viewBox={`${VIEWBOX.x} ${VIEWBOX.y} ${VIEWBOX.width} ${VIEWBOX.height}`}
         role="img"
@@ -151,6 +168,7 @@ export function PermitopolisMap({ highlights, selectedId, onSelect, className }:
       <ul className="flex flex-col gap-1" aria-label="Highlighted bookings and closures">
         {highlights.map((highlight) => {
           const isOverlapping = overlappingHighlightIds.has(highlight.id);
+          const TierIcon = TIER_ICON[highlight.tier];
           return (
             <li key={highlight.id}>
               <button
@@ -159,12 +177,14 @@ export function PermitopolisMap({ highlights, selectedId, onSelect, className }:
                 aria-pressed={highlight.id === selectedId}
                 className={cn(
                   "flex w-full items-center gap-2 rounded-control border border-line-subtle bg-surface-1 px-2 py-1.5 text-left text-sm text-fg-secondary hover:bg-surface-hover",
+                  FOCUS_RING,
                   highlight.id === selectedId && "border-indigo-650",
                 )}
               >
                 <span aria-hidden className={cn("size-2 shrink-0 rounded-full", TIER_DOT[highlight.tier])} />
+                <TierIcon aria-hidden className="size-3.5 shrink-0 text-fg-label" />
                 <span className="flex-1 truncate">
-                  <span className="sr-only">{TIER_LABEL[highlight.tier]}: </span>
+                  <span className="text-xs text-fg-label">{TIER_LABEL[highlight.tier]}: </span>
                   {highlight.label}
                 </span>
                 <span className="text-xs text-fg-label">{STATUS_LABEL[highlight.status]}</span>

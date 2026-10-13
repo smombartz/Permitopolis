@@ -1,13 +1,6 @@
 import { cn } from "cn"
 import { PARTY_LABEL, type Party } from "@/lib/types"
-import { PARTY_ICON } from "@/components/domain/icons"
-
-const PARTY_CLASS: Record<Party, string> = {
-  applicant: "border-party-applicant-border bg-party-applicant-surface text-party-applicant-fg",
-  clerk: "border-party-clerk-border bg-party-clerk-surface text-party-clerk-fg",
-  pws: "border-party-pws-border bg-party-pws-surface text-party-pws-fg",
-  hl: "border-party-hl-border bg-party-hl-surface text-party-hl-fg",
-}
+import { PartyAvatar } from "@/components/domain/PartyAvatar"
 
 interface PartyChipProps extends React.ComponentProps<"span"> {
   party: Party
@@ -17,23 +10,26 @@ interface PartyChipProps extends React.ComponentProps<"span"> {
   suffix?: React.ReactNode
 }
 
-/** Identity chip: icon + color dot + label. Color never stands alone (CLAUDE.md). */
+/**
+ * Identity chip (plan 3.2): the party hue is confined to the leading avatar
+ * tile only. The chip itself sits on a neutral surface with ink text, so
+ * color never carries the chip's meaning alone.
+ */
 function PartyChip({ party, label, suffix, className, ...props }: PartyChipProps) {
-  const Icon = PARTY_ICON[party]
   return (
     <span
       data-slot="party-chip"
       data-party={party}
       className={cn(
-        "inline-flex h-7 w-fit shrink-0 items-center gap-1.5 rounded-full border px-2.5 text-xs font-medium whitespace-nowrap",
-        PARTY_CLASS[party],
+        "inline-flex h-7 w-fit shrink-0 items-center gap-1.5 rounded-full border border-line-subtle bg-surface-2 pr-2.5 pl-0.5 text-xs font-medium whitespace-nowrap text-fg",
         className
       )}
       {...props}
     >
-      <Icon className="size-3.5 shrink-0" aria-hidden="true" />
+      {/* The chip's own text label is the accessible name; the tile is decorative here. */}
+      <PartyAvatar party={party} size="sm" aria-hidden="true" />
       <span className="truncate">{label ?? PARTY_LABEL[party]}</span>
-      {suffix ? <span className="shrink-0">· {suffix}</span> : null}
+      {suffix ? <span className="shrink-0 text-fg-secondary">· {suffix}</span> : null}
     </span>
   )
 }

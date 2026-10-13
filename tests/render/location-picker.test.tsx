@@ -1,7 +1,7 @@
-import { render, screen, within } from "@testing-library/react";
+import { fireEvent, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import * as React from "react";
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { LocationPicker } from "@/components/map/LocationPicker";
 import { buildInventoryLocation, buildStreetsLocation } from "@/lib/view/map";
 import type { EventType, Location } from "@/lib/types";
@@ -91,5 +91,78 @@ describe("LocationPicker: a value that arrives or changes later", () => {
     render(<Harness initial={buildStreetsLocation(["maple-400"])} />);
     expect(tab("Street segments")).toHaveAttribute("aria-selected", "true");
     expect(value()).toBe("streets: 400 block of Maple Street");
+  });
+});
+
+describe("LocationPicker: keyboard focus (Phase 1 review fix)", () => {
+  it("gives the keyboard list rows the system focus ring", async () => {
+    render(<Harness />);
+    const shelter = space(/^Shelter 2/);
+    shelter.focus();
+    expect(shelter).toHaveFocus();
+    expect(shelter.className).toContain("focus-visible:outline-2");
+    expect(shelter.className).toContain("focus-visible:outline-focus-ring");
+
+    await userEvent.setup().click(tab("Street segments"));
+    const streetRow = within(screen.getByRole("list", { name: "Street segments" })).getByRole("button", {
+      name: /Main Street, 1st to 2nd/,
+    });
+    expect(streetRow.className).toContain("focus-visible:outline-2");
+
+    await userEvent.setup().click(tab("Draw a route"));
+    const routeRow = within(screen.getByRole("list", { name: "Route segments, in order" })).getAllByRole("button")[0];
+    expect(routeRow.className).toContain("focus-visible:outline-2");
+  });
+});
+
+describe("LocationPicker: area drag pointer capture (Phase 1 review fix)", () => {
+  // jsdom doesn't implement the Pointer Events capture methods, so they are stubbed here to
+  // make the fix observable; the component itself calls them through optional chaining,
+  // which is also what keeps it safe in environments (and older browsers) without them.
+  const setPointerCapture = vi.fn();
+  const releasePointerCapture = vi.fn();
+  const hasPointerCapture = vi.fn().mockReturnValue(true);
+
+  afterEach(() => {
+    setPointerCapture.mockClear();
+    releasePointerCapture.mockClear();
+    hasPointerCapture.mockClear();
+    delete (SVGElement.prototype as unknown as Record<string, unknown>).setPointerCapture;
+    delete (SVGElement.prototype as unknown as Record<string, unknown>).releasePointerCapture;
+    delete (SVGElement.prototype as unknown as Record<string, unknown>).hasPointerCapture;
+  });
+
+  it("captures the pointer when the drag starts, and releases it on pointerup", () => {
+    Object.assign(SVGElement.prototype, { setPointerCapture, releasePointerCapture, hasPointerCapture });
+    render(<Harness eventType="performance_rally" />);
+
+    const rect = screen.getByTestId("area-active-rect");
+    fireEvent.pointerDown(rect, { pointerId: 7, clientX: 10, clientY: 10 });
+    expect(setPointerCapture).toHaveBeenCalledWith(7);
+
+    fireEvent.pointerUp(rect, { pointerId: 7 });
+    expect(hasPointerCapture).toHaveBeenCalledWith(7);
+    expect(releasePointerCapture).toHaveBeenCalledWith(7);
+  });
+
+  it("also releases the pointer on pointercancel, so an interrupted drag never stays live", () => {
+    Object.assign(SVGElement.prototype, { setPointerCapture, releasePointerCapture, hasPointerCapture });
+    render(<Harness eventType="performance_rally" />);
+
+    const rect = screen.getByTestId("area-active-rect");
+    fireEvent.pointerDown(rect, { pointerId: 3, clientX: 10, clientY: 10 });
+    fireEvent.pointerCancel(rect, { pointerId: 3 });
+    expect(releasePointerCapture).toHaveBeenCalledWith(3);
+  });
+
+  it("drags safely with no pointer-capture support at all (older browsers, jsdom)", () => {
+    // No stub installed: setPointerCapture etc. are genuinely undefined here.
+    render(<Harness eventType="performance_rally" />);
+    const rect = screen.getByTestId("area-active-rect");
+    expect(() => {
+      fireEvent.pointerDown(rect, { pointerId: 1, clientX: 10, clientY: 10 });
+      fireEvent.pointerMove(rect, { pointerId: 1, clientX: 40, clientY: 40 });
+      fireEvent.pointerUp(rect, { pointerId: 1 });
+    }).not.toThrow();
   });
 });

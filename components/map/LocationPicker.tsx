@@ -28,6 +28,9 @@ import type { Availability, EventType, Location } from "@/lib/types";
 export type LocationPickerMode = "inventory" | "area" | "streets" | "route";
 export type AreaId = "city-hall-plaza" | "great-lawn";
 
+const FOCUS_RING =
+  "outline-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring";
+
 export interface LocationPickerProps {
   value: Location | null;
   onChange: (location: Location | null) => void;
@@ -210,7 +213,13 @@ export function LocationPicker({ value, onChange, eventType, availabilityOf, cla
     };
   }
 
+  // Pointer capture keeps the drag live even when the pointer leaves the rectangle
+  // mid-drag, and pointerup/pointercancel both end it, so releasing outside the
+  // shape (or an interrupted gesture) never leaves the drag stuck on.
   function handleAreaPointerDown(event: React.PointerEvent<SVGRectElement>) {
+    // Optional chaining: jsdom (render tests) and some older browsers don't implement
+    // pointer capture, so the drag still works there, just without the capture guarantee.
+    event.currentTarget.setPointerCapture?.(event.pointerId);
     setDragStart(pointToSvg(event.clientX, event.clientY));
   }
   function handleAreaPointerMove(event: React.PointerEvent<SVGRectElement>) {
@@ -218,7 +227,10 @@ export function LocationPicker({ value, onChange, eventType, availabilityOf, cla
     const point = pointToSvg(event.clientX, event.clientY);
     setAreaRect({ x: dragStart.x, y: dragStart.y, w: point.x - dragStart.x, h: point.y - dragStart.y });
   }
-  function handleAreaPointerUp() {
+  function handleAreaPointerEnd(event: React.PointerEvent<SVGRectElement>) {
+    if (event.currentTarget.hasPointerCapture?.(event.pointerId)) {
+      event.currentTarget.releasePointerCapture?.(event.pointerId);
+    }
     setDragStart(null);
   }
 
@@ -277,6 +289,7 @@ export function LocationPicker({ value, onChange, eventType, availabilityOf, cla
                     onClick={() => selectInventory(space.id)}
                     className={cn(
                       "w-full rounded-panel border border-line-subtle bg-surface-1 p-2 text-left text-sm hover:bg-surface-hover",
+                      FOCUS_RING,
                       selected && "border-indigo-650 bg-pill",
                     )}
                   >
@@ -308,6 +321,7 @@ export function LocationPicker({ value, onChange, eventType, availabilityOf, cla
               return (
                 <rect
                   key={id}
+                  data-testid={isActive ? "area-active-rect" : undefined}
                   x={shape.x}
                   y={shape.y}
                   width={shape.w}
@@ -317,7 +331,8 @@ export function LocationPicker({ value, onChange, eventType, availabilityOf, cla
                   strokeWidth={isActive ? 2 : 1}
                   onPointerDown={isActive ? handleAreaPointerDown : () => handleAreaIdChange(id)}
                   onPointerMove={isActive ? handleAreaPointerMove : undefined}
-                  onPointerUp={isActive ? handleAreaPointerUp : undefined}
+                  onPointerUp={isActive ? handleAreaPointerEnd : undefined}
+                  onPointerCancel={isActive ? handleAreaPointerEnd : undefined}
                 />
               );
             })}
@@ -417,6 +432,7 @@ export function LocationPicker({ value, onChange, eventType, availabilityOf, cla
                     onClick={() => selectStreet(segment.id)}
                     className={cn(
                       "flex w-full items-center justify-between gap-2 rounded-control border border-line-subtle bg-surface-1 px-2 py-1.5 text-left text-sm hover:bg-surface-hover",
+                      FOCUS_RING,
                       selected && "border-indigo-650 bg-pill",
                     )}
                   >
@@ -484,6 +500,7 @@ export function LocationPicker({ value, onChange, eventType, availabilityOf, cla
                       onClick={() => (included ? undefined : selectRouteSegment(segment.id))}
                       className={cn(
                         "flex w-full items-center gap-2 rounded-control border border-line-subtle bg-surface-1 px-2 py-1.5 text-left text-sm hover:bg-surface-hover disabled:cursor-not-allowed disabled:opacity-40",
+                        FOCUS_RING,
                         included && "border-indigo-650 bg-pill",
                       )}
                     >

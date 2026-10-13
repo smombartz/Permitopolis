@@ -97,26 +97,53 @@ import {
   CommandShortcut,
 } from "@/components/ui/command"
 import { Toaster } from "@/components/ui/sonner"
+import { PageHeader } from "@/components/ui/page-header"
+import { Section } from "@/components/ui/section"
+import { KeyValueList } from "@/components/ui/key-value"
+import { ConfirmDialog } from "@/components/ui/confirm-dialog"
+import { WizardStepper } from "@/components/ui/wizard-stepper"
+import { FilterBar, FilterChip } from "@/components/ui/filter-bar"
+import { CountBadge } from "@/components/ui/count-badge"
+import { Toolbar } from "@/components/ui/toolbar"
+import { Progress } from "@/components/ui/progress"
+import { InlineAlert } from "@/components/ui/inline-alert"
+import { StickyAside } from "@/components/ui/sticky-aside"
+import { Truncate } from "@/components/ui/truncate"
+import { CopyButton } from "@/components/ui/copy-button"
 
 import {
+  ActivityTimeline,
+  AvailabilityBadge,
   CASE_STATE_ICON,
+  CaseHeader,
   CaseId,
+  ConditionList,
   DateText,
+  DeptStatusDots,
   DueDate,
   ENDING_ICON,
+  EndingBanner,
+  EventTitle,
+  FeeTable,
   HoldStatus,
+  LeadTimeRisk,
   Money,
   PARTY_ICON,
   PartyAvatar,
   PartyChip,
+  PersonaAvatar,
   ReviewClock,
   ReviewStatusDot,
+  StackedTaskCard,
   StateChip,
   StateStepper,
   TASK_KIND_ICON,
   TIER_ICON,
+  TaskCard,
+  TaskKindLabel,
   TierBadge,
   WaitingOnChips,
+  WhoIsUp,
 } from "@/components/domain"
 import {
   DEPTS,
@@ -124,14 +151,19 @@ import {
   PARTIES,
   PARTY_LABEL,
   STATE_LABEL,
+  type Activity,
   type CaseState,
+  type Condition,
   type Ending,
+  type FeeLine,
   type FileRef,
   type Party,
   type ReviewStatus,
+  type Task,
   type TaskKind,
   type Tier,
 } from "@/lib/types"
+import type { PartyStatus } from "@/lib/state/types"
 
 // The kit runs outside app/layout.tsx when mounted by the render test, so it
 // brings its own demo date instead of importing lib/state (another workstream's
@@ -151,7 +183,150 @@ const REVIEW_STATUSES: ReviewStatus[] = [
 ];
 const SAMPLE_FILE: FileRef = { name: "sample-insurance.pdf", size: 248_000, type: "application/pdf" };
 
-function Section({
+// ---- Stress-row samples for Part 3 of workstream 2D: a 90+ character event name, a 60+
+// character organization name, missing fields, overdue dates and an ended case, all shown
+// somewhere below so the kit is the single place to judge the system against them.
+const LONG_EVENT_NAME =
+  "Riverside Park Community Spring Festival, Craft Fair, Food Truck Rally and Live Music Celebration Day";
+const LONG_ORG_NAME = "Permitopolis Riverside Neighborhood Association and Community Partners Coalition";
+
+function sampleTask(overrides: Partial<Task> = {}): Task {
+  return {
+    id: "PMT-27-0118:sample",
+    catalogId: "sample",
+    owner: "applicant",
+    kind: "document",
+    title: "Upload certificate of insurance",
+    why: "Every Reviewed and Special event needs this.",
+    reviewer: "hl",
+    dueDate: "2027-05-05",
+    status: "todo",
+    unlocksOn: null,
+    phase: "before_submitting",
+    payload: {},
+    history: [],
+    tags: [],
+    ...overrides,
+  };
+}
+
+const SAMPLE_TASKS: Task[] = [
+  sampleTask({
+    id: "t-overdue",
+    title: "Respond to a request",
+    why: "Health & Legal asked for the updated vendor list.",
+    dueDate: "2027-04-20",
+    request: {
+      from: "hl",
+      message: "The vendor list is missing Rolling Dumpling Co.'s contact information.",
+      at: "2027-04-18T09:00",
+      dueDate: "2027-04-20",
+      resolved: false,
+    },
+  }),
+  sampleTask({
+    id: "t-locked",
+    kind: "action",
+    title: "Accept conditions and sign",
+    why: "Unlocks once your quote is ready.",
+    status: "locked",
+    unlocksOn: "quote_sent",
+    dueDate: null,
+    reviewer: null,
+  }),
+  sampleTask({
+    id: "t-signoff",
+    kind: "sign_off",
+    title: "Neighbor sign-off",
+    why: "Block parties need every neighbor to sign off before the Clerk can accept.",
+    reviewer: "clerk",
+    dueDate: null,
+    payload: { progress: { done: 9, total: 12 } },
+  }),
+  sampleTask({
+    id: "t-payment",
+    kind: "payment",
+    title: "Pay fees and deposit",
+    why: "Your quote is ready.",
+    reviewer: "clerk",
+    dueDate: "2027-05-14",
+    payload: { amount: 6530 },
+  }),
+  sampleTask({
+    id: "t-done",
+    title: "Vendor list",
+    why: "Because you added food vending.",
+    reviewer: "hl",
+    status: "done",
+    dueDate: "2027-04-30",
+  }),
+];
+
+const SAMPLE_FEE_LINES: FeeLine[] = [
+  { id: "f1", dept: "clerk", label: "Application fee", qty: 1, unit: "flat", unitPrice: 250, estimate: 250, actual: 250, kind: "fee" },
+  { id: "f2", dept: "pws", label: "Police", qty: 8, unit: "officer-hour", unitPrice: 85, estimate: 3400, actual: 3570, kind: "fee" },
+  { id: "f3", dept: "pws", label: "Barricades", qty: 40, unit: "each", unitPrice: 15, estimate: 600, actual: null, kind: "fee" },
+  { id: "f4", dept: "hl", label: "Food or vendor permit", qty: 0, unit: "each", unitPrice: 75, estimate: 0, actual: 0, kind: "fee" },
+  { id: "d1", dept: "clerk", label: "Refundable cleanup deposit", qty: 1, unit: "flat", unitPrice: 1000, estimate: 1000, actual: null, kind: "deposit" },
+];
+
+const SAMPLE_CONDITIONS: Condition[] = [
+  { id: "c1", dept: "pws", text: "Sound ends at 9 pm; speakers face away from the residences on Elm Street.", mergedByClerk: true, acceptedByApplicant: true },
+  { id: "c2", dept: "pws", text: "No more than 85 dB measured at 50 feet.", mergedByClerk: true, acceptedByApplicant: false },
+  { id: "c3", dept: "hl", text: "Vendor list confirmed at least 48 hours ahead of the event.", mergedByClerk: false, acceptedByApplicant: false },
+];
+
+const SAMPLE_ACTIVITY: Activity[] = [
+  { at: "2027-04-16T09:10", actor: "applicant", text: "Started a draft." },
+  { at: "2027-04-16T09:45", actor: "applicant", text: "Submitted the application." },
+  { at: "2027-04-19T11:00", actor: "clerk", text: "Accepted as complete; date held until May 14." },
+  { at: "2027-04-19T11:05", actor: "system", text: "Routed to Public Works & Safety and Health & Legal." },
+  { at: "2027-04-21T14:20", actor: "hl", text: "Verified the insurance certificate." },
+  { at: "2027-04-28T10:00", actor: "pws", text: "Approved with 3 conditions." },
+  { at: "2027-04-30T08:30", actor: "neighbor", text: "Signed off." },
+  { at: "2027-04-30T16:00", actor: "hl", text: "Requested the updated vendor list." },
+];
+
+const SAMPLE_WHO_IS_UP: PartyStatus[] = [
+  {
+    party: "applicant",
+    status: "up_now",
+    openTasks: [SAMPLE_TASKS[0]],
+    oldestDue: "2027-04-20",
+    daysHolding: 13,
+    note: "",
+    scope: LONG_ORG_NAME,
+  },
+  {
+    party: "clerk",
+    status: "not_involved",
+    openTasks: [],
+    oldestDue: null,
+    daysHolding: 0,
+    note: "Owns the case",
+    scope: "Owns the case",
+  },
+  {
+    party: "pws",
+    status: "done_for_now",
+    openTasks: [],
+    oldestDue: null,
+    daysHolding: 0,
+    note: "Approved with conditions",
+    scope: "Route, police, sound",
+  },
+  {
+    party: "hl",
+    status: "waiting",
+    openTasks: [],
+    oldestDue: null,
+    daysHolding: 0,
+    note: "Waiting on the applicant's updated vendor list",
+    scope: "Insurance, accessibility",
+  },
+];
+
+function KitSection({
   id,
   title,
   description,
@@ -196,6 +371,15 @@ function KitScreen() {
   const [files, setFiles] = React.useState<FileRef[]>([]);
   const [commandOpen, setCommandOpen] = React.useState(false);
   const [segment, setSegment] = React.useState<"list" | "board" | "map">("board");
+  const [confirmOpen, setConfirmOpen] = React.useState(false);
+  const [acceptedIds, setAcceptedIds] = React.useState<string[]>(["c1"]);
+  const [filterSearch, setFilterSearch] = React.useState("");
+  const [filterTier, setFilterTier] = React.useState<Tier | "all">("all");
+  const [activeChip, setActiveChip] = React.useState(false);
+
+  function toggleAccept(id: string) {
+    setAcceptedIds((current) => (current.includes(id) ? current.filter((x) => x !== id) : [...current, id]));
+  }
 
   React.useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
@@ -235,7 +419,7 @@ function KitScreen() {
         </div>
 
         {/* ---- Buttons ---- */}
-        <Section
+        <KitSection
           id="buttons"
           title="Button"
           description="Primary, secondary (glass), dark, ghost, destructive and link, at 36/44/56px. Hover rises 2px; active compresses the shadow."
@@ -267,10 +451,10 @@ function KitScreen() {
               </Button>
             </Row>
           </div>
-        </Section>
+        </KitSection>
 
         {/* ---- Form controls ---- */}
-        <Section id="forms" title="Form controls" description="Input, Textarea, Select, Checkbox, Switch, Radio, Field, Segmented control, File drop.">
+        <KitSection id="forms" title="Form controls" description="Input, Textarea, Select, Checkbox, Switch, Radio, Field, Segmented control, File drop.">
           <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
             <div className="flex flex-col gap-4">
               <Field label="Event name" hint="Shown on the applicant's board and the permit.">
@@ -341,10 +525,10 @@ function KitScreen() {
               Kept: {files.map((f) => `${f.name} (${f.type})`).join(", ")}
             </p>
           ) : null}
-        </Section>
+        </KitSection>
 
         {/* ---- Tabs ---- */}
-        <Section id="tabs" title="Tabs">
+        <KitSection id="tabs" title="Tabs">
           <Tabs defaultValue="overview">
             <TabsList>
               <TabsTrigger value="overview">Overview</TabsTrigger>
@@ -373,10 +557,10 @@ function KitScreen() {
               Second tab content.
             </TabsContent>
           </Tabs>
-        </Section>
+        </KitSection>
 
         {/* ---- Overlays ---- */}
-        <Section id="overlays" title="Dialog, sheet, dropdown, popover, tooltip, command" description="HUD panels over a frosted backdrop.">
+        <KitSection id="overlays" title="Dialog, sheet, dropdown, popover, tooltip, command" description="HUD panels over a frosted backdrop.">
           <Row>
             <Dialog>
               <DialogTrigger asChild>
@@ -476,10 +660,10 @@ function KitScreen() {
               </CommandList>
             </Command>
           </CommandDialog>
-        </Section>
+        </KitSection>
 
         {/* ---- Accordion ---- */}
-        <Section id="accordion" title="Accordion">
+        <KitSection id="accordion" title="Accordion">
           <Panel variant="plain" className="px-4">
             <Accordion type="single" collapsible>
               <AccordionItem value="a">
@@ -492,10 +676,10 @@ function KitScreen() {
               </AccordionItem>
             </Accordion>
           </Panel>
-        </Section>
+        </KitSection>
 
         {/* ---- Table ---- */}
-        <Section id="table" title="Table" description="Dense rows, sticky uppercase header, mono numeric cells.">
+        <KitSection id="table" title="Table" description="Dense rows, sticky uppercase header, mono numeric cells.">
           <Panel variant="plain" className="overflow-hidden p-0">
             <Table>
               <TableHeader>
@@ -522,10 +706,10 @@ function KitScreen() {
               </TableBody>
             </Table>
           </Panel>
-        </Section>
+        </KitSection>
 
         {/* ---- Feedback and content primitives ---- */}
-        <Section id="feedback" title="Badge, chip, eyebrow, kbd, banner, callout, empty state, skeleton, stat">
+        <KitSection id="feedback" title="Badge, chip, eyebrow, kbd, banner, callout, empty state, skeleton, stat">
           <Row>
             <Badge>Default</Badge>
             <Badge variant="secondary">Secondary</Badge>
@@ -576,10 +760,10 @@ function KitScreen() {
             <Skeleton className="h-9 w-40" />
             <Skeleton className="size-9 rounded-full" />
           </Row>
-        </Section>
+        </KitSection>
 
         {/* ---- Panel, scroll area, separator ---- */}
-        <Section id="surfaces" title="Panel, scroll area, separator">
+        <KitSection id="surfaces" title="Panel, scroll area, separator">
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
             <Panel variant="frosted" className="p-4 text-sm">Frosted</Panel>
             <Panel variant="hud" className="p-4 text-sm">HUD</Panel>
@@ -599,10 +783,10 @@ function KitScreen() {
             </ScrollArea>
           </Panel>
           <Separator />
-        </Section>
+        </KitSection>
 
         {/* ---- Motion ---- */}
-        <Section id="motion" title="Motion" description="Material settle, idle float, surface sweep, breathing selection, caret blink.">
+        <KitSection id="motion" title="Motion" description="Material settle, idle float, surface sweep, breathing selection, caret blink.">
           <Row>
             <Panel variant="frosted" className="anim-material-settle p-4 text-sm">Material settle</Panel>
             <Panel variant="frosted" className="anim-idle-float p-4 text-sm">Idle float</Panel>
@@ -610,10 +794,10 @@ function KitScreen() {
             <Panel variant="frosted" className="anim-breathing-selection p-4 text-sm">Breathing selection</Panel>
             <span className="anim-caret-blink font-mono text-lg text-fg">|</span>
           </Row>
-        </Section>
+        </KitSection>
 
         {/* ---- Domain: tier, party, state ---- */}
-        <Section id="domain-badges" title="Domain: tier, party and state">
+        <KitSection id="domain-badges" title="Domain: tier, party and state">
           <Row>
             {TIERS.map((tier) => (
               <TierBadge key={tier} tier={tier} />
@@ -644,10 +828,10 @@ function KitScreen() {
               <StateChip key={ending} state="in_review" ending={ending} />
             ))}
           </Row>
-        </Section>
+        </KitSection>
 
         {/* ---- Domain: state stepper ---- */}
-        <Section id="domain-stepper" title="Domain: StateStepper">
+        <KitSection id="domain-stepper" title="Domain: StateStepper">
           <div className="flex flex-col gap-8">
             <Panel variant="plain" className="p-5">
               <StateStepper state="in_review" />
@@ -663,10 +847,10 @@ function KitScreen() {
               <StateStepper state="permitted" compact />
             </Panel>
           </div>
-        </Section>
+        </KitSection>
 
         {/* ---- Domain: review status, due date, clock, hold ---- */}
-        <Section id="domain-review" title="Domain: review status, due date, review clock, hold status">
+        <KitSection id="domain-review" title="Domain: review status, due date, review clock, hold status">
           <Row>
             {DEPTS.map((dept) =>
               REVIEW_STATUSES.map((status) => (
@@ -690,10 +874,10 @@ function KitScreen() {
             <HoldStatus hold={{ status: "expired", placedOn: "2027-04-01", expiresOn: "2027-04-15" }} />
             <HoldStatus hold={{ status: "released", placedOn: "2027-04-01", expiresOn: "2027-04-15" }} />
           </Row>
-        </Section>
+        </KitSection>
 
         {/* ---- Domain: mono (id, date, money) and icon maps ---- */}
-        <Section id="domain-mono" title="Domain: CaseId, DateText, Money, and the icon maps">
+        <KitSection id="domain-mono" title="Domain: CaseId, DateText, Money, and the icon maps">
           <Row>
             <CaseId id="PMT-27-0118" />
             <DateText date="2027-06-18" />
@@ -742,14 +926,293 @@ function KitScreen() {
               );
             })}
           </Row>
-        </Section>
+        </KitSection>
+
+        {/* ---- Shared UI: page header, section, key-value list, confirm dialog ---- */}
+        <KitSection
+          id="ui-blocks-1"
+          title="Shared UI: page header, section, key-value list, confirm dialog"
+          description="PageHeader, Section, KeyValueList and the window.confirm replacement. A 101-character event name and missing fields are shown here (Part 3 stress rows)."
+        >
+          <Panel variant="plain" className="p-4">
+            <PageHeader
+              eyebrow="Case"
+              title={LONG_EVENT_NAME}
+              description="A long event name wraps rather than overflowing; the back link and actions sit above and beside it."
+              backLabel="Back to cases"
+              onBack={() => toast("Back to cases")}
+              actions={<Button size="sm">Issue permit</Button>}
+            />
+          </Panel>
+          <Section title="Documents" description="Uploaded files and their verification state." actions={<Button variant="ghost" size="sm">Upload</Button>}>
+            <p className="text-sm text-fg-secondary">Section body goes here.</p>
+          </Section>
+          <KeyValueList
+            columns={2}
+            items={[
+              { label: "Organization", value: LONG_ORG_NAME },
+              { label: "Attendance", value: "1,200" },
+              { label: "Description", value: null },
+              { label: "Setup time", value: undefined },
+            ]}
+          />
+          <Row>
+            <Button variant="destructive" onClick={() => setConfirmOpen(true)}>
+              Reset the demo
+            </Button>
+          </Row>
+          <ConfirmDialog
+            open={confirmOpen}
+            onOpenChange={setConfirmOpen}
+            title="Reset the demo?"
+            body="This restores the seed exactly as it was on Mon, May 3, 2027."
+            confirmLabel="Reset"
+            destructive
+            onConfirm={() => toast.success("Demo reset")}
+          />
+        </KitSection>
+
+        {/* ---- Shared UI: wizard stepper, filter bar, count badge, toolbar ---- */}
+        <KitSection
+          id="ui-blocks-2"
+          title="Shared UI: wizard stepper, filter bar, count badge, toolbar"
+          description="The applicant wizard's 1-to-5 stepper and the filter row every list view shares."
+        >
+          <WizardStepper
+            steps={[{ label: "What" }, { label: "Where" }, { label: "When" }, { label: "Size" }, { label: "Plan" }]}
+            current={2}
+            onStepSelect={(index) => toast(`Edit step ${index + 1}`)}
+          />
+          <FilterBar
+            selectLabel="Tier"
+            selectValue={filterTier}
+            selectOptions={[
+              { value: "all", label: "All tiers" },
+              { value: "instant", label: "Instant" },
+              { value: "reviewed", label: "Reviewed" },
+              { value: "special", label: "Special event" },
+            ]}
+            onSelectChange={(value) => setFilterTier(value as Tier | "all")}
+            searchValue={filterSearch}
+            onSearchChange={setFilterSearch}
+            searchPlaceholder="Search cases"
+            searchShortcut="/"
+            resultCount={6}
+            resultNoun="case"
+            onClear={() => {
+              setFilterSearch("");
+              setFilterTier("all");
+              setActiveChip(false);
+            }}
+          >
+            <FilterChip active={activeChip} onClick={() => setActiveChip((v) => !v)}>
+              Involves me
+            </FilterChip>
+          </FilterBar>
+          <Row>
+            <CountBadge count={6} />
+            <CountBadge count={2} variant="accent" />
+            <CountBadge count={1} variant="danger" />
+          </Row>
+          <Toolbar aria-label="Case actions">
+            <Button variant="secondary" size="sm">
+              Export
+            </Button>
+            <Button variant="ghost" size="sm">
+              Print
+            </Button>
+          </Toolbar>
+        </KitSection>
+
+        {/* ---- Shared UI: progress, inline alert, sticky aside, truncate, copy button ---- */}
+        <KitSection
+          id="ui-blocks-3"
+          title="Shared UI: progress, inline alert, sticky aside, truncate, copy button"
+        >
+          <Progress value={9} max={12} label="9 of 12 neighbors" />
+          <div className="flex flex-col gap-2">
+            <InlineAlert variant="info">Insurance must name the City as additionally insured.</InlineAlert>
+            <InlineAlert variant="success">Verified.</InlineAlert>
+            <InlineAlert variant="warning">The date hold expires tomorrow.</InlineAlert>
+            <InlineAlert variant="danger">Rejected: the certificate is missing the City as additional insured.</InlineAlert>
+          </div>
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-[1fr_260px]">
+            <Panel variant="plain" className="p-4 text-sm text-fg-secondary">
+              Page content scrolls here while the aside on the right stays in view.
+            </Panel>
+            <StickyAside topOffset="1rem">
+              <p className="text-sm font-semibold text-fg">Your actions</p>
+              <p className="mt-1 text-xs text-fg-secondary">City Clerk · Quote sent</p>
+            </StickyAside>
+          </div>
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <div className="max-w-64 rounded-panel border border-line-subtle bg-surface-1 p-3">
+              <p className="mb-1 text-xs text-fg-label uppercase">Single line</p>
+              <Truncate text={LONG_EVENT_NAME} className="text-sm text-fg" />
+            </div>
+            <div className="max-w-64 rounded-panel border border-line-subtle bg-surface-1 p-3">
+              <p className="mb-1 text-xs text-fg-label uppercase">Two lines</p>
+              <Truncate text={LONG_EVENT_NAME} lines={2} className="text-sm text-fg" />
+            </div>
+          </div>
+          <Row>
+            <CopyButton value="PMT-27-0118" label="Copy case ID" />
+          </Row>
+        </KitSection>
+
+        {/* ---- Domain: persona avatar, task kind label, availability badge, ending banner ---- */}
+        <KitSection
+          id="domain-identity"
+          title="Domain: persona avatar, task kind label, availability badge, ending banner"
+          description="Endings (Withdrawn, Denied, Cancelled, Hold expired), each with its reason — the Part 3 'ended case' stress row."
+        >
+          <Row>
+            <PersonaAvatar name="Maya Chen" />
+            <PersonaAvatar name="Riverfront Running Club" />
+            <PersonaAvatar name={LONG_ORG_NAME} />
+          </Row>
+          <Row>
+            {TASK_KINDS.map((kind) => (
+              <TaskKindLabel key={kind} kind={kind} />
+            ))}
+          </Row>
+          <Row>
+            <AvailabilityBadge availability={{ status: "open" }} />
+            <AvailabilityBadge availability={{ status: "impacted", reason: "Impacted 6 to 11:30 am" }} />
+            <AvailabilityBadge availability={{ status: "booked" }} />
+            <AvailabilityBadge availability={{ status: "blackout", reason: "Citywide maintenance" }} />
+          </Row>
+          <div className="flex flex-col gap-2">
+            {ENDINGS.map((ending) => (
+              <EndingBanner
+                key={ending}
+                ending={ending}
+                reason={
+                  ending === "denied"
+                    ? "Street closure denied by Public Safety."
+                    : ending === "hold_expired"
+                      ? "The date hold expired before payment was received."
+                      : ending === "cancelled"
+                        ? "Cancelled by the applicant after the permit issued."
+                        : "Withdrawn by the applicant before review."
+                }
+              />
+            ))}
+          </div>
+        </KitSection>
+
+        {/* ---- Domain: case row pieces ---- */}
+        <KitSection id="domain-case-row" title="Domain: EventTitle, LeadTimeRisk, DeptStatusDots" description="Dense-list building blocks for the cases pipeline and My queue.">
+          <div className="max-w-xs rounded-control border border-line-subtle bg-surface-1 p-2">
+            <EventTitle name={LONG_EVENT_NAME} applicantName={LONG_ORG_NAME} />
+          </div>
+          <Row>
+            <LeadTimeRisk risk="at_risk" />
+            <span className="text-xs text-fg-secondary">(risk=&quot;ok&quot; renders nothing, shown here as empty space) </span>
+            <LeadTimeRisk risk="ok" />
+          </Row>
+          <Row>
+            <DeptStatusDots
+              items={[
+                { dept: "clerk", status: "pending" },
+                { dept: "pws", status: "approved_with_conditions" },
+                { dept: "hl", status: "needs_info" },
+              ]}
+            />
+          </Row>
+        </KitSection>
+
+        {/* ---- Domain: CaseHeader ---- */}
+        <KitSection id="domain-case-header" title="Domain: CaseHeader" description="The header strip from both wireframes, active and ended.">
+          <div className="flex flex-col gap-4">
+            <CaseHeader
+              name="Jazz in the Plaza"
+              tier="reviewed"
+              caseId="PMT-27-0118"
+              applicantName="Downtown Arts Collective"
+              eventDate="2027-06-18"
+              today={DEMO_TODAY}
+              state="in_review"
+              hold={{ status: "none", placedOn: null, expiresOn: null }}
+              reviewClock={{ dayCount: 9, allowedDays: 21, paused: true, pausedDays: 2 }}
+              actions={<Button size="sm">Send quote</Button>}
+            />
+            <CaseHeader
+              name={LONG_EVENT_NAME}
+              tier="special"
+              caseId="PMT-27-0099"
+              applicantName={LONG_ORG_NAME}
+              eventDate="2027-04-24"
+              today={DEMO_TODAY}
+              state="in_review"
+              ending="denied"
+              hold={{ status: "released", placedOn: "2027-03-01", expiresOn: "2027-03-15" }}
+            />
+          </div>
+        </KitSection>
+
+        {/* ---- Domain: ActivityTimeline ---- */}
+        <KitSection id="domain-activity" title="Domain: ActivityTimeline" description="A collapsed log (latest 3, Show all) next to the full log.">
+          <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
+            <div>
+              <p className="mb-2 text-xs font-bold tracking-[.12em] text-fg-label uppercase">Collapsed</p>
+              <ActivityTimeline items={SAMPLE_ACTIVITY} collapsedCount={3} />
+            </div>
+            <div>
+              <p className="mb-2 text-xs font-bold tracking-[.12em] text-fg-label uppercase">Full, one entry</p>
+              <ActivityTimeline items={SAMPLE_ACTIVITY.slice(0, 1)} />
+            </div>
+          </div>
+        </KitSection>
+
+        {/* ---- Domain: FeeTable ---- */}
+        <KitSection id="domain-fees" title="Domain: FeeTable" description="The quote's fee table, and closeout's Actual/Difference columns (including a $0 line and a figure still unlogged).">
+          <div className="flex flex-col gap-6">
+            <FeeTable lines={SAMPLE_FEE_LINES} />
+            <FeeTable lines={SAMPLE_FEE_LINES} showActual />
+          </div>
+        </KitSection>
+
+        {/* ---- Domain: ConditionList ---- */}
+        <KitSection id="domain-conditions" title="Domain: ConditionList" description="Read-only (the permit) and editable (accept and sign) modes.">
+          <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
+            <ConditionList conditions={SAMPLE_CONDITIONS} />
+            <ConditionList conditions={SAMPLE_CONDITIONS} editable acceptedIds={acceptedIds} onToggleAccept={toggleAccept} />
+          </div>
+        </KitSection>
+
+        {/* ---- Domain: WhoIsUp ---- */}
+        <KitSection id="domain-who-is-up" title="Domain: WhoIsUp" description="docs/spec/img/wireframe-case-s5.png, with an overdue applicant task and a long organization name.">
+          <WhoIsUp
+            items={SAMPLE_WHO_IS_UP}
+            today={DEMO_TODAY}
+            nextMove="Next: the applicant responds to Health & Legal's request, then Health & Legal re-reviews."
+            onSelectTask={(taskId) => toast(`Open ${taskId}`)}
+          />
+        </KitSection>
+
+        {/* ---- Domain: TaskCard ---- */}
+        <KitSection id="domain-task-card" title="Domain: TaskCard, StackedTaskCard" description="Locked (dashed), a pinned and overdue request, sign-off progress, a payment amount, done, and the stacked-card variant.">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            {SAMPLE_TASKS.map((task) => (
+              <TaskCard
+                key={task.id}
+                task={task}
+                today={DEMO_TODAY}
+                unlockHint="Unlocks when your quote is ready."
+                onSelect={() => toast(`Open ${task.title}`)}
+              />
+            ))}
+            <StackedTaskCard title="Vendor health permits" done={25} total={25} onSelect={() => toast("Open vendor permits")} />
+          </div>
+        </KitSection>
 
         {/* ---- Page skeleton ---- */}
-        <Section id="page-skeleton" title="Page skeleton" description="Shown until useHydrated() is true.">
+        <KitSection id="page-skeleton" title="Page skeleton" description="Shown until useHydrated() is true.">
           <Panel variant="plain" className="p-0">
             <PageSkeleton />
           </Panel>
-        </Section>
+        </KitSection>
 
         <Toaster />
       </div>
