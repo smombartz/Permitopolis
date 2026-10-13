@@ -12,6 +12,7 @@ import { InlineAlert } from "@/components/ui/inline-alert";
 import { PageHeader } from "@/components/ui/page-header";
 import { Section } from "@/components/ui/section";
 import { availableActions, useDemo } from "@/lib/state";
+import { fmtMoney, plural } from "@/lib/format";
 import type { RulesCtx } from "@/lib/rules";
 import { routes } from "@/lib/routes";
 import type { EventCase } from "@/lib/types";
@@ -32,6 +33,10 @@ function BookingPanel({ c, ctx, onPaid }: { c: EventCase; ctx: RulesCtx; /** Kee
   const estimate = bookingEstimate(c, ctx);
   const dueNow = dueNowOf(estimate);
   const planHref = routes.apply({ caseId: c.id, step: "plan" });
+  // A series books and pays its first session now; the rest bill on their own date (PRD
+  // "Series... says exactly what is charged now and what later"), so this is the one place
+  // that distinction has to be spelled out before the card is charged.
+  const laterSessions = plan.isSeries && estimate.sessions ? estimate.sessions - 1 : 0;
 
   function handlePay() {
     const result = dispatch(c.id, { type: "book_and_pay", method: "card" });
@@ -73,6 +78,11 @@ function BookingPanel({ c, ctx, onPaid }: { c: EventCase; ctx: RulesCtx; /** Kee
               covers={plan.isSeries ? `The first of ${plan.sessionsCount} sessions, plus fees` : "This event's fees"}
               onPay={handlePay}
             />
+            {laterSessions > 0 ? (
+              <p className="text-sm text-fg-secondary">
+                Then {fmtMoney(estimate.perSession ?? 0)} per session for the {plural(laterSessions, "remaining session")}, billed on their own date.
+              </p>
+            ) : null}
           </Section>
         </>
       )}

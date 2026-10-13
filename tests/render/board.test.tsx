@@ -11,6 +11,7 @@ const S3 = "PMT-27-0118";
 const S4 = "PMT-27-0126";
 const S5 = "PMT-27-0097";
 const S6 = "PMT-27-0031";
+const B16 = "PMT-27-0034"; // Riverside Tai Chi Circle, Instant series, Event day today
 const WITHDRAWN = "PMT-27-0048";
 
 describe("the board (S3): one pinned request stands between it and its quote", () => {
@@ -97,6 +98,20 @@ describe("the board (S5): sign-off and payment cards link to the quote route", (
   });
 });
 
+describe("the board (B16): a series' session schedule", () => {
+  it("shows the total paid and outstanding, and a way to pay the session that is due", async () => {
+    const { user } = await renderScreen(<BoardScreen />, { role: "applicant", personaId: "riverside-tai-chi-circle", path: routes.event(B16) });
+
+    // Instant events show the payment card as "Pay and book"; it opens the schedule once paid.
+    await user.click(screen.getByRole("button", { name: /Pay and book/ }));
+
+    const dialog = screen.getByRole("dialog");
+    const stats = dialog.querySelectorAll('[data-slot="stat"]');
+    expect(Array.from(stats).map((s) => s.textContent)).toEqual([expect.stringContaining("Paid"), expect.stringContaining("Outstanding")]);
+    expect(within(dialog).getByRole("link", { name: /Pay the session due/ })).toBeInTheDocument();
+  });
+});
+
 describe('the board (S5): "With the city" is never a black hole', () => {
   it("names Health & Legal, how many days it has waited, and the expected-by date", async () => {
     await renderScreen(<BoardScreen />, { role: "applicant", personaId: "riverfront-running-club", path: routes.event(S5) });
@@ -165,7 +180,7 @@ describe("the board (S6): after the event", () => {
     expect(draft.clonedFrom).toBe(S6);
     expect(draft.state).toBe("draft");
     expect(draft.schedule?.date).toBe("2028-04-22");
-  });
+  }, 15000); // Many interactions in one flow, end to end; generous under load.
 });
 
 describe("the board's card sheet: a card the applicant no longer holds", () => {

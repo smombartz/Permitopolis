@@ -495,6 +495,20 @@ export function seriesSessions(c: EventCase, cfg: RulesConfig): SessionRow[] {
     }));
 }
 
+export interface SeriesTotals {
+  /** Every session already paid (the booking or quote's first session, plus each one paid since). */
+  paid: number;
+  /** Due and upcoming sessions together: what the series still asks for, skipped ones excluded. */
+  outstanding: number;
+}
+
+/** The series schedule's own totals (PRD "Series... with the total paid and outstanding"). */
+export function seriesTotals(c: EventCase, cfg: RulesConfig): SeriesTotals {
+  const rows = seriesSessions(c, cfg);
+  const sum = (billings: Occurrence["billing"][]) => rows.filter((r) => billings.includes(r.billing)).reduce((s, r) => s + r.amount, 0);
+  return { paid: sum(["paid"]), outstanding: sum(["due", "upcoming"]) };
+}
+
 /* ---------------------------------------------------------------------- */
 /* Re-exported for screens that only need the plain column (no grouping)   */
 /* ---------------------------------------------------------------------- */

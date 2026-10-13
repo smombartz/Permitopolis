@@ -21,6 +21,7 @@ import {
   phaseGroups,
   reviewerRows,
   seriesSessions,
+  seriesTotals,
   waitingOnChipItems,
   withCityColumnSummary,
   withCityInfo,
@@ -271,6 +272,23 @@ describe("seriesSessions", () => {
 
   it("a single event has no session schedule", () => {
     expect(seriesSessions(find(S1), DEFAULT_CONFIG)).toEqual([]);
+  });
+});
+
+describe("seriesTotals", () => {
+  it("B16 on Event day: paid and outstanding add up to every session's share, skipped ones excluded", () => {
+    const c = find(B16);
+    const rows = seriesSessions(c, DEFAULT_CONFIG);
+    const totals = seriesTotals(c, DEFAULT_CONFIG);
+    const expectedPaid = rows.filter((r) => r.billing === "paid").reduce((s, r) => s + r.amount, 0);
+    const expectedOutstanding = rows.filter((r) => r.billing === "due" || r.billing === "upcoming").reduce((s, r) => s + r.amount, 0);
+    expect(totals).toEqual({ paid: expectedPaid, outstanding: expectedOutstanding });
+    expect(totals.paid).toBeGreaterThan(0);
+    expect(totals.outstanding).toBeGreaterThan(0);
+  });
+
+  it("a single event has nothing to total", () => {
+    expect(seriesTotals(find(S1), DEFAULT_CONFIG)).toEqual({ paid: 0, outstanding: 0 });
   });
 });
 
