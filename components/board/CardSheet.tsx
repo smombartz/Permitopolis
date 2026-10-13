@@ -395,11 +395,16 @@ function MeetingBody({ task }: BodyProps) {
 
 function SubmitApplicationBody({ c, task, onClose }: BodyProps) {
   const ready = task.status === "todo"
+  const isAmendment = task.tags.includes("amendment")
   const [error, setError] = React.useState<string | null>(null)
   const preSubmit = c.tasks.filter((t) => t.owner === "applicant" && t.catalogId !== "submit_application" && (t.status === "submitted" || t.status === "done"))
   return (
     <div className="flex flex-col gap-4">
-      <p className="text-sm text-fg-secondary">This sends your application to the City Clerk for intake.</p>
+      <p className="text-sm text-fg-secondary">
+        {isAmendment
+          ? "This sends your amendment to the City Clerk for a decision. Your current permit stays valid for the original plan until then."
+          : "This sends your application to the City Clerk for intake."}
+      </p>
       <ul className="flex flex-col gap-1.5 text-sm text-fg">
         {preSubmit.map((t) => (
           <li key={t.id} className="flex items-center gap-2">
@@ -418,12 +423,12 @@ function SubmitApplicationBody({ c, task, onClose }: BodyProps) {
             setError(result.reason ?? "That didn't go through.")
             return
           }
-          toast.success(SUCCESS_TOAST.submit)
+          toast.success(isAmendment ? "Amendment submitted." : SUCCESS_TOAST.submit)
           onClose()
         }}
         className="self-start"
       >
-        Submit application
+        {isAmendment ? "Submit amendment" : "Submit application"}
       </Button>
     </div>
   )

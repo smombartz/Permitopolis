@@ -791,5 +791,72 @@ describe("Path 7 · Amend up a tier (S1, P1)", () => {
     act(S1, { type: "complete_task", taskId: `${S1}:sound_details`, form: { equipment: "One DJ booth, two speakers", soundCheckTime: "10:30" } });
     expect(board(get(S1)).with_city).toEqual(["sound_details"]);
     expect(get(S1).state).toBe("permitted");
+
+    // Once she finishes the insurance certificate too, "Submit application" (the amendment's
+    // own) unlocks: completing a card is dispatched the same way whether it came from the
+    // original plan or an amendment.
+    expect(refusal(S1, { type: "submit" })).toBe("Unlocks when every card before submitting is done");
+    act(S1, { type: "complete_task", taskId: `${S1}:insurance_certificate`, files: [SAMPLE_FILE] });
+    expect(task(get(S1), "submit_application")).toMatchObject({ status: "todo", tags: ["amendment"] });
+
+    // She submits the amendment. The permit still covers the original plan, and nothing has
+    // reached a city queue yet beyond the two cards already with Public Works & Safety and
+    // Health & Legal.
+    act(S1, { type: "submit" });
+    const submitted = get(S1);
+    expect(submitted).toMatchObject({ state: "permitted", flags: { amendmentPending: true } });
+    expect(task(submitted, "submit_application")).toMatchObject({ status: "done", tags: ["amendment"] });
+    expect(refusal(S1, { type: "submit" })).toBe("The amendment is already submitted.");
+    expect(board(submitted)).toEqual({
+      do_now: [],
+      with_city: ["insurance_certificate", "sound_details"],
+      coming_up: ["carry_permit", "accept_and_sign"],
+      done: ["pay_fees", "submit_application"],
+    });
+
+    // As the City Clerk, she approves the amendment as it stands: the pending flag clears, the
+    // permit now covers the amended plan (already on the record), and the $393.75 difference
+    // between what the amended plan costs and what Maya already paid is charged through "Pay
+    // fees and deposit", the same card that took her first payment.
+    as("clerk");
+    act(S1, { type: "amend", answers: submitted });
+    const approved = get(S1);
+    expect(approved.flags.amendmentPending).toBe(false);
+    expect(task(approved, "pay_fees")).toMatchObject({ status: "done", payload: { amount: 518.75 } });
+    expect(caseTotals(approved)).toEqual({ fees: 268.75, deposit: 250, total: 518.75, paid: 518.75, due: 0 });
+    expect(approved).toMatchObject({ state: "permitted", tier: "reviewed", permit: original.permit, schedule: original.schedule });
+    expect(hasActivePermit(approved)).toBe(true);
+    expect(approved.activity.at(-1)?.text).toBe("Approved the amendment. Charged $393.75.");
+  });
+
+  it("the City Clerk can decline a submitted amendment instead: the original plan comes back and its cards are gone", () => {
+    as("applicant", "maya-chen");
+    const original = get(S1);
+    const withDj: EventAnswers = {
+      eventType: original.eventType,
+      name: original.name,
+      description: original.description,
+      location: original.location,
+      schedule: original.schedule,
+      attendance: original.attendance,
+      addOns: { ...original.addOns, amplifiedSound: true },
+    };
+    act(S1, { type: "amend", answers: withDj, lateFee: true });
+    act(S1, { type: "complete_task", taskId: `${S1}:sound_details`, form: { equipment: "One DJ booth", soundCheckTime: "10:30" } });
+    act(S1, { type: "complete_task", taskId: `${S1}:insurance_certificate`, files: [SAMPLE_FILE] });
+    act(S1, { type: "submit" });
+    const submitted = get(S1);
+
+    as("clerk");
+    act(S1, { type: "amend", answers: original });
+    const declined = get(S1);
+    expect(declined).toMatchObject({ tier: "instant", addOns: { amplifiedSound: false }, flags: { amendmentPending: false, lateFee: false } });
+    expect(declined.tasks.map((t) => t.catalogId)).toEqual(["pay_fees", "carry_permit"]);
+    expect(declined.feeLines).toEqual(original.feeLines);
+    expect(declined).toMatchObject({ state: "permitted", permit: original.permit, dateHold: original.dateHold, payments: original.payments, schedule: original.schedule });
+    expect(declined.activity.at(-1)?.text).toBe("Declined the amendment; the original plan stands.");
+    // Nothing of the declined amendment is left to act on.
+    expect(refusal(S1, { type: "submit" })).not.toBeNull();
+    void submitted;
   });
 });

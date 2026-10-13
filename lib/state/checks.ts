@@ -52,7 +52,9 @@ const ACTION_ACTORS: Record<ActionType, Actor[]> = {
   cancel: ["applicant"],
   submit_feedback: ["applicant"],
   book_again: ["applicant"],
-  amend: ["applicant"],
+  // The applicant proposes an amendment; the City Clerk decides a pending one with the same
+  // action (see decideAmendment() in transitions/applicant.ts).
+  amend: ["applicant", "clerk"],
   accept_complete: ["clerk"],
   confirm_routing: ["clerk"],
   send_to_commission: ["clerk"],
@@ -210,6 +212,19 @@ export function checkBookAndPay(c: EventCase, ctx: RulesCtx): CheckResult {
 }
 
 export function checkSubmit(c: EventCase, ctx: RulesCtx): CheckResult {
+  // A pending amendment reuses this same card and action outside Draft: "Submit amendment" is
+  // "Submit application" reopened on the amendment's own pre-submit cards. The lead time was
+  // already checked when the amendment was proposed (checkAmendedDate), so it is not re-checked
+  // here.
+  if (c.flags.amendmentPending) {
+    const open = requireOpen(c);
+    if (!open.ok) return open;
+    const submitTask = findTask(c, taskId(c.id, "submit_application"));
+    if (!submitTask || !submitTask.tags.includes("amendment")) return fail("There is nothing to submit yet.");
+    if (submitTask.status === "done") return fail("The amendment is already submitted.");
+    if (submitTask.status === "locked" || !preSubmitCardsIn(c)) return fail(unlockHintFor(submitTask.catalogId) ?? "Finish every card before submitting.");
+    return OK;
+  }
   const state = requireState(c, "draft");
   if (!state.ok) return state;
   if (c.tier === "instant") return fail("Instant events book and pay instead of submitting.");
@@ -458,12 +473,28 @@ export function checkBookAgain(c: EventCase): CheckResult {
   return requireState(c, "closed");
 }
 
-export function checkAmend(c: EventCase, today: string, eventDate: string | null): CheckResult {
+/**
+ * `actor` defaults to "applicant" so availableActions() (outside this workstream's files), which
+ * calls this with three arguments, keeps asking "can the applicant amend now". The City Clerk's
+ * decision on an already-pending amendment is the same action, so it is checked here too: the
+ * applicant may not start a second one while the first is pending, and the Clerk may only decide
+ * one the applicant has actually submitted (decideAmendment() in transitions/applicant.ts).
+ */
+export function checkAmend(c: EventCase, today: string, eventDate: string | null, actor: Actor = "applicant"): CheckResult {
   const open = requireOpen(c);
   if (!open.ok) return open;
   if (c.state === "draft") return fail("Confirm the plan and submit before amending.");
   if (c.state === "closed") return fail("This case is already closed.");
   if (eventDate && eventDate < today) return fail("The event has already happened.");
+  if (actor === "clerk") {
+    if (!c.flags.amendmentPending) return fail("There is no amendment pending.");
+    const submitTask = findTask(c, taskId(c.id, "submit_application"));
+    if (!submitTask || !submitTask.tags.includes("amendment") || submitTask.status !== "done") {
+      return fail("The applicant has not submitted the amendment yet.");
+    }
+    return OK;
+  }
+  if (c.flags.amendmentPending) return fail("An amendment is already pending; wait for the City Clerk's decision.");
   return OK;
 }
 

@@ -6,8 +6,10 @@ import { makeTask } from "@/lib/state/testSupport";
 import { routes } from "@/lib/routes";
 import type { EventCase } from "@/lib/types";
 import {
+  amendmentBanner,
   bookAgainDraftDate,
   boardColumnsGrouped,
+  canAmend,
   closeoutStatusLine,
   dateHoldFootnote,
   directLinkHref,
@@ -473,5 +475,60 @@ describe('"With the city": withCityInfo and withCityColumnSummary', () => {
 
   it("an empty With the city column summarizes to nothing", () => {
     expect(withCityColumnSummary(find(S1), TODAY)).toEqual([]);
+  });
+});
+
+describe("canAmend", () => {
+  const CLOSED = "PMT-27-0040";
+
+  it("a live permit, well before its session, can be amended", () => {
+    expect(canAmend(find(S1), TODAY)).toEqual({ ok: true });
+  });
+
+  it("a Draft is edited in the wizard instead", () => {
+    expect(canAmend(find(B02), TODAY).ok).toBe(false);
+  });
+
+  it("a withdrawn case cannot be amended", () => {
+    const result = canAmend(find(WITHDRAWN_B23), TODAY);
+    expect(result.ok).toBe(false);
+    expect(result.reason).toMatch(/withdrawn/);
+  });
+
+  it("a closed case cannot be amended", () => {
+    expect(find(CLOSED).state).toBe("closed");
+    expect(canAmend(find(CLOSED), TODAY)).toEqual({ ok: false, reason: "This case is closed; it cannot be amended." });
+  });
+
+  it("a case past its last session cannot be amended", () => {
+    const c = find(S1);
+    const last = c.schedule!.date;
+    expect(canAmend(c, "2099-01-01").ok).toBe(false);
+    expect(canAmend(c, last).ok).toBe(true);
+  });
+
+  it("refuses a second amendment while one is already pending", () => {
+    const c = { ...find(S1), flags: { ...find(S1).flags, amendmentPending: true } };
+    expect(canAmend(c, TODAY)).toEqual({ ok: false, reason: "An amendment is already pending; wait for the City Clerk's decision." });
+  });
+});
+
+describe("amendmentBanner", () => {
+  it("is null while nothing is pending", () => {
+    expect(amendmentBanner(find(S1))).toBeNull();
+  });
+
+  it("asks the applicant to finish the new cards while the amendment's own Submit application is not yet done", () => {
+    const c = find(S1);
+    const locked = { ...c.tasks[0], catalogId: "submit_application", tags: ["amendment" as const], status: "locked" as const };
+    const pending = { ...c, tasks: [...c.tasks, locked], flags: { ...c.flags, amendmentPending: true } };
+    expect(amendmentBanner(pending)).toMatchObject({ awaitingCity: false });
+  });
+
+  it("tells the applicant it is with the City Clerk once Submit application (the amendment's) is done", () => {
+    const c = find(S1);
+    const submitted = { ...c.tasks[0], catalogId: "submit_application", tags: ["amendment" as const], status: "done" as const };
+    const pending = { ...c, tasks: [...c.tasks, submitted], flags: { ...c.flags, amendmentPending: true } };
+    expect(amendmentBanner(pending)).toMatchObject({ awaitingCity: true });
   });
 });
