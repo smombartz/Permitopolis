@@ -1,10 +1,10 @@
 import { Suspense } from "react";
-import { PlaceholderScreen } from "@/components/shell/PlaceholderScreen";
+import { ClosuresMapScreen } from "@/components/city/closures/ClosuresMapScreen";
 
 export default function Page() {
   return (
     <Suspense fallback={null}>
-      <PlaceholderScreen route="/city/map" />
+      <ClosuresMapScreen />
     </Suspense>
   );
 }
