@@ -1,5 +1,22 @@
 # Change log
 
+## 2026-10-13 - Submission notes and the final gate
+
+**What Changed:**
+- Added "Presenting it" at the top of `docs/readme.md`: who the prototype is for, the workflow it goes deep on, seven decisions, what was deliberately not built, what it is made of and what no person has checked yet
+- Rewrote `README.md` for the finished prototype (how to run it, where to start, where the docs are)
+- Ticked workstream 6C in the plan and recorded the final gate: type-check, lint, 3,197 tests in 109 files and the production build pass on `build`
+
+**Why:**
+- Workstream 6C of the plan, and the close of the build through Phase 6
+
+**Files Modified:**
+- `docs/readme.md`
+- `README.md`
+- `docs/plans/2026-10-12-permitopolis-prototype.md`
+
+---
+
 ## 2026-10-13 - Final review fixes
 
 **What Changed:**

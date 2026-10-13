@@ -3,6 +3,62 @@
 Architecture, integrations and decisions worth remembering. The full plan, with the reasoning, is in
 `docs/plans/2026-10-12-permitopolis-prototype.md`.
 
+## Presenting it
+
+Notes for the walkthrough: who the prototype is for, what it goes deep on, what was decided and
+what was left out. The presenter's guide in the app is `/demo`; the list of screens to judge by eye
+is section 12 of the plan.
+
+**Who it is for.** The City Clerk's staff, who own every event case from intake to closeout; the
+two groups who review only their part of it (Public Works & Safety, Health & Legal); and the
+applicant on the other side of the same record. The record is an event permit application.
+
+**The workflow it goes deep on.** "Whose move is it?" A permit stalls between parties more often
+than inside one, so every screen answers that first. The list views (My queue, Cases) are sorted
+by what is waiting on the viewer; the detail view (a case) opens on "Who's up", four rows that say
+who holds the next step, since when, and what unlocks the others.
+
+**Decisions worth saying out loud.**
+
+1. **One record, two sides.** The applicant's to-do cards and the city's outstanding actions are
+   the same task objects filtered by owner, so "waiting on" is computed and the two sides cannot
+   disagree. Scenario S4 is the case for it: the state says Submitted, but the move belongs to
+   three neighbors.
+2. **Applicants never pick a permit.** Five plain questions; the tier, the permits, the reviewers
+   and the fees change live as they answer, and each trigger that alone holds the tier says what
+   removing it would do.
+3. **The whole journey on day one.** The wizard ends in a board of cards, each one document or
+   action with why it is needed and when it is due, instead of six more screens found one by one.
+4. **Deadline first for staff.** My queue groups by Overdue, Due this week and Later; the pipeline
+   can group by state or by event date; a lead-time flag catches a case running out of time.
+5. **Verification is a checklist against the document.** The verifier sees a drawn preview beside
+   the PRD's checks, already evaluated, and some seeded documents are deliberately wrong so the
+   checks have something to catch.
+6. **Seeded by replay.** All 38 cases are histories replayed through the real rules and state
+   machine, so no seeded case can disagree with the engine, and Reset is exact.
+7. **Built to survive a live demo.** A fixed demo date, one-click reset, no login, a role switcher
+   that follows the case on screen, and a coach that works out the current step of each demo path
+   from the data, so it is right after a reload or an improvisation.
+
+**Deliberately not built.** A backend, accounts, email, real payments or file storage (uploads
+keep name, size and type). Real maps and geocoding (the city is drawn as SVG). Appeals, and a
+commission workflow beyond a flag. Notifications outside the app and other languages. A PDF
+library ("Download PDF" prints the page). Licenses as their own page. Editing inventory, the
+blackout calendar and templates in Settings (they are shown, not edited). Browser automation
+tests and a deploy.
+
+**What it is made of.** 21 routes, 383 source files and 3,197 tests in 109 files (type-check,
+lint, tests and the production build are the gate, `pnpm check`). It was built with Claude Code in
+seven phases: shared contracts first, then parallel builders in separate git worktrees for each
+phase, an integrator that merged them and made the screens meet, read-only reviewers that walked
+the demo paths click by click, and a fixer for what they found.
+
+**What no person has checked yet.** Nothing was looked at in a browser, heard through a screen
+reader or held on a phone while it was built; that was left to the owner by design. Layout at
+375 px and 1280 px, the glass and focus-ring treatment, motion, and print were reasoned from the
+markup and covered by jsdom tests only. Section 12 of the plan lists every screen with what to
+look for, and the last section of this file lists the product questions each built one way.
+
 ## Stack (versions installed on 2026-10-12)
 
 | Package | Version | Notes |
