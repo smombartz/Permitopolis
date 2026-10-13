@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { CountBadge } from "@/components/ui/count-badge";
 import { CaseId, DateText, EventTitle, StateChip, TierBadge, WaitingOnChips } from "@/components/domain";
+import { CommissionBadge } from "@/components/city/lists/CommissionBadge";
 import { StalledBadge } from "@/components/city/lists/StalledBadge";
 import { routes } from "@/lib/routes";
 import { fmtDaysToGo } from "@/lib/format";
@@ -22,6 +23,7 @@ function PipelineCard({ c, today, from, showStateChip }: { c: EventCase; today: 
           <EventTitle name={c.name} applicantName={applicantNameOf(c)} className="flex-1" />
           <div className="flex shrink-0 items-center gap-1.5">
             {isStalled(c, today) ? <StalledBadge /> : null}
+            {c.flags.sentToCommission ? <CommissionBadge /> : null}
             <TierBadge tier={c.tier} />
           </div>
         </div>

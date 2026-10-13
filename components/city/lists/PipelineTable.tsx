@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { ArrowDownIcon, ArrowUpIcon } from "lucide-react";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { CaseId, DateText, DeptStatusDots, DueDate, LeadTimeRisk, StateChip, TierBadge, WaitingOnChips } from "@/components/domain";
+import { CommissionBadge } from "@/components/city/lists/CommissionBadge";
 import { StalledBadge } from "@/components/city/lists/StalledBadge";
 import { Truncate } from "@/components/ui/truncate";
 import { useRovingListNav } from "@/components/city/lists/useRovingListNav";
@@ -103,6 +104,7 @@ function PipelineTable({ rows, today, sort, dir, onSort, from, columns, density 
                     {c.name}
                   </Link>
                   {isStalled(c, today) ? <StalledBadge /> : null}
+                  {c.flags.sentToCommission ? <CommissionBadge /> : null}
                 </div>
                 <Truncate text={applicantNameOf(c)} className="text-xs text-fg-secondary" />
               </div>
