@@ -1,10 +1,10 @@
 import { Suspense } from "react";
-import { PlaceholderScreen } from "@/components/shell/PlaceholderScreen";
+import { CasesScreen } from "@/components/city/lists/CasesScreen";
 
 export default function Page() {
   return (
     <Suspense fallback={null}>
-      <PlaceholderScreen route="/city/cases" />
+      <CasesScreen />
     </Suspense>
   );
 }
