@@ -8,9 +8,10 @@ import { Textarea } from "@/components/ui/textarea"
 import { InlineAlert } from "@/components/ui/inline-alert"
 import { PartyChip } from "@/components/domain"
 import { classify, routing } from "@/lib/rules"
-import { addDaysISO } from "@/lib/dates"
 import { checkConfirmRouting } from "@/lib/state"
 import type { RoutedReviewer } from "@/lib/state/actions"
+import { defaultReviewDueDate, leadTimeLeftAfterRouting } from "@/lib/view/clerkTools"
+import { plural } from "@/lib/format"
 import { PARTY_LABEL, type Dept } from "@/lib/types"
 import { PanelActions, PanelBody, PanelHeader, useCaseContext, useCaseDispatch } from "../panelKit"
 import type { ActionPanelProps } from "../types"
@@ -30,7 +31,8 @@ function ConfirmRoutingPanel({ caseId, onClose }: ActionPanelProps) {
   const [error, setError] = React.useState<string | null>(null)
 
   const suggestions = React.useMemo(() => (c ? routing(c, classify(c, cfg), cfg) : []), [c, cfg]);
-  const defaultDue = c ? addDaysISO(today, cfg.sla.reviewDays[c.tier]) : today;
+  // Today plus the tier's review days, rolled back off a weekend: never empty, never a weekend.
+  const defaultDue = c ? defaultReviewDueDate(c, cfg, today) : today;
   const [rows, setRows] = React.useState<Row[]>(() =>
     suggestions.map((s) => ({ dept: s.dept, reasons: s.reasons, checked: true, sections: s.sections.join("\n"), dueDate: defaultDue })),
   )
@@ -61,6 +63,10 @@ function ConfirmRoutingPanel({ caseId, onClose }: ActionPanelProps) {
   }
   const datesOk = rows.every((row) => dateProblem(row) === null)
 
+  const checkedDueDates = rows.filter((r) => r.checked && r.dueDate).map((r) => r.dueDate);
+  const latestDueDate = checkedDueDates.length > 0 ? checkedDueDates.reduce((a, b) => (a > b ? a : b)) : null;
+  const leadTimeLeft = latestDueDate ? leadTimeLeftAfterRouting(c, latestDueDate) : null;
+
   return (
     <>
       <PanelHeader title="Confirm routing" description="Suggested from the plan's triggers. Adjust who reviews, what each checks, and the due date for its decision." />
@@ -86,6 +92,13 @@ function ConfirmRoutingPanel({ caseId, onClose }: ActionPanelProps) {
             </Field>
           </div>
         ))}
+        {leadTimeLeft !== null ? (
+          <InlineAlert variant={leadTimeLeft < 0 ? "danger" : "info"}>
+            {leadTimeLeft < 0
+              ? `The latest due date is ${plural(-leadTimeLeft, "day")} after the event; move it earlier.`
+              : `${plural(leadTimeLeft, "day")} of lead time left after the latest due date, for the quote and payment.`}
+          </InlineAlert>
+        ) : null}
       </PanelBody>
       <PanelActions error={error} onCancel={onClose} submitLabel="Confirm routing" disabled={!check.ok || !anyChecked || !datesOk} onSubmit={submit} />
     </>
