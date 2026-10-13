@@ -37,7 +37,7 @@ function OverviewTab({ c, today, cfg, applicantName, whoIsUp, nextMove, onSelect
                 <div className="flex flex-wrap gap-1.5">
                   {overview.triggers.map((t) => (
                     <Chip key={t.id}>
-                      <ChipDot />
+                      <ChipDot className="text-fg-tertiary" /> {/* guard-allow-tertiary: a dot, not text */}
                       {t.label}
                     </Chip>
                   ))}

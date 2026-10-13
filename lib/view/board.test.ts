@@ -169,15 +169,15 @@ describe("reviewerRows", () => {
   it("S3: Public Works & Safety approved with conditions, Health & Legal asked for something, the Clerk waits on reviews", () => {
     const rows = reviewerRows(find(S3));
     expect(rows).toEqual([
-      { dept: "clerk", label: "Waiting on reviews" },
-      { dept: "pws", label: "Approved with conditions" },
-      { dept: "hl", label: "Asked you for something" },
+      { dept: "clerk", status: "pending", label: "Waiting on reviews" },
+      { dept: "pws", status: "approved_with_conditions", label: "Approved with conditions" },
+      { dept: "hl", status: "needs_info", label: "Asked you for something" },
     ]);
   });
 
   it("a Draft has nobody involved yet", () => {
     const rows = reviewerRows(find(S2));
-    expect(rows.every((r) => r.label === "Not involved")).toBe(true);
+    expect(rows.every((r) => r.label === "Not involved" && r.status === "not_routed")).toBe(true);
   });
 });
 

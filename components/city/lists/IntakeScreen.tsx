@@ -128,7 +128,7 @@ function IntakeTabTable({
               <TableCell>
                 <TierBadge tier={c.tier} />
               </TableCell>
-              <TableCell numeric>{c.schedule ? <DateText date={c.schedule.date} short /> : "—"}</TableCell>
+              <TableCell numeric>{c.schedule ? <DateText date={c.schedule.date} short /> : "No date yet"}</TableCell>
               <TableCell numeric>{c.submittedAt ? <DateText date={c.submittedAt.slice(0, 10)} short /> : "—"}</TableCell>
               <TableCell numeric>{plural(row.daysInIntake, "day")}</TableCell>
               <TableCell>
@@ -196,7 +196,7 @@ function InstantExceptionsTable({ cases, today, from }: { cases: EventCase[]; to
             <TableCell>
               <CaseLink c={c} from={from} />
             </TableCell>
-            <TableCell numeric>{c.schedule ? <DateText date={c.schedule.date} short /> : "—"}</TableCell>
+            <TableCell numeric>{c.schedule ? <DateText date={c.schedule.date} short /> : "No date yet"}</TableCell>
             <TableCell numeric>{plural(daysInCloseout, "day")}</TableCell>
             <TableCell>
               <Button size="sm" variant="secondary" asChild>

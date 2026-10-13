@@ -1,7 +1,9 @@
 "use client"
 
-import { ConditionList, FeeTable, Money } from "@/components/domain"
+import { ConditionList, FeeTable } from "@/components/domain"
 import { Section } from "@/components/ui/section"
+import { Stat } from "@/components/ui/stat"
+import { fmtMoney } from "@/lib/format"
 import { EmptyState } from "@/components/ui/empty-state"
 import { ReceiptIcon } from "lucide-react"
 import { caseTotals } from "@/lib/state"
@@ -40,22 +42,10 @@ function ConditionsFeesTab({ c }: ConditionsFeesTabProps) {
       </Section>
       <Section title="Payments and what is due">
         <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
-          <div className="flex flex-col gap-0.5">
-            <p className="text-eyebrow font-bold tracking-[.12em] text-fg-label uppercase">Total</p>
-            <Money amount={totals.total} className="text-sm font-semibold text-fg" />
-          </div>
-          <div className="flex flex-col gap-0.5">
-            <p className="text-eyebrow font-bold tracking-[.12em] text-fg-label uppercase">Paid</p>
-            <Money amount={totals.paid} className="text-sm font-semibold text-fg" />
-          </div>
-          <div className="flex flex-col gap-0.5">
-            <p className="text-eyebrow font-bold tracking-[.12em] text-fg-label uppercase">Due</p>
-            <Money amount={totals.due} className="text-sm font-semibold text-fg" />
-          </div>
-          <div className="flex flex-col gap-0.5">
-            <p className="text-eyebrow font-bold tracking-[.12em] text-fg-label uppercase">Deposit</p>
-            <Money amount={totals.deposit} className="text-sm font-semibold text-fg" />
-          </div>
+          <Stat label="Total" value={fmtMoney(totals.total)} />
+          <Stat label="Paid" value={fmtMoney(totals.paid)} />
+          <Stat label="Due" value={fmtMoney(totals.due)} />
+          <Stat label="Deposit" value={fmtMoney(totals.deposit)} />
         </div>
       </Section>
     </div>

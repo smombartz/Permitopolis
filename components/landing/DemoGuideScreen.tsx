@@ -11,14 +11,14 @@ import { PageSkeleton } from "@/components/ui/page-skeleton";
 import { Section } from "@/components/ui/section";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { PartyChip } from "@/components/domain";
+import { DateText, PartyChip } from "@/components/domain";
 import { PARTY_ICON } from "@/components/domain/icons";
 import { buildSeed, useDemo, useHydrated } from "@/lib/state";
 import { DEFAULT_DEMO_TODAY } from "@/lib/rules";
 import { DEMO_DATE_JUMPS, DEMO_PATHS, SCENARIO_JUMPS, type DemoPath } from "@/lib/data/demoScript";
 import { PERSONA_BY_ID } from "@/lib/data/people";
 import { fmtDate } from "@/lib/format";
-import { homeFor } from "@/lib/routes";
+import { homeFor, routes } from "@/lib/routes";
 import { PARTY_LABEL, type Party } from "@/lib/types";
 import { demoPathJump, WHAT_IS_FAKED } from "@/lib/view/landing";
 
@@ -87,6 +87,8 @@ function DemoGuideScreen() {
         <PageHeader
           eyebrow="Demo guide"
           title="Presenting Permitopolis"
+          backHref={routes.home()}
+          backLabel="Back to Permitopolis"
           description="Everything a presenter needs to run the demo: the roles, the date, the rehearsed paths, and a reset button."
           actions={
             <Button variant="destructive" onClick={() => setResetOpen(true)}>
@@ -135,7 +137,7 @@ function DemoGuideScreen() {
                 aria-pressed={jump.date === demoToday}
                 onClick={() => handleSetDemoToday(jump.date)}
               >
-                <span className="font-mono">{fmtDate(jump.date)}</span>
+                <DateText date={jump.date} />
                 <span className="font-normal text-fg-secondary">{jump.note}</span>
               </Button>
             ))}
@@ -148,7 +150,7 @@ function DemoGuideScreen() {
               <Panel key={path.id} variant="frosted" className="flex flex-col gap-3 p-5">
                 <div className="flex items-start justify-between gap-2">
                   <div className="flex flex-col gap-0.5">
-                    <p className="text-xs font-bold tracking-[.12em] text-fg-label uppercase">Path {path.id}</p>
+                    <p className="text-eyebrow font-bold tracking-[.12em] text-fg-label uppercase">Path {path.id}</p>
                     <h3 className="text-base font-bold text-fg">{path.title}</h3>
                   </div>
                   <Badge variant={path.priority === "P0" ? "default" : "secondary"}>{path.priority}</Badge>

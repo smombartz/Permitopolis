@@ -431,6 +431,19 @@ export const EVENT_TYPE_LABEL: Record<EventType, string> = {
   class_meetup: "Class or club meetup",
 };
 
+/** A card's phase, as the board's swimlanes and the wizard's plan both name it. */
+export const TASK_PHASE_LABEL: Record<TaskPhase, string> = {
+  before_submitting: "Before submitting",
+  review: "Review",
+  permit: "Permit",
+  before_event: "Before the event",
+  event_day: "Event day",
+  after: "After",
+};
+
+/** The phases in the order a case goes through them. */
+export const TASK_PHASES: TaskPhase[] = ["before_submitting", "review", "permit", "before_event", "event_day", "after"];
+
 /** The eight states on the stepper. Needs info is a marker on In review. */
 export const MAIN_PATH: CaseState[] = [
   "draft",

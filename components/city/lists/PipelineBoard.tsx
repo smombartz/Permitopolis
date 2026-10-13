@@ -47,7 +47,8 @@ function PipelineBoard({ columns, today, from }: { columns: Record<CaseState, Ev
               <CountBadge count={cases.length} />
             </div>
             <ul className="flex max-h-[70vh] flex-col gap-2 overflow-y-auto">
-              {cases.length === 0 ? <li className="rounded-control border border-dashed border-line-subtle p-3 text-center text-xs text-fg-secondary">Nothing here</li> : null}
+              {/* An empty column, as the applicant's board draws one. */}
+              {cases.length === 0 ? <li className="rounded-panel border border-dashed border-line-subtle bg-surface-soft px-3 py-6 text-center text-xs text-fg-secondary">Nothing here</li> : null}
               {cases.map((c) => (
                 <PipelineCard key={c.id} c={c} today={today} from={from} />
               ))}

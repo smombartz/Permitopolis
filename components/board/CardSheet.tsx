@@ -76,6 +76,15 @@ function historyToActivity(history: TaskHistoryEntry[]) {
   }))
 }
 
+/** What the toast says once a card's action has gone through. */
+const SUCCESS_TOAST: Partial<Record<Action["type"], string>> = {
+  complete_task: "Sent.",
+  respond_to_request: "Reply sent.",
+  submit: "Application submitted.",
+  submit_feedback: "Feedback sent.",
+  book_again: "Next year's application started.",
+}
+
 interface BodyProps {
   c: EventCase
   task: Task
@@ -321,6 +330,7 @@ function SubmitApplicationBody({ c, task, onClose }: BodyProps) {
             setError(result.reason ?? "That didn't go through.")
             return
           }
+          toast.success(SUCCESS_TOAST.submit)
           onClose()
         }}
         className="self-start"
@@ -331,7 +341,7 @@ function SubmitApplicationBody({ c, task, onClose }: BodyProps) {
   )
 }
 
-function FeedbackBody({ c, task, onClose }: BodyProps) {
+function FeedbackBody({ task, dispatch, onClose }: BodyProps) {
   const [rating, setRating] = React.useState(5)
   const [comment, setComment] = React.useState("")
   const done = task.status === "done"
@@ -359,12 +369,7 @@ function FeedbackBody({ c, task, onClose }: BodyProps) {
         <Button
           type="button"
           onClick={() => {
-            const result = useDemo.getState().dispatch(c.id, { type: "submit_feedback", rating, comment: comment || undefined })
-            if (!result.ok) {
-              toast.error(result.reason ?? "That didn't go through.")
-              return
-            }
-            onClose()
+            if (dispatch({ type: "submit_feedback", rating, comment: comment || undefined })) onClose()
           }}
           className="self-start"
         >
@@ -390,6 +395,7 @@ function BookAgainBody({ c, task, onClose }: BodyProps) {
             toast.error(result.reason ?? "That didn't go through.")
             return
           }
+          toast.success(SUCCESS_TOAST.book_again)
           onClose()
           const spawnedId = result.spawnedIds?.[0]
           if (spawnedId) router.push(routes.apply({ caseId: spawnedId }))
@@ -415,12 +421,16 @@ interface CardSheetContentProps {
 function CardSheetContent({ c, task, onClose }: CardSheetContentProps) {
   const pinned = Boolean(task.request) && task.request?.resolved === false
 
+  // Says what happened, as the checkout and the city's panels do. A simulated sign-off only
+  // moves the progress bar in front of the applicant, so it has no toast.
   function dispatch(action: Action): boolean {
     const result = useDemo.getState().dispatch(c.id, action)
     if (!result.ok) {
       toast.error(result.reason ?? "That didn't go through.")
       return false
     }
+    const done = SUCCESS_TOAST[action.type]
+    if (done) toast.success(done)
     return true
   }
 

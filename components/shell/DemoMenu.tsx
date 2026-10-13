@@ -48,7 +48,7 @@ function DemoMenu() {
   function handleReset() {
     reset();
     router.push(homeFor(useDemo.getState().role));
-    toast.success("Demo data restored");
+    toast.success("Demo data restored.");
   }
 
   function handleSetDemoToday(date: ISODate) {

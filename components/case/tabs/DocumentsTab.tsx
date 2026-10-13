@@ -6,7 +6,7 @@ import { EmptyState } from "@/components/ui/empty-state"
 import { Badge } from "@/components/ui/badge"
 import { TaskKindLabel } from "@/components/domain"
 import { FileQuestionIcon } from "lucide-react"
-import { fmtFileSize } from "@/lib/format"
+import { fmtFileSize, plural } from "@/lib/format"
 import { PARTY_LABEL, type EventCase, type Party, type Task, type TaskStatus } from "@/lib/types"
 import { documentGroups } from "@/lib/view/caseDetail"
 
@@ -104,7 +104,7 @@ function DocumentsTab({ c, role, onOpen }: DocumentsTabProps) {
   return (
     <div className="flex flex-col gap-8">
       {groups.map((group) => (
-        <Section key={group.dept} title={PARTY_LABEL[group.dept]} description={`${group.cards.length} card${group.cards.length === 1 ? "" : "s"}`}>
+        <Section key={group.dept} title={PARTY_LABEL[group.dept]} description={plural(group.cards.length, "card")}>
           <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
             {group.cards.map((task) => (
               <DocumentCard key={task.id} task={task} role={role} onOpen={onOpen} />

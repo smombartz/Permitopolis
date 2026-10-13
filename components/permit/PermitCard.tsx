@@ -4,12 +4,12 @@ import * as React from "react";
 import Link from "next/link";
 import { QRCodeSVG } from "qrcode.react";
 import { SessionList } from "@/components/permit/SessionList";
-import { CaseId, ConditionList, TierBadge } from "@/components/domain";
+import { CaseId, ConditionList, Money, TierBadge } from "@/components/domain";
 import { MapThumbnail } from "@/components/map";
 import { Eyebrow } from "@/components/ui/eyebrow";
 import { Separator } from "@/components/ui/separator";
 import { CITY_STAFF_BY_DEPT } from "@/lib/data/people";
-import { fmtDate, fmtMoney, fmtNumber, fmtTimeRange } from "@/lib/format";
+import { fmtDate, fmtNumber, fmtTimeRange } from "@/lib/format";
 import { cancellationRefund, classify } from "@/lib/rules";
 import type { RulesConfig } from "@/lib/rules";
 import { routes } from "@/lib/routes";
@@ -146,7 +146,7 @@ function PermitCard({ c, today, cfg }: { c: EventCase; today: ISODate; cfg: Rule
         <p className="text-eyebrow font-bold tracking-[.12em] text-fg-label uppercase">Cancellation schedule</p>
         <p className="text-sm text-fg">{refund.rule}</p>
         <p className="text-sm text-fg">
-          If cancelled today ({fmtDate(today)}): <span className="font-mono tabular-nums">{fmtMoney(refund.refund)}</span> refund.
+          If cancelled today ({fmtDate(today)}): <Money amount={refund.refund} /> refund.
         </p>
       </div>
     </div>

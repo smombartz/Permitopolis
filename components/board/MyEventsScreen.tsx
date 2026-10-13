@@ -50,7 +50,7 @@ function MyEventsScreen() {
   }
 
   return (
-    <div className="flex flex-col gap-8">
+    <div className="flex flex-col gap-6">
       <PageHeader eyebrow="Applicant" title="My events" description="Your events and what they need from you next." actions={planAction} />
 
       {active.length > 0 ? (

@@ -45,7 +45,7 @@ function endedInfo(c: EventCase): NotReadyInfo {
 function generalNotReadyInfo(c: EventCase): NotReadyInfo {
   if (c.ending) return endedInfo(c);
   if (hasActivePermit(c)) {
-    return { message: "This event already has its permit.", href: routes.permit(c.id), label: "View your permit" };
+    return { message: "This event already has its permit.", href: routes.permit(c.id), label: "View permit" };
   }
   switch (c.state) {
     case "draft":

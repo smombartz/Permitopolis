@@ -150,7 +150,7 @@ function CaseDetailScreen() {
           </TabsContent>
         </Tabs>
 
-        <ActionsPanel role={role} stateLabel={STATE_LABEL[c.state]} actions={actions} whoIsUpNote={sentence} onOpen={(key) => go({ task: key })} />
+        <ActionsPanel role={role} stateLabel={c.ending ? ENDING_LABEL[c.ending] : STATE_LABEL[c.state]} actions={actions} whoIsUpNote={sentence} onOpen={(key) => go({ task: key })} />
       </div>
 
       <ActionSheet caseId={c.id} openKey={openKey} role={role} onOpenChange={(open) => !open && go({ task: null })} />

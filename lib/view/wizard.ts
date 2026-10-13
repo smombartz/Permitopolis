@@ -19,18 +19,20 @@ import {
   type RulesCtx,
   type WhatIf,
 } from "@/lib/rules";
-import type {
-  AddOns,
-  CityServices,
-  EventAnswers,
-  EventType,
-  Location,
-  Schedule,
-  Task,
-  TaskPhase,
-  Trigger,
-  TriggerId,
-  WizardStep,
+import {
+  TASK_PHASES,
+  TASK_PHASE_LABEL,
+  type AddOns,
+  type CityServices,
+  type EventAnswers,
+  type EventType,
+  type Location,
+  type Schedule,
+  type Task,
+  type TaskPhase,
+  type Trigger,
+  type TriggerId,
+  type WizardStep,
 } from "@/lib/types";
 
 /* ---------- step order ---------- */
@@ -294,26 +296,19 @@ export function primaryButtonReady(answers: EventAnswers, gate: DateGate, lateFe
 
 /* ---------- step 5: the plan's cards, grouped by phase ---------- */
 
-export const TASK_PHASE_ORDER: TaskPhase[] = ["before_submitting", "review", "permit", "before_event", "event_day", "after"];
-
-export const TASK_PHASE_LABEL: Record<TaskPhase, string> = {
-  before_submitting: "Before you submit",
-  review: "While it's reviewed",
-  permit: "Getting your permit",
-  before_event: "Before the event",
-  event_day: "On the day",
-  after: "After the event",
-};
-
 export interface PhaseGroup {
   phase: TaskPhase;
   label: string;
   tasks: Task[];
 }
 
-/** The plan's cards (requirements()'s output) grouped by phase, in the catalogue's own order. */
+/**
+ * The plan's cards (requirements()'s output) grouped by phase, in the catalogue's own order,
+ * under the names the board's phase swimlanes use (`TASK_PHASE_LABEL`): the plan's groups are
+ * the board's lanes a step later.
+ */
 export function groupTasksByPhase(tasks: Task[]): PhaseGroup[] {
-  return TASK_PHASE_ORDER.map((phase) => ({ phase, label: TASK_PHASE_LABEL[phase], tasks: tasks.filter((t) => t.phase === phase) })).filter(
+  return TASK_PHASES.map((phase) => ({ phase, label: TASK_PHASE_LABEL[phase], tasks: tasks.filter((t) => t.phase === phase) })).filter(
     (group) => group.tasks.length > 0,
   );
 }

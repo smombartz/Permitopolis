@@ -35,7 +35,7 @@ branches are in one tree.
 
 ## Consistency
 
-- One `applicantName()` (`lib/data/people.ts`) in place of five fallbacks.
+- One `applicantNameOf()` (`lib/data/people.ts`) in place of five fallbacks.
 - One narrow-viewport hook (`useIsNarrow`, from `@/components/shell`); the landing page's copy goes.
 - One back link (`BackLink` in `components/ui/page-header.tsx`): the board, the quote and the case
   detail get the same one `PageHeader` renders.
@@ -45,6 +45,37 @@ branches are in one tree.
   `TIER_LABEL`; table dates from `DateText short`; a pipeline card names its case with `EventTitle`.
 - The same action reads the same: "Request information", "Back to My events", the accept toast.
 - Page rhythm: every screen's root is `gap-6`. The verify page gets its `<h1>`.
+
+Added when the pass was resumed on 2026-10-13:
+
+- **One set of phase names.** The wizard's step 5 grouped the plan's cards under "Before you
+  submit", "While it's reviewed", "On the day"; the board's swimlanes, one click later, used the
+  PRD's "Before submitting", "Review", "Event day". Both now read `TASK_PHASE_LABEL` and
+  `TASK_PHASES` from `lib/types.ts`.
+- **One heading for the reviewers.** The wizard's result panel said "Reviewers" and step 5, beside
+  it, "Reviewing departments". Both say "Reviewers", as the board's row does.
+- **The board's reviewers row is `ReviewStatusDot`** (department icon, status dot, the applicant's
+  plain words through its `label`), the component the kit built for it, in place of two spans.
+  `reviewerRows()` returns the review status with each row.
+- **A session reads the same in the wizard, on the board and on the permit**: `DateText` for its
+  date and `BillingBadge` for "Skipped".
+- **Shared components where a surface had its own**: `Stat` for the case's Total, Paid, Due and
+  Deposit; `Money` for the permit's refund; `DateText` for a stacked card's due date and the demo
+  guide's date jumps; `plural()` for the documents count; the kit's neutral chip dot for a case's
+  trigger chips, as the wizard draws them.
+- **Toasts.** Every toast is a sentence ("Demo data restored."). The board now confirms what an
+  applicant did the way checkout and the city's panels do: "Sent.", "Reply sent.", "Application
+  submitted.", "Feedback sent.", "Application withdrawn.", "Permit cancelled.".
+- **Small agreements**: an ended case names its ending in "Your actions" (it showed the state it
+  ended in); an empty queue no longer reads "My queue" twice; "View permit" is one label; a
+  missing event date reads "No date yet" in Intake as on the pipeline; an empty pipeline column
+  is drawn as an empty board column; My events keeps the `gap-6` rhythm; the demo guide's path
+  label takes the system's label size.
+- **Left as they are, on purpose**: "Book and pay" (the wizard's button, the PRD's words) beside
+  the card "Pay and book" (the PRD's S1 board); My events names an event without `EventTitle`'s
+  second line, which would be the applicant's own name on every row; the city's date fields are
+  native inputs while the wizard has its own `DatePickerPopover` (promote it to `components/ui`
+  when a second surface wants a popover).
 
 ## Contract change requests
 

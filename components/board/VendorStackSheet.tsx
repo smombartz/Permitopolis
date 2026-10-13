@@ -1,6 +1,6 @@
 import { CheckIcon, ChevronRightIcon, ClockIcon, LockIcon, Undo2Icon } from "lucide-react"
 import { SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet"
-import { fmtDateShort } from "@/lib/format"
+import { DateText } from "@/components/domain/DateText"
 import { taskDueDate } from "@/lib/state"
 import type { Task } from "@/lib/types"
 import type { StackedCards } from "@/lib/view/board"
@@ -44,7 +44,7 @@ function VendorStackSheet({ stack, onSelectTask }: VendorStackSheetProps) {
                 {task.title}
               </span>
               <span className="flex items-center gap-2 text-xs text-fg-secondary">
-                {due ? fmtDateShort(due) : null}
+                {due ? <DateText date={due} short className="text-xs text-fg-secondary" /> : null}
                 <ChevronRightIcon className="size-3.5 shrink-0" aria-hidden="true" />
               </span>
             </button>

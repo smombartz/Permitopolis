@@ -16,7 +16,20 @@ import {
   whoIsUp,
 } from "@/lib/state";
 import type { BoardColumn } from "@/lib/state/types";
-import { PARTY_LABEL, type EventCase, type ISODate, type Occurrence, type Party, type Task, type TaskPhase } from "@/lib/types";
+import {
+  DEPTS,
+  PARTY_LABEL,
+  TASK_PHASES,
+  TASK_PHASE_LABEL,
+  type Dept,
+  type EventCase,
+  type ISODate,
+  type Occurrence,
+  type Party,
+  type ReviewStatus,
+  type Task,
+  type TaskPhase,
+} from "@/lib/types";
 import { canPaySession } from "@/lib/view/checkout";
 
 /* ---------------------------------------------------------------------- */
@@ -137,17 +150,6 @@ export const COLUMN_LABEL: Record<BoardColumn, string> = {
   done: "Done",
 };
 
-export const PHASE_LABEL: Record<TaskPhase, string> = {
-  before_submitting: "Before submitting",
-  review: "Review",
-  permit: "Permit",
-  before_event: "Before the event",
-  event_day: "Event day",
-  after: "After",
-};
-
-export const PHASE_ORDER: TaskPhase[] = ["before_submitting", "review", "permit", "before_event", "event_day", "after"];
-
 function isPinned(task: Task): boolean {
   return Boolean(task.request) && task.request?.resolved === false;
 }
@@ -203,9 +205,9 @@ export interface PhaseGroup {
 export function phaseGroups(c: EventCase): PhaseGroup[] {
   const columns = boardColumns(c);
   const all = [...columns.do_now, ...columns.with_city, ...columns.coming_up, ...columns.done];
-  return PHASE_ORDER.map((phase) => ({
+  return TASK_PHASES.map((phase) => ({
     phase,
-    label: PHASE_LABEL[phase],
+    label: TASK_PHASE_LABEL[phase],
     entries: groupColumnEntries(all.filter((t) => t.phase === phase)),
   })).filter((group) => group.entries.length > 0);
 }
@@ -228,23 +230,25 @@ const REVIEW_STATUS_WORD: Record<string, string> = {
 };
 
 export interface ReviewerRow {
-  dept: "clerk" | "pws" | "hl";
+  dept: Dept;
+  /** What `ReviewStatusDot` colors its dot by; the words beside it are `label`. */
+  status: ReviewStatus;
   label: string;
 }
 
 /** Each department's status in the applicant's plain words (PRD: Approved / Approved with conditions / Asked you for something / Reviewing / Not involved). */
 export function reviewerRows(c: EventCase): ReviewerRow[] {
-  return (["clerk", "pws", "hl"] as const).map((dept) => {
+  return DEPTS.map((dept): ReviewerRow => {
     const review = c.reviews.find((r) => r.dept === dept);
-    if (review) return { dept, label: REVIEW_STATUS_WORD[review.status] ?? "Reviewing" };
-    if (dept !== "clerk") return { dept, label: "Not involved" };
+    if (review) return { dept, status: review.status, label: REVIEW_STATUS_WORD[review.status] ?? "Reviewing" };
+    if (dept !== "clerk") return { dept, status: "not_routed", label: "Not involved" };
     // The Clerk owns the case even when it is never a formal "reviewer" on it. "Needs info"
     // can land here from before routing (an intake request) or after (a reviewer's request),
     // so this reads whether reviewers exist yet rather than the exact state.
-    if (c.state === "draft") return { dept, label: "Not involved" };
-    if (c.reviews.length === 0) return { dept, label: "Reviewing" };
-    if (c.state === "in_review" || c.state === "needs_info") return { dept, label: "Waiting on reviews" };
-    return { dept, label: "Approved" };
+    if (c.state === "draft") return { dept, status: "not_routed", label: "Not involved" };
+    if (c.reviews.length === 0) return { dept, status: "pending", label: "Reviewing" };
+    if (c.state === "in_review" || c.state === "needs_info") return { dept, status: "pending", label: "Waiting on reviews" };
+    return { dept, status: "approved", label: "Approved" };
   });
 }
 

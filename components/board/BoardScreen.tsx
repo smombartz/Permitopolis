@@ -11,6 +11,7 @@ import { VendorStackSheet } from "@/components/board/VendorStackSheet"
 import { CaseHeader } from "@/components/domain/CaseHeader"
 import { EndingBanner } from "@/components/domain/EndingBanner"
 import { PartyChip } from "@/components/domain/PartyChip"
+import { ReviewStatusDot } from "@/components/domain/ReviewStatusDot"
 import { CaseNotFound } from "@/components/shell"
 import { Button } from "@/components/ui/button"
 import { EmptyState } from "@/components/ui/empty-state"
@@ -21,7 +22,7 @@ import { applicantNameOf } from "@/lib/data/people"
 import { routes } from "@/lib/routes"
 import { eventDate, useDemo } from "@/lib/state"
 import type { BoardColumn } from "@/lib/state/types"
-import { PARTY_LABEL, type EventCase } from "@/lib/types"
+import type { EventCase } from "@/lib/types"
 import {
   boardColumnsGrouped,
   dateHoldFootnote,
@@ -54,12 +55,9 @@ function StatusStrip({ c }: { c: EventCase }) {
         </div>
         {footnote ? <span className="text-sm text-fg-secondary">{footnote}</span> : null}
       </div>
-      <div className="flex flex-wrap items-center gap-x-5 gap-y-1.5 border-t border-line-subtle pt-3 text-sm">
+      <div className="flex flex-wrap items-start gap-x-6 gap-y-3 border-t border-line-subtle pt-3">
         {rows.map((row) => (
-          <span key={row.dept} className="flex items-center gap-1.5">
-            <span className="font-semibold text-fg">{PARTY_LABEL[row.dept]}</span>
-            <span className="text-fg-secondary">{row.label}</span>
-          </span>
+          <ReviewStatusDot key={row.dept} dept={row.dept} status={row.status} label={row.label} />
         ))}
       </div>
     </div>

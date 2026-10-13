@@ -13,7 +13,7 @@ import { reviewClock, taskDueDate, useDemo, type QueueItem } from "@/lib/state";
 import { applicantNameOf } from "@/lib/data/people";
 import { routes } from "@/lib/routes";
 import { plural } from "@/lib/format";
-import type { Dept, Party } from "@/lib/types";
+import { PARTY_LABEL, type Dept, type Party } from "@/lib/types";
 import {
   QUEUE_GROUP_LABEL,
   emptyQueueMessage,
@@ -79,7 +79,7 @@ function QueueScreen() {
 
   return (
     <div ref={containerRef} className="flex flex-col gap-6">
-      <PageHeader eyebrow="My queue" title={total > 0 ? queueBriefing(groups) : "My queue"} />
+      <PageHeader eyebrow={total > 0 ? "My queue" : PARTY_LABEL[role]} title={total > 0 ? queueBriefing(groups) : "My queue"} />
 
       {total === 0 ? (
         <EmptyState icon={InboxIcon} title="Nothing is waiting on you" text={emptyQueueMessage(others)} />

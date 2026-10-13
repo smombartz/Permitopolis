@@ -34,12 +34,14 @@ function BoardMenu({ c }: BoardMenuProps) {
 
   function withdraw() {
     const result = useDemo.getState().dispatch(c.id, { type: "withdraw" })
-    if (!result.ok) toast.error(result.reason ?? "That didn't go through.")
+    if (result.ok) toast.success("Application withdrawn.")
+    else toast.error(result.reason ?? "That didn't go through.")
   }
 
   function cancel() {
     const result = useDemo.getState().dispatch(c.id, { type: "cancel" })
-    if (!result.ok) toast.error(result.reason ?? "That didn't go through.")
+    if (result.ok) toast.success("Permit cancelled.")
+    else toast.error(result.reason ?? "That didn't go through.")
   }
 
   return (

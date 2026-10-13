@@ -8,7 +8,7 @@ import { Switch } from "@/components/ui/switch";
 import { Button } from "@/components/ui/button";
 import { Banner } from "@/components/ui/banner";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { AvailabilityBadge } from "@/components/domain";
+import { AvailabilityBadge, BillingBadge, DateText } from "@/components/domain";
 import { DatePickerPopover } from "@/components/wizard/DatePickerPopover";
 import { addDaysISO, weekdayOf } from "@/lib/dates";
 import { fmtDate, fmtMoney } from "@/lib/format";
@@ -155,9 +155,9 @@ function StepWhen({ answers, onChange, onLateFee, panel, today }: StepWhenProps)
           <ul className="flex flex-col gap-1.5">
             {occurrences.map((occ) => (
               <li key={occ.date} className="flex items-center justify-between gap-2 rounded-control border border-line-subtle bg-surface-1 px-3 py-1.5">
-                <span className="text-sm text-fg-secondary">{fmtDate(occ.date)}</span>
+                <DateText date={occ.date} />
                 {occ.billing === "skipped" ? (
-                  <span className="text-xs font-medium text-fg-label">Skipped</span>
+                  <BillingBadge billing="skipped" />
                 ) : (
                   <AvailabilityBadge availability={occ.availability} />
                 )}

@@ -41,6 +41,7 @@ import { DEMO_PATHS } from "@/lib/data/demoScript";
 import { routes } from "@/lib/routes";
 import { queueFor, useDemo } from "@/lib/state";
 import { PARTY_LABEL, type Dept, type Party } from "@/lib/types";
+import { queueWaitingOnOthers } from "@/lib/view/cityLists";
 import { navState } from "./setup";
 import { navigate, renderScreen, storedCase, type RenderScreenOptions } from "./harness";
 
@@ -428,6 +429,21 @@ describe("(e) the city lists open the case", () => {
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
   });
 
+  it("a case the role is waiting on others for opens from the queue too, with no panel", async () => {
+    const { user } = await renderApp({ role: "pws", path: routes.city.queue() });
+    const [waiting] = queueWaitingOnOthers(useDemo.getState().cases, "pws", useDemo.getState().demoToday);
+    expect(waiting).toBeDefined();
+
+    await user.click(screen.getByText(/^Waiting on others/));
+    await user.click(linkTo(routes.city.case(waiting.case.id, { from: routes.city.queue() })));
+
+    expect(navState.pathname).toBe(`/city/cases/${waiting.case.id}`);
+    expectRealScreen();
+    expect(h1()).toBe(waiting.case.name);
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    expect(backLink()).toHaveTextContent("Back to My queue");
+  });
+
   it("a Who's up task on the case opens its panel the same way", async () => {
     const { user } = await renderApp({ role: "clerk", path: routes.city.case(S4) });
 
@@ -549,6 +565,24 @@ describe("(f) Active permits opens the case", () => {
     expectRealScreen();
   });
 
+  it("a booking on the map opens the case, and the case comes back to that day's map", async () => {
+    // Jul 11, with held dates on: the 5K's route is held for that day.
+    const map = `${routes.city.active({ view: "map", date: "2027-07-11" })}&holds=1`;
+    const { user } = await renderApp({ role: "pws", path: map });
+
+    const bookings = within(screen.getByRole("list", { name: "Highlighted bookings and closures" }));
+    await user.click(bookings.getByRole("button", { name: /Riverfront Summer 5K/ }));
+
+    expect(navState.pathname).toBe(`/city/cases/${S5}`);
+    expectRealScreen();
+    expect(h1()).toBe("Riverfront Summer 5K");
+
+    await user.click(screen.getByRole("link", { name: "Back to Active permits" }));
+    expect(here()).toBe(map);
+    expect(screen.getByRole("tab", { name: "Map" })).toHaveAttribute("aria-selected", "true");
+    expect(screen.getByRole("switch", { name: "Include held dates" })).toBeChecked();
+  });
+
   it("a Closeout row opens the case", async () => {
     const closeout = routes.city.active({ view: "closeout" });
     const { user } = await renderApp({ role: "pws", path: closeout });
@@ -629,6 +663,26 @@ describe("(g) the landing page's two doors and the demo guide's paths land on re
     // The page is the role's own: the role switcher agrees with the area the path opened in.
     const role = useDemo.getState().role;
     expect(navState.pathname.startsWith("/city")).toBe(role !== "applicant");
+  });
+
+  it("the landing page and the Demo menu both open the guide, and the guide goes back to the landing page", async () => {
+    const { user } = await renderApp({ path: routes.home() });
+
+    await user.click(screen.getByRole("link", { name: /demo guide/i }));
+    expect(here()).toBe(routes.demo());
+    expectRealScreen();
+    expect(h1()).toBe("Presenting Permitopolis");
+
+    await user.click(screen.getByRole("link", { name: "Back to Permitopolis" }));
+    expect(here()).toBe(routes.home());
+    expectRealScreen();
+
+    // From inside the app: the Demo menu's own link.
+    navigate(routes.events());
+    await user.click(screen.getByRole("button", { name: "Demo menu" }));
+    await user.click(screen.getByRole("menuitem", { name: "Demo guide" }));
+    expect(here()).toBe(routes.demo());
+    expectRealScreen();
   });
 
   it("the guide's scenario table jumps to real screens as well", async () => {

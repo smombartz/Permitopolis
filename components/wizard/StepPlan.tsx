@@ -91,7 +91,7 @@ function StepPlan({
 
       {panel.reviewers.length > 0 ? (
         <div className="flex flex-col gap-2">
-          <p className="text-eyebrow font-bold tracking-[.12em] text-fg-label uppercase">Reviewing departments</p>
+          <p className="text-eyebrow font-bold tracking-[.12em] text-fg-label uppercase">Reviewers</p>
           {panel.reviewers.map((reviewer) => {
             const Icon = DEPT_ICON[reviewer.dept];
             return (
