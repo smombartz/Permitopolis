@@ -55,7 +55,9 @@ function CommandDialog({
       </DialogHeader>
       <DialogContent
         className={cn(
-          "top-[18vh] max-w-[640px] translate-y-0 overflow-hidden rounded-panel! p-0",
+          // The dialog's own `sm:max-w-sm` outranked a bare max-w-[640px], so the palette was 384px
+          // wide on a desktop and edge to edge on a phone.
+          "top-[18vh] max-w-[calc(100%-2rem)] translate-y-0 overflow-hidden rounded-panel! p-0 sm:max-w-[640px]",
           className
         )}
         showCloseButton={showCloseButton}

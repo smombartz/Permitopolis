@@ -47,7 +47,7 @@ function ConditionList({ conditions, editable = false, acceptedIds, onToggleAcce
                 >
                   {editable ? (
                     // The PRD's visible "I accept": the checkbox is named by it and by the condition.
-                    <label className="mt-0.5 flex shrink-0 cursor-pointer items-center gap-1.5 text-xs font-semibold text-fg">
+                    <label className="mt-0.5 flex shrink-0 cursor-pointer items-center gap-1.5 text-xs font-semibold text-fg pointer-coarse:min-h-11">
                       <Checkbox
                         checked={accepted}
                         onCheckedChange={() => onToggleAccept?.(condition.id)}

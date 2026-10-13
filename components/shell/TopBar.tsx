@@ -32,7 +32,7 @@ function TopBar() {
       <div className="page-container flex h-14 items-center justify-between gap-3">
         <Link
           href={routes.home()}
-          className="flex min-w-0 shrink-0 items-center gap-2 rounded-control outline-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring"
+          className="flex min-w-0 shrink-0 items-center gap-2 rounded-control outline-none pointer-coarse:min-h-11 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring"
         >
           <span className="truncate font-heading text-base font-bold text-fg">Permitopolis</span>
           <span className="hidden truncate text-xs text-fg-secondary lg:inline">

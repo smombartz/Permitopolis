@@ -54,7 +54,7 @@ function FileDrop({ onFiles, sample, accept, multiple, className, label, hint }:
         <UploadIcon className="size-4.5" aria-hidden="true" />
       </div>
       <div className="flex flex-col gap-1">
-        <label htmlFor={inputId} className="cursor-pointer text-sm font-semibold text-fg">
+        <label htmlFor={inputId} className="cursor-pointer text-sm font-semibold text-fg pointer-coarse:py-3">
           {label ?? "Drop a file here, or browse"}
         </label>
         {hint ? <p className="text-xs text-fg-secondary">{hint}</p> : null}

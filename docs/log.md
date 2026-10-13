@@ -1,5 +1,37 @@
 # Change log
 
+## 2026-10-13 - Accessibility and responsive pass
+
+**What Changed:**
+- Workstream 5F: one pass over the whole prototype against WCAG 2.2 AA, from the markup, the classes, the built stylesheet and jsdom. No browser, screen reader or phone was used (CLAUDE.md). Plan, with everything found: `docs/plans/2026-10-13-accessibility-responsive-pass.md`
+- **The focus ring was never drawn.** The app writes it as `outline-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring`; in Tailwind 4 `outline-none` sets `--tw-outline-style: none` and `focus-visible:outline-2` draws `outline-style: var(--tw-outline-style)`, so no button, link, tab or row showed keyboard focus. One unlayered rule in `app/globals.css` puts the style back, a base rule gives anything else focusable the same ring, the night surface has a mint one, and a forced-colors mode a system one. `--focus-ring` is opaque indigo-500 (the design doc's 70% is 2.95:1 on the page ground; it needs 3:1). Menu and select items and the palette's selected option show which one has focus (the highlight was 1.02:1, and a select's had none: `data-focus:` matches nothing Radix sets). Checkbox, radio, switch and tab panels take the ring
+- **Focus was dropped when a sheet or dialog closed.** A card's sheet and a case's action panel open from the URL, the palette and every confirmation from state: Radix had no trigger to hand focus back to. `Dialog` and `Sheet` return it to whatever opened them (`components/ui/return-focus.tsx`); the Demo menu's date picker to the Demo menu's button
+- **Skip link** in both shells and on the landing page (`components/ui/skip-link.tsx`); `<main>` is present before hydration. **Page titles**: every route shared one, which is also what Next's route announcer read out on each navigation; each `page.tsx` exports its own, and a page about one record adds its name (`useDocumentTitle`)
+- **Shortcuts**: one rule for `/`, `?`, `j` and `k` (`lib/keyboard.ts`). `?` fired with Ctrl held and inside a menu, `/` pulled focus out from under an open sheet, and the arrow keys were taken from the whole page
+- **Live regions**: `Banner`, `InlineAlert` and `EndingBanner` were `role="alert"` or `"status"` by variant on about 75 uses, nearly all static; they are plain content, with `live` for one that answers an action. `Field`'s error is a standing polite region (it was an alert on every keystroke). The wizard and the amendment have one announcer for tier and date gate (`WizardAnnouncer`); the case's status line no longer repeats what a toast said; filter counts, the demo date, the coach's step and "Copied" are polite
+- **Names**: a `Select` inside a `Field` was unnamed everywhere (the label pointed at the Select root, which renders nothing); tables are named; per-row actions say which row on Intake, Payments, Work orders, Inspections and a case's Reviews and Documents tabs; calendar days are named by their date and are buttons only where a day can be chosen; the date picker reads its date; the rating stars say "3 stars"; `required` reaches a screen reader
+- **Contrast**: `text-current/85` on a success or warning tint was 3.9:1 (banners, a badge's reason); calendar days outside the month were at 40% opacity with their events; the night section's label was 4.46:1
+- **Responsive**: 36px buttons, menu items, tabs, date picker days and standalone links take a 44px tap on a touch screen (`pointer-coarse:`); availability reasons, street names and what-if sentences wrap; the landing headlines step down below 640px; the palette keeps a gutter on a phone; calendar day and item buttons are 24px (WCAG 2.5.8)
+- **Color never alone**: a check on an active filter chip and on a chosen space or street
+- **Checkout**: card fields are required and say so; a failed submit focuses the first wrong field; focus moves on to Pay after signing
+- **Tests**: `tests/render/a11y.test.tsx` (every route for every role, 505 pages), `a11y-overlays.test.tsx` (221 action panels, 58 card sheets, the shell's menus and dialogs), `keyboard.test.tsx`, `live-regions.test.tsx`, the checks in `tests/render/a11yAudit.ts`; `lib/contrast.test.ts` extended to tints, the ring, the night section and standalone marks; guards for the ring rules, thinned text and outline resets. About 40 existing assertions follow renamed controls. The render tests' timeout is 20s (a demo path clicked end to end ran past five beside the new audits on a busy machine)
+- **Docs**: `docs/readme.md` has "Accessibility" (what a test holds, what a builder keeps doing, what only a person can check, what is not met) and seven questions for the owner; the main plan has 5F ticked. Gate: type-check, lint, 3,148 tests in 109 files and build pass
+
+**Why:**
+- The PRD's bar is WCAG 2.2 AA, keyboard reachable with visible focus, status changes announced, color never alone, city screens from 1280px and applicant screens down to 375px. Six workstreams had each built to it by eye and by render test; nothing had checked the whole, and the one thing every keyboard user needs, a visible focus ring, was written everywhere and drawn nowhere
+
+**Files Modified:**
+- `app/globals.css`, `styles/tokens.css`, `app/layout.tsx` and every `app/**/page.tsx` (titles), `vitest.config.mts`
+- `components/ui/`: `button`, `dialog`, `sheet`, `return-focus` (new), `skip-link` (new), `radio-keys` (new), `select`, `dropdown-menu`, `command`, `tabs`, `checkbox`, `radio-group`, `switch`, `field`, `banner`, `inline-alert`, `filter-bar`, `segmented-control`, `wizard-stepper`, `empty-state`, `copy-button`, `file-drop`, `page-header`
+- `components/shell/`: `AppShell`, `CityShell`, `TopBar`, `CoachStrip`, `CommandCenter`, `CommandPalette`, `DemoMenu`, `DemoDatePicker`, `PersonaPicker`, `StorageBanner`, `SwitchRolePanel`, `CaseNotFound`, `useDocumentTitle` (new)
+- `components/domain/`: `FeeTable`, `AvailabilityBadge`, `EndingBanner`, `LeadTimeRisk`, `StateStepper`, `ConditionList`, `CommissionBadge`
+- `components/landing/**`, `components/wizard/**` (`WizardAnnouncer` new), `components/map/LocationPicker.tsx`, `components/board/**`, `components/checkout/**`, `components/permit/**`, `components/calendar/**`, `components/active/**`, `components/city/**`, `components/case/**`
+- `lib/keyboard.ts` (new), `lib/view/wizard.ts`, `lib/contrast.test.ts`, `lib/view/wizard.test.ts`
+- `tests/render/a11y.test.tsx`, `a11y-overlays.test.tsx`, `keyboard.test.tsx`, `live-regions.test.tsx`, `a11yAudit.ts` (all new), `tests/guards.test.ts`, and the render tests that named a renamed control
+- `docs/readme.md`, `docs/rime-and-ink-design-system.md`, `docs/plans/2026-10-13-accessibility-responsive-pass.md` (new), `docs/plans/2026-10-12-permitopolis-prototype.md`
+
+---
+
 ## 2026-10-13 - Phases 5 and 6 integration: P1 and P2 in one tree
 
 **What Changed:**

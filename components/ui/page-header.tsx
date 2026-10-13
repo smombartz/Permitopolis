@@ -5,7 +5,7 @@ import { ArrowLeftIcon } from "lucide-react"
 import { Eyebrow } from "@/components/ui/eyebrow"
 
 const BACK_LINK_CLASS =
-  "inline-flex w-fit items-center gap-1.5 rounded-control text-sm font-medium text-fg-secondary outline-none transition-colors duration-[var(--dur-fast)] ease-frost hover:text-fg focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring"
+  "inline-flex w-fit items-center gap-1.5 rounded-control text-sm font-medium text-fg-secondary outline-none pointer-coarse:min-h-11 transition-colors duration-[var(--dur-fast)] ease-frost hover:text-fg focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring"
 
 interface PageHeaderProps extends Omit<React.ComponentProps<"header">, "title"> {
   eyebrow?: React.ReactNode

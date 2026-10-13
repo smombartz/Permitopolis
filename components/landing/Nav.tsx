@@ -41,7 +41,7 @@ function Nav() {
     >
       <Link
         href={routes.home()}
-        className="flex shrink-0 items-center gap-2 rounded-control px-2.5 py-1.5 outline-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring"
+        className="flex shrink-0 items-center gap-2 rounded-control px-2.5 py-1.5 outline-none pointer-coarse:min-h-11 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring"
       >
         <span className="font-heading text-sm font-bold text-fg">Permitopolis</span>
         <span className="hidden text-xs text-fg-secondary sm:inline">City Clerk &middot; Events Permitting</span>

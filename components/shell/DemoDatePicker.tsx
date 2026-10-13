@@ -1,5 +1,7 @@
 "use client";
 
+import type * as React from "react";
+
 import { DayPicker } from "react-day-picker";
 import { Popover, PopoverAnchor, PopoverContent } from "@/components/ui/popover";
 import { Button } from "@/components/ui/button";
@@ -29,16 +31,31 @@ interface DemoDatePickerProps {
   onOpenChange: (open: boolean) => void;
   demoToday: ISODate;
   onSelect: (date: ISODate) => void;
+  /**
+   * Where focus goes when the picker closes. A popover hands focus back to its trigger, and
+   * this one has none (it opens from a menu item, anchored to the Demo menu's button), so Esc
+   * left a keyboard at the top of the page.
+   */
+  returnFocusRef?: React.RefObject<HTMLElement | null>;
 }
 
 /** "Set demo date": react-day-picker inside a popover, plus the demo script's date jumps (lib/data/demoScript.ts). */
-function DemoDatePicker({ open, onOpenChange, demoToday, onSelect }: DemoDatePickerProps) {
+function DemoDatePicker({ open, onOpenChange, demoToday, onSelect, returnFocusRef }: DemoDatePickerProps) {
   return (
     <Popover open={open} onOpenChange={onOpenChange}>
       <PopoverAnchor asChild>
         <span aria-hidden="true" className="pointer-events-none absolute inset-0" />
       </PopoverAnchor>
-      <PopoverContent align="end" className="w-auto">
+      <PopoverContent
+        align="end"
+        className="w-auto"
+        aria-label="Set demo date"
+        onCloseAutoFocus={(event) => {
+          if (!returnFocusRef?.current) return;
+          event.preventDefault();
+          returnFocusRef.current.focus();
+        }}
+      >
         <div className="flex flex-col gap-3">
           <div className="flex flex-col gap-1">
             <p className="mb-1 text-[11px] font-bold tracking-[.12em] text-fg-label uppercase">Quick jumps</p>

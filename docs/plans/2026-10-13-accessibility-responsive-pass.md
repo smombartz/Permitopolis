@@ -49,7 +49,7 @@ text, reduced motion honored.
 - [x] Active permits
 - [x] Payments, closures map, work orders, verifications, inspections, settings
 - [x] Contrast: `lib/contrast.test.ts` extended to the token pairs the screens use
-- [ ] Docs: `docs/readme.md` "Accessibility", `docs/log.md`, the main plan ticked
+- [x] Docs: `docs/readme.md` "Accessibility", `docs/log.md`, the main plan ticked
 
 ## Findings and fixes
 
@@ -167,7 +167,7 @@ page's content. `tests/render/keyboard.test.tsx` was written first and failed on
 
 - **Every panel and every card sheet is audited open**, not only the pages that hold them:
   `tests/render/a11y-overlays.test.tsx` opens each action panel a role can reach in each state
-  (about 190) and each kind of card sheet (about 90), then the shell's menus and dialogs. It
+  (221) and each kind of card sheet in each status (58), then the shell's menus and dialogs. It
   found `<Field label="Department">` around a select that dropped the field's id.
 - **Names that say which.** A table with an action per row had the same name on every row:
   "Accept as complete" and "Request information" on Intake, "Record payment" on Payments, "Mark
@@ -198,9 +198,46 @@ about 80 seconds of CPU to the suite. Beside them, on a busy machine, a demo pat
 end (four seconds alone) ran past Vitest's five-second default, so the render project's timeout
 is 20 seconds.
 
+### Last sweep
+
+- **Color alone.** An active `FilterChip` differed from an idle one by its tint: it carries a
+  check. So does a chosen space or street in the location picker.
+- **The Demo menu's date picker** is a popover with no trigger: Esc dropped focus. It goes back
+  to the Demo menu's button.
+- **The palette** was 384px wide on a desktop (the dialog's `sm:max-w-sm` outranked its own
+  640px) and edge to edge on a phone.
+- **Forced colors.** A field shows focus with a border and a halo, both repainted in Windows
+  High Contrast: everything focused gets a system outline there.
+- **Standalone text links and labels on an applicant's screen** (the back link, "View permit",
+  "I accept", the file drop's label) are 44px on a touch screen.
+- **Two links with one name go to one place** is part of the audit now, on every page.
+
 ## Not verifiable here
 
-Filled in at the end: what needs a browser, a screen reader or a phone.
+No browser, no screen reader and no phone were used (CLAUDE.md). The full list, in the order
+worth doing, is in `docs/readme.md`, "Accessibility", "What was only checked from the markup".
+In short:
+
+- **The focus ring has never been seen.** That it is drawn is argued from the built stylesheet
+  (the two Tailwind rules, and the unlayered rule that now outranks one of them), and held by a
+  guard on the source. Its look on each surface, inset in a menu, and around a tab panel is
+  unseen.
+- **Nothing has been heard.** The tests show where the live regions are, that they are polite,
+  and that one piece of news has one region. Whether a given screen reader says it once is its
+  own behavior.
+- **No layout was measured.** 375px and 1280px were checked by reading classes: no fixed width
+  over 335px on an applicant's screen, every table inside a scrolling container, the wizard's
+  bottom bar cleared by padding and `scroll-padding`. Overlap of the 44px touch areas, the
+  landing page's 60px headline, the tilted hero panel, the month grid's taller cells and zoom
+  at 200% and 400% are unchecked.
+- **Contrast is computed, not seen**: token pairs composited over the grounds they are drawn
+  on. Text over the landing page's gradients and grain, over `backdrop-blur` glass with content
+  behind it, and inside the mock UI is not covered.
+- **Reduced motion, forced colors and print** were not watched.
+
+Not met, and left: the 1.2:1 edge of a field (the design system's), ambient loops with no pause
+control, a truncated name's full text behind a hover. Each is in the readme with its reason, and
+the first two are questions for the owner.
 
 ## Changes
 

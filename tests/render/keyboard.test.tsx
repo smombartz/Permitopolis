@@ -343,3 +343,24 @@ describe('"/", j and k on a list', () => {
     expect(close).toHaveFocus();
   });
 });
+
+describe("the Demo menu's date picker", () => {
+  it("opens from the menu with focus inside it, closes on Esc, and hands focus back to the Demo menu button", async () => {
+    const { user } = await renderScreen(<CityShell>page</CityShell>, { path: routes.city.queue(), role: "clerk" });
+
+    const button = screen.getByRole("button", { name: "Demo menu" });
+    button.focus();
+    await user.keyboard("{Enter}");
+    await user.click(await screen.findByRole("menuitem", { name: /Set demo date/ }));
+
+    const picker = await screen.findByRole("dialog", { name: "Set demo date" });
+    await settle();
+    expect(picker).toContainElement(document.activeElement as HTMLElement);
+
+    await user.keyboard("{Escape}");
+    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+    await settle();
+
+    expect(screen.getByRole("button", { name: "Demo menu" })).toHaveFocus();
+  });
+});

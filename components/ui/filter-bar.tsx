@@ -1,6 +1,6 @@
 import * as React from "react"
 import { cn } from "cn"
-import { SearchIcon } from "lucide-react"
+import { CheckIcon, SearchIcon } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Kbd } from "@/components/ui/kbd"
 import { InputGroup, InputGroupAddon, InputGroupInput } from "@/components/ui/input-group"
@@ -11,8 +11,14 @@ interface FilterChipProps extends React.ComponentProps<"button"> {
   icon?: React.ReactNode
 }
 
-/** A single togglable filter pill, e.g. tier or "Involves me". */
+/**
+ * A single togglable filter pill, e.g. tier or "Involves me". One that is on carries a check as
+ * well as its tint, so what is filtered is never told by color alone; `aria-pressed` says the
+ * same to a screen reader.
+ */
 function FilterChip({ active = false, icon, className, children, ...props }: FilterChipProps) {
+  // A chip that says it is not a toggle (a "remove this filter" chip passes `aria-pressed={undefined}`) has its own mark.
+  const isToggle = !("aria-pressed" in props)
   return (
     <button
       type="button"
@@ -26,6 +32,7 @@ function FilterChip({ active = false, icon, className, children, ...props }: Fil
       )}
       {...props}
     >
+      {active && isToggle ? <CheckIcon className="size-3 shrink-0" aria-hidden="true" /> : null}
       {icon}
       {children}
     </button>

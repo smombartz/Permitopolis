@@ -242,6 +242,20 @@ export function auditPage(options: AuditOptions = {}): string[] {
     problems.push(`A tab stop inside aria-hidden: ${describeElement(el)}`);
   }
 
+  // Two links with one name go to one place. "Record payment" on every row of a table, each to
+  // a different case, says nothing about which: the name has to carry the row.
+  const destinations = new Map<string, Set<string>>();
+  for (const link of accessible(doc, "a[href]")) {
+    const name = accessibleName(link);
+    if (!name) continue;
+    const hrefs = destinations.get(name) ?? new Set<string>();
+    hrefs.add(link.getAttribute("href") ?? "");
+    destinations.set(name, hrefs);
+  }
+  for (const [name, hrefs] of destinations) {
+    if (hrefs.size > 1) problems.push(`${hrefs.size} links named "${name}" go to different places: ${Array.from(hrefs).slice(0, 3).join(", ")}`);
+  }
+
   for (const el of accessible(doc, INTERACTIVE)) {
     const outer = el.parentElement?.closest(INTERACTIVE);
     if (outer) problems.push(`Control inside a control: ${describeElement(el)} inside ${describeElement(outer)}`);
@@ -265,30 +279,4 @@ export function liveRegions(): { element: HTMLElement; text: string }[] {
     element,
     text: element.textContent?.trim() ?? "",
   }));
-}
-
-/**
- * Controls that share a name and do different things: two links called "Open" that go to two
- * cases, or a "Remove" button per row. The name has to say which thing it acts on.
- */
-export function repeatedNames(): string[] {
-  const problems: string[] = [];
-  const links = new Map<string, Set<string>>();
-  for (const link of accessible(document, "a[href]")) {
-    const name = accessibleName(link);
-    if (!name) continue;
-    const hrefs = links.get(name) ?? new Set<string>();
-    hrefs.add(link.getAttribute("href") ?? "");
-    links.set(name, hrefs);
-  }
-  for (const [name, hrefs] of links) if (hrefs.size > 1) problems.push(`${hrefs.size} links named "${name}" go to different places: ${Array.from(hrefs).slice(0, 3).join(", ")}`);
-
-  const buttons = new Map<string, number>();
-  for (const button of accessible(document, 'button:not([role]), [role="button"]')) {
-    const name = accessibleName(button);
-    if (!name) continue;
-    buttons.set(name, (buttons.get(name) ?? 0) + 1);
-  }
-  for (const [name, count] of buttons) if (count > 1) problems.push(`${count} buttons are all named "${name}".`);
-  return problems;
 }

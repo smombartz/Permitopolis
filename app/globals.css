@@ -127,6 +127,17 @@
 [data-tone="night"] :focus-visible {
   outline-color: var(--night-accent);
 }
+/*
+ * Windows High Contrast and other forced-colors modes repaint borders and drop shadows, which
+ * is all a field shows its focus with (border and halo). There, everything focused gets a
+ * system-colored outline.
+ */
+@media (forced-colors: active) {
+  :focus-visible {
+    outline: 2px solid CanvasText !important;
+    outline-offset: 2px !important;
+  }
+}
 
 /*
  * Page chrome (Rime & Ink "Implementation Notes" and plan 3.2's "quiet glass in

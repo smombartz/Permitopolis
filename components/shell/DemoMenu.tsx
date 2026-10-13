@@ -41,6 +41,8 @@ function DemoMenu() {
   const [dateOpen, setDateOpen] = React.useState(false);
   // Set by "Set demo date" and read once as the menu closes: see onCloseAutoFocus below.
   const openingDatePicker = React.useRef(false);
+  // The date picker closes back to this button: it is what opened the menu the picker came from.
+  const triggerRef = React.useRef<HTMLButtonElement>(null);
 
   /**
    * Reset puts the role switcher back on the Applicant, so the page has to follow: a city
@@ -89,7 +91,7 @@ function DemoMenu() {
     <div className="relative">
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
-          <Button variant="ghost" size="icon-sm" aria-label="Demo menu">
+          <Button ref={triggerRef} variant="ghost" size="icon-sm" aria-label="Demo menu">
             <SettingsIcon aria-hidden="true" />
           </Button>
         </DropdownMenuTrigger>
@@ -121,7 +123,7 @@ function DemoMenu() {
         </DropdownMenuContent>
       </DropdownMenu>
 
-      <DemoDatePicker open={dateOpen} onOpenChange={setDateOpen} demoToday={demoToday} onSelect={handleSetDemoToday} />
+      <DemoDatePicker open={dateOpen} onOpenChange={setDateOpen} demoToday={demoToday} onSelect={handleSetDemoToday} returnFocusRef={triggerRef} />
 
       <ConfirmDialog
         open={resetOpen}

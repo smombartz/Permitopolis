@@ -79,7 +79,7 @@ function PermitCard({ c: record, today, cfg }: { c: EventCase; today: ISODate; c
           {/* What the scan opens, for whoever is holding the permit rather than scanning it. */}
           <Link
             href={verifyPath}
-            className="no-print rounded-control text-sm font-medium text-fg-accent underline-offset-4 outline-none hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring"
+            className="no-print rounded-control text-sm font-medium text-fg-accent underline-offset-4 outline-none pointer-coarse:inline-flex pointer-coarse:min-h-11 pointer-coarse:items-center hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring"
           >
             Open the verification page
           </Link>

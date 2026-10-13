@@ -312,6 +312,8 @@ one in every state. Reach for these before writing markup of your own.
 - `StateStepper compact` shows the current state's label under its dots.
 - A new raw `<button>` or link gets the system focus ring:
   `outline-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring`.
+  That pair draws a ring only because of one rule in `app/globals.css` ("Accessibility", below);
+  an element with no outline classes at all gets the same ring from the base layer.
 - `FilterBar`'s select is a native `<select>`. Use the Radix `Select` where options need groups
   or icons.
 
@@ -603,8 +605,9 @@ What a later builder will run into:
 
 - **Wizard.** The step is the URL's, with or without a draft; a draft is created by the first
   answer, never by Next. `WizardScreen` keeps the id of the draft it created until the URL has
-  it, and owns the tier-change announcement (`role="status"`) and highlight, since `ResultPanel`
-  is not mounted on a phone while its sheet is shut. `DateGateBanner` (the gate, its three fixes,
+  it, and owns the tier-change highlight; the announcement (`role="status"`) is `WizardAnnouncer`'s,
+  for the tier and the date gate both, since `ResultPanel` is not mounted on a phone while its
+  sheet is shut. `DateGateBanner` (the gate, its three fixes,
   and "Remove the late fee" once the fee is chosen) is on steps 3 and 5. A date change goes
   through `scheduleOnDate()`, which moves a series' weekday with it.
 - **Board card sheet.** A card the applicant no longer holds is read-only: a form is read back
@@ -846,7 +849,8 @@ Kept as the hand-off Phases 5 and 6 were built from. What they built, and what h
   hint for a step inside a panel has to live in the panel or wait until it shuts. `cmdk` is
   installed (`components/ui/command.tsx`); cases, roles and scenario jumps are all in the store
   and `lib/data/demoScript.ts`.
-- **The accessibility and responsive pass (5F).** Not yet looked at in a browser: the 48rem
+- **The accessibility and responsive pass (5F)** has run since: see "Accessibility". What this
+  note asked of it. Not yet looked at in a browser: the 48rem
   sheet and what is laid out in it; the review panel and the quote builder at 1280px; the
   applicant's "With the city" notes at 375px. Worth a keyboard walk: the quote builder's rows
   (each has a department select, a text field and three buttons); the fee-line rows, whose fields
@@ -1033,7 +1037,8 @@ payment" on a case that never had a quote.
   (the six scenario jumps, the seven paths, the three date jumps, the hints toggle, Reset, which
   asks first). Arrow keys, Enter, Esc.
 - **`?`** opens the list of shortcuts (`KeyboardHelp`): Cmd+K, `/` to search a list, `j` and `k`
-  through rows, Esc. It does not fire while a field has focus.
+  through rows, Esc. It does not fire while a field has focus, with Ctrl, Cmd or Alt held, or
+  inside a menu. Every one-key shortcut asks `isPlainShortcut()` in `lib/keyboard.ts` first.
 
 ### Settings, and what it changes
 
@@ -1116,6 +1121,123 @@ No route is. What is simulated, or deliberately small:
 - **`PlaceholderScreen`** is still in `components/shell` for a route added later. Nothing renders it.
 - **The three role override maps are empty on purpose**, not unfinished ("Where each role's
   tools live").
+
+## Accessibility
+
+The bar is WCAG 2.2 AA (PRD, "App shell, routes and demo controls" and "Success test"). The pass
+that held the whole prototype to it (workstream 5F) worked from the markup, the classes, the
+built stylesheet and jsdom: no browser, no screen reader, no phone. So this section is in two
+halves: what a test now holds, and what a person still has to look at. What was found and fixed
+is in `docs/plans/2026-10-13-accessibility-responsive-pass.md`.
+
+### What is guaranteed, and by which test
+
+| Guarantee | Held by |
+|---|---|
+| Every route, for every role that can reach it, against the seed and inside its shell (505 pages, the applicant's a second time as a 375px phone draws them): one `h1`, one `main`, headings that do not skip a level, no button, link or form control without an accessible name, no duplicate id, no `aria-labelledby` or `aria-describedby` pointing at nothing, every table named and with header cells, every image hidden or named, labelled navigation and side panels, no control inside a control, no tab stop inside `aria-hidden`, no two links with one name going to two places, no assertive live region | `tests/render/a11y.test.tsx`, with the checks in `tests/render/a11yAudit.ts` |
+| The same for every action panel a city role can open on a case, in every state (221), every kind of card sheet on the board in every status (58), and the shell's menus, popovers and dialogs; each dialog has a name and a Close button | `tests/render/a11y-overlays.test.tsx` |
+| A skip link is the first tab stop in both shells and on the landing page, and lands on the page's content (past the sidebar, in the city) | `tests/render/keyboard.test.tsx` |
+| A card's sheet, a case's action panel, the palette, the shortcuts list and the Demo menu's date picker take focus when they open, keep Tab inside, close on Esc, and hand focus back to what opened them | `tests/render/keyboard.test.tsx` |
+| `/`, `?`, `j` and `k` never fire while a field has focus, with Ctrl, Cmd or Alt held, inside a menu or a radio group, or under an open sheet; the arrow keys move through a list only once a row has focus; Cmd+K works from inside a field | `tests/render/keyboard.test.tsx`, `lib/keyboard.ts` |
+| What is announced, and once: a tier change and a date gate change in the wizard, a field's error, an action's result (its toast), a case's change of state that nothing toasted, a filter's result count, the demo date, the coach's step, "Copied". A banner or note that is on the page when it opens is not live | `tests/render/live-regions.test.tsx` |
+| The focus ring is drawn at all, anything focusable with no ring of its own gets one, the night surface and a forced-colors mode have theirs, and no element drops its outline without another way to show focus | `tests/guards.test.ts`, "focus rings" |
+| Contrast: every text token on the page and the glass surfaces; every tint with its own text color, over every ground it is drawn on; the inks a tinted row keeps; the focus ring at 3:1 on every surface and tint; the night section; marks that stand without a word | `lib/contrast.test.ts` |
+| No text color is thinned with an opacity modifier; `fg-tertiary` is on placeholders and decoration only | `tests/guards.test.ts` |
+| Every route has its own page title | each `app/**/page.tsx` exports `metadata`; not held by a test |
+
+### What a builder has to keep doing
+
+- **Focus ring.** Write it as the readme always said (`outline-none focus-visible:outline-2
+  focus-visible:outline-offset-2 focus-visible:outline-focus-ring`). In Tailwind 4 that pair
+  draws nothing on its own: `outline-none` sets `--tw-outline-style: none` and
+  `focus-visible:outline-2` reads it. One unlayered rule in `app/globals.css`
+  (`:focus-visible { --tw-outline-style: solid }`) puts the style back. Do not move it into a
+  layer. A field shows focus on its border and halo instead, and says so by having no
+  `focus-visible:outline-*`; anything else that writes `outline-none` needs the ring, or a
+  `guard-allow-outline` comment that says why not.
+- **The ring's color** is `--focus-ring`, opaque indigo-500. The design doc's 70% was 2.95:1 on
+  the page ground. Inside `data-tone="night"` it is the mint accent.
+- **Menus.** The item with focus is `focus:bg-pill` and an inset ring. Radix marks a select's
+  option `data-highlighted`; `data-focus:` matches nothing.
+- **A dialog or a sheet returns focus by itself** (`components/ui/return-focus.tsx`), whether
+  it opens from a trigger, from the URL or from state. A popover with no trigger does not:
+  give it `onCloseAutoFocus` (the Demo menu's date picker does).
+- **Live regions are polite, and one piece of news has one.** `Banner` and `InlineAlert` are
+  plain content; pass `live` for one that appears because of what the person just did. An
+  action's success is its toast: do not add a status beside it. `Field` announces its own error
+  through a region that is always in the DOM. Nothing is `role="alert"`; the audit refuses it.
+- **`Field`** wires label, hint, error, `aria-invalid` and `aria-required` to its one child by
+  id. A child that renders no element of its own has to pass them on: `Select` does (to its
+  trigger), `DeptSelect` and `DatePickerPopover` do. A control whose text is its value (the
+  date button) is named by its label and its text together (`<id>-label`).
+- **An action on every row says which row**, after the words on the button, so the visible
+  label is still in the name: ``aria-label={`Record payment: ${row.eventName}`}``. Why a row's
+  button is off is its `aria-describedby`, in words on the page, never a `title`.
+- **A table** takes `aria-label` or `aria-labelledby`. Hide a column header's words
+  (`<span className="sr-only">`), not the `th`.
+- **A radio group** written by hand takes `handleRadioGroupKeyDown` and `radioTabIndex()` from
+  `components/ui/radio-keys.ts`. `SegmentedControl` has them built in.
+- **A one-key shortcut** asks `isPlainShortcut(event)` first (`lib/keyboard.ts`).
+- **Touch.** A control on an applicant's screen is 44px on a touch screen: `pointer-coarse:`
+  (`min-h-11`, or the invisible `::after` the 36px `Button` sizes use). On city screens,
+  targets stacked on each other are 24px, which WCAG 2.5.8 asks: the calendars' day and item
+  buttons were 16 to 18px. Nothing was measured in a browser.
+- **Color is never alone.** An active `FilterChip` carries a check, a chosen space a check, a
+  day outside the month a dashed cell.
+- **A page title** is `export const metadata = { title: "..." }` in the route's `page.tsx`; a
+  page about one record adds its name with `useDocumentTitle()` from `@/components/shell`.
+  Next's route announcer reads the title out after every client-side navigation.
+- **A new route** goes into the page list at the top of `tests/render/a11y.test.tsx`.
+
+### What was only checked from the markup
+
+Nobody has looked at any of this in a browser, heard it in a screen reader or touched it on a
+phone. In the order it is worth doing:
+
+1. **Tab through every screen with the keyboard and watch the ring.** The ring was never drawn
+   before this pass, so nobody has seen it anywhere: on glass, on a tinted row, on the night
+   section's button, inside a menu (inset), around a tab panel, on the card sheet's file drop
+   zone. The rule that draws it is argued from the built CSS, not seen.
+2. **A screen reader on the three demo paths that cross roles** (VoiceOver and NVDA): what is
+   said after each action (the toast), on each navigation (the new page title), when a tier
+   changes in the wizard, when a field's error arrives. Whether "polite, once" is what is heard
+   depends on the reader; jsdom only shows where the regions are.
+3. **A phone at 375px, applicant screens and the landing page**: that nothing scrolls sideways
+   (the landing headlines at 60 and 48px are the closest call, with `break-words` as the
+   backstop; the hero's tilted preview panel reaches, by arithmetic, about 14px past its box
+   inside a 20px gutter); that the 44px touch areas do not overlap their neighbors; that a bottom sheet's
+   content scrolls inside it; that the wizard's pinned plan bar never covers the field in focus
+   (`scroll-padding-block` is the mechanism).
+4. **1280px, city screens**: the pipeline board's seven columns scroll inside their row, not
+   the page; the 48rem action sheet; the month grid at its taller cells; Settings' sticky tabs.
+5. **Zoom to 200% and 400%** (WCAG 1.4.4, 1.4.10): not checked at all.
+6. **Reduced motion**: one global rule cuts every animation and transition to 0.01ms. The
+   landing page's scroll thread is removed by script. Not watched.
+7. **Windows High Contrast**: a forced-colors rule gives everything focused a system outline.
+   Not seen.
+8. **Print** of the permit ("Download PDF") was not part of this pass.
+
+### What is not met, on purpose or for want of a decision
+
+- **A field's edge is 1.2:1.** `line-subtle` on `surface-strong` is the design system's field;
+  WCAG 1.4.11 asks 3:1 of a control's boundary. Darkening every field is a design decision
+  (question for the owner, below). Its label, its fill and its focus state do identify it.
+- **Ambient loops do not pause** (the landing page's floating preview, the live dot). WCAG 2.2.2
+  wants a way to stop motion that runs over five seconds; the only one is the system's reduced
+  motion setting.
+- **A truncated name's full text is a hover away** (`Truncate` and its `title`): not on a
+  phone or a keyboard. Each such name is in full on the page it links to, and a screen reader
+  gets all of it.
+- **The city's maps are images with a name**, not `aria-hidden`: `PermitopolisMap` is
+  `role="img"` ("Map of Permitopolis with booked spaces, closures and routes") with the list
+  under it as the path. The wizard's four maps are `aria-hidden`, their lists beside them.
+- **Drawing an area by dragging** has its keyboard path in the Width and Length fields; a route
+  is built from the list. Nothing needs a drag (WCAG 2.5.7).
+- **`text-h5`** on the wizard's step headings is not a class the tokens define, so those
+  headings take the body size. They are `h2` to a screen reader either way. Left alone: a
+  type decision, not an access one.
+- **The development-only Stalled marker** is a focusable `span` inside a link. It never renders
+  in a production build.
 
 ## How the engine behaves
 
@@ -1747,3 +1869,27 @@ Settings:
   number that is not negative. "What this changes" starts over when the Clerk leaves the section.
 - **No attendance threshold moves the 5K.** Its route and its police make it Special whatever
   the numbers say; the brief's example of it dropping to Reviewed does not happen.
+
+Accessibility (the pass that held the prototype to WCAG 2.2 AA; "Accessibility" above):
+
+- **The focus ring is opaque indigo, not the design doc's 70%.** At 70% it is 2.95:1 on the
+  page ground and 2.67:1 on a danger-tinted row, under the 3:1 a focus indicator needs. It is
+  one token (`--focus-ring`), and the design doc now says so. Say if the 70% ring should stand
+  and the rule be waived.
+- **A field's edge is still 1.2:1.** The design system's field is a `line-subtle` border on a
+  near-white fill; WCAG 1.4.11 asks 3:1 of a control's boundary. Nothing was changed: darkening
+  every field is a change to the look. Should fields get a darker border?
+- **The landing page's headlines are smaller on a phone.** 60px and 48px below 640px, where the
+  design doc has 72 and 60 at every width; at 60px the longest word is within a few pixels of
+  the column.
+- **Three small marks were added so that color is never alone**: a check on an active filter
+  chip, a check on a chosen space or street in the location picker, and a dashed cell (not a
+  faded one) for a calendar day outside the month, whose events were otherwise under 2:1.
+- **Ambient motion has no pause.** The landing page's floating preview and live dot run until
+  the system's reduced-motion setting stops them. A pause control would meet WCAG 2.2.2 for
+  everyone else; none was added.
+- **Page titles are short and generic for a route** ("My queue", "Permit"), with the record's
+  name in front where there is one ("Riverfront Summer 5K · Case · Permitopolis"). The wording
+  is nobody's but this pass's.
+- **Nobody has seen or heard any of it.** The pass worked without a browser. The list of what a
+  person should check first is in "Accessibility", "What was only checked from the markup".

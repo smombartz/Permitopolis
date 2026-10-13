@@ -84,6 +84,10 @@ describe("focus rings", () => {
     expect(withoutComments).toMatch(/:focus-visible\s*\{\s*outline:\s*2px solid var\(--focus-ring\);\s*outline-offset:\s*2px;\s*\}/);
   });
 
+  it("a forced-colors mode gets a system-colored outline on everything focused (a field's border and halo are repainted there)", () => {
+    expect(withoutComments).toMatch(/@media \(forced-colors: active\)\s*\{\s*:focus-visible\s*\{\s*outline:\s*2px solid CanvasText !important;/);
+  });
+
   it("the night surface has a ring of its own", () => {
     expect(unlayered).toMatch(/\[data-tone="night"\]\s+:focus-visible\s*\{\s*outline-color:\s*var\(--night-accent\);\s*\}/);
   });

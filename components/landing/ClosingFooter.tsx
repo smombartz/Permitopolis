@@ -52,7 +52,7 @@ function SiteFooter() {
           <p>Office hours: Monday&ndash;Friday, 8 am&ndash;5 pm</p>
         </div>
         <div className="flex flex-col gap-1 sm:items-end sm:text-right">
-          <Link href={routes.demo()} className="font-medium text-fg-accent underline-offset-4 hover:underline">
+          <Link href={routes.demo()} className="rounded-control font-medium text-fg-accent underline-offset-4 pointer-coarse:inline-flex pointer-coarse:min-h-11 pointer-coarse:items-center hover:underline">
             Presenting this prototype? Open the demo guide
           </Link>
           <p className="max-w-[46ch] text-fg-secondary sm:text-right">
