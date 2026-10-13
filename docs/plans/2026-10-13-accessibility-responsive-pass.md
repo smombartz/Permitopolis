@@ -34,8 +34,9 @@ text, reduced motion honored.
 
 - [x] The route and role test, and the keyboard tests for the board's card sheet, the case's
       action panel and the palette (focus moves in, Esc closes, focus returns).
-      `tests/render/a11y.test.tsx` (581 pages), `tests/render/a11yAudit.ts`,
-      `tests/render/keyboard.test.tsx` (18 tests)
+      `tests/render/a11y.test.tsx` (581 pages on its first run, 505 once the phone pass stopped
+      repeating pages that draw the same at every width), `tests/render/a11yAudit.ts`,
+      `tests/render/keyboard.test.tsx` (19 tests)
 - [x] The shell: skip link, landmarks, the top bar, the Demo menu, the coach, the palette, the
       shortcuts dialog, toasts
 - [x] Shared components (`components/ui`, `components/domain`): names, focus rings, live regions,
@@ -192,8 +193,9 @@ page's content. `tests/render/keyboard.test.tsx` was written first and failed on
 
 ### Tests, and what they cost
 
-Four new render test files and the audit helper: `a11y.test.tsx` (506 pages),
-`a11y-overlays.test.tsx` (289), `keyboard.test.tsx` (18), `live-regions.test.tsx` (16). They add
+Four new render test files and the audit helper: `a11y.test.tsx` (505 pages),
+`a11y-overlays.test.tsx` (221 panels, 58 card sheets, 8 menus and dialogs), `keyboard.test.tsx`
+(19 tests), `live-regions.test.tsx` (16). They add
 about 80 seconds of CPU to the suite. Beside them, on a busy machine, a demo path clicked end to
 end (four seconds alone) ran past Vitest's five-second default, so the render project's timeout
 is 20 seconds.
@@ -244,3 +246,9 @@ the first two are questions for the owner.
 - 2026-10-13: plan written.
 - 2026-10-13: the instrument's first run and the keyboard tests changed the order of work: the
   focus ring and the focus return are in shared code, so they were fixed before any screen.
+- 2026-10-13: a second instrument was added partway, `tests/render/a11y-overlays.test.tsx`: the
+  route audit sees a page as it opens, and every panel, sheet and menu is shut then.
+- 2026-10-13: page titles were not in the brief's list. They came up at the checkout (where
+  does focus go after a payment navigates away?): Next's route announcer reads the title, and
+  every route had the same one.
+- 2026-10-13: done. Every step ticked; the gate passes (3,148 tests in 109 files).
