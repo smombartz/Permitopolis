@@ -11,6 +11,7 @@ import { RoleSwitcher } from "@/components/shell/RoleSwitcher";
 import { PersonaPicker } from "@/components/shell/PersonaPicker";
 import { MobileNavMenu } from "@/components/shell/MobileNavMenu";
 import { DemoMenu } from "@/components/shell/DemoMenu";
+import { CommandCenter } from "@/components/shell/CommandCenter";
 
 /**
  * Glass chrome shared by AppShell and CityShell. Left: the wordmark, linking home. Center:
@@ -76,6 +77,7 @@ function TopBarControls() {
       ) : (
         <span className="whitespace-nowrap font-mono text-xs text-fg-label">{dateText}</span>
       )}
+      <CommandCenter />
       <DemoMenu />
     </div>
   );
