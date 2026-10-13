@@ -284,6 +284,7 @@ one in every state. Reach for these before writing markup of your own.
 | `BackLink` (from `@/components/ui/page-header`) | The back link above a screen that opens with `CaseHeader`; `PageHeader` renders the same one from `backHref` |
 | `ReviewStatusDot` | A department with its review status: icon, colored dot, plain words. `label` replaces the words (the board's "Asked you for something") |
 | `BillingBadge` | Where one session of a series stands: Paid, Due, Upcoming or Skipped. The wizard, the board's schedule and the permit all use it |
+| `StalledBadge`, `CommissionBadge` | Two markers for a list row or a case header: "Stalled" (red, development builds only; render it when `isStalled(c, today)`) and "Sent to commission" (when `c.flags.sentToCommission`). Each is one tab stop with its meaning in a tooltip |
 | `TierLegend` | The key for a view that colors by tier (the map, the calendar): dot, icon and name |
 | `Stat` | A labeled figure: counts, and a case's Total, Paid, Due and Deposit |
 | `LeadTimeRisk` | The lead-time flag: `risk={leadTimeRisk(c, today, cfg)}`. Renders nothing when "ok" |
@@ -316,7 +317,7 @@ Every one is pure. Read cases, the date and the config from the store
 
 | Surface | Selectors |
 |---|---|
-| My events, board | `applicantCases(cases, personaId)`, `boardColumns(c)` (cards by column, Do now in the PRD's order), `boardColumn(task)`, `taskDueDate(task)`, `eventDate(c, today)`, `daysUntilEvent(c, today)`, `caseTotals(c)` |
+| My events, board | `applicantCases(cases, personaId)`, `boardColumns(c)` (cards by column, Do now in the PRD's order), `boardColumn(task)`, `taskDueDate(task)`, `taskSubmittedOn(task)` (the day a card last went to the city), `eventDate(c, today)`, `daysUntilEvent(c, today)`, `caseTotals(c)` |
 | My queue | `queueFor(cases, role, today)`: `{ case, task, group, daysWaiting }`, oldest due first; `waitingOnOthers(cases, role, today)`. A task with no due date is `later` while fresh and `this_week` once it has been open more than seven days |
 | Money | `caseTotals(c)`; `dueAtQuote`, `quoteBalance`, `quotePaid` (the quote); `refundIfCancelled(c, today, cfg)`: `{ refund, deposit, rule, canCancel }`, what `cancel` pays back today; `closeoutSettlement(c)`: `{ over, deposit, fromDeposit, refund, bill }`, what `reconcile_close` does. Show these, never a sum of your own: each is the figure its transition uses |
 | Cases pipeline | `isVisibleToCity(c)`, `isOpen(c)`, `involves(c, role)`, `involvement(c, party)`, `whoIsUp(c, today)`, `leadTimeRisk(c, today, cfg)`, `reviewClock(c, dept, today)` |
@@ -497,40 +498,41 @@ Seven surfaces, each built on its own and then joined. Every one is a client scr
   inside `CityShell`, shared by the three city roles.
 - **Files**: `components/case/` (`CaseDetailScreen`, `ActionsPanel`, `ActionSheet`, `tabs/*`,
   `actions/registry.ts`, `actions/types.ts`, `actions/panelKit.tsx`, `actions/generic/*`,
-  `actions/clerk.tsx`, `actions/pws.tsx`, `actions/hl.tsx`).
+  `actions/clerk.tsx`, `actions/pws.tsx`, `actions/hl.tsx`; since Phase 4 also `clerk/*`,
+  `review/*`, `verify/*`, `FeeLineFields.tsx`, `CleanupResult.tsx`).
 - **View-model**: `lib/view/caseDetail.ts`: `caseBackLink()`, `headerReviewClock()`,
   `buildOverview()`, `documentGroups()`, `reviewSummaries()`, `filterActivity()`, and the open-key
   helpers below.
 - **The page**: `CaseHeader`; an `EndingBanner` or the commission banner; five tabs (Overview with
-  `WhoIsUp`; Reviews, one section per department, the viewer's own actionable; Documents, by
-  reviewer, with Verify and Send back; Conditions and fees, with Actual and Difference from
-  closeout on; Activity, newest first, by actor); and the sticky "Your actions" panel, one button
-  per row of `availableActions(c, role, ctx)`. A disabled row shows the engine's reason under it.
-  A Draft is explained as not visible to the city; an ended case offers only "Add a note".
+  `WhoIsUp`; Reviews, one section per department, the viewer's own first and actionable;
+  Documents, by reviewer, with Verify; Conditions and fees, with Actual and Difference from
+  closeout on and the payments made; Activity, newest first, by day and by party); and the sticky
+  "Your actions" panel, one button per row of `availableActions(c, role, ctx)`. A disabled row
+  shows the engine's reason under it. A Draft is explained as not visible to the city; an ended
+  case offers only "Add a note".
 
 **The action registry.** Every action a city role can take has one panel, opened in a sheet.
 
 - `panelFor(action, role)` in `actions/registry.ts` returns the role's own panel when it has
-  one, otherwise the generic one: `ROLE_OVERRIDES[role]?.[action] ?? GENERIC_PANELS[action]`.
-- **To give a role a richer panel**, write a component that takes `ActionPanelProps`
+  one, otherwise the shared one: `ROLE_OVERRIDES[role]?.[action] ?? GENERIC_PANELS[action]`.
+  `panelWidthFor(action)` says whether the sheet opens wide for it.
+- **The shared panels are the role tools.** Phase 4 built the Clerk's, the reviewers' and the
+  verification tools in `actions/generic/` itself, because each is used by more than one role
+  (see "Role tools and edge states (Phase 4)" for the list). `clerk.tsx`, `pws.tsx` and `hl.tsx`
+  are empty.
+- **To give one role a panel of its own**, write a component that takes `ActionPanelProps`
   (`{ caseId, arg?, role, onClose }`, in `actions/types.ts`) and add it to that role's map, keyed
-  by action type. Nothing else changes: the screen, the URL and the generic panel stay as they are.
+  by action type. Nothing else changes: the screen, the URL and the shared panel stay as they are.
 
   ```tsx
   // components/case/actions/clerk.tsx
-  import { QuoteBuilderPanel } from "@/components/case/clerk/QuoteBuilderPanel";
+  import { ClerkOnlyPanel } from "@/components/case/clerk/ClerkOnlyPanel";
 
   export const CLERK_OVERRIDES: Partial<Record<ActionType, ActionPanelComponent>> = {
-    send_quote: QuoteBuilderPanel,
+    send_to_commission: ClerkOnlyPanel,
   };
   ```
 
-- **One file per role, so two workstreams share two of them.** 4A and 4B both register in
-  `clerk.tsx` (4A: `request_info`, `confirm_routing`, `send_quote`, `deny`,
-  `send_to_commission`; 4B: `pay`, `issue_permit`, `reconcile_close`). 4C's review panel serves
-  both departments, so `review_decide` goes into `pws.tsx` and into `hl.tsx`, which is 4D's file
-  for `verify_document` and `reject_document`. Each builder adds only its own keys; the
-  integrator merges the maps.
 - **`panelKit.tsx`** is what every panel is made of: `useCaseContext(caseId)` (the live case,
   today, config, all cases), `useCaseDispatch(caseId)` (returns `(action, successMessage) =>
   { ok, reason }`, with the success toast built in), and `PanelHeader`, `PanelBody`,
@@ -539,7 +541,10 @@ Seven surfaces, each built on its own and then joined. Every one is a client scr
   (`checkAcceptComplete`, `checkConfirmRouting`, `checkRequestInfo`, `checkReviewDecide`,
   `checkSendQuote`, `checkIssuePermit`, `checkVerifyOrReject`, `checkScheduleMeeting`,
   `checkCompleteCityTask`, `checkLogCloseout`, `checkReconcileClose`). A panel calls its check to
-  disable the button with the engine's own words.
+  disable the button with the engine's own words. A check that depends on what is in the form
+  takes it: `checkConfirmRouting(c, reviewers, today)` for the list as it stands,
+  `checkScheduleMeeting(c, id, actor, { date, today })` for the day in the field. Do not write
+  the rule again in the panel.
 - **What `?task=` holds.** Either a task's id, which is what a link from outside carries (a My
   queue row, an Intake row, a Who's up task), or an open key, which is what this screen's own
   buttons write: an action type (`issue_permit`) or `type:arg` (`verify_document:<card id>`,
@@ -554,15 +559,10 @@ Seven surfaces, each built on its own and then joined. Every one is a client scr
   - **A new kind of city task needs a line in `cityTaskAction()`**, or selecting it does nothing.
   - `arg` is a task id for `verify_document`, `reject_document`, `schedule_meeting`,
     `complete_city_task` and `request_info` (the card it is about), and a party for `remind`.
-- **What the generic panels leave for Phase 4.** Send quote dispatches `{ conditions: [],
-  feeLines: [] }`, which the engine reads as "the case's merged conditions and fee lines as they
-  stand": 4A's quote builder passes real arrays. Review decide (4C) already has the three
-  decisions, condition templates, fee lines, an internal note and a message; `transition()`
-  decides as the role that dispatches. Verify and Send back (4D) show the card's files and form;
-  `VerifyDocument.tsx` exports `CardContent` for both. Log closeout (4C) starts each line's
-  actual quantity at its estimate, and a line left alone keeps it. Record payment (4B) takes an
-  amount that defaults to what is due; Issue permit and Reconcile and close are one confirmation
-  each.
+- **What each panel does now** is in "Role tools and edge states (Phase 4)". Two things a
+  panel's author has to know about the action it sends: `send_quote` reads an empty list as "the
+  case's own conditions (or fee lines) as they stand" unless it carries `merged: true`; and
+  `log_closeout` keeps the estimate for any line left out of `actuals`.
 - **A panel must work for whoever is looking.** The page is shared: a link with `?task=<task id>`
   opened by another role resolves again for that role, usually to a reminder.
 
@@ -609,11 +609,242 @@ What a later builder will run into:
   the role overlay's side panel totals `activePermits(cases, today, { includeHolds })`.
 - **Intake.** Accept as complete goes on to the case with Confirm routing open.
 
+## Role tools and edge states (Phase 4)
+
+Five workstreams deepened what Phase 3 built: the City Clerk's tools (4A, with 4B's money and
+closeout, built as one), the reviewer tools (4C), document verification (4D), an applicant depth
+pass (4E) and the city's edge states with the action-coverage test (4F). Nothing here is a new
+route. What changed, the builders' requests and what the integration fixed between them:
+`docs/plans/2026-10-13-phase-4-integration.md`.
+
+### Where each role's tools live
+
+Everything a city role does on a case is still one panel per action, opened in the case detail's
+sheet (see "Case detail (3F)" for `?task=` and the registry). **Phase 4 built the tools in the
+shared panels themselves**, `components/case/actions/generic/`, not in the per-role override
+maps: the review panel serves both departments and the Clerk's license review, and a card is
+verified by whichever department reviews it. `clerk.tsx`, `pws.tsx` and `hl.tsx` are empty and
+stay as the place for a panel only one role uses. Each panel's logic is a pure view-model with
+its own tests against the real seed.
+
+| Action | Panel (in `actions/generic/`) | For | What it does |
+|---|---|---|---|
+| `request_info` | `RequestInfo.tsx` | The Clerk at intake; a department while its review is open | The applicant's cards as checkboxes, grouped by where each stands; "Something new" opens a card; a message with templates; a due date from `sla.requestResponseDays`; a preview of the card as the applicant will see it, drawn with the board's own `TaskCard`. One `request_info` per chosen card |
+| `confirm_routing` | `ConfirmRouting.tsx` | City Clerk | A row per department: the suggested ones checked, with their reasons and sections, the others unchecked ("Not suggested by this plan."). The due date defaults to today plus the tier's review days, never a weekend. "N days of lead time left after the latest due date". The engine's refusal for the list as it stands, before the click |
+| `send_quote` | `SendQuote.tsx`, `clerk/*` | City Clerk | "Consolidation and quote": each routed department's decision side by side (`DepartmentConsolidation`); conflicts flagged (the same condition twice, or the same phrase with different numbers or times from two departments); one merged conditions list to edit, reorder, remove and add to (`ConditionsEditor`); the fee lines by department, each editable (`QuoteLinesEditor`), the deposit as a fixed line, a prompt when the late fee applies and is not on the quote; totals and "Due now" |
+| `pay` | `Pay.tsx` | City Clerk | A payment at the counter. When more than one session of a series sits due, the Clerk picks which |
+| `issue_permit` | `IssuePermit.tsx` | City Clerk | The checklist (signed, paid, insurance verified): who owes each and since when. The conditions and components the permit will carry, and what issuing sets off |
+| `reconcile_close` | `ReconcileClose.tsx` | City Clerk | The cleanup result, estimate against actual line by line (`FeeTable showActual`), and the settlement (`CloseoutSettlementStats`) |
+| `review_decide` | `ReviewDecide.tsx`, `review/*` | Both departments, and the Clerk's license review | The triggers that routed the case here and the review clock; what the applicant submitted for each routed section (`SubmittedMaterial`: form answers in words, files); a four-way decision; conditions from templates and free text (`ConditionBuilder`); fee lines from the department's rates, prefilled from the applicant's own request, with what the estimate already carries (`FeeLineBuilder`) |
+| `log_closeout` | `LogCloseout.tsx` | Public Works & Safety | The cleanup inspection; each of its fee lines' actual quantity beside the estimate, with the difference and a running total; cleanup crew hours as an extra line. For an Instant event: pass, or an issue with its repair charge. Read-only once logged |
+| `complete_city_task` | `CompleteCityTask.tsx` | A work order's owner; a meeting's host | A work order with its detail (what, how many, for which event, due). A meeting is "Mark held" |
+| `schedule_meeting` | `ScheduleMeeting.tsx` | The meeting's department, or the Clerk | Who attends, and a date the engine checks before the click |
+| `verify_document`, `reject_document` | `VerifyDocument.tsx`, `verify/*` | The card's reviewer | One panel: the drawn preview beside its checklist; Verify while every item passes, Send back with its reason prefilled once one does not. `reject_document` opens the same panel |
+| `accept_complete`, `deny`, `send_to_commission`, `add_note`, `remind` | as in Phase 3 | | Unchanged |
+
+- **View-models**: `lib/view/clerkTools.ts` (4A), `lib/view/reviewTools.ts` (4C),
+  `lib/view/verify.ts` (4D). Shared by more than one panel, inside `components/case/`:
+  `FeeLineFields.tsx` (one fee line as an editable row, in the review panel and the quote
+  builder), `CleanupResult.tsx`, `CloseoutSettlementStats.tsx`, `clerk/DeptSelect.tsx`.
+- **The tabs.** Reviews: the viewer's own department first and the only one with buttons; a
+  department named on cards but not routed says so; the Clerk sees every open review's clock; a
+  Meetings block per department (Schedule, Reschedule, Mark held). Documents: by reviewing
+  department, the viewer's own first; Verify is the only button (Send back is inside it); a
+  "Needs my check" filter; another department's cards are read-only; vendor health permits
+  collapse into one row with its progress. Conditions and fees: a payments and refunds table
+  (`paymentRows()`). Activity: entries under a day heading, and a "Since you last acted" divider.
+- **A plain approval carries no conditions.** The condition builder shows under "Approve with
+  conditions" alone, and that decision needs at least one. Fee lines go with either approval.
+- **"Request information" in the review panel decides nothing.** It rewrites `?task=` to
+  `request_info`, so the same sheet shows the request panel and the tab is kept.
+- **The quote builder sends `merged: true`** (see "How the engine behaves"). It keeps the
+  deposit out of its editable rows and puts it back on submit: `send_quote` takes the list as
+  given, so a builder that left it out would send a quote with no deposit. A quote with no fee
+  line cannot be sent.
+- **Use a native `<select>` for a flat list in a row that repeats** (`DeptSelect`). A Radix
+  `Select` per row made one sheet slow enough under jsdom to push a five-step render test past
+  Vitest's 5 seconds.
+
+### The sheet and its width
+
+`ActionSheet` opens most panels at the sheet's usual 28rem. The panels that hold two columns or
+a table open at 48rem: `panelWidthFor(action)` in `actions/registry.ts` lists them (`send_quote`,
+`review_decide`, `verify_document`, `reject_document`, `log_closeout`, `reconcile_close`). Add a
+new panel there if it needs the room. The width has to be set on the Sheet's own
+`sm:data-[side=right]:max-w-*` rule; a plain `sm:max-w-*` class loses to it. Inside, the verify
+panel is two columns from 1024px and the consolidation is one column per routed department.
+Below 640px a sheet is a full-width bottom sheet whatever its width. **None of this has been
+looked at in a browser.**
+
+### Verification previews, and the seeded documents that are wrong on purpose
+
+- **A preview is drawn, never loaded.** `buildVerificationPreview(c, card)` in
+  `lib/view/verify.ts` works out a document's facts and its checklist from the case, the card and
+  its file's name and type. It is deterministic: no randomness, no clock, so the same card
+  previews the same way on every load and in every test.
+- **The checklists.** Insurance certificate: the named insured matches the applicant, the City
+  of Permitopolis is an additional insured, at least $1,000,000 per occurrence, coverage runs
+  through teardown (every session, for a series). Vendor health permit: the vendor is on the
+  vendor list (`payload.vendorName`), a permit number, valid past the event. Accessibility plan:
+  an accessible route, accessible restrooms, a viewing area (named, or reached by the route: the
+  applicant's form calls the named area optional). The other plan documents and forms have a
+  short list each. A posted-notice photo is the one card where an image is the right file.
+- **Each item is pre-checked and can be overridden** with its checkbox ("Looks right: ..."). A
+  failing item makes Send back the primary action, with the reason built from the failing items'
+  fixes; it can be edited.
+- **Wrong on purpose**, so the checklist has something to catch:
+
+  | Case | Card | What is wrong | Open to check on May 3? |
+  |---|---|---|---|
+  | `PMT-27-0115` Plaza wedding photos (F5) | Certificate of insurance | `wedding-photographer-contract.jpg`: a photo where a certificate belongs. "This does not look like a certificate of insurance." | Yes, as Health & Legal |
+  | `PMT-27-0006` Maple Grove Preschool spring fair (B03) | Certificate of insurance | `spring-fair-flyer.jpg`: the same | Yes, as Health & Legal |
+  | `PMT-27-0008` North Side Chess Club open tournament | Certificate of insurance | Coverage ends the day before the event; the other three items pass | Yes, as Health & Legal |
+  | `PMT-27-0030`, `PMT-27-0046`, `PMT-27-0080` | Certificate of insurance | The same short coverage | No: already decided, or the case has ended. `lib/view/verify.test.ts` holds them |
+
+  The two JPEGs are in the seed scripts (Phase 1: "missing insurance" is a JPEG, because Submit
+  needs every pre-submit card in). The short coverage is a rule on the file's name
+  (`insuranceCoverageIsShort()`: the sum of its character codes, mod 13, is 12), checked against
+  every seeded certificate so that S1 to S6 and the certificates the demo paths verify all pass.
+  Every other seeded document passes its checklist.
+
+### The applicant's side (4E)
+
+- **After the event.** In Closeout the board says who has the case
+  (`closeoutStatusLine()`: "Public Works & Safety is checking cleanup; the City Clerk then
+  reconciles costs."). The final-bill card shows estimate against actual and one sentence on how
+  it settled (`finalSettlement()`, from `closeoutSettlement()`), with a Pay button while a bill is
+  owed. "Book again next year" names its date before the click (`bookAgainDraftDate()`).
+- **A series.** The schedule sheet totals paid and outstanding (`seriesTotals()`) and leads with
+  "Pay the session due ...". Booking says what is charged now and what later.
+- **"With the city" says who has the card.** Under each card: how long, who holds it and the
+  date it is expected back; a summary line heads the column (`withCityInfo()`,
+  `withCityColumnSummary()` in `lib/view/board.ts`). The holder and the date are read off the
+  city's own task: the card's `verify:*` task, its department's open review, or, before routing,
+  the Clerk's intake check ("at intake with the City Clerk, then Health & Legal").
+- **The card form validates.** `CardPaymentForm` checks the number, name, expiry and security
+  code on submit. The prefilled test card passes; an emptied field no longer "pays".
+- **The wizard's late fee** is decided by `lateFeeCarriesDate()` alone, so a date in the past or
+  a booked date can no longer ride on a late-fee flag left on a draft.
+
+### The states matrix, and where its tests are
+
+Every empty, error and edge state the plan's section 8 lists has one render test that mounts
+the real screen in that state.
+
+| File | Covers |
+|---|---|
+| `tests/render/states-matrix.test.tsx` | The city side: an empty queue, filters, pipeline column, Intake tab, case tabs and day; an unknown case, a Draft opened by a city role, localStorage blocked, holding an older build's demo, or corrupt; a refused action; a `?task=` for a task that is gone or another role's; a 90-character name and a 60-character organization; "Not provided"; an overdue row for each role; a hold expiring tomorrow; the four endings; a series of 20 or more sessions; competing applications; sent to commission; lead-time risk |
+| `tests/render/applicant-states.test.tsx` | The applicant side: My events empty; a Draft with only a name; the wizard on somebody else's draft, a case that is no longer a draft, an unknown id; a booked, blacked-out and impacted date; attendance over capacity; the lead-time gate from steps 3, 4 and 5; a refused booking; the four endings; a card sent back, overdue, locked; checkout with nothing to pay; no permit, a cancelled one, an amendment pending; empty and invalid payment and signature input; the long names |
+
+Where the seed has no case in a state (a hold expiring tomorrow, a stalled case), the test builds
+one with `makeCase()` and `makeTask()` from `lib/state/testSupport.ts`. A new screen adds its
+rows to one of the two files.
+
+What 4F added to the lists while covering them: a queue row's one-line "why now"
+(`queueReasonLine()`: "Certificate of insurance re-uploaded Apr 30", "Routed Apr 20"); the Cases
+board's "Group by" State or Event date (`?group=event_date`: this week, next two weeks, this
+month, later, past, with the state as a chip on each card); the table's column chips and density
+(`?cols=`, `?density=compact`; ID and Depts are off by default); a "Sent to commission" marker
+on cards and rows; "Expires tomorrow" on a held row in Active permits and on the case.
+
+### The Stalled chip
+
+A case before Permitted with nobody up is a bug in the data or the engine (PRD, "Core model").
+`<StalledBadge />` (`components/domain`) flags it in red, with the reason in its tooltip: render
+it where `isStalled(c, today)` is true. My queue's "Waiting on others", pipeline cards and rows
+and the case header do. **It renders nothing in a production build**
+(`process.env.NODE_ENV === "production"`), and the seed has no stalled case (`tests/seed.test.ts`
+holds that). `<CommissionBadge />`, the gavel beside it, is not dev-only.
+
+### The action-coverage test
+
+`tests/action-coverage.test.ts` is the gate that no action is left without a control:
+
+1. Every `ACTION_TYPES` entry but `tick` is dispatched somewhere in `app/` or `components/`
+   (it scans the source for `dispatch({ type: "..." })`), or has a panel in the registry.
+   `amend` is the one known gap, listed in `KNOWN_GAPS`; the test fails as soon as a listed gap
+   gets a control, so the list cannot go stale. **5A removes `amend` from it.**
+2. On the real seed, for every case and city role, every row of `availableActions()` has a
+   panel, and every enabled row's panel renders.
+3. On the real seed, every open task in Who's up resolves, for each city role, to a panel that
+   renders (`resolveOpenKey()`): the path a My queue row takes.
+
+It runs in node. A panel is rendered inside `<Sheet open>` and not inside `<SheetContent>`,
+because the content is a portal and a portal renders nothing on the server: a test written the
+other way passes whatever the panel does.
+
+### Tests that hold the pieces to each other
+
+| File | Holds |
+|---|---|
+| `tests/both-sides.test.ts` | For every "With the city" card on the seed: the applicant is told the holder, the expected-by date, "overdue" and the days waited that the city's own task, queue and Documents tab show |
+| `tests/render/role-tools.test.tsx` | The registry opens the shared panels for every role, at the right width; the review panel hands off to the request panel; S3 and S6 walked through Reviews, Documents and Conditions and fees after each role acts; Issue permit's checklist against `checkIssuePermit()` |
+| `tests/render/handoffs.test.tsx` | Demo paths 3, 4, 5 and 6, clicked from first step to last across the board, the queues, the case, checkout, Active permits and the wizard, with the role switcher |
+
+### What a Phase 5 builder needs to know
+
+- **Amendment (5A).** `amend` is the only action with no control; build it and take it out of
+  `KNOWN_GAPS`. The board's menu already links to `/events/[id]/amend`, and the permit page
+  already shows "amendment pending". The date gate for an amendment is the wizard's:
+  `dateGateSatisfied()` and `lateFeeCarriesDate()` in `lib/view/wizard.ts`. A rebuilt board
+  keeps what is on a card and takes a per-vendor card's vendor from the new answers. A pending
+  amendment's `submit_application` card still cannot be submitted (`submit` needs a Draft): that
+  is yours to change in `lib/state`. New cards land in "With the city" with the note and the
+  expected-by date like any other; `tests/both-sides.test.ts` will check them.
+- **The Clerk's payments page (5B).** `paymentRows(c)` and `overdueSessionDates(c)` in
+  `lib/view/clerkTools.ts` are the per-case rows the Conditions and fees tab and the payment panel
+  use. Every figure comes from `@/lib/state` (`caseTotals`, `quoteBalance`, `dueAtQuote`,
+  `closeoutSettlement`, `refundIfCancelled`); `tests/both-sides.test.ts` is the model for a test
+  that the page and the case agree. A row opens its case with
+  `routes.city.case(id, { task: "pay", from })`. The license review is `review_decide` as the
+  Clerk: the same panel, with the alcohol license as its fee preset. The pre-application meeting
+  is the Reviews tab's Meetings block and `ScheduleMeeting.tsx`.
+- **Closures map and work orders (5C).** `workOrderDetail(c, task)` in `lib/view/reviewTools.ts`
+  is a work order's what, how many, event and due date; `CompleteCityTask.tsx` is its panel
+  (`routes.city.case(id, { task: task.id, from })` opens it). Work orders are created by
+  `issue_permit`, due two days before the last session. `permitSessions(cases, { from, to })`
+  lists the closures of a date range and `citywideBlackoutOn(date)` names a blackout day. A
+  walkthrough is scheduled with `schedule_meeting`, and the engine refuses a date that is past,
+  on or after the event, or a blackout: show `checkScheduleMeeting(c, id, role, { date, today })`'s
+  reason.
+- **The verifications page (5D).** Everything is in `lib/view/verify.ts`: `canActOn(task,
+  role)`, `buildVerificationPreview()`, `daysWaiting()`, `decidedOn()`,
+  `groupDocumentsForDisplay()`. The queue is every card `canActOn()` is true for, across cases; a
+  row opens `routes.city.case(id, { tab: "documents", task: "verify_document:<card id>", from })`,
+  which is the merged panel. `components/case/verify/` holds `DocumentPreview` and
+  `ChecklistPanel` if the page shows a preview of its own (a component under `components/case/`
+  may import them; one under `components/city/` may not).
+- **Any new list that opens a case** passes `from` and needs its line in `BACK_LABEL`
+  (`lib/view/caseDetail.ts`), or the case goes "Back to cases".
+- **Demo hints and the command palette (5E).** `DEMO_PATHS` has every step with its role and
+  persona, and `useDemo((s) => s.hints)` is the toggle. `tests/render/handoffs.test.tsx` has the
+  exact clicks of paths 3 to 6, and `tests/render/wizard.test.tsx` and `active.test.tsx` those of
+  1 and 2: a callout's "click this next" should name the same control. A sheet is modal, so a
+  hint for a step inside a panel has to live in the panel or wait until it shuts. `cmdk` is
+  installed (`components/ui/command.tsx`); cases, roles and scenario jumps are all in the store
+  and `lib/data/demoScript.ts`.
+- **The accessibility and responsive pass (5F).** Not yet looked at in a browser: the 48rem
+  sheet and what is laid out in it; the review panel and the quote builder at 1280px; the
+  applicant's "With the city" notes at 375px. Worth a keyboard walk: the quote builder's rows
+  (each has a department select, a text field and three buttons); the fee-line rows, whose fields
+  are named for their line; the verify checklist's checkboxes; the Documents tab's vendor group
+  (an accordion); the Stalled and commission markers, which are focusable so their tooltips can
+  be read, and add a tab stop per row. 4E's 375px pass covered the files it owned.
+
 ### What is still a placeholder
 
-`/events/[id]/amend` (5A; the board's menu already links to it), `/city/payments` (5B),
-`/city/map` and `/city/work-orders` (5C), `/city/verifications` (5D), `/city/inspections` (6B) and
-`/city/settings` (6A) render `PlaceholderScreen`. The sidebar links to the city ones.
+- **Routes.** `/events/[id]/amend` (5A; the board's menu already links to it), `/city/payments`
+  (5B), `/city/map` and `/city/work-orders` (5C), `/city/verifications` (5D), `/city/inspections`
+  (6B) and `/city/settings` (6A) render `PlaceholderScreen`. The sidebar links to the city ones.
+- **`amend` has no control** anywhere (the action-coverage test's one known gap).
+- **A document preview is a drawing.** No file is stored or opened; "Use sample file" produces a
+  name, a size and a type.
+- **The closeout's photo is not kept.** The log's "Add a photo" shows the file as attached;
+  `log_closeout` carries no file, so nothing is stored with the case.
+- **"Sent to commission" is a flag**, with a banner and a marker; there is no commission
+  workflow (plan section 11).
+- **The Clerk's compliance log** on Active permits always reads "No log entries yet" (6B).
+- **The three role override maps are empty on purpose**, not unfinished (see above).
 
 ## How the engine behaves
 
@@ -645,6 +876,9 @@ Things a screen builder needs to know that the type signatures do not say.
   with an ending never does, so cancelling a permit frees its date.
 - **A series skips a blackout session.** `occurrences()` marks it `skipped`: it is not billed,
   not held and not an event day.
+- **A blackout for something with no place.** `availability()` knows which spaces a blackout
+  closes and from what time. `citywideBlackoutOn(date)` returns the blackout's label for a day,
+  whatever the place: a meeting's date and Active permits' map use it.
 
 **State (`lib/state`)**
 
@@ -709,12 +943,20 @@ Things a screen builder needs to know that the type signatures do not say.
   - `schedule_meeting`: the meeting's department or the Clerk. It accepts the Clerk's
     `schedule_pre_application_meeting` task id and puts the date on the applicant's card, as
     `payload.scheduledFor` and as the card's `dueDate`: a scheduled meeting is due on its day,
-    not on the plan's default date. A meeting can be moved until it is held.
+    not on the plan's default date. A meeting can be moved until it is held. The date has to be
+    today or later, before the event (the next session still ahead) and not a blackout day
+    (`citywideBlackoutOn()` in `lib/rules`): "Choose a date before Sun, Jul 11, 2027."
+    `checkScheduleMeeting(c, id, actor, { date, today })` gives a panel the same reason before
+    the click; without the last argument it answers only who may schedule.
   - `complete_city_task` closes a work order (its owner), a meeting that was held (its
     department or the Clerk), or a `verify:*` task (which also accepts the card). Every other
     city task is finished by its own action; the refusal names it.
   - `confirm_routing` needs at least one reviewer, each department once, and a due date for each
-    that is today or later (the date is the review's allowance; none gave "Day 0 of NaN").
+    that is today or later (the date is the review's allowance; none gave "Day 0 of NaN"). It
+    also needs every department that checks one of the applicant's documents or forms: a list
+    that leaves one out is refused (`Route Health & Legal too: it checks "Certificate of
+    insurance".`). The Clerk's own cards and meetings never force a reviewer. `routing()`
+    suggests every such department on all 38 seed scripts, so the prefill always goes through.
   - A meeting card (`kind: "meeting"`) is the applicant's, but only the city can move it:
     `openKeyForTask()` opens `schedule_meeting` for the Clerk and the department that holds it
     while it has no date, and `complete_city_task` once it has one.
@@ -758,6 +1000,12 @@ Things a screen builder needs to know that the type signatures do not say.
   to that department gets its own `verify:<card suffix>` task, from routing through Event day (a
   vendor's health permit usually arrives after the permit). A second upload reopens the same
   verify task. Answers to the Clerk's own intake requests are accepted by `accept_complete`.
+- **`send_quote` and an empty list.** `{ conditions: [], feeLines: [] }` means "the case's own
+  conditions and fee lines as they stand", which is what the seed scripts send. With
+  `merged: true` both lists are the Clerk's final ones and are taken as given, an empty one
+  included: the quote builder sends that, so a condition the Clerk removed stays removed.
+- **A per-vendor card names its vendor**: `payload.vendorName`, set by `requirements()`. A board
+  rebuilt after an edit keeps what is on a card and takes the vendor from the new answers.
 - **A reviewer's denial goes to the Clerk.** `review_decide` with `deny` finishes that
   department's review task and gives the Clerk a `consolidate` task titled "Decide: a reviewer
   denied" (`payload.denied`). `send_quote` then says which department denied; Deny is the move.
@@ -830,6 +1078,8 @@ Things a screen builder needs to know that the type signatures do not say.
   week. City staff act on working days in every history, and the due dates they set are working
   days. The one exception is F7's damage report, logged on the Saturday of the picnic (see Open
   questions).
+- **B22 is routed to both departments.** It routed only Public Works & Safety until Phase 4;
+  `confirm_routing` now refuses a list that leaves out the department that checks its insurance.
 - **Where the seed differs from the PRD's wording**: S4's routing reasons read "Block party" and
   "City services" (the PRD says "closure, barricades"); F7 is named "Brightline Logistics
   company picnic"; "missing insurance" (F5, B03) is a JPEG uploaded as the certificate, because
@@ -838,10 +1088,6 @@ Things a screen builder needs to know that the type signatures do not say.
 
 **Open items for later workstreams**
 
-- **A case routed without a card's reviewer** leaves that card with nobody tasked (B22, a denied
-  case, routes only Public Works & Safety while its insurance card names Health & Legal). The
-  routing panel (4A) should not let the Clerk drop Health & Legal while an insurance card
-  exists, or `confirm_routing` should refuse.
 - **A pending amendment's `submit_application` card cannot be submitted**, because `submit`
   needs a Draft. Workstream 5A owns that flow.
 - **`classify()`'s summary phrases** ("about 3 weeks", "about 2 months") are fixed copy from the
@@ -1000,3 +1246,57 @@ Raised by the Phase 3 review fixes:
 - **Next on an empty wizard starts nothing.** Stepping through the wizard without answering
   anything creates no draft; the first answer does. So a visitor who only looks leaves nothing in
   My events.
+
+Raised while the Phase 4 role tools were built and joined:
+
+- **Routing cannot leave out a department that checks a card.** `confirm_routing` refuses a list
+  without the department named on one of the applicant's documents or forms, so the Clerk cannot
+  take Health & Legal off an event that carries an insurance card. The PRD lets the Clerk "add
+  or remove reviewers"; this keeps every card with somebody to check it. If the Clerk should be
+  able to drop a department and take its cards over, the card's reviewer has to change with it.
+- **A meeting cannot be set on a blackout day.** The PRD's blackout dates close spaces to
+  bookings. The build also refuses a meeting or a walkthrough on one (Memorial Day, Jul 4 and
+  Jul 5), as well as a date that has passed or falls on or after the event. A weekend is not
+  refused. Say if blackouts should not apply to meetings, or if weekends should.
+- **A card can be verified before the case is routed.** On a Submitted case the Documents tab
+  offers Verify to the card's reviewer: the engine asks only who is looking and whether the card
+  is submitted. So Health & Legal can send back the photo uploaded as insurance on the Plaza
+  wedding photos before the Clerk accepts the application. Say if a check should wait for
+  routing.
+- **Every checklist item can be overridden.** The verifier may tick "Looks right" on any item,
+  including "Looks like the right kind of document" on a photo, and Verify then goes through. If
+  an upload of the wrong kind should never be verifiable, that item becomes read-only.
+- **Which certificate is short on coverage.** The one certificate with a subtle defect that is
+  open to check on May 3 is the North Side Chess Club's (`PMT-27-0008`), chosen by a rule on the
+  file's name. If a certificate on one of the six scenarios should carry it instead, it is one
+  line in `lib/view/verify.ts`, and the demo path that verifies it then needs a second upload.
+- **The accessibility plan's viewing area.** The PRD's checklist has three items: route,
+  restrooms, viewing area. The applicant's form calls the named viewing area optional, and none
+  of the seeded plans names one. The check passes on a named area or on the route ("to every
+  viewing area") being marked. If the named area should be required, the form's label and six
+  seed scripts change with the check.
+- **A plain approval carries no conditions.** The review panel offers the condition builder under
+  "Approve with conditions" only, and that decision needs at least one. Fee lines go with either.
+- **A quote needs at least one fee line.** The quote builder will not send an empty quote. A
+  quote with no conditions is fine.
+- **Before routing, "With the city" names the City Clerk.** The PRD has each card there show its
+  reviewer. A card on a Submitted case reads "at intake with the City Clerk, then Health & Legal",
+  with the intake check's due date, because that is who holds it: the department has not started.
+  Say if the board should name only the reviewer.
+- **The closeout's photo is not kept.** Public Works & Safety can attach a photo to a cleanup
+  issue; the action that logs the closeout carries no file, so it is not on the case afterwards.
+- **The Documents tab's "Needs my check" filter is not in the URL.** It is a toggle on one tab
+  and is gone on reload. The list screens keep their filters in the URL; say if this should too.
+- **The Cases table hides ID and Depts by default.** Tier, Waiting on, Next action, Due and Risk
+  are on; the column chips turn the other two on, and the choice is kept in the URL.
+- **A hold expiring tomorrow is flagged on Active permits and on the case**, not on the Cases
+  pipeline's cards and rows. It is one line each if the pipeline should carry it too.
+- **The card form checks its fields.** A cleared card number or a malformed expiry now stops the
+  payment with a message under the field. It is still a simulation: any well-formed card pays.
+- **The wide panels open in a 48rem sheet.** The quote builder, the review, verification, the
+  closeout log and reconciliation. The PRD's consolidation is "side by side"; at 1280px a sheet
+  that wide covers most of the case. If the Clerk's consolidation should be a page of its own, it
+  is a route and a move, not a rebuild. Not yet looked at in a browser.
+- **The case header shows a long name in full.** A 90-character event name wraps on the case's
+  own page and on the board; it is truncated with a tooltip only in lists.
+

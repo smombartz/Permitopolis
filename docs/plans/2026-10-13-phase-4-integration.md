@@ -16,13 +16,14 @@ one tree.
 - [x] Make the pieces meet: the registry opens the new panels; Reviews, Documents and Conditions
       and fees agree on one case (S3 and S6 walked through all three after each role acts); the
       applicant's "expected by" is the city's due date on the same task; demo paths 5 and 6 clicked
-      from first step to last in `tests/render/handoffs.test.tsx`; the consistency pass. (Nine
-      seams fixed; tables below. Gate: 1,742 tests in 82 files.)
-- [ ] `docs/readme.md`: "Role tools and edge states (Phase 4)", "What is still a placeholder", the
-      builders' new questions for the owner.
-- [ ] `docs/log.md`: one entry per workstream and one for the integration. The main plan: Phase 4
+      from first step to last in `tests/render/handoffs.test.tsx`; the consistency pass. (Ten
+      seams fixed; tables below.)
+- [x] `docs/readme.md`: "Role tools and edge states (Phase 4)", "What is still a placeholder", the
+      builders' new questions for the owner (16).
+- [x] `docs/log.md`: one entry per workstream and one for the integration. The main plan: Phase 4
       ticked, section 12, a Changes line.
-- [ ] Gate (`pnpm check`), commit, remove the merged worktrees and branches.
+- [x] Gate (`pnpm check`: type-check, lint, 1,746 tests in 82 files, build), commit, remove the
+      merged worktrees and branches.
 
 ## Engine requests
 
@@ -59,6 +60,7 @@ another's, or by the engine, and did not line up. Each is fixed and covered by a
 | 7 | The routing panel (4A) and the PRD | It listed only the suggested departments, so a reviewer could be removed and never added | Every department has a row; the unsuggested ones start unchecked |
 | 8 | The case detail (4F) and the lists' Stalled chip (4F) | The case drew its own copy of the chip, because a case component may not import from the lists | `StalledBadge` and `CommissionBadge` are in `components/domain` |
 | 9 | My queue's "why now" line (4F) and a first upload | A card uploaded for the first time after its review read "re-uploaded" | "uploaded" the first time, "re-uploaded" after that |
+| 10 | The accessibility checklist (4D) and the applicant's form (3C) | The checklist failed a plan with no named viewing area; the form labels that field optional and no seeded plan fills it in, so S5's and S6's approved plans read as failing | The item passes on a named area or on the route "to every viewing area" being marked; a test holds every seeded plan to passing |
 
 Walked and found to line up: the registry opens the shared panels for every role (no override
 hides one); S3 and S6 through Reviews, Documents and Conditions and fees after each role acts
@@ -103,3 +105,9 @@ step to last across the board, the queues, the case, checkout, Active permits an
 ## Changes
 
 - 2026-10-13: Written after the merges and the first gate, before any integration change.
+- 2026-10-13: Two things were added to the plan as the work found them. The wide sheet grew from
+  five panels to six: the closeout log joined once its read-only view became the full estimate
+  against actual table. And an eighth and ninth seam came out of writing the docs: listing the
+  seeded documents that fail their checklist showed every approved accessibility plan failing
+  "viewing area", a field the applicant's form calls optional (the check now passes on the route
+  the form asks for), and the queue's reason line saying "re-uploaded" for a first upload.

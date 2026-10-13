@@ -372,19 +372,19 @@ useHydrated(): boolean                                       // gate rendering u
 | `simulate_signoff` | neighbor, applicant | none | Neighbor sign-off progress plus one; card done at 12 of 12. The applicant may raise it too: the demo button sits on the block captain's own card and the store dispatches as the current role |
 | `submit` | applicant | none | Draft to Submitted; creates the Clerk's intake task |
 | `accept_complete` | clerk | none | Places the date hold if the slot is free; creates the routing task. Block parties need every sign-off |
-| `confirm_routing` | clerk | `reviewers: { dept, sections, dueDate }[]` | Submitted to In review; creates review tasks, starts clocks |
+| `confirm_routing` | clerk | `reviewers: { dept, sections, dueDate }[]` | Submitted to In review; creates review tasks, starts clocks. Refused when the list leaves out a department that checks one of the applicant's documents or forms (Phase 4) |
 | `request_info` | clerk, pws, hl | `taskId?, message, dueDate` | To Needs info; pins or creates the applicant card; pauses that clock |
 | `respond_to_request` | applicant | `taskId, files?, message?` | Card to submitted; re-review task for the asker; back to In review when no request is open |
 | `verify_document` | clerk, pws, hl | `taskId` | Applicant card to done |
 | `reject_document` | clerk, pws, hl | `taskId, reason` | Card to changes requested |
 | `review_decide` | clerk, pws, hl | `decision, conditions, feeLines, internalNote?, message?` | Sets the department's Review |
 | `send_to_commission` | clerk | none | Sets the flag |
-| `send_quote` | clerk | `conditions, feeLines` | In review to Quote sent; hold expiry set; unlocks sign and pay |
+| `send_quote` | clerk | `conditions, feeLines, merged?` | In review to Quote sent; hold expiry set; unlocks sign and pay. An empty list means "as the case stands"; with `merged: true` both lists are taken as given (Phase 4, the quote builder) |
 | `deny` | clerk | `reason` | Ending Denied; hold released |
 | `accept_and_sign` | applicant | `signature, conditionIds` | Marks conditions accepted |
 | `pay` | applicant, clerk | `amount, method, occurrenceDate?` | Records a payment; the Clerk uses it for in-person payments |
 | `issue_permit` | clerk | none | Quote sent to Permitted. Needs signed, paid and insurance verified; creates work-order tasks |
-| `schedule_meeting` | clerk, pws | `taskId, date` | Sets `scheduledFor` |
+| `schedule_meeting` | clerk, pws | `taskId, date` | Sets `scheduledFor`. The date is today or later, before the event, and not a blackout day (Phase 4) |
 | `log_closeout` | pws | `cleanup, notes?, actuals: { feeLineId, qty }[], extraLines?` | Fills actuals; creates the Clerk's reconciliation task |
 | `reconcile_close` | clerk | none | Closeout to Closed; final invoice or refund; unlocks the applicant's last cards |
 | `withdraw`, `cancel` | applicant | none | Ending Withdrawn before a permit, Cancelled after, with the refund recorded |
@@ -611,9 +611,9 @@ Every builder also writes `lib/view/<surface>.ts` with tests, handles loading, e
 - [x] **3G Active permits** (`0adb264`): `/city/active`.
 - [x] **Integration**: the seven branches merged with no conflicts; 11 hand-offs between surfaces fixed, each covered in `tests/render/handoffs.test.tsx`; the consistency pass; the builders' contract change requests decided (`docs/plans/2026-10-12-phase-3-integration.md`).
 - [x] **Gate**: paths 1 to 4 have a control for every step. Paths 3 and 4 are clicked from first step to last across the board, My queue, Intake, the case, checkout and Active permits in `tests/render/handoffs.test.tsx`; path 1 in its group (a) with `tests/render/active.test.tsx`; path 2 in `tests/render/wizard.test.tsx`.
-- [ ] **Review**: the read-only review of Phase 3 against the PRD (section 9) has not run yet.
+- [x] **Review**: ran on 2026-10-13: 38 findings, all fixed (`docs/plans/2026-10-13-phase-3-review-fixes.md`).
 
-**Done 2026-10-13**, the review aside. Gate: type-check, lint, 1,255 tests in 69 files and build pass. What a Phase 4 builder needs is in `docs/readme.md`, "The screens (Phase 3)"; what to open in a browser is in section 12.
+**Done 2026-10-13.** Gate: type-check, lint, 1,255 tests in 69 files and build pass. What a Phase 4 builder needs is in `docs/readme.md`, "The screens (Phase 3)"; what to open in a browser is in section 12.
 
 ### Phase 4: Role tools and money (6 builders)
 
@@ -635,6 +635,21 @@ Every builder also writes `lib/view/<surface>.ts` with tests, handles loading, e
 | Edge | 90-character names and long organization names; missing fields shown as "Not provided"; overdue for each party; hold expiring tomorrow; each off-path ending with its reason banner; a 20-session series; competing applications; sent to commission |
 
 **Gate:** paths 5 and 6 have a control for every step; the action-coverage test passes. **Checkpoint:** all six paths end to end. P0 is complete.
+
+As built, five builders instead of six, and in the shared panels instead of the per-role files
+the table names (a review panel serves both departments, and a card is verified by whichever
+department reviews it, so each tool is one panel in `components/case/actions/generic/`):
+
+- [x] **4A Clerk hand-offs and 4B Clerk money and closeout** (`b14d73f7`), built as one workstream, "the Clerk's tools": request information with a card picker and a preview; routing with reasons, due dates and lead time left; the consolidation side by side with conflict flags; the merged conditions and the quote builder; record payment by session; Issue permit with its checklist; reconciliation line by line. `components/case/clerk/**`, `lib/view/clerkTools.ts`.
+- [x] **4C Reviewer panel** (`4c41784e`): the shared review panel (sections with what the applicant submitted, four decisions, condition templates, fee lines from the department's rates); Public Works & Safety's closeout (cleanup inspection, actual quantities against the estimate); work orders with their detail; meetings scheduled from the Reviews tab. `components/case/review/**`, `lib/view/reviewTools.ts`.
+- [x] **4D Verification** (`ce8b8d19`): the drawn document preview and a checklist for every reviewed card (insurance, health permit, accessibility plan and the rest); Verify and Send back in one panel; the Documents tab by reviewing department. `components/case/verify/**`, `lib/view/verify.ts`.
+- [x] **4E After the event**, widened to an applicant depth pass (`d315270f`): the final bill or refund with estimate and actual and how it settled; feedback; Book again with its date; the series schedule's totals; "With the city" with who has each card and by when; the applicant states matrix (`tests/render/applicant-states.test.tsx`); a 375px pass. In `components/board/**` and `components/checkout/**`, not in new `after/` and `series/` folders.
+- [x] **4F Edge states and coverage** (`59bfef09`): the states matrix above (`tests/render/states-matrix.test.tsx`); the Stalled chip; `tests/action-coverage.test.ts`; and for the lists, a "why now" line per queue row, Group by event date, table columns and density, the commission marker.
+- [x] **Integration**: the five branches merged with no conflicts. Six engine requests decided (four applied, two declined), ten seams between the builders' work fixed, a consistency pass, and the docs (`docs/plans/2026-10-13-phase-4-integration.md`).
+- [x] **Gate**: paths 5 and 6 have a control for every step, clicked from first step to last across the surfaces in `tests/render/handoffs.test.tsx`, as 3 and 4 are; the action-coverage test passes, and now renders every panel it counts.
+- [ ] **Review**: the read-only review of Phase 4 against the PRD (section 9) has not run yet.
+
+**Done 2026-10-13**, the review aside. Gate: type-check, lint, 1,746 tests in 82 files and build pass. What a Phase 5 builder needs is in `docs/readme.md`, "Role tools and edge states (Phase 4)"; what to open in a browser is in section 12.
 
 ### Phase 5: P1 depth (5 builders, then 1)
 
@@ -816,9 +831,80 @@ menu's scenario jumps (S1 to S6) set role, persona and page in one step.
 | `/city/cases/PMT-27-0097` | Applicant | "This screen is built for a city role."; "Switch to Health & Legal" opens the case, not the queue |
 | `/city/intake` | City Clerk, then Public Works & Safety | The switch leaves the Clerk's Intake for the queue; a case opened from Intake as the Clerk says "Back to Intake" |
 
+### Phase 4
+
+Role tools and edge states. Each panel below opens in the case's sheet; the ones marked wide
+open at 48rem, which nobody has looked at yet (`docs/readme.md`, "The sheet and its width").
+
+#### The Clerk's tools (4A)
+
+| URL | As | Look for |
+|---|---|---|
+| `/city/cases/PMT-27-0118` | Health & Legal, then City Clerk | First the applicant (Downtown Arts Collective) answers the pinned card on the board, and Health & Legal verifies it (Documents) and approves (Reviews, "Decide your review"). Then, as the Clerk, "Send quote" (wide): the consolidation shows Public Works & Safety's three sound conditions beside Health & Legal's approval; edit the Amplified sound line's unit price and watch the total move; send, and it reads Quote sent at $715, or at the edited total |
+| `/city/cases/PMT-27-0126` | City Clerk | After the block captain's "Simulate a sign-off" three more times and Accept as complete: Confirm routing has Public Works & Safety and Health & Legal checked with their reasons and the City Clerk unchecked, due dates on a weekday, a "days of lead time left" line; unchecking Health & Legal shows "Route Health & Legal too: it checks ..." and disables Confirm |
+| `/city/cases/PMT-27-0097?task=issue_permit` | City Clerk | The checklist: three items "Waiting", each with who owes it and since when. After Health & Legal verifies the insurance and the applicant signs and pays, it reads "Everything this needs is in place." and three "Done" |
+| `/city/cases/PMT-27-0031` | Public Works & Safety, then City Clerk | Log closeout (pass, 72 for Police, 4 cleanup crew hours); then as the Clerk, Reconcile and close (wide): the cleanup result, the line-by-line table, $750 over, $250 refund, and Close works |
+| `/city/intake` | City Clerk | A Submitted row's "Request information": the applicant's cards by status with checkboxes, a template for the message, and the preview of the card the applicant will see |
+
+#### Reviewer tools (4C)
+
+| URL | As | Look for |
+|---|---|---|
+| `/city/cases/PMT-27-0118?tab=reviews` | Health & Legal | "Decide your review" (wide): the routing reasons and review clock in the header, what the applicant submitted per section (the vendor list in words, the health permit's file once it is in); choose "Request information" and Continue to see the same sheet become the request panel |
+| `/city/cases/PMT-27-0070?tab=reviews` | Public Works & Safety | A freshly routed case: choose "Approve with conditions", add two templates, add a fee line (a preset, or "Add line"), approve; both land in the department's own section, shown first. "Already on the estimate" lists what the plan already charges |
+| `/city/cases/PMT-27-0031` | Public Works & Safety | "Log closeout" (wide): 72 for Police and 4 crew hours; the per-line difference and "$750 over" update as you type. After submitting, `?task=log_closeout` shows the read-only view: the cleanup result and the table with Actual and Difference |
+| `/city/cases/PMT-27-0030?task=PMT-27-0030:work_order:barricades` | Public Works & Safety | The work order's own detail (30 barricades, the event, the due date) above Mark done |
+| `/city/cases/PMT-27-0097?tab=reviews` | Public Works & Safety | The Meetings block in its own section: Reschedule the walkthrough and type a date after Jul 11: "Choose a date before Sun, Jul 11, 2027." under the field, and Schedule disabled. Try May 31 (a blackout) too |
+
+#### Document verification (4D)
+
+| URL | As | Look for |
+|---|---|---|
+| `/city/cases/PMT-27-0097?tab=documents` | Health & Legal | Verify on the insurance certificate (wide): the drawn certificate on the left, the four checklist items on the right, all "Passes"; Verify clears it (demo path 5) |
+| `/city/cases/PMT-27-0118?tab=documents` | Health & Legal | Before the applicant answers, the vendor's health permit card shows the request Health & Legal pinned to it. After the answer: Verify, the three items pass, and it clears (demo path 3) |
+| `/city/cases/PMT-27-0115?tab=documents` | Health & Legal | The insurance card is a JPEG of a wedding contract: "This does not look like a certificate of insurance.", one failing item, and Send back as the primary action with its reason filled in |
+| `/city/cases/PMT-27-0115?tab=documents` | Public Works & Safety | The same card, read-only: "Checked by Health & Legal (not yours to check)", no Verify |
+| `/city/cases/PMT-27-0031?tab=documents` | Health & Legal | "Vendor health permits", "25 of 25 vendors verified", collapsed; it expands to each vendor's card. "Needs my check" narrows the tab |
+| `/city/cases/PMT-27-0008?tab=documents` | Health & Legal | A certificate whose coverage ends the day before the event: only the coverage item fails, and Send back's reason asks for the dates to be extended |
+
+#### Applicant depth (4E)
+
+| URL | As | Look for |
+|---|---|---|
+| `/events/PMT-27-0031` | Applicant, Main Street Business Alliance (S6) | Under the status strip: "Public Works & Safety is checking cleanup; the City Clerk then reconciles costs." After demo path 6: the final-bill card's table and "Your event ran $750 over the estimate ... $250 was refunded.", and "Book again next year" naming Sat, Apr 22, 2028 |
+| `/events/PMT-27-0097` | Applicant, Riverfront Running Club (S5) | "With the city": "1 card with Health & Legal, expected by Fri, May 7" above the card, and "3 days with Health & Legal · expected by Fri, May 7" under it |
+| `/events/PMT-27-0126` | Applicant, Maple Street block captain (S4) | "With the city" before routing: "2 cards at intake with the City Clerk, no expected date yet", and under each card which department it goes to next |
+| `/events/PMT-27-0034` | Applicant, Riverside Tai Chi Circle | The "Pay and book" card opens the session schedule: Paid and Outstanding, and "Pay the session due ..." ahead of the list |
+| `/events/PMT-27-0142/quote` | Applicant, Sunrise Yoga Club (S2) | "Then $20 per session for the 12 remaining sessions, billed on their own date." |
+| `/apply` | Applicant, New applicant | Picnic or party, Shelter 2, May 22 (19 days out), then Amplified sound at step 4 and back to step 3 (or on to 5): the date-gate banner and its three fixes; "Remove the late fee" undoes the fee |
+| `/events/PMT-27-0097/quote` | Applicant, Riverfront Running Club | Clear the signature name: Accept and sign is disabled. Clear the card number and press Pay: a message under each field that is wrong |
+| The board, a card sheet, the quote and the permit, at 375px | Applicant | Tap targets (the feedback stars), the vendor list's fields stacked, the final bill's table in its compact form |
+
+#### City edge states (4F)
+
+| URL | As | Look for |
+|---|---|---|
+| `/city/queue` | City Clerk, then each department | The one-line reason under each task ("Submitted Apr 27", "Routed Apr 26", "Certificate of insurance re-uploaded Apr 30") |
+| `/city/cases` | Any city role | "Group by": State or Event date (the state becomes a chip on each card). In the Table: the column chips and Comfortable or Compact. The Permitopolis Rotary Club charity gala (`PMT-27-0014`) carries the gavel "Sent to commission" marker |
+| `/city/cases?view=table` | Any city role | St. Agnes Parish's 90-character event name (`PMT-27-0012`) truncated with its full text in the tooltip, and its red lead-time risk flag; on the case itself the name wraps in full |
+| `/city/cases/PMT-27-0118?tab=activity` | City Clerk | Entries under a day heading, the "Filter by party" select, and "Since you last acted" where the role has acted before |
+| `/city/active` | City Clerk | Riverside Tai Chi Circle as one row with "+20 more". The Stalled chip and "Expires tomorrow" have no case in the seed: both are held by tests on hand-built cases |
+
+#### Across the role tools (Phase 4 integration)
+
+| Start at | As | Look for |
+|---|---|---|
+| `/demo`, "Start this path" on paths 5 and 6 | Anybody | Each can be clicked through to its last step with the role switcher: path 5 ends on the route on Public Works & Safety's map for Jul 11 and the Impacted warning in the wizard; path 6 ends in the wizard on next year's draft |
+| `/events/PMT-27-0097`, then `/city/queue` | Applicant (Riverfront Running Club), then Health & Legal | The board's "expected by Fri, May 7" is the due date on Health & Legal's queue row for the same certificate |
+| `/events/PMT-27-0006`, then `/city/queue` | Applicant (the link opens Maple Grove Preschool's board whoever is picked), then City Clerk | The board says "Overdue at intake with the City Clerk, then Health & Legal · expected by Fri, Apr 30"; the Clerk's queue has that intake check under Overdue |
+| `/city/cases/PMT-27-0118?task=send_quote`, at 1280px | City Clerk | The wide sheet itself: two department columns side by side, the fee-line rows with room for their labels, how much of the case it covers. Then remove every condition and send: the quote goes out with none |
+| `/city/cases/PMT-27-0070?task=review_decide` | Public Works & Safety | "Approve" offers no conditions; "Approve with conditions" is disabled until one is added |
+
 ---
 
 ## Changes
+
+- 2026-10-13: Phase 4 done (the read-only review has still to run). **4A and 4B were built as one workstream**, the Clerk's tools, and **4E became an applicant depth pass** (after the event, the series schedule, "With the city", the applicant states matrix and 375px), so five builders ran instead of six. Built: the Clerk's request, routing, consolidation and quote builder, payment, permit checklist and reconciliation (4A); the shared review panel, the closeout log, work orders and meetings (4C); document verification with drawn previews and checklists (4D); the applicant depth pass (4E); the city's states matrix, the Stalled chip and the action-coverage test (4F). **The tools are the shared panels** in `components/case/actions/generic/`, not per-role overrides: `clerk.tsx`, `pws.tsx` and `hl.tsx` stay empty. The five branches merged with no conflicts and the gate passed on the merged tree (1,699 tests in 80 files) before any integration change. What the integration changed, and why (`docs/plans/2026-10-13-phase-4-integration.md`): (1) **engine requests**: `confirm_routing` refuses a list that leaves out a department a card names as its reviewer (B22's script now routes Health & Legal too); `schedule_meeting` checks its date against today, the event and the blackouts; the action sheet opens at 48rem for six panels; a per-vendor card carries `payload.vendorName`; truncating the case header and a caption in Who's up were declined; (2) **contract, additive**: `send_quote` takes `merged?: boolean` (section 5.4), because an empty list meant "as the case stands" and a Clerk who removed every condition sent them all; `checkScheduleMeeting()` takes `{ date, today }`; `lib/rules` exports `citywideBlackoutOn()`; `lib/state` exports `taskSubmittedOn()`; (3) **seams**: the applicant's "With the city" note names the Clerk's intake before routing, with its date, and `tests/both-sides.test.ts` holds every such card to the city's own task; a lone vendor's permit is its own row on the Documents tab; conditions belong to "Approve with conditions"; the accessibility checklist no longer fails a field the applicant's form calls optional; the action-coverage test rendered its panels inside a portal and could not fail, and now renders each one; (4) **consistency**: one fee-line row, one department picker, one cleanup result, `FeeTable` for the logged closeout, money, dates and counts through the shared formatters, `StalledBadge` and `CommissionBadge` in `components/domain`. Demo paths 5 and 6 are clicked from first step to last in `tests/render/handoffs.test.tsx`, and S3 and S6 are walked through Reviews, Documents and Conditions and fees after each role acts in `tests/render/role-tools.test.tsx`. Gate on the final tree: type-check, lint, 1,746 tests in 82 files and build pass. Section 12 has the builders' screens under "Phase 4". Sixteen new questions for the owner are at the end of `docs/readme.md`. For Phase 5: `amend` is the one action with no control, and `KNOWN_GAPS` in `tests/action-coverage.test.ts` is where 5A takes it off the list.
 
 - 2026-10-13: Phase 3 review fixes (38 findings from the applicant-side and city-side reviewers: 2 high, 23 medium, 13 low; all confirmed and fixed). Plan and what changed from it: `docs/plans/2026-10-13-phase-3-review-fixes.md`. What they change for Phase 4 and later: (1) **one figure per money question**, each used by the transition and by every screen that shows it: `refundIfCancelled(c, today, cfg)` (what `cancel` pays back: the schedule's share plus the deposit, capped at what was paid) and `closeoutSettlement(c)` (over estimate, from the deposit, refund or final bill: what `reconcile_close` does), both exported from `@/lib/state`; 4B builds the reconcile panel on the second; (2) **a card's form is read back with `formRows()` / `<FormAnswers />`** (`lib/view/cardForms.ts`, `components/domain`), on the city's Documents tab, its Verify and Send back panels and the applicant's own card sheet; 4D's verification screens use it instead of printing `payload.form`; (3) **engine behaviour screens will meet**: `log_closeout` is taken once ("Hours were logged on ...; the City Clerk is reconciling."); a quote paid in full takes no further payment; `send_to_commission` is sent once; `confirm_routing` refuses a reviewer with no due date or one already passed; a decided review offers no `review_decide` or `request_info` row; a case asked for information at intake keeps the intake actions; a refusal for the wrong state reads "Not available while the case is in <State>."; an undated task that has waited more than a week is grouped "Due this week" (the Clerk's opening queue is now 1 overdue and 7 for this week; section 6.2's rows otherwise stand); (4) **the render harness can hold a navigation** (`holdNavigation()`, `releaseNavigation()`), for a screen that has to behave between a `router.push()` and the URL catching up; (5) **shared components**: `FeeTable` takes `compact`, `CaseHeader` takes `compactStepper`, the calendar grids and the day strip take `selected`, a `Sheet` is a bottom sheet below 640px whatever its side, `ConditionList`'s checkboxes are named "I accept: ..."; (6) Intake's Accept as complete goes on to the case with Confirm routing open, and a meeting card opens Schedule or Close for the Clerk and the department that holds it. Gate on the final tree: type-check, lint, tests and build pass. Six questions for the owner are added at the end of `docs/readme.md`.
 - 2026-10-13: Phase 3 done (the read-only review has still to run). Built: the public landing page and the demo guide (3A); the five-step wizard with its live result panel (3B); My events and the to-do board (3C); checkout in four modes, the permit with its QR code and the public check (3D); My queue, the Cases pipeline and Intake (3E); the city's case detail with a panel for every action and a registry Phase 4 overrides by role (3F); Active permits as list, calendar, map and closeout (3G). The seven branches merged with no conflicts and the gate passed on the merged tree (1,155 tests in 68 files) before any integration change. **The integration was interrupted by a usage limit on 2026-10-12**, after the merges and with its first changes uncommitted, **and was resumed and finished on 2026-10-13**; it now commits at each checkpoint. What it changed, and why: (1) **11 hand-offs between surfaces were broken or missing** (a queue row opened an empty sheet; a case always went "Back to cases"; a booked session fell through to "Nothing to pay here"; the permit's QR code held a path; a page opened under the wrong role lost its link on the switch; the full table is in `docs/plans/2026-10-12-phase-3-integration.md`), each fixed and each covered by `tests/render/handoffs.test.tsx`, which mounts the real layouts and pages by URL and follows a link from one surface into the next (69 tests, with demo paths 3 and 4 clicked through from first step to last); (2) **consistency**: one set of phase names for the wizard and the board, `BillingBadge` and `TierLegend` moved into `components/domain`, one `applicantNameOf()`, one `BackLink`, the board's reviewers row through `ReviewStatusDot`, success toasts on the board as on checkout and the city's panels; (3) **contracts, all additive**: `routes.city.case()` takes `from`; `lib/types.ts` gains `TASK_PHASE_LABEL` and `TASK_PHASES`; the `lib/state` barrel exports the quote figures and the `check*` functions (3D's request, applied); 3E's request to type the pipeline's `sort`, `dir` and `closed` into `CasesFilters` was declined; (4) the role-switch rule gained one case: a page opened under the wrong role stays put when the switch is to a role it is built for. Gate on the final tree: type-check, lint, 1,255 tests in 69 files and build pass. Section 12, "What to look at", is new and collects every builder's list of screens. Nine new questions for the owner are at the end of `docs/readme.md`. For Phase 4: `clerk.tsx` is shared by 4A and 4B, and `hl.tsx` by 4C (the review panel) and 4D (verification), so each adds only its own keys.

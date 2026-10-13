@@ -147,6 +147,44 @@ describe("the reason built from failing items", () => {
   });
 });
 
+describe("buildVerificationPreview: the accessibility plan, checked against the form the applicant filled in", () => {
+  // The applicant's form marks the viewing area optional ("Accessible viewing area (optional)",
+  // lib/view/cardForms.ts): the route's own checkbox already reads "to every viewing area".
+  it("S5's plan, which Health & Legal approved, passes all three items without a named viewing area", () => {
+    const s5 = caseById("PMT-27-0097");
+    const plan = s5.tasks.find((t) => t.catalogId === "accessibility_plan")!;
+    expect(plan.payload.form).toEqual({ accessibleRoute: true, restrooms: 6 });
+    const preview = buildVerificationPreview(s5, plan);
+    expect(preview.checklist.map((i) => [i.id, i.pass])).toEqual([["route", true], ["restrooms", true], ["viewing_area", true]]);
+    expect(preview.checklist[2].evidence).toBe("No separate viewing area named; the accessible route reaches every viewing area.");
+    expect(preview.allPass).toBe(true);
+  });
+
+  it("a named viewing area is the evidence when there is one", () => {
+    const s5 = caseById("PMT-27-0097");
+    const plan = s5.tasks.find((t) => t.catalogId === "accessibility_plan")!;
+    const named = { ...plan, payload: { ...plan.payload, form: { ...plan.payload.form, viewingArea: "Finish line, north side" } } };
+    expect(buildVerificationPreview(s5, named).checklist[2]).toMatchObject({ pass: true, evidence: "Viewing area: Finish line, north side." });
+  });
+
+  it("no route and no viewing area fails both, and the reason to send back names each fix", () => {
+    const s5 = caseById("PMT-27-0097");
+    const plan = s5.tasks.find((t) => t.catalogId === "accessibility_plan")!;
+    const bare = { ...plan, payload: { ...plan.payload, form: { accessibleRoute: false, restrooms: 0 } } };
+    const preview = buildVerificationPreview(s5, bare);
+    expect(preview.checklist.map((i) => i.pass)).toEqual([false, false, false]);
+    expect(preview.defaultReason).toBe("Add an accessible route to every viewing area. Add at least one accessible restroom. Name an accessible viewing area, or mark the route that reaches it.");
+  });
+
+  it("no form a seeded applicant submitted fails a check on a field its own form calls optional", () => {
+    for (const c of buildSeed()) {
+      for (const t of c.tasks.filter((task) => task.catalogId === "accessibility_plan" && task.payload.form)) {
+        expect(buildVerificationPreview(c, t).allPass, `${c.id}: ${c.name}`).toBe(true);
+      }
+    }
+  });
+});
+
 describe("Documents tab: grouping and progress for S6's 25 vendor health permits", () => {
   const s6 = caseById("PMT-27-0031"); // Main Street Food Truck Festival
 

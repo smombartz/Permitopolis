@@ -232,7 +232,7 @@ function buildAccessibilityPlan(task: Task): { kind: PreviewKind; facts: DocFact
   const facts: DocFact[] = [
     { label: "Accessible route", value: route ? "Yes" : "No" },
     { label: "Accessible restrooms", value: String(restrooms) },
-    { label: "Accessible viewing area", value: viewingArea || "Not noted" },
+    { label: "Accessible viewing area", value: viewingArea || (route ? "Reached by the accessible route" : "Not provided") },
   ];
 
   const checklist: ChecklistItem[] = [
@@ -250,12 +250,14 @@ function buildAccessibilityPlan(task: Task): { kind: PreviewKind; facts: DocFact
       restrooms > 0 ? `${restrooms} accessible restrooms.` : "No accessible restrooms given.",
       "Add at least one accessible restroom.",
     ),
+    // The form calls the named area optional: its route checkbox already reads "to every
+    // viewing area". So this passes on either, and fails only when the plan gives neither.
     item(
       "viewing_area",
-      "Accessible viewing area named",
-      viewingArea.length > 0,
-      viewingArea ? `Viewing area: ${viewingArea}.` : "No accessible viewing area named.",
-      "Name an accessible viewing area.",
+      "Accessible viewing area",
+      viewingArea.length > 0 || route,
+      viewingArea ? `Viewing area: ${viewingArea}.` : route ? "No separate viewing area named; the accessible route reaches every viewing area." : "No accessible viewing area named, and no route to one.",
+      "Name an accessible viewing area, or mark the route that reaches it.",
     ),
   ];
 

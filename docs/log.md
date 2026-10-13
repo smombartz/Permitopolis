@@ -1,5 +1,179 @@
 # Change log
 
+## 2026-10-13 - Phase 4 integration: the role tools meet
+
+**What Changed:**
+- Merged `phase4/states`, `clerk`, `review`, `verify` and `applicant` into `build`, no fast-forward and no conflicts. The gate passed on the merged tree before any change (1,699 tests in 80 files). Plan, the builders' requests and every seam: `docs/plans/2026-10-13-phase-4-integration.md`
+- **Engine requests, four applied (test first) and two declined:**
+  - `confirm_routing` refuses a list that leaves out a department one of the applicant's documents or forms names as its reviewer (`Route Health & Legal too: it checks "Certificate of insurance".`), in `checkConfirmRouting()`. The routing panel's own insurance-only guard is gone: it asks the engine about the list as it stands. The panel now has a row for every department, so a reviewer can be added as well as removed. B22's seed script routes Health & Legal too
+  - `schedule_meeting` checks its date: today or later, before the event, not a blackout day. `checkScheduleMeeting()` takes `{ date, today }`; `citywideBlackoutOn()` is new in `lib/rules`. `meetingDateValid()` and `isBlackoutDate()` left `lib/view/reviewTools.ts`
+  - The action sheet opens at 48rem for the panels that need two columns or a table (`panelWidthFor()` in `actions/registry.ts`). The verify panel is preview beside checklist from 1024px; the consolidation is one column per routed department
+  - A per-vendor card carries `payload.vendorName` (`requirements()`); a board rebuilt after an edit takes the new name and keeps what was uploaded. The title regex left `lib/view/verify.ts`
+  - Declined: truncating the case header's name (it wraps; `break-words` added), and a per-task "who can act" caption in Who's up (each row already names its party)
+- **Seams between the builders' work, each fixed and tested:**
+  - `send_quote` takes `merged: true`. An empty list meant "as the case stands", so a Clerk who removed every condition in the quote builder sent them all. A quote with no fee line cannot be sent
+  - The applicant's "With the city" note names who holds the card now. Before routing it said a department had it while the city showed that department as not started; it reads "at intake with the City Clerk, then Health & Legal" with the intake check's date. `tests/both-sides.test.ts` holds every such card on the seed to the city's own task
+  - A lone vendor's permit is its own row on the Documents tab, and a vendor group opens while one of its permits is in flight: S3's pinned request was inside a collapsed group
+  - The review panel offers conditions under "Approve with conditions" only, and that decision needs one; they could go out with a plain approval
+  - The accessibility checklist passes its viewing-area item on the route the form asks for: the form calls the named area optional and no seeded plan names one, so every approved plan read as failing
+  - `tests/action-coverage.test.ts` rendered panels inside the sheet's portal, which renders nothing on the server, so it could not fail. It renders each panel itself, and every open task in Who's up for each city role
+  - `StalledBadge` and `CommissionBadge` moved to `components/domain`; the case detail drew its own copy of the chip
+  - My queue's reason line says "uploaded" for a first upload and "re-uploaded" after that
+- **Consistency:** one fee-line row (`components/case/FeeLineFields.tsx`) for the review panel and the quote builder; one department picker (`clerk/DeptSelect.tsx`); one cleanup result block (`CleanupResult.tsx`: "Cleanup inspection", "Pass" or "Issues found"); the logged closeout is `FeeTable showActual`; money through `Money` and `fmtMoney` ("$510", not "+510.00"), dates through `fmtDateShort` ("Session payment: Tue, Jun 8"), counts through `plural()`; a checklist reads the same in Verify and in Issue permit; a meeting is "Mark held"; a condition's buttons are named for it; one `taskSubmittedOn()` behind both sides' "days waiting"
+- **Tests:** `tests/render/role-tools.test.tsx` (the registry, the sheet widths, the review-to-request hand-off, S3 and S6 through Reviews, Documents and Conditions and fees after each role acts); `tests/render/handoffs.test.tsx` clicks demo paths 5 and 6 from first step to last with the role switcher, as 3 and 4 were; `tests/both-sides.test.ts`
+- **Docs:** `docs/readme.md` has "Role tools and edge states (Phase 4)" and 16 new questions for the owner; the main plan has Phase 4 ticked, the builders' screens in section 12 and a Changes line
+
+**Why:**
+- Five builders worked in parallel worktrees without sight of each other. The integration decides what they asked of shared code, joins what one built to what another reads, and proves the two P0 demo paths Phase 4 was for
+
+**Files Modified:**
+- `lib/state/checks.ts`, `lib/state/actions.ts`, `lib/state/core.ts`, `lib/state/index.ts`, `lib/state/transitions/clerk.ts`, `lib/state/transitions/city.ts`, `lib/state/transitions/applicant.ts`, `lib/state/seed/background/b22-b25.ts`, and their tests
+- `lib/rules/availability.ts`, `lib/rules/requirements.ts`, `lib/rules/index.ts`, `lib/types.ts`, and their tests
+- `lib/view/board.ts`, `lib/view/verify.ts`, `lib/view/clerkTools.ts`, `lib/view/reviewTools.ts`, `lib/view/cityLists.ts`, `lib/view/active.ts`, and their tests
+- `components/case/ActionSheet.tsx`, `CaseDetailScreen.tsx`, `FeeLineFields.tsx` (new), `CleanupResult.tsx` (new), `actions/registry.ts`, `actions/clerk.tsx`, `actions/pws.tsx`, `actions/hl.tsx`, `actions/generic/index.ts`
+- `components/case/actions/generic/ConfirmRouting.tsx`, `SendQuote.tsx`, `ScheduleMeeting.tsx`, `VerifyDocument.tsx`, `ReviewDecide.tsx`, `LogCloseout.tsx`, `ReconcileClose.tsx`, `IssuePermit.tsx`, `CompleteCityTask.tsx`
+- `components/case/clerk/ConditionsEditor.tsx`, `QuoteLinesEditor.tsx`, `DepartmentConsolidation.tsx`, `DeptSelect.tsx` (new), `components/case/review/FeeLineBuilder.tsx`, `components/case/tabs/DocumentsTab.tsx`
+- `components/domain/StalledBadge.tsx` and `CommissionBadge.tsx` (moved from `components/city/lists/`), `components/domain/index.ts`, `components/domain/CaseHeader.tsx`
+- `components/city/lists/QueueScreen.tsx`, `PipelineBoard.tsx`, `PipelineTable.tsx`, `components/board/BoardColumns.tsx`
+- `tests/action-coverage.test.ts`, `tests/both-sides.test.ts` (new), `tests/engines.test.ts`, `tests/seed.test.ts`
+- `tests/render/role-tools.test.tsx` (new), `handoffs.test.tsx`, `clerk-tools.test.tsx`, `review-tools.test.tsx`, `board.test.tsx`
+- `docs/readme.md`, `docs/log.md`, `docs/plans/2026-10-12-permitopolis-prototype.md`, `docs/plans/2026-10-13-phase-4-integration.md` (new)
+
+---
+
+## 2026-10-13 - Phase 4A: City Clerk's tools (consolidation, quote builder, routing, permit, reconciliation)
+
+**What Changed:**
+- `lib/view/clerkTools.ts` (new) + `lib/view/clerkTools.test.ts`: condition-conflict detection (exact duplicates and cross-department value clashes), editable condition-row and fee-line-row helpers and totals (mirroring `dueAtQuote()`'s series math), routing's weekend-safe default due date and lead-time-left, the request-info card groups and card preview, the issue-permit checklist (who owes it, since when), closeout reconciliation lines, and payment rows for the Conditions and fees tab.
+- `components/case/clerk/` (new): `ConditionsEditor.tsx`, `QuoteLinesEditor.tsx`, `DepartmentConsolidation.tsx` — the consolidation/quote builder's editable lists and side-by-side department view, built on native `<select>` pickers (not Radix) for the flat department/template lists.
+- `components/case/actions/generic/SendQuote.tsx`: rebuilt into the Consolidation and quote builder panel.
+- `components/case/actions/generic/ConfirmRouting.tsx`: weekend-safe default due date, a lead-time-left line, and a guard against routing without Health & Legal while an insurance card exists.
+- `components/case/actions/generic/RequestInfo.tsx`: reworked to a multi-select of the applicant's cards by status (one request per chosen card), with a live preview of the card the applicant will see.
+- `components/case/actions/generic/IssuePermit.tsx`: a checklist of what's owed, by whom and since when, plus what the permit covers and what issuing triggers.
+- `components/case/actions/generic/ReconcileClose.tsx`: a full per-line estimate-vs-actual table and the cleanup result/notes, alongside the existing settlement stats.
+- `components/case/actions/generic/Pay.tsx`: lets the Clerk choose which session when more than one sits overdue on a series.
+- `components/case/tabs/ConditionsFeesTab.tsx`: added a payments and refunds table.
+- `tests/render/clerk-tools.test.tsx` (new): render tests for S3 (quote + an edited line), S4 (routing), S5 (the permit checklist before/after each step), S6 (reconciliation) and Deny.
+
+**Why:**
+- Workstream 4A of Phase 4 (City Clerk's tools), per the PRD's City Clerk views table and the owner's build brief dated 2026-10-13. The plan's 4B (Clerk money and closeout) was built with it, as one workstream.
+
+**Files Modified:**
+- `lib/view/clerkTools.ts`, `lib/view/clerkTools.test.ts`
+- `components/case/clerk/ConditionsEditor.tsx`, `components/case/clerk/QuoteLinesEditor.tsx`, `components/case/clerk/DepartmentConsolidation.tsx`
+- `components/case/actions/generic/SendQuote.tsx`, `ConfirmRouting.tsx`, `RequestInfo.tsx`, `IssuePermit.tsx`, `ReconcileClose.tsx`, `Pay.tsx`
+- `components/case/tabs/ConditionsFeesTab.tsx`
+- `tests/render/clerk-tools.test.tsx`
+
+---
+
+## 2026-10-13 - Reviewer tools: review panel, PWS closeout, work orders and meetings (Workstream 4C)
+
+**What Changed:**
+- Rebuilt the shared review-decide panel (`components/case/actions/generic/ReviewDecide.tsx`) with a 4-way decision (Approve, Approve with conditions, Request information, Deny with a reason), the routing triggers and review clock, the applicant's submitted material per routed section, a reorderable condition builder fed by department templates plus free text, and a fee-line builder with per-department presets from the fee schedule and a note of what the plan's own estimate already carries.
+- Added `components/case/review/SubmittedMaterial.tsx`, `ConditionBuilder.tsx` and `FeeLineBuilder.tsx`, the shared pieces the review panel is built from.
+- Rebuilt Public Works & Safety's closeout (`LogCloseout.tsx`): per-line actual quantities against the estimate with a live difference and running total, an Instant event's own damage-report shape, and a read-only view once logged.
+- Rebuilt `CompleteCityTask.tsx` (a work order's own detail: what, how many, for which event, due) and `ScheduleMeeting.tsx` (date validation against the event date and blackouts, and who attends).
+- Enhanced `components/case/tabs/ReviewsTab.tsx`: the viewer's own department sorts first and is actionable; a department named on cards but not yet routed says so; the Clerk sees every review's clock against its due date; meeting cards are schedulable/completable from here.
+- Added `lib/view/reviewTools.ts`, the pure view-model behind all of the above, with `lib/view/reviewTools.test.ts` against the real seed.
+- Added `tests/render/review-tools.test.tsx`.
+
+**Why:**
+- Phase 4, workstream 4C: deepen the reviewer tools for Public Works & Safety and Health & Legal (and the Clerk's own license review, which shares the same panel) per the PRD's "Public Works & Safety views" and "Health & Legal views".
+
+**Files Modified:**
+- `components/case/actions/generic/ReviewDecide.tsx`
+- `components/case/actions/generic/LogCloseout.tsx`
+- `components/case/actions/generic/CompleteCityTask.tsx`
+- `components/case/actions/generic/ScheduleMeeting.tsx`
+- `components/case/tabs/ReviewsTab.tsx`
+- `components/case/review/SubmittedMaterial.tsx` (new)
+- `components/case/review/ConditionBuilder.tsx` (new)
+- `components/case/review/FeeLineBuilder.tsx` (new)
+- `lib/view/reviewTools.ts` (new)
+- `lib/view/reviewTools.test.ts` (new)
+- `tests/render/review-tools.test.tsx` (new)
+
+---
+
+## 2026-10-13 - Workstream 4D: document verification panel, checklists and Documents tab
+
+**What Changed:**
+- Added `lib/view/verify.ts` + `lib/view/verify.test.ts`: deterministic mock document preview and checklist for every reviewed catalogue id (insurance certificate, vendor health permit, accessibility plan, the other plan documents and forms, the posted-notice photo), plus Documents-tab grouping/progress/ordering/waiting helpers.
+- Added `components/case/verify/DocumentPreview.tsx`, `ChecklistPanel.tsx`, `index.ts`: the two presentational pieces the panel is built from.
+- Rewrote `components/case/actions/generic/VerifyDocument.tsx`: merged Verify and Send back into one panel — preview, a confirm/override checklist, and a reason field that appears and is prefilled once an item fails; the primary action switches from Verify to Send back accordingly.
+- Rewrote `components/case/actions/generic/RejectDocument.tsx` to re-export the same merged panel under `reject_document` (no behavior of its own left to maintain).
+- Rewrote `components/case/tabs/DocumentsTab.tsx`: grouped by reviewing department (viewer's own first), a "Needs my check" filter, read-only display for a non-reviewing department, per-vendor health permits collapsed into one progress row, request thread and verification history shown per card.
+- Added `tests/render/verify.test.tsx`: S5's insurance clearing, S3's health-permit path, the wedding-photos JPEG failing with a prefilled Send back, read-only for another department, the filter, and the vendor group.
+
+**Why:**
+- Workstream 4D of the Phase 4 build: deepen document verification on the case detail screen and the Documents tab per the PRD's Health & Legal "Verifications" checklist and the applicant card catalogue.
+
+**Files Modified:**
+- `lib/view/verify.ts` (new)
+- `lib/view/verify.test.ts` (new)
+- `components/case/verify/DocumentPreview.tsx` (new)
+- `components/case/verify/ChecklistPanel.tsx` (new)
+- `components/case/verify/index.ts` (new)
+- `components/case/actions/generic/VerifyDocument.tsx`
+- `components/case/actions/generic/RejectDocument.tsx`
+- `components/case/tabs/DocumentsTab.tsx`
+- `tests/render/verify.test.tsx` (new)
+
+---
+
+## 2026-10-13 - Workstream 4E: applicant depth (after the event, series, With-the-city, states matrix, 375px)
+
+**What Changed:**
+- `lib/view/wizard.ts` — tightened `dateGateSatisfied()` and `buildResultPanel()`'s late-fee line to defer fully to `lateFeeCarriesDate()` (the engine's own `fixes`), instead of reading availability status directly; fixes a gap where a past-dated or stale draft's late-fee flag could carry a date the engine would refuse.
+- `lib/view/board.ts` — added `closeoutStatusLine()`, `finalSettlement()`, `bookAgainDraftDate()`, `seriesTotals()`, `withCityInfo()`, `withCityColumnSummary()`.
+- `components/board/BoardScreen.tsx`, `CardSheet.tsx`, `BoardColumns.tsx`, `SeriesScheduleSheet.tsx`, `CardForms.tsx`, `VendorStackSheet.tsx` — wired the above in: the Closeout status line, the final bill/refund settlement sentence + estimated/actual table + Pay button, Book-again's draft date before the click, the series schedule's paid/outstanding stats and "Pay the session due" action, every With-the-city card's who/how-long/expected-by note and the column summary line, plus a 375px pass (tap targets, a cramped form row).
+- `components/checkout/BookingPanel.tsx` — a series' booking page now states what is charged now vs. later.
+- `components/checkout/CardPaymentForm.tsx` — added per-field validation (was previously accepting any input, including empty, and "succeeding" regardless).
+- `lib/view/wizard.test.ts`, `lib/view/board.test.ts`, `tests/render/board.test.tsx`, `tests/render/checkout.test.tsx` — extended for all of the above.
+- `tests/render/applicant-states.test.tsx` — new file, 31 tests, one per state in the brief's applicant states matrix.
+
+**Why:**
+- Phase 4 brief, workstream 4E: deepen the applicant side's after-the-event flow, series billing, "With the city" visibility, edge/empty/error states, and mobile layout, per the PRD and the take-home brief's emphasis on realistic edge states. The plan's 4E ("After the event") became this wider applicant depth pass.
+
+**Files Modified:**
+- `lib/view/wizard.ts`, `lib/view/wizard.test.ts`
+- `lib/view/board.ts`, `lib/view/board.test.ts`
+- `components/board/BoardScreen.tsx`, `components/board/CardSheet.tsx`, `components/board/BoardColumns.tsx`, `components/board/SeriesScheduleSheet.tsx`, `components/board/CardForms.tsx`, `components/board/VendorStackSheet.tsx`
+- `components/checkout/BookingPanel.tsx`, `components/checkout/CardPaymentForm.tsx`
+- `tests/render/board.test.tsx`, `tests/render/checkout.test.tsx`, `tests/render/applicant-states.test.tsx` (new)
+
+---
+
+## 2026-10-13 - Phase 4F: city edge states, stalled cases and action coverage
+
+**What Changed:**
+- `lib/view/cityLists.ts`: `queueReasonLine()` for My queue's one-line "why now"; Group by (State default, Event date buckets) for the Cases board; table column visibility and a density toggle, all kept in the URL.
+- `lib/view/caseDetail.ts`: `groupActivityByDay()`, `lastActedAt()`, `sinceLastActedCount()` for the Activity tab; `isHoldExpiringTomorrow()`.
+- `lib/view/active.ts`: wires `isHoldExpiringTomorrow` into `activeListRows()`.
+- `components/city/lists/StalledBadge.tsx`, `CommissionBadge.tsx` (new): dev-only "Stalled" chip and a "Sent to commission" marker, wired into `QueueScreen`, `PipelineBoard`, `PipelineTable`.
+- `components/city/lists/{QueueScreen,CasesScreen,PipelineBoard,PipelineTable}.tsx`: queue reason line, Group by control, column-visibility chips, density toggle, the two markers.
+- `components/case/CaseDetailScreen.tsx`: dev-only Stalled chip near the header; "expires tomorrow" alert.
+- `components/case/tabs/ActivityTab.tsx`: day grouping and a "Since you last acted" marker, keeping the existing party filter.
+- `components/active/ActiveListView.tsx`: "Expires tomorrow" flag on a held row.
+- `tests/action-coverage.test.ts` (new): every action type has a dispatching control (or the one documented gap, "amend"), and every seeded case/role's `availableActions()` row has a panel that renders.
+- `tests/render/states-matrix.test.tsx` (new): one render test per EMPTY/ERROR/EDGE cell across My queue, the Cases board/table, Intake, the case detail and Active permits.
+- Extended `lib/view/{cityLists,caseDetail,active}.test.ts` and `tests/render/{city-lists,case-detail,active}.test.tsx` with matching unit/view-model coverage.
+
+**Why:**
+- Workstream 4F (Phase 4, plan section 8): the states matrix for the list and detail views, the Stalled chip the PRD's "Core model" calls for, the action-coverage gate, and the PRD's push ("officials may triage by deadline more than by state").
+
+**Files Modified:**
+- `lib/view/cityLists.ts`, `lib/view/caseDetail.ts`, `lib/view/active.ts`
+- `components/city/lists/QueueScreen.tsx`, `CasesScreen.tsx`, `PipelineBoard.tsx`, `PipelineTable.tsx`, `StalledBadge.tsx` (new), `CommissionBadge.tsx` (new)
+- `components/case/CaseDetailScreen.tsx`, `components/case/tabs/ActivityTab.tsx`
+- `components/active/ActiveListView.tsx`
+- `tests/action-coverage.test.ts` (new), `tests/render/states-matrix.test.tsx` (new)
+- `lib/view/cityLists.test.ts`, `lib/view/caseDetail.test.ts`, `lib/view/active.test.ts`
+- `tests/render/city-lists.test.tsx`, `tests/render/case-detail.test.tsx`, `tests/render/active.test.tsx`
+
+---
+
 ## 2026-10-13 - Phase 3 review fixes
 
 **What Changed:**
