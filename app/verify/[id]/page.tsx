@@ -1,10 +1,10 @@
 import { Suspense } from "react";
-import { PlaceholderScreen } from "@/components/shell/PlaceholderScreen";
+import { VerifyScreen } from "@/components/permit/VerifyScreen";
 
 export default function Page() {
   return (
     <Suspense fallback={null}>
-      <PlaceholderScreen route="/verify/[id]" standalone />
+      <VerifyScreen />
     </Suspense>
   );
 }

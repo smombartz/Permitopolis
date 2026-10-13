@@ -1,10 +1,10 @@
 import { Suspense } from "react";
-import { PlaceholderScreen } from "@/components/shell/PlaceholderScreen";
+import { CheckoutScreen } from "@/components/checkout/CheckoutScreen";
 
 export default function Page() {
   return (
     <Suspense fallback={null}>
-      <PlaceholderScreen route="/events/[id]/quote" />
+      <CheckoutScreen />
     </Suspense>
   );
 }
