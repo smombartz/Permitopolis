@@ -1,14 +1,18 @@
 "use client"
 
-import { ConditionList, FeeTable } from "@/components/domain"
+import { ConditionList, FeeTable, Money } from "@/components/domain"
 import { Section } from "@/components/ui/section"
 import { Stat } from "@/components/ui/stat"
-import { fmtMoney } from "@/lib/format"
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
+import { fmtDateTime, fmtMoney } from "@/lib/format"
 import { EmptyState } from "@/components/ui/empty-state"
 import { ReceiptIcon } from "lucide-react"
 import { caseTotals } from "@/lib/state"
+import { paymentRows } from "@/lib/view/clerkTools"
 import type { EventCase } from "@/lib/types"
 import { CloseoutSettlementStats } from "../CloseoutSettlementStats"
+
+const METHOD_LABEL: Record<"card" | "in_person", string> = { card: "Card", in_person: "In person" };
 
 interface ConditionsFeesTabProps {
   c: EventCase
@@ -63,6 +67,32 @@ function ConditionsFeesTab({ c }: ConditionsFeesTabProps) {
           </div>
         </Section>
       )}
+      {c.payments.length > 0 ? (
+        <Section title="Payments and refunds">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Date</TableHead>
+                <TableHead>What</TableHead>
+                <TableHead>Method</TableHead>
+                <TableHead className="text-right">Amount</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {paymentRows(c).map((row) => (
+                <TableRow key={row.id}>
+                  <TableCell>{fmtDateTime(row.at)}</TableCell>
+                  <TableCell>{row.label}</TableCell>
+                  <TableCell>{METHOD_LABEL[row.method]}</TableCell>
+                  <TableCell numeric className="text-right">
+                    <Money amount={row.amount} signColor />
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </Section>
+      ) : null}
     </div>
   )
 }

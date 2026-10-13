@@ -2,12 +2,14 @@
 
 import * as React from "react"
 import { InlineAlert } from "@/components/ui/inline-alert"
+import { Badge } from "@/components/ui/badge"
+import { FeeTable } from "@/components/domain"
 import { checkReconcileClose } from "@/lib/state"
 import { CloseoutSettlementStats } from "../../CloseoutSettlementStats"
 import { PanelActions, PanelBody, PanelHeader, useCaseContext, useCaseDispatch } from "../panelKit"
 import type { ActionPanelProps } from "../types"
 
-/** Compares the logged actuals to the estimate, issues the final bill or refund, and closes the case. */
+/** Compares estimate to actual by line, shows the cleanup result and notes, issues the final bill or refund, and closes the case. */
 function ReconcileClosePanel({ caseId, onClose }: ActionPanelProps) {
   const { c } = useCaseContext(caseId)
   const [error, setError] = React.useState<string | null>(null)
@@ -26,10 +28,29 @@ function ReconcileClosePanel({ caseId, onClose }: ActionPanelProps) {
     <>
       <PanelHeader
         title="Reconcile and close"
-        description="Compares the actual costs Public Works & Safety logged against the estimate. Any overage comes out of the deposit; what is left is refunded, or a final bill is issued for the rest. The case then closes."
+        description="Compares the actual costs Public Works & Safety logged against the estimate, line by line. Any overage comes out of the deposit; what is left is refunded, or a final bill is issued for the rest. The case then closes."
       />
       <PanelBody>
-        {!check.ok ? <InlineAlert variant="warning">{check.reason}</InlineAlert> : <CloseoutSettlementStats c={c} />}
+        {!check.ok ? (
+          <InlineAlert variant="warning">{check.reason}</InlineAlert>
+        ) : (
+          <>
+            <div className="flex flex-col gap-2">
+              <p className="text-eyebrow font-bold tracking-[.12em] text-fg-label uppercase">Cleanup inspection</p>
+              <div className="flex flex-wrap items-center gap-2">
+                <Badge variant={c.closeout.cleanup === "pass" ? "success" : "warning"}>{c.closeout.cleanup === "pass" ? "Pass" : "Issues"}</Badge>
+                {c.closeout.notes ? <p className="text-sm text-fg-secondary">{c.closeout.notes}</p> : null}
+              </div>
+            </div>
+
+            <div className="flex flex-col gap-2">
+              <p className="text-eyebrow font-bold tracking-[.12em] text-fg-label uppercase">Estimate against actual</p>
+              <FeeTable lines={c.feeLines} showActual />
+            </div>
+
+            <CloseoutSettlementStats c={c} />
+          </>
+        )}
       </PanelBody>
       <PanelActions error={error} onCancel={onClose} submitLabel="Reconcile and close" disabled={!check.ok} onSubmit={submit} />
     </>
