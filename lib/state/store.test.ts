@@ -5,7 +5,7 @@ import { classify, estimateFees } from "@/lib/rules";
 import { DEFAULT_DEMO_TODAY } from "@/lib/rules/config";
 import { resetDemoStoreForTests, useDemo, useHydrated } from "./store";
 
-vi.mock("./seed", () => ({ buildSeed: () => [] }));
+vi.mock("./seed", () => ({ buildSeed: () => [], seedFingerprint: () => 1 }));
 
 beforeEach(() => {
   resetDemoStoreForTests();

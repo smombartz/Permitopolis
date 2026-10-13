@@ -12,7 +12,7 @@ import type { Actor, EventAnswers, EventCase, ISODate, Party, WizardStep } from 
 import { advanceClock, computeNow } from "./clock";
 import { nextCaseId } from "./selectors";
 import { newCase, syncDraft } from "./newCase";
-import { buildSeed } from "./seed";
+import { buildSeed, seedFingerprint } from "./seed";
 import { safeGet, safeRemove, safeSet, storageAvailable } from "./storage";
 import { transition } from "./transition";
 import type { Action } from "./actions";
@@ -118,7 +118,11 @@ export const useDemo = create<DemoStore>()(
       name: STORAGE_KEY,
       storage: createJSONStorage(() => storageAdapter),
       skipHydration: true,
-      version: 1,
+      // A stored demo belongs to the seed it grew from. The version is the seed's fingerprint,
+      // so a demo saved by an earlier build (other scripts, or an engine that seeded a case
+      // differently) is dropped on load: the store keeps the fresh seed and saves it back.
+      version: seedFingerprint(),
+      migrate: () => ({}),
       partialize: (state) => ({
         cases: state.cases,
         demoToday: state.demoToday,
