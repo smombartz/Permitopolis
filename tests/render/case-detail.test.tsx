@@ -334,6 +334,59 @@ describe("case detail: Activity tab", () => {
     const newest = c.activity.at(-1)!;
     expect(screen.getByText(newest.text)).toBeInTheDocument();
   });
+
+  it("groups entries by day, under a day heading each", async () => {
+    await renderScreen(<CaseDetailScreen />, { path: routes.city.case(S4, { tab: "activity" }), role: "clerk" });
+    const c = storedCase(S4);
+    const days = new Set(c.activity.map((a) => a.at.slice(0, 10)));
+    // Every distinct day the case's history touches gets its own heading, newest first.
+    expect(days.size).toBeGreaterThan(1);
+    const headings = screen.getAllByText(/^\w{3}, \w{3} \d{1,2}, \d{4}$/);
+    expect(headings.length).toBe(days.size);
+  });
+
+  it("filters by party", async () => {
+    const { user } = await renderScreen(<CaseDetailScreen />, { path: routes.city.case(S3, { tab: "activity" }), role: "clerk" });
+    const c = storedCase(S3);
+    const hlEntry = c.activity.find((a) => a.actor === "hl");
+    const clerkOnlyEntry = c.activity.find((a) => a.actor === "clerk" && !c.activity.some((other) => other.text === a.text && other.actor === "hl"));
+    expect(hlEntry).toBeDefined();
+
+    await user.click(screen.getByRole("combobox", { name: "Filter by party" }));
+    await user.click(screen.getByRole("option", { name: "Health & Legal" }));
+
+    expect(screen.getByText(hlEntry!.text)).toBeInTheDocument();
+    if (clerkOnlyEntry) expect(screen.queryByText(clerkOnlyEntry.text)).not.toBeInTheDocument();
+  });
+
+  it("marks what happened since the viewing role last acted", async () => {
+    const c = makeCase({
+      id: "PMT-27-0501",
+      state: "needs_info",
+      activity: [
+        { at: "2027-04-20T09:00", actor: "applicant", text: "Submitted the application." },
+        { at: "2027-04-21T09:00", actor: "clerk", text: "Accepted as complete." },
+        { at: "2027-05-02T09:00", actor: "hl", text: "Asked a question." },
+        { at: "2027-05-03T09:00", actor: "applicant", text: "Answered the question." },
+      ],
+    });
+    await renderScreen(<CaseDetailScreen />, { path: routes.city.case("PMT-27-0501", { tab: "activity" }), role: "clerk", cases: [c] });
+
+    expect(screen.getByRole("separator", { name: "Since you last acted" })).toBeInTheDocument();
+  });
+
+  it("no marker for a role that has never acted on the case", async () => {
+    const c = makeCase({
+      id: "PMT-27-0502",
+      state: "needs_info",
+      activity: [
+        { at: "2027-04-20T09:00", actor: "applicant", text: "Submitted the application." },
+        { at: "2027-04-21T09:00", actor: "clerk", text: "Accepted as complete." },
+      ],
+    });
+    await renderScreen(<CaseDetailScreen />, { path: routes.city.case("PMT-27-0502", { tab: "activity" }), role: "hl", cases: [c] });
+    expect(screen.queryByRole("separator", { name: "Since you last acted" })).not.toBeInTheDocument();
+  });
 });
 
 describe("case detail: edge states", () => {

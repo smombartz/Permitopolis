@@ -6,14 +6,17 @@ import { FileLockIcon } from "lucide-react"
 import { CaseHeader, EndingBanner } from "@/components/domain"
 import { Banner } from "@/components/ui/banner"
 import { EmptyState } from "@/components/ui/empty-state"
+import { InlineAlert } from "@/components/ui/inline-alert"
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 import { BackLink, PageHeader } from "@/components/ui/page-header"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { TriangleAlertIcon } from "lucide-react"
 import { CaseNotFound } from "@/components/shell"
 import { applicantNameOf } from "@/lib/data/people"
 import { routes } from "@/lib/routes"
-import { availableActions, eventDate, isVisibleToCity, nextMove, waitingOn, useDemo } from "@/lib/state"
+import { availableActions, eventDate, isStalled, isVisibleToCity, nextMove, waitingOn, useDemo } from "@/lib/state"
 import { ENDING_LABEL, STATE_LABEL, type Dept, type Party } from "@/lib/types"
-import { CASE_TABS, CASE_TAB_LABEL, caseBackLink, headerReviewClock, isCaseTab, resolveOpenKey } from "@/lib/view/caseDetail"
+import { CASE_TABS, CASE_TAB_LABEL, caseBackLink, headerReviewClock, isCaseTab, isHoldExpiringTomorrow, resolveOpenKey } from "@/lib/view/caseDetail"
 import { ActionSheet } from "./ActionSheet"
 import { ActionsPanel } from "./ActionsPanel"
 import { ActivityTab } from "./tabs/ActivityTab"
@@ -113,8 +116,25 @@ function CaseDetailScreen() {
         hold={c.dateHold}
         reviewClock={headerClock ? { dayCount: headerClock.day, allowedDays: headerClock.of, paused: headerClock.paused, pausedDays: headerClock.pausedDays } : null}
       />
+      {!c.ending && isStalled(c, today) && process.env.NODE_ENV !== "production" ? (
+        <TooltipProvider>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <span
+                tabIndex={0}
+                className="inline-flex h-7 w-fit items-center gap-1.5 self-start rounded-full border border-danger-border bg-danger-surface px-2.5 text-xs font-semibold text-danger-fg outline-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring"
+              >
+                <TriangleAlertIcon className="size-3.5" aria-hidden="true" />
+                Stalled
+              </span>
+            </TooltipTrigger>
+            <TooltipContent>Nobody has an open task on this case. That is a bug in the demo data or the engine.</TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
+      ) : null}
       {c.ending ? <EndingBanner ending={c.ending} reason={c.endingReason} /> : null}
       {!c.ending && c.flags.sentToCommission ? <Banner variant="info">This case has been sent to the commission.</Banner> : null}
+      {!c.ending && isHoldExpiringTomorrow(c.dateHold, today) ? <InlineAlert variant="warning">This case&apos;s date hold expires tomorrow.</InlineAlert> : null}
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-[1fr_280px]">
         <Tabs value={tab} onValueChange={(v) => go({ tab: v })} className="min-w-0">
@@ -146,7 +166,7 @@ function CaseDetailScreen() {
             <ConditionsFeesTab c={c} />
           </TabsContent>
           <TabsContent value="activity" className="pt-5">
-            <ActivityTab c={c} />
+            <ActivityTab c={c} role={role} />
           </TabsContent>
         </Tabs>
 

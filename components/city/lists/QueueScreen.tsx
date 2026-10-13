@@ -8,8 +8,9 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { CountBadge } from "@/components/ui/count-badge";
 import { CaseId, DueDate, EventTitle, ReviewClock, StateChip, TierBadge, WaitingOnChips } from "@/components/domain";
 import { KeyboardFooter } from "@/components/city/lists/KeyboardFooter";
+import { StalledBadge } from "@/components/city/lists/StalledBadge";
 import { useRovingListNav } from "@/components/city/lists/useRovingListNav";
-import { reviewClock, taskDueDate, useDemo, type QueueItem } from "@/lib/state";
+import { isStalled, reviewClock, taskDueDate, useDemo, type QueueItem } from "@/lib/state";
 import { applicantNameOf } from "@/lib/data/people";
 import { routes } from "@/lib/routes";
 import { plural } from "@/lib/format";
@@ -20,6 +21,7 @@ import {
   orderedQueueGroups,
   queueBriefing,
   queueGroups,
+  queueReasonLine,
   queueTotal,
   queueWaitingOnOthers,
   triggerLabels,
@@ -51,6 +53,7 @@ function QueueRow({ item, role, today, reviewer }: { item: QueueItem; role: Dept
         </div>
         <div className="flex min-w-0 flex-col gap-1 sm:w-64">
           <p className="truncate text-sm font-medium text-fg">{task.title}</p>
+          <p className="truncate text-xs text-fg-secondary">{queueReasonLine(item)}</p>
           {reviewer && c.triggers.length > 0 ? <p className="truncate text-xs text-fg-secondary">{triggerLabels(c).join(", ")}</p> : null}
         </div>
         <div className="flex shrink-0 flex-wrap items-center gap-3">
@@ -120,6 +123,7 @@ function QueueScreen() {
                   <div className="flex min-w-0 items-center gap-3">
                     <EventTitle name={c.name} applicantName={applicantNameOf(c)} className="min-w-0" />
                     <CaseId id={c.id} />
+                    {isStalled(c, today) ? <StalledBadge /> : null}
                   </div>
                   <WaitingOnChips items={parties.map((p) => ({ party: p.party, days: p.daysHolding }))} />
                 </Link>
