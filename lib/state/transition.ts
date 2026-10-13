@@ -8,7 +8,6 @@ import type { Actor, EventCase } from "@/lib/types";
 import type { Action } from "./actions";
 import {
   acceptAndSign,
-  amend,
   bookAgain,
   bookAndPay,
   cancel,
@@ -20,6 +19,7 @@ import {
   submitFeedback,
   withdraw,
 } from "./transitions/applicant";
+import { amend, decideAmendment } from "./transitions/amendment";
 import { acceptComplete, confirmRouting, deny, issuePermit, reconcileClose, sendQuote } from "./transitions/clerk";
 import {
   addNote,
@@ -89,6 +89,8 @@ export const transition: StateApi["transition"] = (c: EventCase, action: Action,
       return issuePermit(c, action, actor, ctx);
     case "reconcile_close":
       return reconcileClose(c, action, actor, ctx);
+    case "decide_amendment":
+      return decideAmendment(c, action, actor, ctx);
     case "request_info":
       return requestInfo(c, action, actor, ctx);
     case "verify_document":

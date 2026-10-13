@@ -54,6 +54,7 @@ function initialState() {
     role: "applicant" as Party,
     personaId: "new",
     hints: true,
+    activeDemoPath: null as number | null,
     lastPathByRole: {},
     storageOk: storageAvailable(),
   };
@@ -117,7 +118,14 @@ export const useDemo = create<DemoStore>()(
       },
 
       setConfig(patch) {
-        set((state: DemoStore) => ({ cfg: { ...state.cfg, ...patch } }));
+        set((state: DemoStore) => {
+          const cfg = { ...state.cfg, ...patch };
+          // "Changing a threshold re-classifies open drafts live" (PRD, Settings): a Draft's
+          // sessions, tier and triggers follow the rules as they are now, as they follow its own
+          // answers. syncDraft() leaves anything past Draft alone; an ended Draft is nobody's.
+          const cases = state.cases.map((c: EventCase) => (c.state === "draft" && c.ending === null ? syncDraft(c, { today: state.demoToday, cases: state.cases, cfg }) : c));
+          return { cfg, cases };
+        });
       },
 
       rememberPath(role: Party, path: string) {
@@ -126,6 +134,10 @@ export const useDemo = create<DemoStore>()(
 
       toggleHints() {
         set((state: DemoStore) => ({ hints: !state.hints }));
+      },
+
+      setActiveDemoPath(pathId: number | null) {
+        set({ activeDemoPath: pathId });
       },
 
       reset() {
@@ -148,6 +160,7 @@ export const useDemo = create<DemoStore>()(
         role: state.role,
         personaId: state.personaId,
         hints: state.hints,
+        activeDemoPath: state.activeDemoPath,
         lastPathByRole: state.lastPathByRole,
       }),
     },

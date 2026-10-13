@@ -36,9 +36,7 @@ function AppShell({ children }: AppShellProps) {
       ) : (
         <main className="flex-1">
           {!storageOk ? <StorageBanner /> : null}
-          <React.Suspense fallback={null}>
-            <CoachStrip />
-          </React.Suspense>
+          <CoachStrip />
           {role === "applicant" ? (
             <>
               <React.Suspense fallback={null}>

@@ -2,8 +2,8 @@ import { describe, expect, it } from "vitest";
 import { DEFAULT_CONFIG } from "@/lib/rules";
 import { fmtMonthDay } from "@/lib/format";
 import { buildSeed, isStalled, queueFor, taskDueDate, transition, waitingOn, whoIsUp } from "@/lib/state";
-import { makeCase } from "@/lib/state/testSupport";
-import type { EventCase } from "@/lib/types";
+import { makeCase, makeTask } from "@/lib/state/testSupport";
+import { EMPTY_ADDONS, type EventCase } from "@/lib/types";
 import {
   activeFilterChips,
   casesFiltersToParams,
@@ -115,6 +115,32 @@ describe("queueReasonLine: the one-line reason a row is this role's move", () =>
       }
     }
     expect(rows).toBeGreaterThanOrEqual(5);
+  });
+
+  it("the Clerk's own license review says it is its own section: the Clerk routed it to itself", () => {
+    const routing = makeTask({ id: "PMT-27-0001:confirm_routing", catalogId: "confirm_routing", owner: "clerk", kind: "action" });
+    const gala = makeCase({
+      state: "submitted",
+      tier: "reviewed",
+      submittedAt: "2027-04-28T09:00",
+      addOns: { ...EMPTY_ADDONS, alcohol: true },
+      flags: { sentToCommission: false, lateFee: false, signed: false, acceptedComplete: true, amendmentPending: false },
+      tasks: [routing],
+    });
+    const routed = transition(
+      gala,
+      { type: "confirm_routing", reviewers: [{ dept: "clerk", sections: ["Alcohol details and liquor liability insurance"], dueDate: "2027-05-17" }, { dept: "pws", sections: ["Police"], dueDate: "2027-05-17" }] },
+      "clerk",
+      { today: TODAY, now: `${TODAY}T09:00`, cases: [gala], cfg: CFG },
+    );
+    if (!routed.ok) throw new Error(routed.reason);
+    const own = queueFor([routed.case], "clerk", TODAY).find((i) => i.task.catalogId === "review:clerk")!;
+    expect(own.task.title).toBe("Review the temporary alcohol license");
+    expect(queueReasonLine(own)).toBe("Your own review section, routed May 3");
+    // Public Works & Safety's row for the same case reads as before.
+    const pws = queueFor([routed.case], "pws", TODAY).find((i) => i.task.catalogId === "review:pws")!;
+    expect(pws.task.title).toBe("Review your sections");
+    expect(queueReasonLine(pws)).toBe("Routed May 3");
   });
 
   it("S3 once the applicant answers: Health & Legal's review is back because the answer came, not because it was routed today", () => {

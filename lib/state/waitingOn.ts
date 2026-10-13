@@ -23,6 +23,8 @@ const CITY_UNLOCK_HINT: Record<string, string> = {
   issue_permit: "Unlocks when paid and verified",
   reconcile: "Unlocks when hours are logged",
   consolidate: "Unlocks when every review is in",
+  issue_food_permits: "Unlocks when every vendor's health permit is verified",
+  decide_amendment: "Unlocks when the amendment's cards are checked",
 };
 
 /**
@@ -79,6 +81,7 @@ const UNLOCK_ORDER: UnlockEvent[] = [
   "signed",
   "paid",
   "permitted",
+  "food_permits_issued",
   "event_day",
   "closeout",
   "hours_logged",
@@ -113,6 +116,7 @@ export const UNLOCK_NOTE: Partial<Record<UnlockEvent, string>> = {
   accepted: "Unlocks when the City Clerk accepts the application",
   quote_sent: "Unlocks when the quote is ready",
   permitted: "Unlocks when the permit is issued",
+  food_permits_issued: "Unlocks when Health & Legal issues the food permits",
   event_day: "For the day of the event",
   hours_logged: "Unlocks when hours are logged",
   invoice_issued: "Unlocks when the City Clerk finishes reconciling costs",
@@ -225,6 +229,8 @@ const PHRASE: Record<string, string> = {
   schedule_pre_application_meeting: "schedules the pre-application meeting",
   consolidate: "consolidates the reviews and sends the quote",
   issue_permit: "issues the permit",
+  issue_food_permits: "issues the vendors' food permits",
+  decide_amendment: "decides the amendment",
   cleanup_inspection: "inspects the cleanup",
   log_actual_hours: "logs the actual hours",
   reconcile: "reconciles the costs and closes",

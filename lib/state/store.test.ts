@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { createElement } from "react";
 import { renderToString } from "react-dom/server";
 import { classify, estimateFees } from "@/lib/rules";
-import { DEFAULT_DEMO_TODAY } from "@/lib/rules/config";
+import { DEFAULT_CONFIG, DEFAULT_DEMO_TODAY } from "@/lib/rules/config";
 import { resetDemoStoreForTests, useDemo, useHydrated } from "./store";
 
 vi.mock("./seed", () => ({ buildSeed: () => [], seedFingerprint: () => 1 }));
@@ -147,11 +147,64 @@ describe("useDemo", () => {
   it("reset() restores the seed and the defaults exactly", () => {
     useDemo.getState().createDraft("maya");
     useDemo.getState().setRole("clerk");
+    useDemo.getState().setConfig({ thresholds: { ...DEFAULT_CONFIG.thresholds, reviewedAttendance: 30 } });
+    useDemo.getState().setActiveDemoPath(3);
     useDemo.getState().reset();
     const state = useDemo.getState();
     expect(state.cases).toEqual([]);
     expect(state.role).toBe("applicant");
     expect(state.demoToday).toBe(DEFAULT_DEMO_TODAY);
+    // The Clerk's Settings edits and the demo path picked go back with everything else.
+    expect(state.cfg).toEqual(DEFAULT_CONFIG);
+    expect(state.activeDemoPath).toBeNull();
+  });
+
+  it("setActiveDemoPath records the demo path the presenter picked, and null clears it", () => {
+    expect(useDemo.getState().activeDemoPath).toBeNull();
+    useDemo.getState().setActiveDemoPath(5);
+    expect(useDemo.getState().activeDemoPath).toBe(5);
+    useDemo.getState().setActiveDemoPath(null);
+    expect(useDemo.getState().activeDemoPath).toBeNull();
+  });
+});
+
+describe("setConfig", () => {
+  const draftOf = (id: string) => useDemo.getState().cases.find((c) => c.id === id)!;
+
+  it("merges the patch into the config and leaves the rest of it alone", () => {
+    useDemo.getState().setConfig({ leadTimeDays: { instant: 7, reviewed: 30, special: 60 } });
+    expect(useDemo.getState().cfg).toEqual({ ...DEFAULT_CONFIG, leadTimeDays: { instant: 7, reviewed: 30, special: 60 } });
+  });
+
+  it("re-classifies every open Draft at once (PRD, Settings: changing a threshold re-classifies open drafts live)", () => {
+    const picnic = useDemo.getState().createDraft("maya", { eventType: "picnic_party", attendance: 40 });
+    const rally = useDemo.getState().createDraft("maya", { eventType: "picnic_party", attendance: 600 });
+    expect(draftOf(picnic)).toMatchObject({ tier: "instant", triggers: [] });
+    expect(draftOf(rally).tier).toBe("reviewed");
+
+    // Reviewed from 30 people, Special from 500: both drafts move without being touched.
+    useDemo.getState().setConfig({ thresholds: { ...DEFAULT_CONFIG.thresholds, reviewedAttendance: 30, specialAttendance: 500 } });
+    expect(draftOf(picnic).tier).toBe("reviewed");
+    expect(draftOf(picnic).triggers.map((t) => t.id)).toEqual(["attendance_100"]);
+    expect(draftOf(rally).tier).toBe("special");
+
+    // And back again when the Clerk restores the defaults.
+    useDemo.getState().setConfig({ thresholds: DEFAULT_CONFIG.thresholds });
+    expect(draftOf(picnic)).toMatchObject({ tier: "instant", triggers: [] });
+    expect(draftOf(rally).tier).toBe("reviewed");
+  });
+
+  it("leaves a case that is past Draft, and a Draft that has ended, as they were", () => {
+    const submitted = useDemo.getState().createDraft("maya", { eventType: "picnic_party", attendance: 40 });
+    const withdrawn = useDemo.getState().createDraft("maya", { eventType: "picnic_party", attendance: 40 });
+    useDemo.setState({
+      cases: useDemo.getState().cases.map((c) => (c.id === submitted ? { ...c, state: "submitted" as const } : c.id === withdrawn ? { ...c, ending: "withdrawn" as const } : c)),
+    });
+    const before = useDemo.getState().cases;
+
+    useDemo.getState().setConfig({ thresholds: { ...DEFAULT_CONFIG.thresholds, reviewedAttendance: 30 } });
+    // The tier a submitted case was classified with is the one it was reviewed and priced under.
+    expect(useDemo.getState().cases).toEqual(before);
   });
 });
 

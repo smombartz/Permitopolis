@@ -138,6 +138,9 @@ export const S6: SeedScript = {
       date: "2027-04-16",
     }),
     step("2027-04-02T11:00", "clerk", { type: "complete_city_task", taskId: taskId(CASE_ID, "coordination_meeting") }),
+    // Every vendor's health permit was verified with the review, so the food permits could be
+    // issued any day after the permit; Health & Legal did it the week before the festival.
+    step("2027-04-15T09:00", "hl", { type: "complete_city_task", taskId: taskId(CASE_ID, "issue_food_permits") }),
     step("2027-04-16T10:00", "pws", { type: "complete_city_task", taskId: taskId(CASE_ID, "site_walkthrough") }),
     step("2027-04-16T14:00", "applicant", { type: "complete_task", taskId: taskId(CASE_ID, "vendor_food_permits") }),
     ...WORK_ORDERS.map((key, i) =>

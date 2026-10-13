@@ -5,7 +5,7 @@
  * not made with. Runs in node, with a stand-in for window.localStorage.
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { STORAGE_KEY } from "@/lib/rules";
+import { DEFAULT_CONFIG, STORAGE_KEY } from "@/lib/rules";
 import { buildSeed, seedFingerprint } from "./seed";
 import { hydrateDemoStore, resetDemoStoreForTests, useDemo } from "./store";
 
@@ -129,5 +129,41 @@ describe("loading a stored demo", () => {
     stored.set(STORAGE_KEY, "{not json");
     await useDemo.persist.rehydrate();
     expect(useDemo.getState().cases).toEqual(buildSeed());
+  });
+});
+
+describe("the Clerk's settings and the demo path picked are part of the stored demo", () => {
+  const storedState = () => JSON.parse(stored.get(STORAGE_KEY) ?? "null")?.state as { cfg: typeof DEFAULT_CONFIG; activeDemoPath: number | null } | undefined;
+
+  it("a threshold edited in Settings and the path picked on the demo guide are saved, and come back on the next load", async () => {
+    await hydrateDemoStore();
+    const thresholds = { ...DEFAULT_CONFIG.thresholds, reviewedAttendance: 40 };
+    useDemo.getState().setConfig({ thresholds });
+    useDemo.getState().setActiveDemoPath(5);
+    expect(storedState()).toMatchObject({ cfg: { thresholds }, activeDemoPath: 5 });
+
+    // A reload: the page starts from the defaults in memory, then reads what was stored.
+    const left = stored.get(STORAGE_KEY)!;
+    resetDemoStoreForTests();
+    stored.set(STORAGE_KEY, left);
+    expect(useDemo.getState().cfg).toEqual(DEFAULT_CONFIG);
+    await hydrateDemoStore();
+    expect(useDemo.getState().cfg).toEqual({ ...DEFAULT_CONFIG, thresholds });
+    expect(useDemo.getState().activeDemoPath).toBe(5);
+  });
+
+  it("Reset puts the configured rules back to their defaults, in storage too", async () => {
+    await hydrateDemoStore();
+    useDemo.getState().setConfig({ thresholds: { ...DEFAULT_CONFIG.thresholds, reviewedAttendance: 40 } });
+    useDemo.getState().setActiveDemoPath(2);
+    useDemo.getState().reset();
+    expect(useDemo.getState().cfg).toEqual(DEFAULT_CONFIG);
+    expect(storedState()).toMatchObject({ cfg: DEFAULT_CONFIG, activeDemoPath: null });
+  });
+
+  it("a demo stored before there was a path to pick loads with none picked", async () => {
+    stored.set(STORAGE_KEY, JSON.stringify({ version: seedFingerprint(), state: { cases: buildSeed(), role: "clerk", personaId: "new", demoToday: "2027-05-03", hints: true } }));
+    await hydrateDemoStore();
+    expect(useDemo.getState()).toMatchObject({ role: "clerk", activeDemoPath: null, cfg: DEFAULT_CONFIG });
   });
 });

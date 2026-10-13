@@ -17,6 +17,7 @@ export {
   checkCompleteCityTask,
   checkCompleteTask,
   checkConfirmRouting,
+  checkDecideAmendment,
   checkIssuePermit,
   checkLogCloseout,
   checkReconcileClose,
@@ -33,9 +34,22 @@ export {
   nextUnpaidSession,
   type CheckResult,
 } from "./checks";
+// An amendment: where it stands, the plan the permit still covers, what it owes.
+export {
+  amendmentBalance,
+  amendmentCardsInFlight,
+  amendmentPayOpen,
+  amendmentPaymentDue,
+  amendmentSignOpen,
+  amendmentStage,
+  pendingAmendment,
+  permittedPlan,
+  type AmendmentStage,
+  type PendingAmendment,
+} from "./amendment";
 export { advanceClock, isSessionDate, lastSessionDate, sessionDates } from "./clock";
 // What a quote asks for and what is still owed on it ("What a quote asks for" in the readme).
-export { dueAtQuote, quoteBalance, quotePaid, taskDueDate, taskSubmittedOn } from "./core";
+export { dueAtQuote, quoteBalance, quotePaid, taskDueDate, taskSubmittedOn, vendorHealthPermits } from "./core";
 export { classifyDraft, newCase, syncDraft } from "./newCase";
 export { buildSeed } from "./seed";
 export {

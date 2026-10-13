@@ -6,7 +6,7 @@ import { ConditionList } from "@/components/domain";
 import { PageSkeleton } from "@/components/ui/page-skeleton";
 import { cn } from "@/lib/utils";
 import { fmtDate, fmtNumber, fmtTimeRange } from "@/lib/format";
-import { eventDate, useDemo, useHydrated } from "@/lib/state";
+import { eventDate, permittedPlan, useDemo, useHydrated } from "@/lib/state";
 import { verifyStatus } from "@/lib/view/permit";
 
 /**
@@ -28,8 +28,10 @@ function VerifyScreen() {
     );
   }
 
-  const c = cases.find((x) => x.id === id);
-  const result = verifyStatus(c);
+  const record = cases.find((x) => x.id === id);
+  const result = verifyStatus(record);
+  // What the permit covers: the plan from before a pending amendment, never the amended one.
+  const c = record ? permittedPlan(record) : undefined;
   const when = c?.schedule ? eventDate(c, today) : null;
 
   return (
@@ -60,6 +62,9 @@ function VerifyScreen() {
             <p className="text-eyebrow font-bold tracking-[.12em] text-fg-label uppercase">Attendance</p>
             <p className="text-sm text-fg">{c.attendance !== null ? `${fmtNumber(c.attendance)} people` : "Not provided"}</p>
           </div>
+          {record?.flags.amendmentPending ? (
+            <p className="text-sm font-medium text-warning-fg">A change to this event is pending. Until it is approved, the permit covers only what is shown here.</p>
+          ) : null}
           {c.conditions.length > 0 ? (
             <div className="flex flex-col gap-2">
               <p className="text-eyebrow font-bold tracking-[.12em] text-fg-label uppercase">Conditions</p>

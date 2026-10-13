@@ -14,8 +14,9 @@
  *    on Mon, May 3, 2027, the Applicant role and the "new" persona, nothing in localStorage,
  *    and the stored demo not read yet. Pass `cases` to replace the seed with hand-built ones
  *    (`makeCase` and `makeTask` from lib/state/testSupport).
- * 2. Applies `scenario` (a Demo menu jump: its role, persona and page), then `role`,
- *    `personaId`, `demoToday` and `path`, which each override what the scenario set.
+ * 2. Applies `scenario` (a Demo menu jump: its role, persona and page, and the demo coach on
+ *    the path built on it), then `role`, `personaId`, `demoToday` and `path`, which each
+ *    override what the scenario set.
  * 3. Points the mocked router at `path`. A query string in `path` becomes the search params,
  *    so `path` can come straight from lib/routes.ts; `search` adds to it. `params.id` is read
  *    off an event, case or verify path unless `params` is given.
@@ -50,6 +51,7 @@ import { SCENARIO_JUMPS, type ScenarioKey } from "@/lib/data/demoScript";
 import { STORAGE_KEY } from "@/lib/rules";
 import { hydrateDemoStore, resetDemoStoreForTests, useDemo, type DemoState } from "@/lib/state";
 import { seedFingerprint } from "@/lib/state/seed";
+import { demoPathIdForScenario } from "@/lib/view/coach";
 import type { EventCase, ISODate, Party } from "@/lib/types";
 import { holdNavigation, navState, navigate, paramsFromPath, releaseNavigation, resetNavState } from "./setup";
 
@@ -96,13 +98,15 @@ export function prepareScreen(options: RenderScreenOptions = {}): void {
   useDemo.setState({
     role: options.role ?? jump?.role ?? "applicant",
     personaId: options.personaId ?? jump?.personaId ?? "new",
+    // A scenario jump puts the demo coach on the path built on that scenario, as the Demo menu does.
+    activeDemoPath: jump ? demoPathIdForScenario(jump.id) : null,
     ...(options.demoToday !== undefined ? { demoToday: options.demoToday } : {}),
     ...(options.cases !== undefined ? { cases: options.cases } : {}),
   });
   if (options.stored) {
     // What persist would have saved: the whole demo, under this seed's fingerprint.
-    const { cases, demoToday, cfg, role, personaId, hints, lastPathByRole } = { ...useDemo.getInitialState(), ...options.stored };
-    window.localStorage.setItem(STORAGE_KEY, JSON.stringify({ state: { cases, demoToday, cfg, role, personaId, hints, lastPathByRole }, version: seedFingerprint() }));
+    const { cases, demoToday, cfg, role, personaId, hints, activeDemoPath, lastPathByRole } = { ...useDemo.getInitialState(), ...options.stored };
+    window.localStorage.setItem(STORAGE_KEY, JSON.stringify({ state: { cases, demoToday, cfg, role, personaId, hints, activeDemoPath, lastPathByRole }, version: seedFingerprint() }));
   }
 }
 

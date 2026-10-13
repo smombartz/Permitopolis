@@ -13,8 +13,9 @@ import { PARTY_LABEL, STATE_LABEL, type Actor, type Availability, type Dept } fr
 import type { EventCase, ISODate, Task } from "@/lib/types";
 import type { RulesConfig, RulesCtx } from "@/lib/rules/types";
 import type { ActionType, RoutedReviewer } from "./actions";
+import { amendmentBalance, amendmentCardsInFlight, amendmentPayOpen, amendmentSignOpen, amendmentStage } from "./amendment";
 import { sessionDates } from "./clock";
-import { findTask, idSuffix, preSubmitCardsIn, quoteBalance, quotePaid, reviewFor, signoffsLeft, taskId } from "./core";
+import { findTask, idSuffix, preSubmitCardsIn, quoteBalance, quotePaid, reviewFor, signoffsLeft, taskId, vendorHealthPermits } from "./core";
 import { UNLOCK_NOTE } from "./waitingOn";
 
 function unlockHintFor(catalogId: string): string | undefined {
@@ -52,9 +53,7 @@ const ACTION_ACTORS: Record<ActionType, Actor[]> = {
   cancel: ["applicant"],
   submit_feedback: ["applicant"],
   book_again: ["applicant"],
-  // The applicant proposes an amendment; the City Clerk decides a pending one with the same
-  // action (see decideAmendment() in transitions/applicant.ts).
-  amend: ["applicant", "clerk"],
+  amend: ["applicant"],
   accept_complete: ["clerk"],
   confirm_routing: ["clerk"],
   send_to_commission: ["clerk"],
@@ -62,6 +61,7 @@ const ACTION_ACTORS: Record<ActionType, Actor[]> = {
   deny: ["clerk"],
   issue_permit: ["clerk"],
   reconcile_close: ["clerk"],
+  decide_amendment: ["clerk"],
   request_info: CITY,
   verify_document: CITY,
   reject_document: CITY,
@@ -96,6 +96,7 @@ const ACTION_PHRASE: Record<ActionType, string> = {
   deny: "deny an application",
   issue_permit: "issue the permit",
   reconcile_close: "reconcile and close",
+  decide_amendment: "decide an amendment",
   request_info: "request information",
   verify_document: "verify a document",
   reject_document: "send a document back",
@@ -364,6 +365,8 @@ export function checkDeny(c: EventCase): CheckResult {
 }
 
 export function checkAcceptAndSign(c: EventCase): CheckResult {
+  // On a permitted case the card is open only for an approved amendment that needs a signature.
+  if (amendmentSignOpen(c)) return OK;
   return requireState(c, "quote_sent");
 }
 
@@ -388,6 +391,8 @@ export function checkPay(c: EventCase, ask: PaymentAsk, cfg?: RulesConfig): Chec
   if (ask.amount !== undefined && !(ask.amount > 0)) return fail("Enter an amount above $0.");
   switch (ask.kind) {
     case "quote":
+      // On a permitted case the payment card is open again only for what an amendment added.
+      if (amendmentPayOpen(c)) return cfg && amendmentBalance(c, cfg) <= 0 ? fail("The amendment is paid in full.") : OK;
       if (c.state !== "quote_sent") return fail("No quote to pay.");
       // A quote already covered has nothing left to take: no row for it, and no overpayment.
       if (cfg && quoteBalance(c, cfg) <= 0) return fail("The quote is paid in full.");
@@ -473,28 +478,41 @@ export function checkBookAgain(c: EventCase): CheckResult {
   return requireState(c, "closed");
 }
 
-/**
- * `actor` defaults to "applicant" so availableActions() (outside this workstream's files), which
- * calls this with three arguments, keeps asking "can the applicant amend now". The City Clerk's
- * decision on an already-pending amendment is the same action, so it is checked here too: the
- * applicant may not start a second one while the first is pending, and the Clerk may only decide
- * one the applicant has actually submitted (decideAmendment() in transitions/applicant.ts).
- */
-export function checkAmend(c: EventCase, today: string, eventDate: string | null, actor: Actor = "applicant"): CheckResult {
+export function checkAmend(c: EventCase, today: string, eventDate: string | null): CheckResult {
   const open = requireOpen(c);
   if (!open.ok) return open;
   if (c.state === "draft") return fail("Confirm the plan and submit before amending.");
   if (c.state === "closed") return fail("This case is already closed.");
   if (eventDate && eventDate < today) return fail("The event has already happened.");
-  if (actor === "clerk") {
-    if (!c.flags.amendmentPending) return fail("There is no amendment pending.");
-    const submitTask = findTask(c, taskId(c.id, "submit_application"));
-    if (!submitTask || !submitTask.tags.includes("amendment") || submitTask.status !== "done") {
-      return fail("The applicant has not submitted the amendment yet.");
-    }
-    return OK;
+  // One at a time: a second amendment would have no plan to go back to if the first is declined.
+  if (c.flags.amendmentPending) {
+    return fail(amendmentStage(c) === "approved" ? "An amendment is approved; sign and pay it before changing the plan again." : "An amendment is already pending; wait for the City Clerk's decision.");
   }
-  if (c.flags.amendmentPending) return fail("An amendment is already pending; wait for the City Clerk's decision.");
+  return OK;
+}
+
+/**
+ * The Clerk decides an amendment once the applicant has submitted it. Without a `decision`
+ * (availableActions(), a panel that has not chosen yet) this answers only whether there is one
+ * to decide. Approving waits for the departments: every card of the amendment that went to one
+ * has to be verified, as Issue permit waits for the insurance. Declining needs a reason, which
+ * the applicant is told.
+ */
+export function checkDecideAmendment(c: EventCase, decision?: "approve" | "decline", reason?: string): CheckResult {
+  const open = requireOpen(c);
+  if (!open.ok) return open;
+  const stage = amendmentStage(c);
+  if (stage === null) return fail("There is no amendment pending.");
+  if (stage === "proposed") return fail("The applicant has not submitted the amendment yet.");
+  if (stage === "approved") return fail("The amendment is already approved; it takes effect once the applicant has signed and paid.");
+  if (decision === "approve") {
+    const [first, ...rest] = amendmentCardsInFlight(c);
+    if (first) {
+      const more = rest.length > 0 ? `, and ${plural(rest.length, "more card")}` : "";
+      return fail(first.status === "submitted" ? `${PARTY_LABEL[first.reviewer ?? "clerk"]} is still checking "${first.title}"${more}.` : `"${first.title}" was sent back to the applicant${more}.`);
+    }
+  }
+  if (decision === "decline" && !(reason ?? "").trim()) return fail("Give the applicant a reason.");
   return OK;
 }
 
@@ -593,6 +611,7 @@ function ownActionFor(catalogId: string): string | undefined {
     instant_exception: "Reconcile and close",
     cleanup_inspection: "Log the closeout",
     log_actual_hours: "Log the closeout",
+    decide_amendment: "Decide the amendment",
   };
   return actions[catalogId];
 }
@@ -619,6 +638,11 @@ export function checkCompleteCityTask(c: EventCase, taskIdArg: string, actor: Ac
     if (task.owner !== actor) return fail(`That task belongs to ${PARTY_LABEL[task.owner]}.`);
     const ownAction = ownActionFor(task.catalogId);
     if (ownAction) return fail(`${ownAction} to finish this task.`);
+  }
+  // Food permits are issued once every vendor's health permit is verified: say how many are out.
+  if (task.catalogId === "issue_food_permits" && task.status !== "done") {
+    const { left, total } = vendorHealthPermits(c);
+    if (left > 0) return fail(`${left} of ${plural(total, "vendor health permit")} still ${left === 1 ? "needs" : "need"} to be verified.`);
   }
   if (task.status === "locked") return fail((task.unlocksOn ? UNLOCK_NOTE[task.unlocksOn] : undefined) ?? "That card is locked.");
   if (task.status === "done") return fail("Already done.");

@@ -6,10 +6,12 @@
  * two are not the same code, so a test holds them together against the real seed
  * (amend.test.ts); if they ever disagree, `amend()` is the one that counts.
  */
+import { fmtDate, fmtMoney, fmtNumber, fmtTimeRange, plural } from "@/lib/format";
 import { classify, dateGate, estimateFees, requirements, type Classification, type DateGate, type FeeEstimate } from "@/lib/rules";
 import { CARD_BY_ID, type CardSpec } from "@/lib/rules/catalog";
-import type { RulesCtx } from "@/lib/rules/types";
-import { TIER_LABEL, type EventAnswers, type EventCase, type Task, type Tier } from "@/lib/types";
+import type { RulesConfig, RulesCtx } from "@/lib/rules/types";
+import { amendmentBalance, amendmentCardsInFlight, amendmentStage, checkDecideAmendment, pendingAmendment, type AmendmentStage } from "@/lib/state";
+import { PARTY_LABEL, TIER_LABEL, type AddOns, type Dept, type EventAnswers, type EventCase, type ISODate, type Task, type TaskStatus, type Tier } from "@/lib/types";
 
 /** Mirrors `answersOf()` in transitions/applicant.ts: only what the wizard collects. */
 export function amendAnswersOf(a: EventAnswers): EventAnswers {
@@ -133,3 +135,142 @@ export function amendmentGateSatisfied(diff: AmendmentDiff, lateFee: boolean): b
 }
 
 export type { Classification };
+
+/* ---------------------------------------------------------------------- */
+/* A pending amendment, as the city reads it: the case's banner and the   */
+/* Clerk's "Decide amendment" panel                                        */
+/* ---------------------------------------------------------------------- */
+
+const ADD_ON_LABEL: [key: keyof AddOns, label: string][] = [
+  ["amplifiedSound", "Amplified sound"],
+  ["alcohol", "Alcohol"],
+  ["foodVending", "Food or vending"],
+  ["tentsStages", "Tents or stages"],
+  ["cookingGenerators", "Cooking or generators"],
+  ["fireworksDrones", "Fireworks or drones"],
+  ["admission", "Admission charged"],
+  ["cityServices", "City services"],
+];
+
+const isOn = (value: AddOns[keyof AddOns]) => value !== null && value !== false;
+
+/**
+ * What an amendment changes in the applicant's answers, one line each, in the order of the
+ * wizard: "Place: Shelter 3 to Shelter 2", "Amplified sound: added". An add-on that stays on
+ * with other numbers (two more vendors, ten more barricades) reads "changed".
+ */
+export function answerChanges(before: EventAnswers, after: EventAnswers): string[] {
+  const lines: string[] = [];
+  if (before.name !== after.name) lines.push(`Name: ${before.name || "none"} to ${after.name || "none"}`);
+  if (before.location?.label !== after.location?.label) lines.push(`Place: ${before.location?.label ?? "none"} to ${after.location?.label ?? "none"}`);
+  if (before.schedule?.date !== after.schedule?.date) lines.push(`Date: ${before.schedule ? fmtDate(before.schedule.date) : "none"} to ${after.schedule ? fmtDate(after.schedule.date) : "none"}`);
+  const hours = (a: EventAnswers) => (a.schedule ? fmtTimeRange(a.schedule.start, a.schedule.end) : "none");
+  if (hours(before) !== hours(after)) lines.push(`Hours: ${hours(before)} to ${hours(after)}`);
+  if (before.attendance !== after.attendance) lines.push(`Attendance: ${before.attendance === null ? "none" : fmtNumber(before.attendance)} to ${after.attendance === null ? "none" : fmtNumber(after.attendance)}`);
+  for (const [key, label] of ADD_ON_LABEL) {
+    const was = isOn(before.addOns[key]);
+    const is = isOn(after.addOns[key]);
+    if (was !== is) lines.push(`${label}: ${is ? "added" : "removed"}`);
+    else if (is && JSON.stringify(before.addOns[key]) !== JSON.stringify(after.addOns[key])) lines.push(`${label}: changed`);
+  }
+  return lines;
+}
+
+/** How a card of the amendment stands, in the city's words. */
+const AMENDMENT_CARD_STATUS: Record<TaskStatus, string> = {
+  locked: "Not open yet",
+  todo: "With the applicant",
+  submitted: "Being checked",
+  changes_requested: "Sent back",
+  done: "Checked",
+};
+
+export interface AmendmentCardRow {
+  id: string;
+  title: string;
+  status: TaskStatus;
+  /** "Being checked by Public Works & Safety", "Checked", "With the applicant". */
+  statusText: string;
+  reviewer: Dept | null;
+}
+
+export interface AmendmentReview {
+  stage: AmendmentStage;
+  proposedOn: ISODate | null;
+  tierBefore: Tier;
+  tierAfter: Tier;
+  changes: string[];
+  /** The cards the amendment added, in the order the board lists them. */
+  cards: AmendmentCardRow[];
+  totalBefore: number;
+  totalAfter: number;
+  paid: number;
+  /** Positive: the applicant owes it once approved. Negative: it goes back. */
+  balance: number;
+  lateFee: number | null;
+  /** Why the Clerk cannot approve yet, in the engine's words; null when the Clerk can. */
+  approveBlockedBy: string | null;
+  /** One sentence for the banner on the case: where the amendment stands and whose move it is. */
+  status: string;
+}
+
+function joinParties(depts: Dept[]): string {
+  const names = depts.map((d) => PARTY_LABEL[d]);
+  return names.length <= 1 ? (names[0] ?? "") : `${names.slice(0, -1).join(", ")} and ${names.at(-1)}`;
+}
+
+/**
+ * A pending amendment as the city side shows it: what changed, the cards it added and who has
+ * each, the money, and whose move it is. Null when nothing is pending. Every figure is the
+ * engine's (`amendmentBalance()`, the stage, the check the Clerk's approval runs), read off the
+ * record and the plan it kept from before.
+ */
+export function amendmentReview(c: EventCase, cfg: RulesConfig): AmendmentReview | null {
+  const stage = amendmentStage(c);
+  if (stage === null) return null;
+  const prior = pendingAmendment(c);
+  const cards: AmendmentCardRow[] = c.tasks
+    .filter((t) => t.owner === "applicant" && t.tags.includes("amendment"))
+    .map((t) => ({
+      id: t.id,
+      title: t.title,
+      status: t.status,
+      statusText: t.status === "submitted" && t.reviewer ? `Being checked by ${PARTY_LABEL[t.reviewer]}` : t.status === "done" && t.catalogId === "submit_application" ? "Submitted" : AMENDMENT_CARD_STATUS[t.status],
+      reviewer: t.reviewer,
+    }));
+
+  const sum = (lines: EventCase["feeLines"]) => Math.round(lines.reduce((total, line) => total + line.estimate, 0) * 100) / 100;
+  const balance = amendmentBalance(c, cfg);
+  const approve = stage === "submitted" ? checkDecideAmendment(c, "approve") : null;
+  const checking = [...new Set(amendmentCardsInFlight(c).filter((t) => t.status === "submitted" && t.reviewer).map((t) => t.reviewer as Dept))];
+  const sentBack = amendmentCardsInFlight(c).some((t) => t.status === "changes_requested");
+
+  let status: string;
+  if (stage === "proposed") status = "Waiting on the applicant to finish its cards and submit it.";
+  else if (stage === "approved") status = balance > 0 ? `Approved. Waiting on the applicant to sign and pay ${fmtMoney(balance)}.` : "Approved. Waiting on the applicant to sign.";
+  else if (sentBack) status = "A card was sent back: waiting on the applicant, then the City Clerk decides.";
+  else if (checking.length > 0) status = `${joinParties(checking)} ${checking.length === 1 ? "is" : "are"} checking its cards, then the City Clerk decides.`;
+  else status = "Its cards are checked: the City Clerk decides.";
+
+  return {
+    stage,
+    proposedOn: prior?.proposedOn ?? null,
+    tierBefore: prior?.priorTier ?? c.tier,
+    tierAfter: c.tier,
+    changes: prior ? answerChanges(prior.priorAnswers, c) : [],
+    cards,
+    totalBefore: prior ? sum(prior.priorFeeLines) : sum(c.feeLines),
+    totalAfter: sum(c.feeLines),
+    paid: Math.round(c.payments.reduce((total, p) => total + p.amount, 0) * 100) / 100,
+    balance,
+    lateFee: c.feeLines.find((line) => line.kind === "late_fee" && !(prior?.priorFeeLines ?? []).some((before) => before.kind === "late_fee"))?.estimate ?? null,
+    approveBlockedBy: approve && !approve.ok ? approve.reason : null,
+    status,
+  };
+}
+
+/** "Instant to Reviewed, 4 new cards" (or "Reviewed, 1 new card" when the tier holds): the banner's first words. */
+export function amendmentHeadline(review: AmendmentReview): string {
+  const tier = review.tierBefore === review.tierAfter ? TIER_LABEL[review.tierAfter] : `${TIER_LABEL[review.tierBefore]} to ${TIER_LABEL[review.tierAfter]}`;
+  return `${tier}, ${plural(review.cards.length, "new card")}`;
+}

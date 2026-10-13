@@ -74,6 +74,18 @@ describe("command palette", () => {
 
     expect(useDemo.getState().role).toBe("clerk");
     expect(lastPush()).toBe("/city/cases/PMT-27-0097");
+    expect(useDemo.getState().activeDemoPath).toBe(5);
+  });
+
+  it("jumping to a scenario puts the coach on the path built on it", async () => {
+    const { user } = await renderScreen(<AppShell>my events</AppShell>, { path: "/events" });
+    await user.click(screen.getByRole("button", { name: "Search" }));
+    await user.type(screen.getByRole("combobox"), "Maya");
+
+    await user.click(screen.getByRole("option", { name: /Jump to S1 · Maya Chen/ }));
+
+    expect(lastPush()).toBe("/events/PMT-27-0109/permit");
+    expect(useDemo.getState()).toMatchObject({ role: "applicant", personaId: "maya-chen", activeDemoPath: 7 });
   });
 
   it('"reset" asks for confirmation before restoring the seed', async () => {

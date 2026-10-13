@@ -19,12 +19,13 @@ import type { EventCase } from "@/lib/types";
 import { checkoutDecision } from "@/lib/view/checkout";
 
 /** What was just paid on this visit. */
-export type PaidKind = "booking" | "session" | "final";
+export type PaidKind = "booking" | "session" | "final" | "amendment";
 
 const PAID_COPY: Record<PaidKind, { title: string; text: string }> = {
   booking: { title: "Booked and paid", text: "Your permit is issued. Opening it now." },
   session: { title: "Session paid", text: "Taking you back to your board." },
   final: { title: "Final bill paid", text: "Taking you back to your board." },
+  amendment: { title: "Your change is in effect", text: "Your permit now covers the amended plan. Taking you back to your board." },
 };
 
 /**
@@ -103,7 +104,7 @@ function CheckoutScreen() {
 
   const onPaid = (kind: PaidKind) => setPaid({ visit, kind });
   if (decision.mode === "booking") return <BookingPanel c={c} ctx={ctx} onPaid={() => onPaid("booking")} />;
-  if (decision.mode === "quote") return <QuotePanel c={c} today={today} />;
+  if (decision.mode === "quote") return <QuotePanel c={c} today={today} amendment={decision.amendment === true} onSettled={() => onPaid("amendment")} />;
   if (decision.mode === "session") return <SessionPanel c={c} occurrenceDate={decision.occurrenceDate} onPaid={() => onPaid("session")} />;
   return <FinalPanel c={c} onPaid={() => onPaid("final")} />;
 }

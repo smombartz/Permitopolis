@@ -261,6 +261,12 @@ export function signoffsLeft(c: EventCase): number {
   return progress ? Math.max(0, progress.total - progress.done) : 0;
 }
 
+/** Vendor health permits on this case, and how many are still to be verified. Health & Legal's "Issue food permits" waits for them. */
+export function vendorHealthPermits(c: EventCase): { left: number; total: number } {
+  const cards = c.tasks.filter((t) => t.catalogId === "vendor_health_permit");
+  return { left: cards.filter((t) => t.status !== "done").length, total: cards.length };
+}
+
 /** Every open (actionable) task owned by this party, optionally narrowed further. */
 export function openTasksFor(c: EventCase, owner: Party, extra?: (t: Task) => boolean): Task[] {
   return c.tasks.filter(

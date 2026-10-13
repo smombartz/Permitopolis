@@ -43,8 +43,6 @@ function SettingsScreen() {
 
   const sectionParam = search.get("section");
   const section: SettingsSection = isSettingsSection(sectionParam) ? sectionParam : "tier-rules";
-  const query = search.toString();
-  const settingsHref = query ? `${pathname}?${query}` : pathname;
 
   function setSection(next: string) {
     const qs = new URLSearchParams();
@@ -70,7 +68,7 @@ function SettingsScreen() {
         </TabsList>
 
         <TabsContent value="tier-rules">
-          <TierRulesSection cfg={cfg} cases={cases} setConfig={setConfig} settingsHref={settingsHref} />
+          <TierRulesSection cfg={cfg} cases={cases} setConfig={setConfig} />
         </TabsContent>
         <TabsContent value="fees">
           <FeesSection cfg={cfg} setConfig={setConfig} />

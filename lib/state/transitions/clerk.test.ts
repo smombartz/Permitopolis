@@ -226,6 +226,21 @@ describe("confirm_routing: the list the Clerk confirms", () => {
     expect(today.ok && today.case.reviews[0].clock.allowedDays).toBe(0);
   });
 
+  it("the Clerk's own review of an event with alcohol is the license review; every other review is the department's sections (PRD, Licenses)", () => {
+    const alcohol = { ...accepted(), addOns: { ...accepted().addOns, alcohol: true } };
+    const clerk = { dept: "clerk" as const, sections: ["Alcohol details and liquor liability insurance"], dueDate: "2027-05-17" };
+    const result = transition(alcohol, { type: "confirm_routing", reviewers: [clerk, { dept: "pws", sections: ["Police"], dueDate: "2027-05-17" }, hl] }, "clerk", makeCtx());
+    expect(result.ok && result.case.tasks.filter((t) => t.catalogId.startsWith("review:")).map((t) => [t.owner, t.title])).toEqual([
+      ["clerk", "Review the temporary alcohol license"],
+      ["pws", "Review your sections"],
+      ["hl", "Review your sections"],
+    ]);
+
+    // Routed to the Clerk with no license to review, its task is a review like any other.
+    const dry = transition(accepted(), { type: "confirm_routing", reviewers: [clerk, hl] }, "clerk", makeCtx());
+    expect(dry.ok && dry.case.tasks.find((t) => t.catalogId === "review:clerk")?.title).toBe("Review your sections");
+  });
+
   it("a list with each department once goes through", () => {
     const result = transition(accepted(), { type: "confirm_routing", reviewers: [{ dept: "pws", sections: ["Sound details"], dueDate: "2027-05-17" }, hl] }, "clerk", makeCtx());
     expect(result.ok && result.case.reviews.map((r) => r.dept)).toEqual(["pws", "hl"]);

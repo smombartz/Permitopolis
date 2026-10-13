@@ -1,7 +1,7 @@
 import { Section } from "@/components/ui/section"
 import { Progress } from "@/components/ui/progress"
 import { Truncate } from "@/components/ui/truncate"
-import type { EventCase } from "@/lib/types"
+import type { EventCase, Party } from "@/lib/types"
 import { vendorPermitGroup } from "@/lib/view/vendors"
 import { VendorPermitStatusLine } from "@/components/case/vendors/VendorPermitStatus"
 import { IssueFoodPermits } from "@/components/case/vendors/IssueFoodPermits"
@@ -9,12 +9,12 @@ import { IssueFoodPermits } from "@/components/case/vendors/IssueFoodPermits"
 /**
  * The Documents tab's "Vendors" group (workstream 5D, PRD "Vendor permits"): every food
  * vendor's health permit, by its own status word and valid-through date, with the case's
- * overall progress, and "Issue food permits" once the permit is live. Separate from the
+ * overall progress, and "Issue food permits" once the permit is live (a Special event). Separate from the
  * "Health & Legal" department's own accordion above (which is where a permit is actually
  * verified or sent back): this is the per-event roll-up the PRD's row describes. Renders
  * nothing for a case with no food vendors.
  */
-function VendorsSection({ c }: { c: EventCase }) {
+function VendorsSection({ c, role }: { c: EventCase; role: Party }) {
   const group = vendorPermitGroup(c)
   if (!group) return null
 
@@ -32,7 +32,7 @@ function VendorsSection({ c }: { c: EventCase }) {
           </li>
         ))}
       </ul>
-      <IssueFoodPermits c={c} />
+      <IssueFoodPermits c={c} role={role} />
     </Section>
   )
 }

@@ -5,11 +5,12 @@ import { Button } from "@/components/ui/button"
 import { Section } from "@/components/ui/section"
 import { EmptyState } from "@/components/ui/empty-state"
 import { Badge } from "@/components/ui/badge"
+import { Chip } from "@/components/ui/chip"
 import { FilterChip } from "@/components/ui/filter-bar"
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion"
 import { Progress } from "@/components/ui/progress"
 import { FormAnswers, TaskKindLabel } from "@/components/domain"
-import { FileQuestionIcon } from "lucide-react"
+import { FilePenLineIcon, FileQuestionIcon } from "lucide-react"
 import { fmtDate, fmtFileSize, plural } from "@/lib/format"
 import { useDemo } from "@/lib/state"
 import { PARTY_LABEL, type EventCase, type ISODate, type Party, type Task, type TaskStatus } from "@/lib/types"
@@ -73,6 +74,13 @@ function DocumentCard({ task, role, today, onOpen }: { task: Task; role: Party; 
         <div className="flex items-center gap-2">
           <TaskKindLabel kind={task.kind} />
           <span className="text-sm font-semibold text-fg">{task.title}</span>
+          {/* The same chip the applicant's board puts on a card an amendment added. */}
+          {task.tags.includes("amendment") ? (
+            <Chip variant="pill">
+              <FilePenLineIcon className="size-3" aria-hidden="true" />
+              Amendment
+            </Chip>
+          ) : null}
         </div>
         <Badge variant={badge.variant}>{badge.text}</Badge>
       </div>
@@ -222,7 +230,7 @@ function DocumentsTab({ c, role, onOpen }: DocumentsTabProps) {
           ))}
         </div>
       )}
-      {hasVendors ? <VendorsSection c={c} /> : null}
+      {hasVendors ? <VendorsSection c={c} role={role} /> : null}
     </div>
   )
 }

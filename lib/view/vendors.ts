@@ -3,12 +3,15 @@
  * 5D, "Vendor permits"): the Documents tab's "Vendors" group, and what "Issue food permits"
  * needs. No React, no store. Tested against the real seed in vendors.test.ts.
  *
- * `issueFoodPermitsStatus()` is built against a contract the engine does not have yet: see the
- * `issue_food_permits` engineRequest in this workstream's hand-off. Until `lib/state` grows that
- * city task, this always finds none and the UI it drives stays disabled with that reason.
+ * "Issue food permits" is Health & Legal's own city task (`CITY_TASKS.issue_food_permits`):
+ * `issue_permit` creates it for a Special event with food vendors, it opens once every vendor's
+ * health permit is verified, and finishing it (`complete_city_task`) opens the applicant's
+ * "Download per-vendor food permits" card. Whether the button is live, and why not, is the
+ * engine's own answer (`checkCompleteCityTask()`), never a rule of this file's.
  */
+import { checkCompleteCityTask } from "@/lib/state";
 import { buildVerificationPreview } from "@/lib/view/verify";
-import type { EventCase, Task } from "@/lib/types";
+import type { EventCase, ISODate, Task } from "@/lib/types";
 
 /** The word shown for a vendor's health permit: not uploaded, waiting for a check, verified, or sent back. */
 export type VendorPermitStatus = "not_uploaded" | "waiting_for_you" | "verified" | "sent_back";
@@ -56,54 +59,39 @@ export function vendorPermitGroup(c: EventCase): VendorPermitGroup | null {
   return { rows, verifiedCount: rows.filter((row) => row.status === "verified").length, total: rows.length };
 }
 
-/* ---------- Issue food permits (needs the issue_food_permits engineRequest) ---------- */
+/* ---------- Issue food permits ---------- */
 
-/** The catalogue id the engineRequest asks for: a Health & Legal city task that completes the per-vendor permits. */
+/** Health & Legal's city task that issues the per-vendor food permits (`CITY_TASKS.issue_food_permits`). */
 export const ISSUE_FOOD_PERMITS_CATALOG_ID = "issue_food_permits";
 
-/** A Special event with vendors, once its permit is live: the case this action is ever for. */
-export function issueFoodPermitsEligible(c: EventCase): boolean {
-  return c.tier === "special" && (c.addOns.foodVending?.vendors ?? 0) > 0 && c.state !== "draft" && isPermittedOrLater(c);
-}
-
-function isPermittedOrLater(c: EventCase): boolean {
-  return c.state === "permitted" || c.state === "event_day" || c.state === "closeout" || c.state === "closed";
-}
-
-/** The city task the engineRequest describes, if the engine has grown one. Always null today. */
+/** The case's "Issue food permits" task: there from the day the permit is issued, for a Special event with food vendors. */
 export function findIssueFoodPermitsTask(c: EventCase): Task | null {
   return c.tasks.find((task) => task.catalogId === ISSUE_FOOD_PERMITS_CATALOG_ID) ?? null;
 }
 
 export interface IssueFoodPermitsStatus {
-  /** Whether this case ever gets the section at all. */
-  eligible: boolean;
-  /** The engine's own task, once it exists. */
+  /** The engine's task, or null for a case that has no food permits to issue (or no permit yet). */
   task: Task | null;
+  /** The day Health & Legal issued them, once it has. */
+  issuedOn: ISODate | null;
   verifiedCount: number;
   total: number;
-  allVerified: boolean;
-  /** Why the button is disabled; null once it is enabled, and null while `task` is already done. */
+  /** Why the button is disabled, in the engine's words; null once it is enabled, and once the permits are issued. */
   disabledReason: string | null;
 }
 
-/** What the Documents tab's "Issue food permits" section shows and whether its button is live. */
-export function issueFoodPermitsStatus(c: EventCase): IssueFoodPermitsStatus {
-  const eligible = issueFoodPermitsEligible(c);
+/** What the Documents tab's "Issue food permits" block shows, and whether its button is live for Health & Legal today. */
+export function issueFoodPermitsStatus(c: EventCase, today: ISODate): IssueFoodPermitsStatus {
   const group = vendorPermitGroup(c);
-  const verifiedCount = group?.verifiedCount ?? 0;
-  const total = group?.total ?? 0;
-  const allVerified = total > 0 && verifiedCount === total;
   const task = findIssueFoodPermitsTask(c);
-
-  let disabledReason: string | null = null;
-  if (eligible) {
-    if (!task) {
-      disabledReason = "Issuing food permits needs an engine step that does not exist yet.";
-    } else if (task.status !== "done" && !allVerified) {
-      disabledReason = `Waiting on ${total - verifiedCount} of ${total} vendor health permits to be verified.`;
-    }
-  }
-
-  return { eligible, task, verifiedCount, total, allVerified, disabledReason };
+  const issued = task?.status === "done";
+  const issuedOn = issued ? ((task!.history.at(-1)?.at.slice(0, 10) as ISODate | undefined) ?? null) : null;
+  const check = task && !issued ? checkCompleteCityTask(c, task.id, "hl", today) : null;
+  return {
+    task,
+    issuedOn,
+    verifiedCount: group?.verifiedCount ?? 0,
+    total: group?.total ?? 0,
+    disabledReason: check && !check.ok ? check.reason : null,
+  };
 }

@@ -74,6 +74,23 @@ describe("caseBackLink", () => {
   it("does not send another department back to the Clerk's Intake", () => {
     expect(caseBackLink("/city/intake", "pws")).toEqual({ href: "/city/cases", label: "Back to cases" });
   });
+
+  it("returns to each role's own tool page, with that page's tab and filters", () => {
+    expect(caseBackLink("/city/payments?tab=received&method=card", "clerk")).toEqual({ href: "/city/payments?tab=received&method=card", label: "Back to Payments" });
+    expect(caseBackLink("/city/map?mode=day&from=2027-07-11", "pws")).toEqual({ href: "/city/map?mode=day&from=2027-07-11", label: "Back to Closures and routes" });
+    expect(caseBackLink("/city/work-orders?tab=meetings", "pws")).toEqual({ href: "/city/work-orders?tab=meetings", label: "Back to Work orders" });
+    expect(caseBackLink("/city/verifications?group=event", "hl")).toEqual({ href: "/city/verifications?group=event", label: "Back to Verifications" });
+    expect(caseBackLink("/city/inspections", "hl")).toEqual({ href: "/city/inspections", label: "Back to Inspections" });
+  });
+
+  it("does not send a role back to another role's tool page", () => {
+    const pipeline = { href: "/city/cases", label: "Back to cases" };
+    expect(caseBackLink("/city/payments", "hl")).toEqual(pipeline);
+    expect(caseBackLink("/city/map", "clerk")).toEqual(pipeline);
+    expect(caseBackLink("/city/work-orders", "hl")).toEqual(pipeline);
+    expect(caseBackLink("/city/verifications", "pws")).toEqual(pipeline);
+    expect(caseBackLink("/city/inspections", "clerk")).toEqual(pipeline);
+  });
 });
 
 describe("headerReviewClock", () => {

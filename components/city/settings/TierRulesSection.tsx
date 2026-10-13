@@ -5,10 +5,11 @@
  * once it passes `validateTierRules()`; an invalid value stays on screen with its error and is
  * never saved. The "What this changes" panel computes both the open Drafts and the six demo
  * scenarios straight from `classify()` under the edited values (lib/view/settings.ts), so it
- * reads right even while the edit is invalid and unsaved.
+ * reads right even while the edit is invalid and unsaved. The store re-classifies every open
+ * Draft with each saved edit (`setConfig()`), so a draft's own board and wizard already show the
+ * new tier; the panel compares against the rules as they were when the section opened.
  */
 import * as React from "react";
-import Link from "next/link";
 import { Section } from "@/components/ui/section";
 import { Field } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
@@ -17,10 +18,9 @@ import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { StickyAside } from "@/components/ui/sticky-aside";
 import { EmptyState } from "@/components/ui/empty-state";
 import { SlidersHorizontalIcon } from "lucide-react";
-import { TierBadge } from "@/components/domain";
+import { CaseId, TierBadge } from "@/components/domain";
 import { DEFAULT_CONFIG } from "@/lib/rules";
 import type { RulesConfig } from "@/lib/rules/types";
-import { routes } from "@/lib/routes";
 import { plural } from "@/lib/format";
 import type { EventCase, Tier } from "@/lib/types";
 import {
@@ -42,10 +42,9 @@ interface TierRulesSectionProps {
   cfg: RulesConfig;
   cases: EventCase[];
   setConfig: (patch: Partial<RulesConfig>) => void;
-  settingsHref: string;
 }
 
-function TierRulesSection({ cfg, cases, setConfig, settingsHref }: TierRulesSectionProps) {
+function TierRulesSection({ cfg, cases, setConfig }: TierRulesSectionProps) {
   const [edits, setEdits] = React.useState<TierRulesEdits>(() => tierRulesFromConfig(cfg));
   const [confirmOpen, setConfirmOpen] = React.useState(false);
   const errors = validateTierRules(edits);
@@ -130,7 +129,7 @@ function TierRulesSection({ cfg, cases, setConfig, settingsHref }: TierRulesSect
           </div>
         </div>
 
-        <WhatThisChangesPanel draftChanges={draftChanges} scenarioRows={scenarioRows} settingsHref={settingsHref} />
+        <WhatThisChangesPanel draftChanges={draftChanges} scenarioRows={scenarioRows} />
       </div>
 
       <ConfirmDialog
@@ -150,10 +149,9 @@ const TIER_LABEL_SHORT: Record<Tier, string> = { instant: "Instant", reviewed: "
 interface WhatThisChangesPanelProps {
   draftChanges: TierChangeRow[];
   scenarioRows: ScenarioPreviewRow[];
-  settingsHref: string;
 }
 
-function WhatThisChangesPanel({ draftChanges, scenarioRows, settingsHref }: WhatThisChangesPanelProps) {
+function WhatThisChangesPanel({ draftChanges, scenarioRows }: WhatThisChangesPanelProps) {
   const changedScenarios = scenarioRows.filter((r) => r.before !== r.after).length;
   return (
     <StickyAside className="w-full lg:w-auto">
@@ -173,9 +171,11 @@ function WhatThisChangesPanel({ draftChanges, scenarioRows, settingsHref }: What
             <ul className="flex flex-col gap-2">
               {draftChanges.map((row) => (
                 <li key={row.caseId} className="flex items-center justify-between gap-3 text-sm">
-                  <Link href={routes.city.case(row.caseId, { from: settingsHref })} className="min-w-0 truncate text-fg underline-offset-2 hover:underline">
-                    {row.name}
-                  </Link>
+                  {/* Named, not linked: a Draft is the applicant's alone, and the city has no page for one. */}
+                  <span className="flex min-w-0 flex-col">
+                    <span className="truncate text-fg">{row.name || "Untitled event"}</span>
+                    <CaseId id={row.caseId} />
+                  </span>
                   <span className="flex shrink-0 items-center gap-1.5 text-xs">
                     <TierBadge tier={row.before} />
                     <span aria-hidden="true" className="text-fg-tertiary">{/* guard-allow-tertiary: decorative arrow; the tier badges carry the meaning. */}

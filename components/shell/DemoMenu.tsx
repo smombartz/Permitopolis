@@ -19,6 +19,7 @@ import {
 import { DemoDatePicker } from "@/components/shell/DemoDatePicker";
 import { useDemo } from "@/lib/state";
 import { SCENARIO_JUMPS, type ScenarioJump } from "@/lib/data/demoScript";
+import { demoPathIdForScenario } from "@/lib/view/coach";
 import { fmtDate } from "@/lib/format";
 import { homeFor, routes } from "@/lib/routes";
 import { DEFAULT_DEMO_TODAY } from "@/lib/rules/config";
@@ -34,6 +35,7 @@ function DemoMenu() {
   const toggleHints = useDemo((s) => s.toggleHints);
   const setRole = useDemo((s) => s.setRole);
   const setPersona = useDemo((s) => s.setPersona);
+  const setActiveDemoPath = useDemo((s) => s.setActiveDemoPath);
 
   const [resetOpen, setResetOpen] = React.useState(false);
   const [dateOpen, setDateOpen] = React.useState(false);
@@ -72,10 +74,14 @@ function DemoMenu() {
     event.preventDefault();
   }
 
-  /** A jump names its own page, so it sets the role and persona itself and skips useRoleSwitch(). */
+  /**
+   * A jump names its own page, so it sets the role and persona itself and skips useRoleSwitch().
+   * It also puts the demo coach on the path built on that scenario (S3 is path 3).
+   */
   function handleScenarioJump(jump: ScenarioJump) {
     setRole(jump.role);
     setPersona(jump.personaId);
+    setActiveDemoPath(demoPathIdForScenario(jump.id));
     router.push(jump.path);
   }
 

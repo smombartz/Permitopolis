@@ -4,8 +4,10 @@ import type { RulesCtx } from "@/lib/rules/types";
 import type { Actor, EventCase } from "@/lib/types";
 import type { Action } from "../actions";
 import { checkPay } from "../checks";
+import { amendmentBalance } from "../amendment";
 import { appendActivity, findTask, moveTask, nowOf, patchTask, quoteBalance, taskId, totalPaid } from "../core";
 import type { TransitionResult } from "../types";
+import { maybeFinishAmendment } from "./amendment";
 import { maybeUnlockIssuePermit } from "./shared";
 
 type PayAction = Extract<Action, { type: "pay" }>;
@@ -22,7 +24,9 @@ export function pay(c: EventCase, action: PayAction, actor: Actor, ctx: RulesCtx
   if (action.kind === "quote") {
     // The card is done only when the quote is covered. A part payment (the Clerk records
     // whatever was handed over) leaves it open for the balance, so the applicant is still up.
-    const remaining = quoteBalance(next, ctx.cfg);
+    // On a permitted case the "quote" is an amendment's: what the amended plan costs beyond
+    // what was paid.
+    const remaining = c.state === "quote_sent" ? quoteBalance(next, ctx.cfg) : amendmentBalance(next, ctx.cfg);
     const payFees = findTask(next, taskId(next.id, "pay_fees"));
     if (payFees && payFees.status !== "done") {
       next =
@@ -51,7 +55,8 @@ export function pay(c: EventCase, action: PayAction, actor: Actor, ctx: RulesCtx
   }
 
   next = appendActivity(next, actor, `Recorded a payment of ${fmtMoney(action.amount)} (${action.method === "card" ? "card" : "in person"}).`, ctx);
-  return { ok: true, case: next };
+  // Paying what an approved amendment adds can be the last thing it waits for.
+  return { ok: true, case: action.kind === "quote" ? maybeFinishAmendment(next, ctx) : next };
 }
 
 /** A series' quote includes its first session, so paying the quote pays that session. */

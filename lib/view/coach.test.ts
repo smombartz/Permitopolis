@@ -1,5 +1,5 @@
 /**
- * `pathProgress()` and `activeDemoPathId()` against the real store: each of the seven demo
+ * `pathProgress()` against the real store: each of the seven demo
  * paths is replayed step by step the way tests/demo-paths.test.ts does, and the derived step
  * must advance exactly once per coach step and read done at the end; after reset() it is back
  * at step 1. See lib/view/coach.ts for why path 7's three steps land together.
@@ -8,7 +8,8 @@ import { beforeEach, describe, expect, it } from "vitest";
 import { DEMO_PATHS } from "@/lib/data/demoScript";
 import { EMPTY_ADDONS, type EventAnswers } from "@/lib/types";
 import { resetDemoStoreForTests, useDemo } from "@/lib/state";
-import { activeDemoPathId, pathProgress } from "./coach";
+import { pageIsFor } from "./shell";
+import { activeDemoPathOf, demoPathIdForScenario, pathProgress } from "./coach";
 
 const store = () => useDemo.getState();
 const ctx = () => ({ cases: store().cases, role: store().role, personaId: store().personaId, today: store().demoToday });
@@ -231,20 +232,33 @@ describe("pathProgress", () => {
   });
 });
 
-describe("activeDemoPathId", () => {
-  it("reads the scenario path off the case on screen", () => {
-    expect(activeDemoPathId("/events/PMT-27-0142")).toBe(1);
-    expect(activeDemoPathId("/apply", "?case=PMT-27-0142&step=when")).toBe(1);
-    expect(activeDemoPathId("/events/PMT-27-0118")).toBe(3);
-    expect(activeDemoPathId("/city/cases/PMT-27-0097")).toBe(5);
-    expect(activeDemoPathId("/city/cases/PMT-27-0031?tab=activity")).toBe(6);
+describe("which path the coach is on", () => {
+  it("a jump to a scenario puts the coach on the path built on it", () => {
+    expect(demoPathIdForScenario("S1")).toBe(7);
+    expect(demoPathIdForScenario("S2")).toBe(1);
+    expect(demoPathIdForScenario("S3")).toBe(3);
+    expect(demoPathIdForScenario("S4")).toBe(4);
+    expect(demoPathIdForScenario("S5")).toBe(5);
+    expect(demoPathIdForScenario("S6")).toBe(6);
+    // Every scenario has a path, and path 2 (the tier-watching one) is the only path with none.
+    expect(DEMO_PATHS.filter((p) => p.scenario === null).map((p) => p.id)).toEqual([2]);
   });
 
-  it("is path 2 on a blank wizard, and null everywhere else with no matching case", () => {
-    expect(activeDemoPathId("/apply")).toBe(2);
-    expect(activeDemoPathId("/apply", "?step=where")).toBe(2);
-    expect(activeDemoPathId("/apply", "?case=PMT-27-0004")).toBeNull(); // somebody else's draft
-    expect(activeDemoPathId("/events")).toBeNull();
-    expect(activeDemoPathId("/city/queue")).toBeNull();
+  it("is the store's activeDemoPath: none until the presenter picks one, and none again after Reset", () => {
+    expect(activeDemoPathOf(store().activeDemoPath)).toBeUndefined();
+    store().setActiveDemoPath(5);
+    expect(activeDemoPathOf(store().activeDemoPath)?.title).toBe("Two parties up at once");
+    store().reset();
+    expect(activeDemoPathOf(store().activeDemoPath)).toBeUndefined();
+    // A number that names no path (a stored demo from a build with another script) shows nothing.
+    expect(activeDemoPathOf(12)).toBeUndefined();
+  });
+
+  it("every step's page is a page of the role the step is for", () => {
+    for (const p of DEMO_PATHS) {
+      for (const step of p.steps) {
+        expect(pageIsFor(step.role, step.page), `path ${p.id}, ${step.id}: ${step.page} as ${step.role}`).toBe(true);
+      }
+    }
   });
 });

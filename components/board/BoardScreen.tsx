@@ -95,6 +95,7 @@ function BoardScreen() {
 
   const cases = useDemo((s) => s.cases)
   const today = useDemo((s) => s.demoToday)
+  const cfg = useDemo((s) => s.cfg)
   // Below 768px the header's stepper is markers and the one current label (see CaseHeader).
   const narrow = useIsNarrow()
   const c = cases.find((candidate) => candidate.id === id)
@@ -170,7 +171,7 @@ function BoardScreen() {
 
       {c.ending ? <EndingBanner ending={c.ending} reason={c.endingReason} /> : <StatusStrip c={c} />}
       {!c.ending && closeoutStatusLine(c) ? <Banner data-slot="closeout-status">{closeoutStatusLine(c)}</Banner> : null}
-      {!c.ending && amendmentBanner(c) ? <Banner data-slot="amendment-pending">{amendmentBanner(c)!.text}</Banner> : null}
+      {!c.ending && amendmentBanner(c, cfg) ? <Banner data-slot="amendment-pending">{amendmentBanner(c, cfg)!.text}</Banner> : null}
 
       {!c.ending ? (
         <div className="flex items-center justify-between gap-3">

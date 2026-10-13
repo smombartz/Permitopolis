@@ -5,7 +5,8 @@
  * ones. Case ids follow `docs/spec/prd.md`'s "Seed data" table and plan 3.3;
  * `tests/seed.test.ts` checks every jump against the seed itself.
  *
- * Owned by workstream 2B (components/shell, lib/view/shell.ts).
+ * First written by workstream 2B (the jumps and the paths); each step's id, page and
+ * presenter's wording were added by 5E for the demo coach (lib/view/coach.ts).
  */
 import { routes } from "@/lib/routes";
 import { DEFAULT_DEMO_TODAY } from "@/lib/rules/config";
@@ -287,10 +288,11 @@ export const DEMO_PATHS: DemoPath[] = [
         id: "add-dj",
         role: "applicant",
         persona: "maya-chen",
-        page: routes.event(S1),
+        // The wizard reopened on the same record: the board's menu and the permit both link here.
+        page: routes.amend(S1),
         text: "Add a DJ. The event becomes Reviewed and the date gate fires: 19 days left, 30 needed.",
       },
-      { id: "choose-late-fee", role: "applicant", persona: "maya-chen", page: routes.event(S1), text: "Choose the late fee." },
+      { id: "choose-late-fee", role: "applicant", persona: "maya-chen", page: routes.amend(S1), text: "Choose the late fee." },
       {
         id: "amendment-cards",
         role: "applicant",

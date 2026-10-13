@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { useRouter } from "next/navigation";
 import { ChevronDownIcon, XIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Callout } from "@/components/ui/callout";
@@ -14,16 +14,18 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { useDemo } from "@/lib/state";
 import { DEMO_PATHS, type DemoPath, type DemoStep } from "@/lib/data/demoScript";
-import { activeDemoPathId, pathProgress } from "@/lib/view/coach";
+import { activeDemoPathOf, pathProgress } from "@/lib/view/coach";
 import { PARTY_LABEL } from "@/lib/types";
 
 /**
- * The demo coach: a slim, dismissible strip under the top bar naming the step of the demo
- * path the case (or wizard) on screen is built on. Shown only while Demo hints are on; reads
- * `activeDemoPathId()` off the URL and `pathProgress()` off the store, so it is right after a
- * reload, after the presenter improvises, and after Reset — never counted from clicks. It
- * reads `useSearchParams()`, so AppShell/CityShell mount it under its own `<Suspense>`, the
- * same way they mount `<RememberPath />`.
+ * The demo coach: a slim, dismissible strip under the top bar naming the current step of the
+ * demo path the presenter picked. Shown only while Demo hints are on. Which path is the
+ * store's `activeDemoPath` (set by the demo guide, this strip's own menu, the command palette
+ * and every scenario jump; cleared by Reset and by dismissing the strip), so the strip stays
+ * with the presenter on pages that name no case (My queue, Active permits, a blank wizard) and
+ * a dismissal holds across the applicant's and the city's shells. Which step is
+ * `pathProgress()`, read off the cases, so it is right after a reload, after the presenter
+ * improvises, and after Reset: never counted from clicks.
  */
 function CoachStrip() {
   const hints = useDemo((s) => s.hints);
@@ -31,19 +33,14 @@ function CoachStrip() {
   const personaId = useDemo((s) => s.personaId);
   const demoToday = useDemo((s) => s.demoToday);
   const cases = useDemo((s) => s.cases);
+  const activeDemoPath = useDemo((s) => s.activeDemoPath);
+  const setActiveDemoPath = useDemo((s) => s.setActiveDemoPath);
   const setRole = useDemo((s) => s.setRole);
   const setPersona = useDemo((s) => s.setPersona);
-  const pathname = usePathname();
-  const search = useSearchParams();
   const router = useRouter();
-  // Dismissed strips remember the path id, not just "dismissed", so moving on to another path
-  // (or back to this one on a later visit) shows the strip again.
-  const [dismissedPathId, setDismissedPathId] = React.useState<number | null>(null);
 
-  const pathId = hints ? activeDemoPathId(pathname, search.toString()) : null;
-  const path = pathId ? DEMO_PATHS.find((p) => p.id === pathId) : undefined;
-
-  if (!path || path.id === dismissedPathId) return null;
+  const path = hints ? activeDemoPathOf(activeDemoPath) : undefined;
+  if (!path) return null;
 
   const progress = pathProgress(path, { cases, role, personaId, today: demoToday });
   const { step, stepIndex, totalSteps, done } = progress;
@@ -55,6 +52,7 @@ function CoachStrip() {
   }
 
   function startPath(p: DemoPath) {
+    setActiveDemoPath(p.id);
     goTo(p.steps[0]);
   }
 
@@ -90,7 +88,7 @@ function CoachStrip() {
                 ))}
               </DropdownMenuContent>
             </DropdownMenu>
-            <Button type="button" size="icon-sm" variant="ghost" aria-label="Dismiss the demo coach" onClick={() => setDismissedPathId(path.id)}>
+            <Button type="button" size="icon-sm" variant="ghost" aria-label="Dismiss the demo coach" onClick={() => setActiveDemoPath(null)}>
               <XIcon aria-hidden="true" />
             </Button>
           </div>

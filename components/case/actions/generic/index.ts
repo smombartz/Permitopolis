@@ -13,6 +13,7 @@ import { AcceptCompletePanel } from "./AcceptComplete";
 import { AddNotePanel } from "./AddNote";
 import { CompleteCityTaskPanel } from "./CompleteCityTask";
 import { ConfirmRoutingPanel } from "./ConfirmRouting";
+import { DecideAmendmentPanel } from "./DecideAmendment";
 import { DenyPanel } from "./Deny";
 import { IssuePermitPanel } from "./IssuePermit";
 import { LogCloseoutPanel } from "./LogCloseout";
@@ -43,6 +44,8 @@ export const GENERIC_PANELS: Partial<Record<ActionType, ActionPanelComponent>> =
   complete_city_task: CompleteCityTaskPanel,
   log_closeout: LogCloseoutPanel,
   reconcile_close: ReconcileClosePanel,
+  // Phase 5: the Clerk's decision on an amendment the applicant has submitted.
+  decide_amendment: DecideAmendmentPanel,
   add_note: AddNotePanel,
   remind: RemindPanel,
 };

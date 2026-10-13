@@ -11,7 +11,7 @@ import { routes } from "@/lib/routes";
 import { useDemo } from "@/lib/state";
 import { makeCase } from "@/lib/state/testSupport";
 import { EMPTY_ADDONS } from "@/lib/types";
-import { lastReplace, renderScreen } from "./harness";
+import { lastReplace, renderScreen, storedCase } from "./harness";
 
 const S2 = "PMT-27-0142"; // Sunrise Yoga Club weekly class: Instant Draft, booked on Field 4
 
@@ -50,8 +50,12 @@ describe("Settings: Tier rules (default section)", () => {
     await user.type(input, "40");
 
     expect(within(tierRulesPanel()).getByText(/1 open Draft would change tier/)).toBeInTheDocument();
-    const row = within(tierRulesPanel()).getByRole("link", { name: "A 45-guest picnic draft" });
-    expect(row).toHaveAttribute("href", expect.stringContaining(`/city/cases/${draft.id}`));
+    // Named with its id, and not a link: a Draft is the applicant's alone, so the city has no page to open for it.
+    const row = within(tierRulesPanel()).getByText("A 45-guest picnic draft").closest("li") as HTMLElement;
+    expect(within(row).getByText(draft.id)).toBeInTheDocument();
+    expect(within(tierRulesPanel()).queryByRole("link")).not.toBeInTheDocument();
+    // The Draft itself has moved in the store, not only in this panel: its board and wizard read Reviewed too.
+    expect(storedCase(draft.id).tier).toBe("reviewed");
   });
 
   it("an invalid threshold shows its error and is never saved", async () => {

@@ -60,8 +60,10 @@ describe("the registry opens the Phase 4 panels", () => {
       if (!generic) continue;
       for (const role of roles) expect(panelFor(type, role), `${type} as ${role}`).toBe(generic);
     }
-    // The 17 actions a city role takes from the case; the applicant's own are on the board.
-    expect(Object.keys(GENERIC_PANELS)).toHaveLength(17);
+    // The 18 actions a city role takes from the case (Phase 5 added the Clerk's decision on an
+    // amendment); the applicant's own are on the board.
+    expect(Object.keys(GENERIC_PANELS)).toHaveLength(18);
+    expect(GENERIC_PANELS.decide_amendment).toBeDefined();
   });
 
   it("the panels that hold two columns or a table open wide; a short form does not", () => {

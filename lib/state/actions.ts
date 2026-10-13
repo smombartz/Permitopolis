@@ -60,7 +60,9 @@ export type Action =
    * sessions are listed and the date gate runs again: a place that is no longer free is refused,
    * and so is an amendment that raises the tier or moves the date inside the new tier's lead
    * time, unless `lateFee` is true. The plan's fee lines are replaced; lines a reviewer added,
-   * the state, the permit and the hold stay as they are.
+   * the state, the permit and the hold stay as they are. A change that adds no card takes effect
+   * at once; one that adds a card is pending until the applicant has submitted it (`submit`) and
+   * the City Clerk has decided it (`decide_amendment`).
    */
   | { type: "amend"; answers: EventAnswers; lateFee?: boolean }
 
@@ -87,6 +89,15 @@ export type Action =
   | { type: "issue_permit" }
   /** Closeout to Closed. Issues the final invoice or the deposit refund. */
   | { type: "reconcile_close" }
+  /**
+   * P1. The Clerk's decision on an amendment the applicant has submitted. `approve` needs every
+   * card of the amendment a department was checking to be verified; on a permitted case it opens
+   * the amendment's "Accept conditions and sign" and reopens "Pay fees and deposit" for what the
+   * amended plan costs beyond what was paid (a difference the other way is refunded), and the
+   * amendment takes effect once the applicant has signed and paid. `decline` needs a `reason` and
+   * puts the record back exactly as it was before the amendment.
+   */
+  | { type: "decide_amendment"; decision: "approve" | "decline"; reason?: string }
 
   /* ---- any city role ---- */
   /**
@@ -162,6 +173,7 @@ export const ACTION_TYPES: ActionType[] = [
   "deny",
   "issue_permit",
   "reconcile_close",
+  "decide_amendment",
   "request_info",
   "verify_document",
   "reject_document",

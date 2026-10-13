@@ -2,12 +2,14 @@
 
 import * as React from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { CardPaymentForm } from "@/components/checkout/CardPaymentForm";
 import { PlanSummaryCard } from "@/components/checkout/PlanSummaryCard";
 import { SignatureForm } from "@/components/checkout/SignatureForm";
 import { CaseHeader, ConditionList, FeeTable } from "@/components/domain";
 import { useIsNarrow } from "@/components/shell";
+import { Banner } from "@/components/ui/banner";
 import { Button } from "@/components/ui/button";
 import { InlineAlert } from "@/components/ui/inline-alert";
 import { BackLink } from "@/components/ui/page-header";
@@ -15,11 +17,13 @@ import { Section } from "@/components/ui/section";
 import { applicantNameOf } from "@/lib/data/people";
 import { fmtDate, fmtMoney, plural } from "@/lib/format";
 import { routes } from "@/lib/routes";
-import { eventDate, useDemo } from "@/lib/state";
+import { amendmentSignOpen, eventDate, useDemo } from "@/lib/state";
 import type { EventCase } from "@/lib/types";
 import {
   afterQuotePaymentMessage,
   allAccepted,
+  amendmentAmountOwed,
+  amendmentQuoteOpen,
   isQuotePaid,
   planSummary,
   quoteAmountOwed,
@@ -27,8 +31,22 @@ import {
   seriesQuoteNote,
 } from "@/lib/view/checkout";
 
-/** QUOTE mode: accept and sign, then pay — the one place an applicant pays for a quote. */
-function QuotePanel({ c, today }: { c: EventCase; today: string }) {
+interface QuotePanelProps {
+  c: EventCase;
+  today: string;
+  /** The quote is an approved amendment's: the case has its permit, and this settles what the change adds. */
+  amendment?: boolean;
+  /** Called when a signature or payment was the last thing an amendment waited for: it is in effect, and this page has nothing left. */
+  onSettled?: () => void;
+}
+
+/**
+ * QUOTE mode: accept and sign, then pay — the one place an applicant pays for a quote. An
+ * approved amendment's quote is the same page on a case that already has its permit: the
+ * signature if the amended plan needs one it never had, then the difference.
+ */
+function QuotePanel({ c, today, amendment = false, onSettled }: QuotePanelProps) {
+  const router = useRouter();
   const dispatch = useDemo((s) => s.dispatch);
   const cfg = useDemo((s) => s.cfg);
   // Eight stepper labels need about 385px and the fee table about 430px; a phone has 295.
@@ -40,12 +58,26 @@ function QuotePanel({ c, today }: { c: EventCase; today: string }) {
 
   const plan = planSummary(c);
   const applicantName = applicantNameOf(c);
-  const paid = isQuotePaid(c, cfg);
-  const owed = quoteAmountOwed(c, cfg);
+  const owed = amendment ? amendmentAmountOwed(c, cfg) : quoteAmountOwed(c, cfg);
+  const paid = amendment ? owed <= 0 : isQuotePaid(c, cfg);
   const dueNow = quoteDueNow(c, cfg);
   const amountToPay = owed > 0 ? owed : dueNow;
-  const series = seriesQuoteNote(c, cfg);
+  const series = amendment ? null : seriesQuoteNote(c, cfg);
   const everyAccepted = allAccepted(c.conditions, acceptedIds);
+  // An amended plan that was signed before needs no second signature: only the new card asks for one.
+  const signed = amendment ? !amendmentSignOpen(c) : c.flags.signed;
+
+  /** The amendment took effect with this click: the case has nothing left to sign or pay here. */
+  function settledNow(): boolean {
+    const now = useDemo.getState().cases.find((x) => x.id === c.id);
+    return amendment && !!now && !now.flags.amendmentPending && !amendmentQuoteOpen(now);
+  }
+
+  function leaveIfSettled() {
+    if (!settledNow()) return;
+    onSettled?.();
+    router.push(routes.event(c.id));
+  }
 
   function toggleAccept(id: string) {
     setAcceptedIds((current) => (current.includes(id) ? current.filter((x) => x !== id) : [...current, id]));
@@ -53,13 +85,19 @@ function QuotePanel({ c, today }: { c: EventCase; today: string }) {
 
   function handleSign(signature: string) {
     const result = dispatch(c.id, { type: "accept_and_sign", signature });
-    if (result.ok) toast.success("Signed.");
+    if (result.ok) {
+      toast.success("Signed.");
+      leaveIfSettled();
+    }
     return result;
   }
 
   function handlePay() {
     const result = dispatch(c.id, { type: "pay", amount: amountToPay, method: "card", kind: "quote" });
-    if (result.ok) toast.success("Paid.");
+    if (result.ok) {
+      toast.success("Paid.");
+      leaveIfSettled();
+    }
     return result;
   }
 
@@ -80,6 +118,13 @@ function QuotePanel({ c, today }: { c: EventCase; today: string }) {
       {c.dateHold.status === "held" && c.dateHold.expiresOn ? (
         <InlineAlert variant="warning">Pay by {fmtDate(c.dateHold.expiresOn)} to keep your date.</InlineAlert>
       ) : null}
+      {amendment ? (
+        <Banner data-slot="amendment-quote">
+          {c.flags.amendmentPending
+            ? "The City Clerk approved your amendment. It takes effect once you have signed and paid what it adds; your current permit stays valid for the original plan until then."
+            : "Your change is in effect. What it adds to your fees is due here."}
+        </Banner>
+      ) : null}
 
       <Section title="Your plan">
         <PlanSummaryCard plan={plan} />
@@ -87,9 +132,9 @@ function QuotePanel({ c, today }: { c: EventCase; today: string }) {
 
       <Section
         title="Conditions"
-        description={c.flags.signed ? undefined : "Read every condition, then check each one to accept it."}
+        description={signed ? undefined : c.conditions.length > 0 ? "Read every condition, then check each one to accept it." : "This plan carries no conditions; your signature accepts the plan as amended."}
       >
-        <ConditionList conditions={c.conditions} editable={!c.flags.signed} acceptedIds={acceptedIds} onToggleAccept={toggleAccept} />
+        <ConditionList conditions={c.conditions} editable={!signed} acceptedIds={acceptedIds} onToggleAccept={toggleAccept} />
       </Section>
 
       <Section
@@ -105,7 +150,7 @@ function QuotePanel({ c, today }: { c: EventCase; today: string }) {
       </Section>
 
       <Section title="Sign">
-        {c.flags.signed ? (
+        {signed ? (
           <InlineAlert variant="success">Signed and dated.</InlineAlert>
         ) : (
           <SignatureForm
@@ -119,7 +164,7 @@ function QuotePanel({ c, today }: { c: EventCase; today: string }) {
       <Section title="Pay">
         {paid ? (
           <div className="flex flex-col gap-3">
-            <InlineAlert variant="success">{afterQuotePaymentMessage(c)}</InlineAlert>
+            <InlineAlert variant="success">{amendment ? "Nothing more to pay. Sign above to put your change into effect." : afterQuotePaymentMessage(c)}</InlineAlert>
             <Button asChild variant="secondary" className="self-start">
               <Link href={routes.event(c.id)}>Back to your board</Link>
             </Button>
@@ -127,8 +172,8 @@ function QuotePanel({ c, today }: { c: EventCase; today: string }) {
         ) : (
           <CardPaymentForm
             amount={amountToPay}
-            covers={plan.isSeries ? "The first session, plus fees and deposit" : "This event's fees and deposit"}
-            disabled={!c.flags.signed}
+            covers={amendment ? "What your change adds, beyond what you have paid" : plan.isSeries ? "The first session, plus fees and deposit" : "This event's fees and deposit"}
+            disabled={!signed}
             disabledReason="Sign first."
             onPay={handlePay}
           />

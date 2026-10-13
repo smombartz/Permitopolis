@@ -13,7 +13,7 @@ import { fmtDate, fmtNumber, fmtTimeRange } from "@/lib/format";
 import { classify } from "@/lib/rules";
 import type { RulesConfig } from "@/lib/rules";
 import { routes } from "@/lib/routes";
-import { refundIfCancelled } from "@/lib/state";
+import { permittedPlan, refundIfCancelled } from "@/lib/state";
 import type { EventCase, ISODate } from "@/lib/types";
 import { sessionRows } from "@/lib/view/permit";
 
@@ -35,11 +35,15 @@ function useOrigin(): string {
  * The permit itself: mobile-first (applicants carry it on a phone), and what prints through
  * `PermitPrintStyles`'s visibility pattern when `id="permit-print-area"` is targeted.
  */
-function PermitCard({ c, today, cfg }: { c: EventCase; today: ISODate; cfg: RulesConfig }) {
+function PermitCard({ c: record, today, cfg }: { c: EventCase; today: ISODate; cfg: RulesConfig }) {
+  // The plan the permit covers. While an amendment is pending that is the plan from before it
+  // (PRD: "the current permit stays valid for the original plan until the amendment is
+  // approved"): its place, hours, tier and what it covers, not the amended ones on the record.
+  const c = permittedPlan(record);
   const cls = classify(c, cfg);
   const contact = CITY_STAFF_BY_DEPT.clerk;
   // What `cancel` would pay back today: capped at what was paid, the deposit included.
-  const refund = refundIfCancelled(c, today, cfg);
+  const refund = refundIfCancelled(record, today, cfg);
   const bands = [...cfg.cancellation].sort((a, b) => b.minDaysBefore - a.minDaysBefore);
   const rows = sessionRows(c);
   const isSeries = !!c.schedule?.recurrence;

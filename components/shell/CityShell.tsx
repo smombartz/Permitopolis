@@ -60,9 +60,7 @@ function CityShell({ children }: CityShellProps) {
       ) : (
         <main className="flex-1">
           {!storageOk ? <StorageBanner /> : null}
-          <React.Suspense fallback={null}>
-            <CoachStrip />
-          </React.Suspense>
+          <CoachStrip />
           {isCityRole(role) ? (
             <div className="page-container flex gap-6 py-6">
               <CitySidebar role={role} pathname={pathname} queueCount={queueFor(cases, role, demoToday).length} />

@@ -212,6 +212,8 @@ export type UnlockEvent =
   | "signed"
   | "paid"
   | "permitted"
+  /** Health & Legal finished its "Issue food permits" task (a Special event with food vendors). */
+  | "food_permits_issued"
   | "event_day"
   | "closeout"
   | "hours_logged"

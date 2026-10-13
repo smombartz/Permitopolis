@@ -69,8 +69,12 @@ function AmendReviewStep({ diff, gateBanner, leadTimeDays, ready, error, onConfi
         <h3 className="text-sm font-bold text-fg">What happens next</h3>
         <p className="text-sm text-fg-secondary">
           {diff.material
-            ? "This needs a look from the City Clerk. Finish the new cards and submit the amendment from your board; your permit keeps covering the original plan until it is decided."
-            : "Nothing here needs another look: it takes effect as soon as you confirm."}
+            ? "This needs a look from the city. Finish the new cards and submit the amendment from your board. The departments check them, the City Clerk decides, and you then sign and pay what the change adds. Your permit keeps covering the original plan until then."
+            : diff.feeDiff > 0
+              ? "Nothing here needs another look: it takes effect as soon as you confirm, and what it adds to your fees is then due from your board."
+              : diff.feeDiff < 0
+                ? "Nothing here needs another look: it takes effect as soon as you confirm, and the difference is refunded."
+                : "Nothing here needs another look: it takes effect as soon as you confirm."}
         </p>
       </section>
 

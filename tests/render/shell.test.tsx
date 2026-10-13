@@ -5,7 +5,7 @@ import { AppShell } from "@/components/shell/AppShell";
 import { CaseNotFound } from "@/components/shell/CaseNotFound";
 import { CityShell } from "@/components/shell/CityShell";
 import { PlaceholderScreen } from "@/components/shell/PlaceholderScreen";
-import { SCENARIO_JUMPS } from "@/lib/data/demoScript";
+import { DEMO_PATHS, SCENARIO_JUMPS } from "@/lib/data/demoScript";
 import { PERSONA_BY_ID, PICKABLE_PERSONA_IDS } from "@/lib/data/people";
 import { DEFAULT_DEMO_TODAY } from "@/lib/rules";
 import { makeCase, makeTask } from "@/lib/state/testSupport";
@@ -248,6 +248,10 @@ describe("Demo menu", () => {
     expect(useDemo.getState()).toMatchObject({ role: jump.role, personaId: jump.personaId });
     expect(lastPush()).toBe(jump.path);
     expect(storedCase(jump.caseId).applicantId).toBe(jump.personaId);
+    // The demo coach is now on the path built on this scenario, and its first step is this jump's role.
+    const path = DEMO_PATHS.find((p) => p.scenario === jump.id)!;
+    expect(useDemo.getState().activeDemoPath).toBe(path.id);
+    expect(path.steps[0].role).toBe(jump.role);
   });
 
   it.each(SCENARIO_JUMPS)("$id lands inside the shell built for its role, with no switch-role panel", async (jump) => {

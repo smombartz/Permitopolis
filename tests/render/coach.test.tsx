@@ -1,4 +1,4 @@
-import { act, screen } from "@testing-library/react";
+import { act, render, screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 import { AppShell } from "@/components/shell/AppShell";
 import { CityShell } from "@/components/shell/CityShell";
@@ -9,7 +9,7 @@ const S3 = "PMT-27-0118";
 const HEALTH_PERMIT = `${S3}:vendor_health_permit:1`;
 
 describe("CoachStrip", () => {
-  it("with hints on and S3 on screen, shows path 3 step 1", async () => {
+  it("with hints on, after the jump to S3, shows path 3 step 1", async () => {
     await renderScreen(<AppShell>board</AppShell>, { scenario: "S3" });
 
     expect(screen.getByText("Path 3 · Step 1 of 5")).toBeInTheDocument();
@@ -50,16 +50,51 @@ describe("CoachStrip", () => {
     expect(screen.queryByText(/^Path 3/)).not.toBeInTheDocument();
   });
 
-  it("is dismissible, and never shows on the landing page (no shell to mount it in)", async () => {
-    const { user } = await renderScreen(<AppShell>board</AppShell>, { scenario: "S3" });
+  it("is dismissible, and a dismissal holds when the other shell mounts (it is the store's, not the strip's)", async () => {
+    const { user, unmount } = await renderScreen(<AppShell>board</AppShell>, { scenario: "S3" });
     expect(screen.getByText("Path 3 · Step 1 of 5")).toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: "Dismiss the demo coach" }));
 
     expect(screen.queryByText(/^Path 3/)).not.toBeInTheDocument();
+    expect(useDemo.getState().activeDemoPath).toBeNull();
+
+    // The presenter switches to a city role: another layout, so another shell and another strip.
+    unmount();
+    act(() => {
+      useDemo.getState().setRole("hl");
+    });
+    render(<CityShell>case detail</CityShell>);
+    expect(screen.queryByText(/^Path 3/)).not.toBeInTheDocument();
   });
 
-  it("derives path 5 for a city role on S5, and the Next path menu jumps to another path", async () => {
+  it("shows nothing until a path is picked, whatever case is on screen", async () => {
+    await renderScreen(<AppShell>board</AppShell>, { path: `/events/${S3}`, personaId: "downtown-arts-collective" });
+    expect(screen.queryByText(/^Path \d/)).not.toBeInTheDocument();
+
+    act(() => {
+      useDemo.getState().setActiveDemoPath(3);
+    });
+    expect(screen.getByText("Path 3 · Step 1 of 5")).toBeInTheDocument();
+  });
+
+  it("stays with the presenter on a page that names no case: path 1's last step is on Active permits", async () => {
+    await renderScreen(<CityShell>active permits</CityShell>, { scenario: "S2", role: "pws", path: "/city/active" });
+
+    act(() => {
+      const state = useDemo.getState();
+      state.setRole("applicant");
+      state.updateDraft("PMT-27-0142", { wizardStep: "plan" });
+      expect(state.dispatch("PMT-27-0142", { type: "book_and_pay", method: "card" }).ok).toBe(true);
+      state.setRole("pws");
+    });
+
+    expect(screen.getByText("Path 1 · Step 3 of 3")).toBeInTheDocument();
+    expect(screen.getByText("Active permits shows 13 Sundays on Field 4.")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Switch to City Clerk" })).toBeInTheDocument();
+  });
+
+  it("is on path 5 for a city role after the jump to S5, and the Next path menu starts another path", async () => {
     const { user } = await renderScreen(<CityShell>case detail</CityShell>, { scenario: "S5" });
 
     expect(screen.getByText("Path 5 · Step 1 of 5")).toBeInTheDocument();
@@ -67,7 +102,7 @@ describe("CoachStrip", () => {
     await user.click(screen.getByRole("button", { name: "Next path" }));
     await user.click(screen.getByRole("menuitem", { name: "Path 6: Closeout" }));
 
-    expect(useDemo.getState().role).toBe("pws");
+    expect(useDemo.getState()).toMatchObject({ role: "pws", activeDemoPath: 6 });
     expect(lastPush()).toBe("/city/cases/PMT-27-0031");
   });
 

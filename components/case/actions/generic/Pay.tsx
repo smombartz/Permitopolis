@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input"
 import { InlineAlert } from "@/components/ui/inline-alert"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { classify, estimateFees } from "@/lib/rules"
-import { caseTotals, nextUnpaidSession, quoteBalance } from "@/lib/state"
+import { amendmentPaymentDue, caseTotals, nextUnpaidSession, quoteBalance } from "@/lib/state"
 import { overdueSessionDates } from "@/lib/view/clerkTools"
 import { fmtDateShort, fmtMoney } from "@/lib/format"
 import type { RulesConfig } from "@/lib/rules/types"
@@ -14,13 +14,16 @@ import type { EventCase, Payment } from "@/lib/types"
 import { PanelActions, PanelBody, PanelHeader, useCaseContext, useCaseDispatch } from "../panelKit"
 import type { ActionPanelProps } from "../types"
 
-/** What is owed right now, and the label for it: the quote, the next session, or the final bill. */
+/** What is owed right now, and the label for it: the quote, what an amendment added, the next session, or the final bill. */
 function paymentAsk(c: EventCase, cfg: RulesConfig, occurrenceDate?: string) {
   if (c.state === "quote_sent") {
     // A quote already paid in full has nothing to take (the engine refuses it too).
     const balance = quoteBalance(c, cfg)
     return balance > 0 ? { kind: "quote" as Payment["kind"], label: "Quote balance", amount: balance } : null
   }
+  // What an amendment added to a plan that was already paid: the same payment card, open again.
+  const amendmentDue = amendmentPaymentDue(c, cfg)
+  if (amendmentDue > 0) return { kind: "quote" as Payment["kind"], label: "Amendment balance", amount: amendmentDue }
   if (c.state === "permitted" || c.state === "event_day") {
     const chosen = occurrenceDate ?? nextUnpaidSession(c)
     if (chosen) {

@@ -16,13 +16,13 @@ import { DateText, PartyChip } from "@/components/domain";
 import { PARTY_ICON } from "@/components/domain/icons";
 import { buildSeed, useDemo, useHydrated } from "@/lib/state";
 import { DEFAULT_DEMO_TODAY } from "@/lib/rules";
-import { DEMO_DATE_JUMPS, DEMO_PATHS, SCENARIO_JUMPS, type DemoPath } from "@/lib/data/demoScript";
+import { DEMO_DATE_JUMPS, DEMO_PATHS, SCENARIO_JUMPS, type DemoPath, type DemoStep } from "@/lib/data/demoScript";
 import { PERSONA_BY_ID } from "@/lib/data/people";
 import { fmtDate } from "@/lib/format";
 import { homeFor, routes } from "@/lib/routes";
 import { PARTY_LABEL, type Party } from "@/lib/types";
 import { demoPathJump, WHAT_IS_FAKED } from "@/lib/view/landing";
-import { pathProgress } from "@/lib/view/coach";
+import { demoPathIdForScenario, pathProgress } from "@/lib/view/coach";
 
 const ROLE_DESCRIPTION: Record<Party, string> = {
   applicant: "Describes the event, answers requests, accepts the quote, pays, and runs it.",
@@ -53,13 +53,25 @@ function DemoGuideScreen() {
   // path, when there is one, is started right after the reset restores the seed.
   const [pendingReset, setPendingReset] = React.useState<{ andStartPath: DemoPath | null } | null>(null);
 
+  /** "Start this path": the path's opening screen, with the demo coach on this path from here on. */
   function startPath(path: DemoPath) {
     if (!hydrated) return;
     const jump = demoPathJump(path, seed);
     const state = useDemo.getState();
     state.setRole(jump.role);
     if (jump.personaId) state.setPersona(jump.personaId);
+    state.setActiveDemoPath(path.id);
     router.push(jump.href);
+  }
+
+  /** "Continue": the step the path has reached, as the role and persona that step is for. */
+  function continuePath(path: DemoPath, step: DemoStep) {
+    if (!hydrated) return;
+    const state = useDemo.getState();
+    state.setRole(step.role);
+    if (step.persona) state.setPersona(step.persona);
+    state.setActiveDemoPath(path.id);
+    router.push(step.page);
   }
 
   function startScenario(caseId: string) {
@@ -69,6 +81,7 @@ function DemoGuideScreen() {
     const state = useDemo.getState();
     state.setRole(jump.role);
     state.setPersona(jump.personaId);
+    state.setActiveDemoPath(demoPathIdForScenario(jump.id));
     router.push(jump.path);
   }
 
@@ -216,7 +229,7 @@ function DemoGuideScreen() {
                     })}
                   </ol>
                   <div className="flex flex-wrap items-center gap-2">
-                    <Button type="button" size="sm" className="w-fit" onClick={() => startPath(path)}>
+                    <Button type="button" size="sm" className="w-fit" onClick={() => (underWay && !progress.done ? continuePath(path, progress.step) : startPath(path))}>
                       {underWay ? "Continue" : "Start this path"}
                     </Button>
                     {underWay ? (

@@ -9,6 +9,9 @@ import { CARD_BY_ID, type CatalogId } from "@/lib/rules/catalog";
 import type { RulesConfig } from "@/lib/rules/types";
 import { routes } from "@/lib/routes";
 import {
+  amendmentPaymentDue,
+  amendmentSignOpen,
+  amendmentStage,
   applicantCases,
   boardColumn,
   boardColumns,
@@ -579,28 +582,42 @@ export function canAmend(c: EventCase, today: ISODate): AmendEligibility {
   if (c.state === "closed") return { ok: false, reason: "This case is closed; it cannot be amended." };
   const last = lastSessionDate(c);
   if (last && last < today) return { ok: false, reason: "The event has already happened; it cannot be amended." };
-  if (c.flags.amendmentPending) return { ok: false, reason: "An amendment is already pending; wait for the City Clerk's decision." };
+  if (c.flags.amendmentPending) {
+    // The engine's own two reasons (`checkAmend()`): one amendment at a time.
+    return { ok: false, reason: amendmentStage(c) === "approved" ? "An amendment is approved; sign and pay it before changing the plan again." : "An amendment is already pending; wait for the City Clerk's decision." };
+  }
   return { ok: true };
 }
 
 export interface AmendmentBanner {
   text: string;
-  /** Once the applicant has submitted it (the amendment's own "Submit application" is done): nothing left for them to do but wait. */
+  /** Once the applicant has submitted it (the amendment's own "Submit application" is done) and until the city has decided: nothing for them to do but wait. */
   awaitingCity: boolean;
 }
 
 /**
  * The board's "an amendment is pending" banner (PRD "Amend", "the current permit stays valid
- * for the original plan until the amendment is approved"). Null once there is nothing pending.
+ * for the original plan until the amendment is approved"), in three stages: the applicant is
+ * on its cards; it is with the city (the departments check its cards, then the City Clerk
+ * decides); the Clerk approved it and it waits for the applicant's signature and payment. Null
+ * once nothing is pending.
  */
-export function amendmentBanner(c: EventCase): AmendmentBanner | null {
+export function amendmentBanner(c: EventCase, cfg?: RulesConfig): AmendmentBanner | null {
   if (!c.flags.amendmentPending) return null;
   const submitCard = c.tasks.find((t) => t.catalogId === "submit_application" && t.tags.includes("amendment"));
-  const awaitingCity = submitCard?.status === "done";
-  const text = awaitingCity
-    ? "An amendment is pending with the City Clerk. Your current permit stays valid for the original plan until it is decided."
+  const submitted = submitCard?.status === "done";
+  if (submitted && amendmentStage(c) === "approved") {
+    const due = cfg ? amendmentPaymentDue(c, cfg) : 0;
+    const sign = amendmentSignOpen(c);
+    const todo = sign && due > 0 ? `Accept and sign, then pay ${fmtMoney(due)},` : sign ? "Accept and sign" : due > 0 ? `Pay ${fmtMoney(due)}` : "Finish what is left below";
+    return { text: `The City Clerk approved your amendment. ${todo} to put it into effect; your current permit stays valid for the original plan until then.`, awaitingCity: false };
+  }
+  const checking = [...new Set(c.tasks.filter((t) => t.owner === "applicant" && t.tags.includes("amendment") && t.status === "submitted" && t.reviewer && t.reviewer !== "clerk").map((t) => PARTY_LABEL[t.reviewer as Dept]))];
+  const withCity = checking.length > 0 ? `${checking.join(" and ")} ${checking.length === 1 ? "is" : "are"} checking its cards, then the City Clerk decides.` : "It is with the City Clerk for a decision.";
+  const text = submitted
+    ? `An amendment is pending. ${withCity} Your current permit stays valid for the original plan until it is decided.`
     : "An amendment is pending. Finish the new cards below, then submit it; your current permit stays valid for the original plan until it is decided.";
-  return { text, awaitingCity };
+  return { text, awaitingCity: submitted };
 }
 
 /* ---------------------------------------------------------------------- */

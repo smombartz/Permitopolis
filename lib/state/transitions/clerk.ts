@@ -2,15 +2,15 @@
 import { addDaysISO, daysBetween } from "@/lib/dates";
 import { fmtMoney } from "@/lib/format";
 import { dueDate } from "@/lib/rules";
-import { CARD_BY_ID, CITY_TASKS } from "@/lib/rules/catalog";
+import { CARD_BY_ID, CITY_TASKS, reviewTaskTitle } from "@/lib/rules/catalog";
 import type { RulesCtx } from "@/lib/rules/types";
 import type { Actor, Condition, EventCase, FeeLine, Review } from "@/lib/types";
 import type { Action } from "../actions";
 import { checkAcceptComplete, checkConfirmRouting, checkDeny, checkIssuePermit, checkReconcileClose, checkSendQuote } from "../checks";
-import { lastSessionDate } from "../clock";
 import { closeoutSettlement } from "../selectors";
 import { addTask, addTasks, appendActivity, applyUnlockEvent, dueAtQuote, findTask, lineAmount, moveTask, newTask, nowOf, patchTask, releaseHold, taskId } from "../core";
 import type { TransitionResult } from "../types";
+import { withFoodPermitsTask, workOrdersFor } from "./shared";
 
 type Extract_<T extends Action["type"]> = Extract<Action, { type: T }>;
 
@@ -69,7 +69,7 @@ export function confirmRouting(c: EventCase, action: Extract_<"confirm_routing">
   }));
   const reviewTasks = action.reviewers.map((r) =>
     newTask(
-      { id: taskId(c.id, `review:${r.dept}`), catalogId: `review:${r.dept}`, owner: r.dept, kind: "review", title: "Review your sections", dueDate: r.dueDate, phase: "review" },
+      { id: taskId(c.id, `review:${r.dept}`), catalogId: `review:${r.dept}`, owner: r.dept, kind: "review", title: reviewTaskTitle(r.dept, c), dueDate: r.dueDate, phase: "review" },
       ctx,
       "system",
     ),
@@ -170,24 +170,9 @@ export function issuePermit(c: EventCase, _action: Extract_<"issue_permit">, act
   if (findTask(next, issueTaskId)) next = moveTask(next, issueTaskId, "done", ctx, actor, { unlocksOn: null });
   next = applyUnlockEvent(next, "permitted", ctx);
   next = addTasks(next, workOrdersFor(next, ctx));
+  next = withFoodPermitsTask(next, ctx);
   next = appendActivity(next, actor, "Issued the permit.", ctx);
   return { ok: true, case: next };
-}
-
-function workOrdersFor(c: EventCase, ctx: RulesCtx) {
-  const last = lastSessionDate(c);
-  const due = last ? addDaysISO(last, -2) : ctx.today;
-  const services = c.addOns.cityServices;
-  const usesStreet = c.location?.mode === "streets" || c.location?.mode === "route";
-  const orders: { key: string; title: string }[] = [];
-  if (usesStreet || (services?.barricades ?? 0) > 0) orders.push({ key: "barricades", title: "Deliver barricades" });
-  if ((services?.policeOfficers ?? 0) > 0 || c.addOns.alcohol) orders.push({ key: "police", title: "Staff police officers" });
-  if (usesStreet) orders.push({ key: "closure", title: "Close the street" });
-  if (services?.trash) orders.push({ key: "trash", title: "Arrange trash service" });
-  if (services?.power) orders.push({ key: "power", title: "Arrange power" });
-  return orders.map((o) =>
-    newTask({ id: taskId(c.id, `work_order:${o.key}`), catalogId: `work_order:${o.key}`, owner: "pws", kind: "action", title: o.title, dueDate: due, phase: "before_event" }, ctx, "system"),
-  );
 }
 
 export function reconcileClose(c: EventCase, _action: Extract_<"reconcile_close">, actor: Actor, ctx: RulesCtx): TransitionResult {

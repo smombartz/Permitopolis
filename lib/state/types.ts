@@ -112,6 +112,12 @@ export interface DemoState {
   /** The applicant persona in use. 'new' is the blank wizard run. */
   personaId: string;
   hints: boolean;
+  /**
+   * The demo path the presenter picked (a `DEMO_PATHS` id, 1 to 7), or null when none is: set
+   * from the demo guide, the coach's own menu or the command palette, cleared by Reset. The
+   * coach follows it across pages that name no case (My queue, Active permits, a blank wizard).
+   */
+  activeDemoPath: number | null;
   lastPathByRole: Partial<Record<Party, string>>;
   /** False when localStorage is blocked; the app then runs in memory. Read it only once useHydrated() is true: the server has no storage. */
   storageOk: boolean;
@@ -137,9 +143,17 @@ export interface DemoActions {
   setPersona(personaId: string): void;
   /** Moves the demo date and runs advanceClock() over every case. */
   setDemoToday(date: ISODate): void;
+  /**
+   * The Clerk's Settings. A shallow merge: pass a whole replacement for the nested object being
+   * edited (`thresholds`, `fees`, `sla`). Every open Draft is brought in step at once (its
+   * sessions, tier and triggers, as `updateDraft()` does), so a threshold change re-classifies
+   * open drafts live; a case past Draft keeps the tier it was submitted and priced under.
+   */
   setConfig(patch: Partial<RulesConfig>): void;
   rememberPath(role: Party, path: string): void;
   toggleHints(): void;
+  /** Records the demo path the presenter picked; null clears it. */
+  setActiveDemoPath(pathId: number | null): void;
   /** Restores the seed exactly. */
   reset(): void;
 }

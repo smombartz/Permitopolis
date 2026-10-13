@@ -1,7 +1,10 @@
 /**
- * Pure view-model for the demo coach: which of the seven demo paths is on screen, and which of
- * its steps is current. Nothing here reads the store; AppShell/CityShell's CoachStrip and the
- * demo guide pass in what they read from it. Covered by lib/view/coach.test.ts.
+ * Pure view-model for the demo coach: which step of a demo path is current. Nothing here reads
+ * the store; AppShell/CityShell's CoachStrip and the demo guide pass in what they read from it.
+ * Which path the coach is on is the store's `activeDemoPath` (the one the presenter picked on
+ * the demo guide, in the coach's own menu or in the command palette, or the one built on the
+ * scenario they jumped to), never guessed from the page. Covered by lib/view/coach.test.ts, and
+ * held to the demo script step by step in tests/demo-paths.test.ts.
  *
  * The current step is derived from the case the path is built on (and the current role,
  * persona and demo date), never counted from clicks: `pathProgress()` reads the first step
@@ -15,8 +18,6 @@
 import { caseTotals } from "@/lib/state";
 import { MAIN_PATH, type CaseState, type EventCase, type ISODate, type Party } from "@/lib/types";
 import { DEMO_PATHS, SCENARIO_JUMPS, type DemoPath, type DemoStep, type ScenarioKey } from "@/lib/data/demoScript";
-import { applicantCaseIdFromHref, caseIdFromPath } from "@/lib/view/shell";
-import { routes } from "@/lib/routes";
 
 export interface CoachContext {
   cases: EventCase[];
@@ -84,9 +85,7 @@ const PATH_CHECKS: Record<number, (ctx: CoachContext) => boolean[]> = {
   // Watch the tier move: no scenario case, so it reads the latest fresh "new" draft's own
   // fields. Path 5's own last step also drafts as "new" (a City Hall Plaza event for Jul 11),
   // so running path 5 to the end can read back here as progress on path 2 too, in the demo
-  // guide's overview only — the coach strip never shows both at once, since it picks the path
-  // from the case (or blank wizard) actually on screen. `activeDemoPath` on the store would
-  // remove the overlap outright.
+  // guide's overview only: the coach strip shows the one path the presenter picked.
   2: (ctx) => {
     const draft = draftsFor(ctx.cases, "new")[0];
     if (!draft) return [false, false, false, false];
@@ -178,19 +177,12 @@ export function allPathProgress(ctx: CoachContext): PathProgress[] {
   return DEMO_PATHS.map((path) => pathProgress(path, ctx));
 }
 
-/**
- * Which demo path is "on screen", read from the case on screen (S3 on screen means path 3; a
- * blank wizard means path 2). There is no store field for which path the presenter picked yet
- * (an engine request: `activeDemoPath` on `DemoState`); until it lands, this is the fallback.
- */
-export function activeDemoPathId(pathname: string, search = ""): number | null {
-  const query = search.replace(/^\?/, "");
-  const href = query ? `${pathname}?${query}` : pathname;
-  const caseId = applicantCaseIdFromHref(href) ?? caseIdFromPath(pathname, "clerk");
-  if (caseId) {
-    const path = DEMO_PATHS.find((p) => SCENARIO_JUMPS.find((j) => j.id === p.scenario)?.caseId === caseId);
-    return path?.id ?? null;
-  }
-  const bare = pathname.split("?")[0];
-  return bare === routes.apply() ? 2 : null;
+/** The demo path built on a scenario (S3 is path 3), or null: a jump to that scenario puts the coach on it. */
+export function demoPathIdForScenario(scenario: ScenarioKey): number | null {
+  return DEMO_PATHS.find((path) => path.scenario === scenario)?.id ?? null;
+}
+
+/** The path the coach is on: the store's `activeDemoPath`, when it names one of the seven. */
+export function activeDemoPathOf(activeDemoPath: number | null): DemoPath | undefined {
+  return activeDemoPath === null ? undefined : DEMO_PATHS.find((path) => path.id === activeDemoPath);
 }

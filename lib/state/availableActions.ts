@@ -15,6 +15,7 @@ import {
   checkCancel,
   checkConfirmRouting,
   checkCreateBoard,
+  checkDecideAmendment,
   checkDeny,
   checkIssuePermit,
   checkLogCloseout,
@@ -30,6 +31,7 @@ import {
   nextUnpaidSession,
   type CheckResult,
 } from "./checks";
+import { amendmentPayOpen, amendmentSignOpen, amendmentStage } from "./amendment";
 import { lastSessionDate } from "./clock";
 import { caseTotals, eventDate } from "./selectors";
 import type { ActionAvailability, StateApi } from "./types";
@@ -67,6 +69,9 @@ function applicantActions(c: EventCase, ctx: RulesCtx): ActionAvailability[] {
     items.push(row("pay", "Pay fees and deposit", checkPay(c, { kind: "quote" }, ctx.cfg), c.flags.signed));
     items.push(row("withdraw", "Withdraw", checkWithdraw(c)));
   } else if (c.state === "permitted" || c.state === "event_day") {
+    // An approved amendment's own quote: the signature it needs, and what it costs beyond what was paid.
+    if (amendmentSignOpen(c)) items.push(row("accept_and_sign", "Accept and sign", checkAcceptAndSign(c), true));
+    if (amendmentPayOpen(c)) items.push(row("pay", "Pay the difference", checkPay(c, { kind: "quote" }, ctx.cfg), !amendmentSignOpen(c)));
     const session = sessionPayRow(c, "Pay the next session");
     if (session) items.push(session);
     items.push(row("cancel", "Cancel", checkCancel(c, ctx.today, lastSessionDate(c))));
@@ -108,6 +113,9 @@ function reviewRows(c: EventCase, dept: Dept): ActionAvailability[] {
 
 function clerkActions(c: EventCase, ctx: RulesCtx): ActionAvailability[] {
   const items: ActionAvailability[] = [];
+  // A submitted amendment is the Clerk's to decide in whatever state the case is. The row is
+  // there from the moment it is submitted; approving waits for the departments' checks.
+  if (amendmentStage(c) === "submitted") items.push(row("decide_amendment", "Decide amendment", checkDecideAmendment(c), true));
   if (c.state === "submitted") {
     if (!c.flags.acceptedComplete) {
       items.push(row("accept_complete", "Accept as complete", checkAcceptComplete(c, ctx), true));
@@ -143,8 +151,9 @@ function clerkActions(c: EventCase, ctx: RulesCtx): ActionAvailability[] {
   } else if (c.state === "closeout") {
     items.push(row("reconcile_close", "Reconcile and close", checkReconcileClose(c), true));
   } else if (c.state === "permitted" || c.state === "event_day") {
-    // A session paid at the counter.
-    const session = sessionPayRow(c, IN_PERSON);
+    // What an amendment added, or a session, paid at the counter.
+    if (amendmentPayOpen(c)) items.push(row("pay", IN_PERSON, checkPay(c, { kind: "quote" }, ctx.cfg)));
+    const session = amendmentPayOpen(c) ? null : sessionPayRow(c, IN_PERSON);
     if (session) items.push(session);
     items.push(remindRow());
     items.push(addNoteRow());

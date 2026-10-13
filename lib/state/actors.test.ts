@@ -40,6 +40,7 @@ const SAMPLE: { [T in Action["type"]]: Extract<Action, { type: T }> } = {
   deny: { type: "deny", reason: "No." },
   issue_permit: { type: "issue_permit" },
   reconcile_close: { type: "reconcile_close" },
+  decide_amendment: { type: "decide_amendment", decision: "approve" },
   request_info: { type: "request_info", message: "Please send it." },
   verify_document: { type: "verify_document", taskId: `${ID}:x` },
   reject_document: { type: "reject_document", taskId: `${ID}:x`, reason: "Expired." },
@@ -87,6 +88,10 @@ describe("who may raise each action (plan 5.4)", () => {
     );
     expect(reasonFor(makeCase({ state: "in_review" }), { type: "add_note", text: "Hello" }, "applicant")).toBe("Only city staff can add a note.");
     expect(reasonFor(makeCase({ state: "permitted" }), { type: "tick" }, "clerk")).toBe("Only the system can advance the clock.");
+    // An amendment is the applicant's to propose and the Clerk's to decide: two actions, one party each.
+    expect(reasonFor(makeCase({ state: "permitted" }), { type: "amend", answers: makeCase() }, "clerk")).toBe("Only the applicant can amend the application.");
+    expect(reasonFor(makeCase({ state: "permitted" }), { type: "decide_amendment", decision: "approve" }, "applicant")).toBe("Only the City Clerk can decide an amendment.");
+    expect(reasonFor(makeCase({ state: "permitted" }), { type: "decide_amendment", decision: "decline", reason: "No." }, "pws")).toBe("Only the City Clerk can decide an amendment.");
   });
 
   it("an ended case still answers with its ending first", () => {

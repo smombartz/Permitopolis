@@ -11,7 +11,7 @@ import { format } from "date-fns";
 import { toDate } from "@/lib/dates";
 import { fmtDate, fmtMoney, fmtTimeRange, plural } from "@/lib/format";
 import { classify, estimateFees, type FeeEstimate, type RulesConfig, type RulesCtx } from "@/lib/rules";
-import { caseTotals, dueAtQuote, hasActivePermit, lateFeeApplies, quoteBalance, quotePaid } from "@/lib/state";
+import { amendmentPayOpen, amendmentPaymentDue, amendmentSignOpen, caseTotals, dueAtQuote, hasActivePermit, lateFeeApplies, quoteBalance, quotePaid } from "@/lib/state";
 import { ENDING_LABEL, type Condition, type EventCase, type ISODate } from "@/lib/types";
 import { routes } from "@/lib/routes";
 
@@ -28,7 +28,8 @@ export interface NotReadyInfo {
 
 export type CheckoutDecision =
   | { mode: "booking" }
-  | { mode: "quote" }
+  /** `amendment`: the quote is an approved amendment's, on a case that already has its permit. */
+  | { mode: "quote"; amendment?: boolean }
   | { mode: "session"; occurrenceDate: ISODate }
   | { mode: "final" }
   | { mode: "not_ready"; info: NotReadyInfo };
@@ -100,8 +101,9 @@ function duePaySessionDate(c: EventCase, date: string | undefined): ISODate | nu
 /**
  * Which of the four checkout modes the case and the URL select (plan 3D): `?pay=session&date=`
  * pays one series session, `?pay=final` pays the closeout bill, an Instant Draft books and
- * pays, and a case in Quote sent accepts, signs and pays. Everything else explains where the
- * case stands and where to go instead; the screen never offers a payment this rules out.
+ * pays, and a case in Quote sent accepts, signs and pays, as does a permitted case with an
+ * amendment to sign or pay for. Everything else explains where the case stands and where to go
+ * instead; the screen never offers a payment this rules out.
  */
 export function checkoutDecision(c: EventCase, search: CheckoutSearch): CheckoutDecision {
   if (search.pay === "final") {
@@ -119,7 +121,23 @@ export function checkoutDecision(c: EventCase, search: CheckoutSearch): Checkout
   }
   if (!c.ending && c.tier === "instant" && c.state === "draft") return { mode: "booking" };
   if (!c.ending && c.state === "quote_sent") return { mode: "quote" };
+  // An amendment on a permitted case is signed and paid on the same page as a quote.
+  if (amendmentQuoteOpen(c)) return { mode: "quote", amendment: true };
   return { mode: "not_ready", info: generalNotReadyInfo(c) };
+}
+
+/**
+ * A permitted case whose "Accept conditions and sign" or "Pay fees and deposit" card is open
+ * again: an amendment put it there (the Clerk approved one, or a change that took effect at once
+ * costs more than was paid). The board's two cards link to the quote page for it.
+ */
+export function amendmentQuoteOpen(c: EventCase): boolean {
+  return amendmentSignOpen(c) || amendmentPayOpen(c);
+}
+
+/** What the applicant still owes on an amendment, never negative. */
+export function amendmentAmountOwed(c: EventCase, cfg: RulesConfig): number {
+  return amendmentPaymentDue(c, cfg);
 }
 
 /**

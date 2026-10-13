@@ -1,20 +1,16 @@
 /**
  * Transitions the applicant actor raises. `pay` lives in ./payment because the Clerk raises
- * it too, for an in-person payment.
+ * it too, for an in-person payment, and `amend` in ./amendment with the rest of an amendment.
  */
 import { addDaysISO, daysBetween } from "@/lib/dates";
 import { fmtMoney } from "@/lib/format";
 import { classify, dueDate, estimateFees, requirements } from "@/lib/rules";
-import { round2 } from "@/lib/rules/shared";
 import { CARD_BY_ID, CITY_TASKS, type CardSpec } from "@/lib/rules/catalog";
 import type { FeeEstimate, RulesCtx } from "@/lib/rules/types";
-import type { Actor, EventAnswers, EventCase, Task } from "@/lib/types";
+import type { Actor, EventCase, Task } from "@/lib/types";
 import type { Action } from "../actions";
 import {
-  amendmentNeedsNotice,
   checkAcceptAndSign,
-  checkAmend,
-  checkAmendedDate,
   checkBookAndPay,
   checkBookAgain,
   checkCancel,
@@ -48,8 +44,9 @@ import {
   taskId,
   totalPaid,
 } from "../core";
-import { caseTotals, eventDate, nextCaseId, refundIfCancelled } from "../selectors";
+import { nextCaseId, refundIfCancelled } from "../selectors";
 import type { TransitionResult } from "../types";
+import { maybeFinishAmendment, submitAmendment, syncAmendmentDecision } from "./amendment";
 import { maybeUnlockIssuePermit } from "./shared";
 
 type Extract_<T extends Action["type"]> = Extract<Action, { type: T }>;
@@ -158,6 +155,8 @@ export function completeTask(c: EventCase, action: Extract_<"complete_task">, ac
 
   const hasPreSubmitCards = next.tasks.some((t) => isCatalogId(t.catalogId) && (CARD_BY_ID as Record<string, CardSpec>)[t.catalogId]?.preSubmit);
   if (hasPreSubmitCards && preSubmitCardsIn(next)) next = applyUnlockEvent(next, "presubmit_done", ctx);
+  // A card of a submitted amendment that goes back to its reviewer holds the Clerk's decision again.
+  next = syncAmendmentDecision(next, ctx);
 
   next = appendActivity(next, actor, `Completed "${task.title}".`, ctx);
   return { ok: true, case: next };
@@ -237,11 +236,8 @@ export function submit(c: EventCase, _action: Extract_<"submit">, actor: Actor, 
   const check = checkSubmit(c, ctx);
   if (!check.ok) return check;
   // "Submit amendment": the same card and action, reused outside Draft. The amendment stays
-  // pending (flags.amendmentPending) until the City Clerk decides it (see amend(), below).
-  if (c.flags.amendmentPending) {
-    const next = moveTask(c, taskId(c.id, "submit_application"), "done", ctx, actor);
-    return { ok: true, case: appendActivity(next, actor, "Submitted the amendment.", ctx) };
-  }
+  // pending until the City Clerk decides it (./amendment.ts).
+  if (c.flags.amendmentPending) return { ok: true, case: submitAmendment(c, actor, ctx) };
   // The fee lines the Clerk quotes from are priced as the application goes in: this is the
   // moment the lead time is measured, so it is also when a late fee joins them.
   const estimate = estimateFees(c, classify(c, ctx.cfg), ctx.cfg, { caseId: c.id, lateFee: lateFeeApplies(c, ctx) });
@@ -319,7 +315,8 @@ export function acceptAndSign(c: EventCase, action: Extract_<"accept_and_sign">,
   next = applyUnlockEvent(next, "signed", ctx);
   next = maybeUnlockIssuePermit(next, ctx);
   next = appendActivity(next, actor, "Accepted the conditions and signed.", ctx);
-  return { ok: true, case: next };
+  // On a permitted case this is an approved amendment's signature, which can be the last thing it waits for.
+  return { ok: true, case: maybeFinishAmendment(next, ctx) };
 }
 
 export function withdraw(c: EventCase, _action: Extract_<"withdraw">, actor: Actor, ctx: RulesCtx): TransitionResult {
@@ -415,151 +412,4 @@ export function bookAgain(c: EventCase, _action: Extract_<"book_again">, actor: 
   // The new Draft is prepared like any Draft the store creates: next year's sessions listed
   // against next year's calendar, and the tier of the plan it copies.
   return { ok: true, case: next, spawned: [syncDraft(spawned, ctx)] };
-}
-
-/** Only what the wizard collects. An amendment changes the answers, never the record's history. */
-function answersOf(a: EventAnswers): EventAnswers {
-  return { eventType: a.eventType, name: a.name, description: a.description, location: a.location, schedule: a.schedule, attendance: a.attendance, addOns: a.addOns };
-}
-
-/**
- * The fee lines of an amended plan: the new plan's own lines, plus every line somebody added
- * to the old one (a reviewer's fire watch, a late fee already charged). The old plan's own
- * lines are the ones its answers price, and those are replaced.
- */
-function amendedFeeLines(before: EventCase, fresh: FeeEstimate, ctx: RulesCtx): EventCase["feeLines"] {
-  const priced = new Set(estimateFees(before, classify(before, ctx.cfg), ctx.cfg).lines.map((line) => line.label));
-  const chargesLateFee = fresh.lines.some((line) => line.kind === "late_fee");
-  const added = before.feeLines.filter((line) => (line.kind === "late_fee" ? !chargesLateFee : !priced.has(line.label)));
-  return [...fresh.lines, ...added].map((line, i) => ({ ...line, id: taskId(before.id, "fee", i + 1) }));
-}
-
-/**
- * P1. The same record takes new answers: it is classified again, the date gate runs again, and
- * the cards the new plan adds join the board tagged 'amendment'. State, permit and date hold
- * are not touched, so a permit stays valid for the original plan while a *material* amendment
- * is pending (`flags.amendmentPending`): one that lowers the tier or changes nothing a reviewer
- * would need to see again (no new card) applies at once instead (see `material`, below).
- *
- * The City Clerk's decision on a pending amendment is this same action (`decideAmendment()`):
- * there is no city-only action type or panel for it in this workstream's files (see the
- * engineRequests for a dedicated one), so the Clerk's dispatch is told apart by its `answers`:
- * the ones already on the record (approve, keep what is here) or the ones stashed on the
- * amendment's own "Submit application" card before it was proposed (decline, put it back).
- */
-export function amend(c: EventCase, action: Extract_<"amend">, actor: Actor, ctx: RulesCtx): TransitionResult {
-  const ed = eventDate(c, ctx.today);
-  const check = checkAmend(c, ctx.today, ed, actor);
-  if (!check.ok) return check;
-
-  if (actor === "clerk") return decideAmendment(c, action, actor, ctx);
-
-  // Sessions first, as for a Draft: the new schedule's sessions come from the rules engine.
-  const withAnswers = withSessions({ ...c, ...answersOf(action.answers), flags: { ...c.flags, lateFee: !!action.lateFee } }, ctx);
-  const cls = classify(withAnswers, ctx.cfg);
-  const amended: EventCase = { ...withAnswers, tier: cls.tier, triggers: cls.triggers };
-
-  const gate = checkAmendedDate(c, amended, ctx);
-  if (!gate.ok) return gate;
-
-  // The late fee is for notice the amendment needed and did not have, nothing else.
-  const lateFee = amendmentNeedsNotice(c, amended) && lateFeeApplies(amended, ctx);
-  const estimate = estimateFees(amended, cls, ctx.cfg, { caseId: c.id, lateFee });
-  const freshTasks = requirements(amended, cls, { caseId: c.id, today: ctx.today, cfg: ctx.cfg });
-  // A new card is dated from the amendment: it has been the applicant's since now, not since the
-  // original application went in.
-  const newCards = freshTasks
-    .filter((t) => !c.tasks.some((existing) => existing.id === t.id))
-    .map((t) => ({ ...t, tags: ["amendment" as const], history: [{ at: nowOf(ctx), actor, status: t.status }] }));
-
-  // Nothing new is required of anybody (a later time the same day, a smaller crowd), or the
-  // change actually lowers the tier: either way there is nothing to send the City Clerk, so it
-  // takes effect immediately.
-  const material = newCards.length > 0;
-
-  let next: EventCase = {
-    ...amended,
-    tasks: [...c.tasks, ...newCards],
-    feeLines: amendedFeeLines(c, estimate, ctx),
-    flags: { ...amended.flags, amendmentPending: material },
-  };
-
-  if (material) {
-    // The amendment's own "Submit application" card, new or (on a case amended more than once)
-    // already spent: reopened and tagged, with what the record looked like before this
-    // amendment so the City Clerk's decline can put it back exactly.
-    const resubmitId = taskId(next.id, "submit_application");
-    const resubmitTask = findTask(next, resubmitId);
-    if (resubmitTask) {
-      const ready = preSubmitCardsIn(next);
-      const status: "todo" | "locked" = ready ? "todo" : "locked";
-      const payload = { ...resubmitTask.payload, priorAnswers: answersOf(c), priorFlags: { lateFee: c.flags.lateFee } };
-      next =
-        resubmitTask.status === status
-          ? patchTask(next, resubmitId, { tags: ["amendment"], payload })
-          : moveTask(next, resubmitId, status, ctx, "system", { tags: ["amendment"], unlocksOn: ready ? null : "presubmit_done", payload });
-    }
-  }
-
-  const lateFeeLine = estimate.lines.find((line) => line.kind === "late_fee");
-  next = appendActivity(next, actor, `Amended the plan: ${cls.summary}.${lateFeeLine ? ` Late fee: ${fmtMoney(lateFeeLine.estimate)}.` : ""}`, ctx);
-  return { ok: true, case: next };
-}
-
-function sameAnswers(a: EventAnswers, b: EventAnswers): boolean {
-  return JSON.stringify(answersOf(a)) === JSON.stringify(answersOf(b));
-}
-
-/** The City Clerk's decision on a pending, submitted amendment (see the doc comment on amend()). */
-function decideAmendment(c: EventCase, action: Extract_<"amend">, actor: Actor, ctx: RulesCtx): TransitionResult {
-  const submitTask = findTask(c, taskId(c.id, "submit_application"));
-  const priorAnswers = submitTask?.payload.priorAnswers as EventAnswers | undefined;
-  const priorFlags = submitTask?.payload.priorFlags as { lateFee: boolean } | undefined;
-  if (priorAnswers && sameAnswers(action.answers, priorAnswers)) {
-    return declineAmendment(c, priorAnswers, priorFlags?.lateFee ?? false, actor, ctx);
-  }
-  if (sameAnswers(action.answers, c)) {
-    return approveAmendment(c, actor, ctx);
-  }
-  return { ok: false, reason: "Approve the amendment as it stands, or decline it back to the original plan." };
-}
-
-/**
- * Clears the pending flag; the record already carries the amended plan, so the permit now
- * covers it. The fee difference goes through the existing payment card ("Pay fees and
- * deposit"), the same one that took the original payment: approving settles it at once, a
- * simulated charge or refund like the rest of this demo's payments (the booking the Clerk could
- * instead leave the card open for the applicant to pay separately needs `pay`'s own check
- * (`checkPay`, outside this workstream's files) to accept a "quote" payment on a Permitted case,
- * which it does not today — see the engineRequests).
- */
-function approveAmendment(c: EventCase, actor: Actor, ctx: RulesCtx): TransitionResult {
-  const diff = round2(caseTotals(c).total - totalPaid(c));
-  let next: EventCase = { ...c, flags: { ...c.flags, amendmentPending: false } };
-  if (diff !== 0) {
-    next = {
-      ...next,
-      payments: [...next.payments, { id: taskId(next.id, "pay", next.payments.length + 1), at: nowOf(ctx), amount: diff, method: "card", kind: diff > 0 ? "quote" : "refund" }],
-    };
-  }
-  const payFees = findTask(next, taskId(next.id, "pay_fees"));
-  if (payFees && payFees.status !== "done") {
-    next = moveTask(next, payFees.id, "done", ctx, "system", { payload: { ...payFees.payload, amount: totalPaid(next) } });
-  } else if (payFees) {
-    next = patchTask(next, payFees.id, { payload: { ...payFees.payload, amount: totalPaid(next) } });
-  }
-  const message = diff > 0 ? `Approved the amendment. Charged ${fmtMoney(diff)}.` : diff < 0 ? `Approved the amendment. Refunded ${fmtMoney(-diff)}.` : "Approved the amendment.";
-  return { ok: true, case: appendActivity(next, actor, message, ctx) };
-}
-
-/** Puts the record back exactly as it was before the amendment and drops its cards. */
-function declineAmendment(c: EventCase, priorAnswers: EventAnswers, priorLateFee: boolean, actor: Actor, ctx: RulesCtx): TransitionResult {
-  const reverted = withSessions({ ...c, ...answersOf(priorAnswers), flags: { ...c.flags, lateFee: priorLateFee, amendmentPending: false } }, ctx);
-  const cls = classify(reverted, ctx.cfg);
-  const estimate = estimateFees(reverted, cls, ctx.cfg, { caseId: c.id, lateFee: priorLateFee });
-  // A verify task a reviewer got for one of the amendment's own cards goes with it.
-  const removedSuffixes = new Set(c.tasks.filter((t) => t.tags.includes("amendment")).map((t) => idSuffix(c, t.id)));
-  const tasks = c.tasks.filter((t) => !t.tags.includes("amendment") && !(t.catalogId.startsWith("verify:") && removedSuffixes.has(t.catalogId.slice("verify:".length))));
-  const next: EventCase = { ...reverted, tier: cls.tier, triggers: cls.triggers, tasks, feeLines: estimate.lines };
-  return { ok: true, case: appendActivity(next, actor, "Declined the amendment; the original plan stands.", ctx) };
 }

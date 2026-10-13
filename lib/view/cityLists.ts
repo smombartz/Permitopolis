@@ -112,13 +112,21 @@ export function queueReasonLine(item: QueueItem): string {
     const parkedAt = task.history.findLastIndex((h) => h.status === "locked");
     if (parkedAt !== -1 && parkedAt < task.history.length - 1) return since ? `Answer received ${since}` : "Answer received";
     const routedOn = c.reviews.find((r) => r.dept === task.owner)?.clock.startedOn ?? when;
-    return routedOn ? `Routed ${fmtMonthDay(routedOn)}` : "Routed";
+    // The Clerk routes cases to itself too: its license review is a section like any department's.
+    const what = task.owner === "clerk" ? "Your own review section, routed" : "Routed";
+    return routedOn ? `${what} ${fmtMonthDay(routedOn)}` : what;
   }
   if (task.catalogId === "intake_check") return c.submittedAt ? `Submitted ${fmtMonthDay(c.submittedAt)}` : "Submitted";
   if (task.catalogId === "confirm_routing") return since ? `Accepted as complete ${since}` : "Accepted as complete";
   if (task.catalogId === "consolidate") return task.payload.denied === true ? "A reviewer denied" : "Every review is in";
   if (task.catalogId === "issue_permit") return "Signed, paid and verified";
   if (task.catalogId.startsWith("work_order:")) return since ? `Permitted ${since}` : "Permitted";
+  if (task.catalogId === "issue_food_permits") return "Every vendor's health permit is verified";
+  if (task.catalogId === "decide_amendment") {
+    // It opened either when the amendment came in, or when the last department finished checking its cards.
+    const checked = c.tasks.some((t) => t.owner === "applicant" && t.tags.includes("amendment") && t.reviewer !== null && t.reviewer !== "clerk" && t.status === "done" && t.catalogId !== "submit_application");
+    return checked ? "The amendment's cards are checked" : since ? `Amendment submitted ${since}` : "Amendment submitted";
+  }
   if (task.status === "changes_requested") return since ? `Changes requested ${since}` : "Changes requested";
   return since ? `Opened ${since}` : task.title;
 }

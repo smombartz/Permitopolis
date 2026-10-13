@@ -14,6 +14,7 @@ import { fmtDate } from "@/lib/format";
 import { DEFAULT_CONFIG, DEFAULT_DEMO_TODAY, availability, capacityWarning, classify, dateGate, dueDate, estimateFees, routing, whatIf, type RulesCtx } from "@/lib/rules";
 import {
   activePermits,
+  amendmentStage,
   applicantCases,
   availableActions,
   boardColumns,
@@ -22,7 +23,9 @@ import {
   hasActivePermit,
   involves,
   isVisibleToCity,
+  pendingAmendment,
   permitSessions,
+  permittedPlan,
   queueFor,
   reviewClock,
   sessionDates,
@@ -814,22 +817,86 @@ describe("Path 7 · Amend up a tier (S1, P1)", () => {
       done: ["pay_fees", "submit_application"],
     });
 
-    // As the City Clerk, she approves the amendment as it stands: the pending flag clears, the
-    // permit now covers the amended plan (already on the record), and the $393.75 difference
-    // between what the amended plan costs and what Maya already paid is charged through "Pay
-    // fees and deposit", the same card that took her first payment.
+    // The permit still covers the plan it was issued for: the picnic without the DJ, Instant.
+    expect(permittedPlan(submitted)).toMatchObject({ tier: "instant", triggers: [], addOns: { amplifiedSound: false }, schedule: original.schedule, location: original.location });
+    expect(pendingAmendment(submitted)).toMatchObject({ priorTier: "instant", priorFeeLines: original.feeLines, priorSubmit: null, proposedOn: TODAY });
+    expect(amendmentStage(submitted)).toBe("submitted");
+
+    // On the city side: the two departments check the amendment's cards, and the Clerk's decision waits for them.
+    expect(up(S1)).toEqual(["pws", "hl"]);
+    expect(queue("pws", S1)).toEqual(["verify:sound_details"]);
+    expect(queue("hl", S1)).toEqual(["verify:insurance_certificate"]);
+    expect(queue("clerk", S1)).toEqual([]);
+    expect(note(S1, "clerk")).toBe("Unlocks when the amendment's cards are checked");
+    expect(task(submitted, "decide_amendment")).toMatchObject({ owner: "clerk", status: "locked", title: "Decide amendment: approve or decline the change" });
     as("clerk");
-    act(S1, { type: "amend", answers: submitted });
+    expect(panel(S1, "clerk", "decide_amendment")).toMatchObject({ label: "Decide amendment", enabled: true, primary: true });
+    expect(refusal(S1, { type: "decide_amendment", decision: "approve" })).toBe('Health & Legal is still checking "Certificate of insurance", and 1 more card.');
+
+    as("pws");
+    act(S1, { type: "verify_document", taskId: `${S1}:sound_details` });
+    expect(up(S1)).toEqual(["hl"]);
+    as("hl");
+    act(S1, { type: "verify_document", taskId: `${S1}:insurance_certificate` });
+    expect(up(S1)).toEqual(["clerk"]);
+    expect(queue("clerk", S1)).toEqual(["decide_amendment"]);
+    const decision = queueFor(cases(), "clerk", TODAY).find((item) => item.case.id === S1)!;
+    expect(decision).toMatchObject({ task: { dueDate: "2027-05-06" }, group: "this_week" });
+    expect(queueReasonLine(decision)).toBe("The amendment's cards are checked");
+
+    // As the City Clerk, she approves it: the amendment's quote. Nothing is charged; what the
+    // amended plan costs beyond the $125 already paid is Maya's to pay, with the signature a
+    // Reviewed event needs and her Instant one never had.
+    as("clerk");
+    act(S1, { type: "decide_amendment", decision: "approve" });
     const approved = get(S1);
-    expect(approved.flags.amendmentPending).toBe(false);
-    expect(task(approved, "pay_fees")).toMatchObject({ status: "done", payload: { amount: 518.75 } });
-    expect(caseTotals(approved)).toEqual({ fees: 268.75, deposit: 250, total: 518.75, paid: 518.75, due: 0 });
-    expect(approved).toMatchObject({ state: "permitted", tier: "reviewed", permit: original.permit, schedule: original.schedule });
-    expect(hasActivePermit(approved)).toBe(true);
-    expect(approved.activity.at(-1)?.text).toBe("Approved the amendment. Charged $393.75.");
+    expect(approved.activity.at(-1)?.text).toBe("Approved the amendment. $393.75 more is due from the applicant.");
+    expect(approved.flags.amendmentPending).toBe(true);
+    expect(amendmentStage(approved)).toBe("approved");
+    expect(approved.payments).toEqual(original.payments);
+    // Both are due the same day, so they stand in the order the case got them: the payment
+    // card was on the Instant plan, the signature came with the amendment.
+    expect(board(approved)).toEqual({
+      do_now: ["pay_fees", "accept_and_sign"],
+      with_city: [],
+      coming_up: ["carry_permit"],
+      done: ["insurance_certificate", "sound_details", "submit_application"],
+    });
+    expect(task(approved, "pay_fees")).toMatchObject({ status: "todo", dueDate: "2027-05-17", payload: { amount: 393.75 } });
+    expect(task(approved, "accept_and_sign")).toMatchObject({ status: "todo", dueDate: "2027-05-17", tags: ["amendment"] });
+    expect(up(S1)).toEqual(["applicant"]);
+    expect(queueSizes()).toEqual(queuesBefore);
+    expect(permittedPlan(approved)).toMatchObject({ tier: "instant", addOns: { amplifiedSound: false } });
+
+    // As Maya: sign, then pay the difference. That is the last thing the amendment waits for.
+    as("applicant", "maya-chen");
+    expect(availableActions(approved, "applicant", ctx()).map((a) => [a.type, a.label, a.enabled])).toEqual([
+      ["accept_and_sign", "Accept and sign", true],
+      ["pay", "Pay the difference", true],
+      ["cancel", "Cancel", true],
+      ["amend", "Amend", false],
+    ]);
+    act(S1, { type: "accept_and_sign", signature: "Maya Chen" });
+    expect(get(S1).flags).toMatchObject({ signed: true, amendmentPending: true });
+    act(S1, { type: "pay", amount: 393.75, method: "card", kind: "quote" });
+    const inEffect = get(S1);
+    expect(inEffect.flags.amendmentPending).toBe(false);
+    expect(amendmentStage(inEffect)).toBeNull();
+    expect(permittedPlan(inEffect)).toBe(inEffect);
+    expect(task(inEffect, "pay_fees")).toMatchObject({ status: "done", payload: { amount: 518.75 } });
+    expect(caseTotals(inEffect)).toEqual({ fees: 268.75, deposit: 250, total: 518.75, paid: 518.75, due: 0 });
+    expect(inEffect).toMatchObject({ state: "permitted", tier: "reviewed", permit: original.permit, schedule: original.schedule });
+    expect(hasActivePermit(inEffect)).toBe(true);
+    expect(inEffect.activity.slice(-2).map((a) => [a.actor, a.text])).toEqual([
+      ["applicant", "Recorded a payment of $393.75 (card)."],
+      ["system", "The amendment is in effect: the permit covers the amended plan."],
+    ]);
+    expect(up(S1)).toEqual([]);
+    expect(panel(S1, "applicant", "amend")).toMatchObject({ enabled: true });
   });
 
   it("the City Clerk can decline a submitted amendment instead: the original plan comes back and its cards are gone", () => {
+    const queuesBefore = queueSizes();
     as("applicant", "maya-chen");
     const original = get(S1);
     const withDj: EventAnswers = {
@@ -847,16 +914,26 @@ describe("Path 7 · Amend up a tier (S1, P1)", () => {
     act(S1, { type: "submit" });
     const submitted = get(S1);
 
+    // Declining does not wait for the departments' checks, and it needs a reason for the applicant.
     as("clerk");
-    act(S1, { type: "amend", answers: original });
+    expect(refusal(S1, { type: "decide_amendment", decision: "decline" })).toBe("Give the applicant a reason.");
+    act(S1, { type: "decide_amendment", decision: "decline", reason: "Shelter 3 is beside the nature trail: no amplified sound there" });
     const declined = get(S1);
-    expect(declined).toMatchObject({ tier: "instant", addOns: { amplifiedSound: false }, flags: { amendmentPending: false, lateFee: false } });
-    expect(declined.tasks.map((t) => t.catalogId)).toEqual(["pay_fees", "carry_permit"]);
+    expect(declined).toMatchObject({ tier: "instant", triggers: [], addOns: { amplifiedSound: false }, flags: { amendmentPending: false, lateFee: false } });
+    // The record is as it was, to the last fee line; what is new is the Clerk's own decision, kept for the file.
+    expect(declined.tasks.filter((t) => t.owner === "applicant")).toEqual(original.tasks);
+    expect(declined.tasks.map((t) => t.catalogId)).toEqual(["pay_fees", "carry_permit", "decide_amendment"]);
     expect(declined.feeLines).toEqual(original.feeLines);
-    expect(declined).toMatchObject({ state: "permitted", permit: original.permit, dateHold: original.dateHold, payments: original.payments, schedule: original.schedule });
-    expect(declined.activity.at(-1)?.text).toBe("Declined the amendment; the original plan stands.");
-    // Nothing of the declined amendment is left to act on.
+    expect(declined).toMatchObject({ state: "permitted", permit: original.permit, dateHold: original.dateHold, payments: original.payments, schedule: original.schedule, location: original.location });
+    expect(caseTotals(declined)).toEqual(caseTotals(original));
+    expect(declined.activity.at(-1)?.text).toBe("Declined the amendment: Shelter 3 is beside the nature trail: no amplified sound there. The original plan stands.");
+    // Nothing of the declined amendment is left to act on, for anybody.
     expect(refusal(S1, { type: "submit" })).not.toBeNull();
-    void submitted;
+    expect(up(S1)).toEqual([]);
+    expect(queueSizes()).toEqual(queuesBefore);
+    expect(submitted.tasks.some((t) => t.catalogId === "verify:sound_details")).toBe(true);
+    expect(declined.tasks.some((t) => t.catalogId.startsWith("verify:"))).toBe(false);
+    as("applicant", "maya-chen");
+    expect(panel(S1, "applicant", "amend")).toMatchObject({ enabled: true });
   });
 });

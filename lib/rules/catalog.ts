@@ -18,6 +18,8 @@
  *   to 'submitted' for a fresh check.
  * - `preSubmit` cards must all be 'submitted' or 'done' before Submit application unlocks.
  * - Meeting cards are closed by the city with complete_city_task on the card's id.
+ * - "Download per-vendor food permits" opens when Health & Legal issues them
+ *   (`food_permits_issued`), which it can once every vendor's health permit is verified.
  * - A reviewer's request pins `request` on an existing card, or creates one
  *   `respond_to_request:${n}` card when it targets nothing.
  */
@@ -458,8 +460,10 @@ export const CARD_CATALOG: CardSpec[] = [
     phase: "before_event",
     stage: "plan",
     when: (a, cls) => cls.tier === "special" && a.addOns.foodVending !== null,
-    unlocksOn: "permitted",
-    unlockHint: "Unlocks when your permit is issued",
+    // Not the permit alone: Health & Legal issues each vendor's food permit first (its own
+    // "Issue food permits" task, see CITY_TASKS), and only then is there anything to download.
+    unlocksOn: "food_permits_issued",
+    unlockHint: "Unlocks when Health & Legal issues the food permits",
     due: { type: "before_event", sla: "vendorFoodPermitsDaysBefore" },
     preSubmit: false,
     needsCheck: false,
@@ -552,7 +556,10 @@ export const CITY_TASKS = {
   confirm_routing: { owner: "clerk", kind: "action", title: "Confirm routing: reviewers and due dates" },
   /** Clerk, Special events. Created by accept_complete. Done by schedule_meeting on the applicant's pre_application_meeting card. */
   schedule_pre_application_meeting: { owner: "clerk", kind: "meeting", title: "Schedule the pre-application meeting" },
-  /** One per routed department. Created by confirm_routing. Done by review_decide. */
+  /**
+   * One per routed department. Created by confirm_routing, titled by `reviewTaskTitle()`: the
+   * Clerk's own review is the license it issues. Done by review_decide.
+   */
   review: { owner: null, kind: "review", title: "Review your sections" },
   /**
    * The card's reviewer. Created when an applicant card with needsCheck becomes 'submitted' and
@@ -573,13 +580,38 @@ export const CITY_TASKS = {
   issue_permit: { owner: "clerk", kind: "action", title: "Issue permit" },
   /** Public Works & Safety. Created by issue_permit, one per approved service: `:work_order:barricades`, `:work_order:police`, `:work_order:closure`, `:work_order:trash`, `:work_order:power`. Done by complete_city_task. */
   work_order: { owner: "pws", kind: "action", title: "Work order" },
+  /**
+   * Health & Legal. Created by issue_permit for a case whose plan has the applicant's "Download
+   * per-vendor food permits" card (a Special event with food vendors), due when that card is.
+   * Locked until every vendor's health permit is verified; done by complete_city_task, which
+   * raises `food_permits_issued` and so opens the applicant's card.
+   */
+  issue_food_permits: { owner: "hl", kind: "action", title: "Issue food permits" },
   /** Public Works & Safety. Created when the case enters Closeout. Both done by log_closeout. */
   cleanup_inspection: { owner: "pws", kind: "inspection", title: "Log closeout: cleanup inspection" },
   log_actual_hours: { owner: "pws", kind: "action", title: "Log closeout: actual hours" },
   /** Clerk. Created when the case enters Closeout, locked until hours are logged. Done by reconcile_close. */
   reconcile: { owner: "clerk", kind: "action", title: "Reconcile and close" },
+  /**
+   * Clerk. Created when the applicant submits an amendment (`submit` on a case with one pending).
+   * Locked while a department still has one of the amendment's cards, or has sent one back; done
+   * by decide_amendment. One per case: a later amendment opens it again.
+   */
+  decide_amendment: { owner: "clerk", kind: "review", title: "Decide amendment: approve or decline the change" },
   /** Clerk. Created for an Instant event's Closeout exception (damage or dispute). Done by reconcile_close. */
   instant_exception: { owner: "clerk", kind: "review", title: "Reconcile and close: resolve the exception" },
 } as const;
 
 export type CityTaskId = keyof typeof CITY_TASKS;
+
+/** What the Clerk's own review of an event with alcohol is called: the license it issues (PRD, "Licenses"). */
+export const LICENSE_REVIEW_TITLE = "Review the temporary alcohol license";
+
+/**
+ * A department's review task, as My queue, Who's up and Your actions call it. The Clerk reviews
+ * the temporary alcohol license "as its own review section, like any department" (PRD, City
+ * Clerk views), so its task says which license; every other review is the department's sections.
+ */
+export function reviewTaskTitle(dept: Dept, answers: Pick<EventAnswers, "addOns">): string {
+  return dept === "clerk" && answers.addOns.alcohol ? LICENSE_REVIEW_TITLE : CITY_TASKS.review.title;
+}

@@ -14,6 +14,7 @@ import { applicantNameOf } from "@/lib/data/people"
 import { routes } from "@/lib/routes"
 import { availableActions, eventDate, isStalled, isVisibleToCity, nextMove, waitingOn, useDemo } from "@/lib/state"
 import { ENDING_LABEL, STATE_LABEL, type Dept, type Party } from "@/lib/types"
+import { amendmentHeadline, amendmentReview } from "@/lib/view/amend"
 import { CASE_TABS, CASE_TAB_LABEL, caseBackLink, headerReviewClock, isCaseTab, isHoldExpiringTomorrow, ownTaskRows, resolveOpenKey } from "@/lib/view/caseDetail"
 import { ActionSheet } from "./ActionSheet"
 import { ActionsPanel } from "./ActionsPanel"
@@ -100,6 +101,8 @@ function CaseDetailScreen() {
   // What the role has open and no row above reaches: on any tab but Overview, the only way to it.
   const ownTasks = isDept(role) ? ownTaskRows(c, role, statuses.find((s) => s.party === role)?.openTasks ?? [], actions) : []
   const headerClock = isDept(role) ? headerReviewClock(c, role, today) : null
+  // A pending amendment: what it changes and whose move it is, for every city role.
+  const amendment = c.ending ? null : amendmentReview(c, cfg)
 
   return (
     <div className="flex flex-col gap-6">
@@ -120,6 +123,13 @@ function CaseDetailScreen() {
       {!c.ending && isStalled(c, today) ? <StalledBadge /> : null}
       {c.ending ? <EndingBanner ending={c.ending} reason={c.endingReason} /> : null}
       {!c.ending && c.flags.sentToCommission ? <Banner variant="info">This case has been sent to the commission.</Banner> : null}
+      {amendment ? (
+        <Banner variant="info" data-slot="amendment-pending">
+          <p>
+            <strong>Amendment pending: {amendmentHeadline(amendment)}.</strong> {amendment.status} The permit covers the original plan until the amendment is in effect.
+          </p>
+        </Banner>
+      ) : null}
       {!c.ending && isHoldExpiringTomorrow(c.dateHold, today) ? <InlineAlert variant="warning">This case&apos;s date hold expires tomorrow.</InlineAlert> : null}
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-[1fr_280px]">

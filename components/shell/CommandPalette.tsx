@@ -11,6 +11,7 @@ import { useDemo } from "@/lib/state";
 import { homeFor } from "@/lib/routes";
 import { DEFAULT_DEMO_TODAY } from "@/lib/rules";
 import { fmtDate } from "@/lib/format";
+import { demoPathIdForScenario } from "@/lib/view/coach";
 import { buildPaletteItems, groupPaletteItems, matchPaletteItems, type PaletteItem } from "@/lib/view/palette";
 
 interface CommandPaletteProps {
@@ -36,6 +37,7 @@ function CommandPalette({ open, onOpenChange }: CommandPaletteProps) {
   const setPersona = useDemo((s) => s.setPersona);
   const setDemoToday = useDemo((s) => s.setDemoToday);
   const toggleHints = useDemo((s) => s.toggleHints);
+  const setActiveDemoPath = useDemo((s) => s.setActiveDemoPath);
   const reset = useDemo((s) => s.reset);
 
   const [query, setQuery] = React.useState("");
@@ -65,12 +67,14 @@ function CommandPalette({ open, onOpenChange }: CommandPaletteProps) {
       case "scenarioJump":
         setRole(action.jump.role);
         setPersona(action.jump.personaId);
+        setActiveDemoPath(demoPathIdForScenario(action.jump.id));
         router.push(action.jump.path);
         return;
       case "demoPath": {
         const first = action.path.steps[0];
         setRole(first.role);
         if (first.persona) setPersona(first.persona);
+        setActiveDemoPath(action.path.id);
         router.push(first.page);
         return;
       }

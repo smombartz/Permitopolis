@@ -50,12 +50,20 @@ export function isCaseTab(value: string | null): value is CaseTab {
   return value !== null && (CASE_TABS as string[]).includes(value);
 }
 
-/** The lists a case is opened from, and what its back link calls each of them. */
+/**
+ * The lists a case is opened from, and what its back link calls each of them: the four shared
+ * lists, then each role's own tool pages, named as the sidebar names them.
+ */
 const BACK_LABEL: [path: string, label: string][] = [
   [routes.city.queue(), "Back to My queue"],
   [routes.city.cases(), "Back to cases"],
   [routes.city.active(), "Back to Active permits"],
   [routes.city.intake(), "Back to Intake"],
+  [routes.city.payments(), "Back to Payments"],
+  [routes.city.map(), "Back to Closures and routes"],
+  [routes.city.workOrders(), "Back to Work orders"],
+  [routes.city.verifications(), "Back to Verifications"],
+  [routes.city.inspections(), "Back to Inspections"],
 ];
 
 export interface CaseBackLink {
@@ -66,8 +74,8 @@ export interface CaseBackLink {
 /**
  * Where a case's back link goes: the list it was opened from (`?from=`, a city path with its
  * own query string, so a filtered pipeline comes back filtered), or the cases pipeline. A list
- * this role does not have (the Clerk's Intake, after a switch to another department) and
- * anything that is not one of the four lists fall back to the pipeline too.
+ * this role does not have (the Clerk's Intake or Payments, after a switch to another
+ * department) and anything that is not one of the lists above fall back to the pipeline too.
  */
 export function caseBackLink(fromParam: string | null, role: Party): CaseBackLink {
   const fallback: CaseBackLink = { href: routes.city.cases(), label: "Back to cases" };
@@ -340,9 +348,10 @@ function cityTaskAction(c: EventCase, task: Task): { action: ActionType; arg?: s
   if (id === "issue_permit") return { action: "issue_permit" };
   // An Instant event's closeout exception (a damage report) is settled by reconciling it.
   if (id === "instant_exception") return { action: "reconcile_close" };
-  if (id.startsWith("work_order:")) return { action: "complete_city_task", arg: task.id };
+  if (id.startsWith("work_order:") || id === "issue_food_permits") return { action: "complete_city_task", arg: task.id };
   if (id === "cleanup_inspection" || id === "log_actual_hours") return { action: "log_closeout" };
   if (id === "reconcile") return { action: "reconcile_close" };
+  if (id === "decide_amendment") return { action: "decide_amendment" };
   return null;
 }
 

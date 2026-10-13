@@ -1,4 +1,4 @@
-import { screen, within } from "@testing-library/react";
+import { act, screen, within } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 import { LandingScreen } from "@/components/landing/LandingScreen";
 import { DemoGuideScreen } from "@/components/landing/DemoGuideScreen";
@@ -101,6 +101,35 @@ describe("DemoGuideScreen (/demo)", () => {
     expect(lastPush()).toBe("/events/PMT-27-0118");
     expect(useDemo.getState().role).toBe("applicant");
     expect(useDemo.getState().personaId).toBe("downtown-arts-collective");
+    // The demo coach is on path 3 from here on, on every page.
+    expect(useDemo.getState().activeDemoPath).toBe(3);
+  });
+
+  it("Continue goes to the step the path has reached, as the role that step is for", async () => {
+    const { user } = await renderScreen(<DemoGuideScreen />, { path: routes.demo() });
+    // Path 3's first step has happened: the applicant answered Health & Legal's request.
+    act(() => {
+      const state = useDemo.getState();
+      const result = state.dispatch("PMT-27-0118", { type: "respond_to_request", taskId: "PMT-27-0118:vendor_health_permit:1", files: [{ name: "permit.pdf", size: 1000, type: "application/pdf" }] });
+      expect(result.ok).toBe(true);
+    });
+
+    const card = screen.getByRole("heading", { name: "Answer a request" }).closest('[data-slot="panel"]') as HTMLElement;
+    expect(within(card).getByText("Step 2 of 5")).toBeInTheDocument();
+    await user.click(within(card).getByRole("button", { name: "Continue" }));
+
+    expect(lastPush()).toBe("/city/cases/PMT-27-0118");
+    expect(useDemo.getState()).toMatchObject({ role: "hl", activeDemoPath: 3 });
+  });
+
+  it("a scenario's Jump puts the coach on the path built on that scenario", async () => {
+    const { user } = await renderScreen(<DemoGuideScreen />, { path: routes.demo() });
+
+    const row = screen.getByText("S6 · Main Street Food Truck Festival").closest("tr") as HTMLElement;
+    await user.click(within(row).getByRole("button", { name: "Jump" }));
+
+    expect(lastPush()).toBe("/city/cases/PMT-27-0031");
+    expect(useDemo.getState()).toMatchObject({ role: "pws", personaId: "main-street-business-alliance", activeDemoPath: 6 });
   });
 
   it("Reset asks for confirmation before restoring the seed", async () => {

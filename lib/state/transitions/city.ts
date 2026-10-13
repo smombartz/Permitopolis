@@ -1,5 +1,5 @@
 /** Transitions any city role (Clerk, Public Works & Safety, Health & Legal) can raise. */
-import { fmtDate } from "@/lib/format";
+import { fmtDate, plural } from "@/lib/format";
 import { dueDate } from "@/lib/rules";
 import { CITY_TASKS } from "@/lib/rules/catalog";
 import type { RulesCtx } from "@/lib/rules/types";
@@ -16,9 +16,10 @@ import {
   checkVerifyOrReject,
   meetingCardFor,
 } from "../checks";
-import { addTask, appendActivity, applyUnlockEvent, findTask, lineAmount, moveTask, newTask, parkTasksAwaitingAnswer, patchTask, taskId } from "../core";
+import { addTask, appendActivity, applyUnlockEvent, findTask, lineAmount, moveTask, newTask, parkTasksAwaitingAnswer, patchTask, taskId, vendorHealthPermits } from "../core";
 import type { TransitionResult } from "../types";
-import { maybeUnlockIssuePermit } from "./shared";
+import { syncAmendmentDecision } from "./amendment";
+import { maybeUnlockIssueFoodPermits, maybeUnlockIssuePermit } from "./shared";
 
 type Extract_<T extends Action["type"]> = Extract<Action, { type: T }>;
 
@@ -74,8 +75,12 @@ export function verifyDocument(c: EventCase, action: Extract_<"verify_document">
 function acceptCard(c: EventCase, card: Task, ctx: RulesCtx, actor: Actor): EventCase {
   let next = moveTask(c, card.id, "done", ctx, actor);
   next = finishVerifyTaskFor(next, card, ctx, actor);
-  // Verifying the insurance can be the last of the three things Issue permit waits for.
-  return maybeUnlockIssuePermit(next, ctx);
+  // Verifying the insurance can be the last of the three things Issue permit waits for, and
+  // verifying a vendor's health permit the last thing Issue food permits waits for.
+  next = maybeUnlockIssuePermit(next, ctx);
+  next = maybeUnlockIssueFoodPermits(next, ctx);
+  // And the last card of a submitted amendment hands the decision to the Clerk.
+  return syncAmendmentDecision(next, ctx);
 }
 
 export function rejectDocument(c: EventCase, action: Extract_<"reject_document">, actor: Actor, ctx: RulesCtx): TransitionResult {
@@ -84,6 +89,8 @@ export function rejectDocument(c: EventCase, action: Extract_<"reject_document">
   const card = findTask(c, action.taskId) as Task;
   let next = moveTask(c, card.id, "changes_requested", ctx, actor, { payload: { ...card.payload, rejectedReason: action.reason } });
   next = finishVerifyTaskFor(next, card, ctx, actor);
+  // A card of a submitted amendment that is sent back keeps the Clerk's decision waiting.
+  next = syncAmendmentDecision(next, ctx);
   next = appendActivity(next, actor, `Sent "${card.title}" back: ${action.reason}`, ctx);
   return { ok: true, case: next };
 }
@@ -229,6 +236,12 @@ export function completeCityTask(c: EventCase, action: Extract_<"complete_city_t
   if (card) next = acceptCard(next, card, ctx, actor);
   // A pre-application meeting that was held needs no date any more, scheduled or not.
   if (task.catalogId === "pre_application_meeting") next = finishScheduling(next, ctx, actor);
+  // Issuing the food permits is what the applicant's "Download per-vendor food permits" waits for.
+  if (task.catalogId === "issue_food_permits") {
+    next = applyUnlockEvent(next, "food_permits_issued", ctx);
+    next = appendActivity(next, actor, `Issued the food permits for ${plural(vendorHealthPermits(next).total, "vendor")}.`, ctx);
+    return { ok: true, case: next };
+  }
   next = appendActivity(next, actor, `Completed "${task.title}".`, ctx);
   return { ok: true, case: next };
 }

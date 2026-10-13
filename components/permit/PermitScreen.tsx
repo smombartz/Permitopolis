@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useParams } from "next/navigation";
-import { FileQuestionIcon } from "lucide-react";
+import { FilePenLineIcon, FileQuestionIcon } from "lucide-react";
 import { PermitCard } from "@/components/permit/PermitCard";
 import { PermitPrintStyles } from "@/components/permit/PermitPrintStyles";
 import { CaseNotFound } from "@/components/shell";
@@ -11,6 +11,7 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { PageHeader } from "@/components/ui/page-header";
 import { routes } from "@/lib/routes";
 import { useDemo } from "@/lib/state";
+import { canAmend } from "@/lib/view/board";
 import { permitPageInfo } from "@/lib/view/permit";
 
 /**
@@ -28,6 +29,7 @@ function PermitScreen() {
   if (!c) return <CaseNotFound id={id} backHref={routes.events()} backLabel="Back to My events" />;
 
   const info = permitPageInfo(c);
+  const amend = canAmend(c, today);
 
   return (
     <div className="flex flex-col gap-6">
@@ -39,9 +41,20 @@ function PermitScreen() {
         backLabel="Back to your board"
         actions={
           info.ready ? (
-            <Button variant="secondary" onClick={() => window.print()} className="no-print">
-              Download PDF
-            </Button>
+            <>
+              {/* The same rule as the board's menu: a permit that can still be changed says so here too. */}
+              {amend.ok ? (
+                <Button asChild variant="ghost" className="no-print">
+                  <Link href={routes.amend(c.id)}>
+                    <FilePenLineIcon data-icon="inline-start" aria-hidden="true" />
+                    Change your event
+                  </Link>
+                </Button>
+              ) : null}
+              <Button variant="secondary" onClick={() => window.print()} className="no-print">
+                Download PDF
+              </Button>
+            </>
           ) : undefined
         }
       />
