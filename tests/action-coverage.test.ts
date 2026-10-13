@@ -119,13 +119,12 @@ function coverageFor(type: ActionType): string[] {
 }
 
 /**
- * Action types this prototype deliberately has no control for yet. Amendment (5A) reopens the
- * wizard on a submitted record and is still "This screen is being built" (docs/readme.md, "What
- * is still a placeholder"); nothing in this workstream's paths can add that control. Keep this
- * list to the bare minimum: the second `it` below fails the moment a listed gap is actually
- * closed, so it cannot go stale in the other direction either.
+ * Action types this prototype deliberately has no control for yet. There are none: amendment
+ * (5A) was the last, and its control is the amendment wizard's last step. Keep this list to the
+ * bare minimum: the first `it` below fails the moment a listed gap is actually closed, so it
+ * cannot go stale in the other direction either.
  */
-const KNOWN_GAPS: ActionType[] = ["amend"];
+const KNOWN_GAPS: ActionType[] = [];
 
 describe("action coverage: every action a person can take has a control", () => {
   const actionable = ACTION_TYPES.filter((type) => type !== "tick");
