@@ -114,6 +114,46 @@ describe("WizardScreen: a new applicant watches the tier move (demo path 2)", ()
   }, 30_000);
 });
 
+describe("WizardScreen: the stepper's edit links (demo path 2 goes Size, Where, Size, Where, Size)", () => {
+  const stepButtons = () => within(screen.getByRole("list", { name: "Application steps" })).getAllByRole("button").map((b) => b.textContent);
+
+  it("back on Where, When and Size keep their marks, and Size is one click away, not Next twice through When", async () => {
+    const { user } = await renderScreen(<WizardScreen />, { path: routes.apply({ caseId: S2, step: "size" }), personaId: "sunrise-yoga-club" });
+    expect(screen.getByLabelText(/Expected attendance/)).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: /Where, done, edit/ }));
+    expect(navState.search.get("step")).toBe("where");
+    expect(stepButtons()).toEqual(["Step 1: What, done, edit", "Step 3: When, done, edit", "Step 4: Size, done, edit"]);
+
+    await user.click(screen.getByRole("button", { name: /Size, done, edit/ }));
+    expect(navState.search.get("step")).toBe("size");
+    expect(screen.getByLabelText(/Expected attendance/)).toBeInTheDocument();
+
+    // And again, as the path does.
+    await user.click(screen.getByRole("button", { name: /Where, done, edit/ }));
+    await user.click(screen.getByRole("button", { name: /Size, done, edit/ }));
+    expect(navState.search.get("step")).toBe("size");
+  });
+
+  it("a draft reopened on an early step offers every step its answers reach, and the plan once it has been seen", async () => {
+    // S2 has a place, a date and an attendance: reopened on Where (a reload), Size is still reachable.
+    const { user } = await renderScreen(<WizardScreen />, { path: routes.apply({ caseId: S2, step: "where" }), personaId: "sunrise-yoga-club" });
+    expect(stepButtons()).toEqual(["Step 1: What, done, edit", "Step 3: When, done, edit", "Step 4: Size, done, edit"]);
+
+    // The plan has not been seen on this visit, so it is not marked done. Once seen, it is a link back.
+    await user.click(screen.getByRole("button", { name: /Size, done, edit/ }));
+    await user.click(screen.getByRole("button", { name: "Next" }));
+    expect(navState.search.get("step")).toBe("plan");
+    await user.click(screen.getByRole("button", { name: /Where, done, edit/ }));
+    expect(stepButtons()).toEqual(["Step 1: What, done, edit", "Step 3: When, done, edit", "Step 4: Size, done, edit", "Step 5: Plan, done, edit"]);
+  });
+
+  it("a blank wizard has nothing ahead to jump to", async () => {
+    await renderScreen(<WizardScreen />, { path: "/apply", personaId: "new" });
+    expect(within(screen.getByRole("list", { name: "Application steps" })).queryAllByRole("button")).toEqual([]);
+  });
+});
+
 describe("WizardScreen: availability and the lead-time gate", () => {
   it("a booked date (Shelter 3 on May 22) shows Booked with next open dates", async () => {
     const { user } = await renderScreen(<WizardScreen />, { path: "/apply", personaId: "new" });

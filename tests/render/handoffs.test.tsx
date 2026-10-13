@@ -719,6 +719,8 @@ describe("the demo paths that cross surfaces have a control for every step", () 
     await user.click(panelButton("Reply and attach"));
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
     expect(storedCase(S3).state).toBe("in_review");
+    // The three days Health & Legal waited for this answer are given back: due Thu, May 6.
+    expect(screen.getByText("0 days with Health & Legal · expected by Thu, May 6")).toBeInTheDocument();
 
     // Health & Legal: the switch follows the case. Its queue has the review back, and the row
     // opens the decision; the answer itself is verified on the Documents tab first.
@@ -726,6 +728,13 @@ describe("the demo paths that cross surfaces have a control for every step", () 
     expect(here()).toBe(routes.city.case(S3));
     await user.click(screen.getByRole("link", { name: /^My queue/ }));
     const review = queueFor(useDemo.getState().cases, "hl", useDemo.getState().demoToday).find((row) => row.case.id === S3)!;
+    // The row's parts agree: why it is back, since when, due when, and where the clock stands.
+    const reviewRow = within(linkTo(routes.city.case(S3, { task: review.task.id, from: routes.city.queue() })));
+    expect(reviewRow.getByText("Answer received May 3")).toBeInTheDocument();
+    expect(reviewRow.getByText("0 days waiting")).toBeInTheDocument();
+    expect(reviewRow.getByText(/Thu, May 6/)).toBeInTheDocument();
+    expect(reviewRow.getByText(/Day 11 of 14 · paused 3 days/)).toBeInTheDocument();
+    expect(reviewRow.queryByText(/Due today|Routed May 3|14 days waiting/)).not.toBeInTheDocument();
     await user.click(linkTo(routes.city.case(S3, { task: review.task.id, from: routes.city.queue() })));
     expect(within(screen.getByRole("dialog")).getByRole("heading", { name: "Decide your review" })).toBeInTheDocument();
     await user.click(panelButton("Cancel"));
@@ -1032,6 +1041,12 @@ describe("the demo paths that cross surfaces have a control for every step", () 
     expect(navState.search.get("case")).toBe(draft.id);
     expectRealScreen();
     expect(h1()).toBe("Main Street Food Truck Festival");
+    // The last screen of the path: the plan for Apr 22, 2028, with who reviews what. Twenty-five
+    // vendors' permits read as one thing Health & Legal checks, never the catalogue's "{vendor}".
+    expect(navState.search.get("step")).toBe("plan");
+    expect(screen.getAllByText("Health & Legal checks your certificate of insurance, vendor list, vendor health permits and accessibility plan.").length).toBeGreaterThan(0);
+    expect(document.body.textContent).not.toMatch(/\{vendor\}/);
+    expect(document.body.textContent).not.toMatch(/checks your[^.]*(Submit application|Pay fees and deposit|Coordination meeting)/);
   }, 60_000);
 });
 

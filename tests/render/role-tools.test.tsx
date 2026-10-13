@@ -13,6 +13,7 @@ import { describe, expect, it } from "vitest";
 import { CaseDetailScreen } from "@/components/case/CaseDetailScreen";
 import { panelFor, panelWidthFor } from "@/components/case/actions/registry";
 import { GENERIC_PANELS } from "@/components/case/actions/generic";
+import { REQUEST_TEMPLATES } from "@/lib/data/templates";
 import { routes } from "@/lib/routes";
 import { caseTotals, checkIssuePermit, closeoutSettlement, dueAtQuote, useDemo } from "@/lib/state";
 import { ACTION_TYPES } from "@/lib/state/actions";
@@ -67,9 +68,9 @@ describe("the registry opens the Phase 4 panels", () => {
     expect(ACTION_TYPES.filter((type) => panelWidthFor(type) === "wide").sort()).toEqual(["log_closeout", "reconcile_close", "reject_document", "review_decide", "send_quote", "verify_document"]);
   });
 
-  it("Send quote opens the consolidation and quote builder, wide", async () => {
+  it("Send quote opens the consolidation and quote builder, wide, under the button's own name", async () => {
     await renderScreen(<CaseDetailScreen />, { path: routes.city.case(S3, { task: "send_quote" }), role: "clerk" });
-    expect(sheet().getByRole("heading", { name: "Consolidation and quote" })).toBeInTheDocument();
+    expect(sheet().getByRole("heading", { name: "Send quote" })).toBeInTheDocument();
     expect(sheet().getByRole("heading", { name: "Each department's decision" })).toBeInTheDocument();
     expect(sheet().getByRole("heading", { name: "Merged conditions" })).toBeInTheDocument();
     expect(sheetEl()).toHaveAttribute("data-width", "wide");
@@ -97,6 +98,36 @@ describe("the registry opens the Phase 4 panels", () => {
     expect(sheetEl()).toHaveAttribute("data-width", "default");
     navigate(routes.city.case(S5, { task: "remind:applicant" }));
     expect(sheetEl()).toHaveAttribute("data-width", "default");
+  });
+});
+
+describe("the request panel's templates", () => {
+  it("Health & Legal's health-permit template names the vendor of the card ticked, in the preview and in what is sent", async () => {
+    const { user } = await renderScreen(<CaseDetailScreen />, { path: routes.city.case(FARMERS_MARKET, { task: "request_info" }), role: "hl" });
+    const pick = async (template: string) => {
+      await user.click(sheet().getByRole("combobox"));
+      await user.click(screen.getByRole("option", { name: template }));
+    };
+
+    // Nothing ticked yet: the words stand for every vendor, and no card is previewed.
+    await pick(REQUEST_TEMPLATES.hl[0]);
+    expect(sheet().getByRole("textbox", { name: /Message/ })).toHaveValue("Please upload each vendor's current health permit");
+
+    // One vendor's card ticked: the template is that vendor's, and so is the card the applicant will see.
+    await user.click(sheet().getByRole("checkbox", { name: "Health permit: Market Stall 3" }));
+    await pick(REQUEST_TEMPLATES.hl[0]);
+    expect(sheet().getByRole("textbox", { name: /Message/ })).toHaveValue("Please upload Market Stall 3's current health permit");
+    expect(sheet().getByText("Please upload Market Stall 3's current health permit", { selector: "p" })).toBeInTheDocument();
+
+    // No template leaves a raw placeholder in the preview card.
+    for (const template of REQUEST_TEMPLATES.hl) {
+      await pick(template);
+      expect(screen.getByRole("dialog").textContent).not.toMatch(/[{}]/);
+    }
+
+    await pick(REQUEST_TEMPLATES.hl[0]);
+    await user.click(sheet().getByRole("button", { name: "Send request" }));
+    expect(storedCase(FARMERS_MARKET).tasks.find((t) => t.id === `${FARMERS_MARKET}:vendor_health_permit:3`)?.request?.message).toBe("Please upload Market Stall 3's current health permit");
   });
 });
 

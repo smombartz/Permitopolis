@@ -197,7 +197,7 @@ describe("nextMove", () => {
 });
 
 describe("nextMove: who goes after the party that is up", () => {
-  const cleanup = makeTask({ id: "PMT-27-0031:cleanup_inspection", catalogId: "cleanup_inspection", owner: "pws", kind: "inspection", title: "Cleanup inspection" });
+  const cleanup = makeTask({ id: "PMT-27-0031:cleanup_inspection", catalogId: "cleanup_inspection", owner: "pws", kind: "inspection", title: "Log closeout: cleanup inspection" });
   const reconcile = makeTask({ id: "PMT-27-0031:reconcile", catalogId: "reconcile", owner: "clerk", kind: "action", status: "locked", unlocksOn: "hours_logged" });
   const bill = makeTask({ id: "PMT-27-0031:final_bill_or_refund", catalogId: "final_bill_or_refund", kind: "payment", status: "locked", unlocksOn: "invoice_issued" });
   const feedback = makeTask({ id: "PMT-27-0031:feedback", catalogId: "feedback", kind: "form", status: "locked", unlocksOn: "closed" });

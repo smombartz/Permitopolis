@@ -180,6 +180,25 @@ describe("classify: the block-party exception", () => {
   });
 });
 
+describe("classify: who approves a space reservation", () => {
+  const reservation = (a: ReturnType<typeof answers>) => classify(a).components.find((c) => c.id === "space_reservation")?.approvedBy;
+
+  it("is automatic on an Instant plan, and says so only there", () => {
+    const picnic = answers({ location: inventoryLocation(["shelter-2"]), attendance: 40 });
+    expect(classify(picnic).tier).toBe("instant");
+    expect(reservation(picnic)).toBe("City Clerk (automatic for Instant)");
+  });
+
+  it("on a Reviewed or Special plan the Clerk approves it like the rest: the picnic once alcohol is on, a gala for 1,200", () => {
+    const withAlcohol = answers({ location: inventoryLocation(["shelter-2"]), attendance: 40, addOns: addOns({ alcohol: true }) });
+    expect(classify(withAlcohol).tier).toBe("reviewed");
+    expect(reservation(withAlcohol)).toBe("City Clerk");
+    const gala = answers({ location: inventoryLocation(["shelter-2"]), attendance: 1200 });
+    expect(classify(gala).tier).toBe("special");
+    expect(reservation(gala)).toBe("City Clerk");
+  });
+});
+
 describe("classify: partial answers", () => {
   it("works with nothing answered yet", () => {
     const cls = classify(answers({}));

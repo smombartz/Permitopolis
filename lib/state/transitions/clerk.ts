@@ -32,7 +32,7 @@ export function acceptComplete(c: EventCase, _action: Extract_<"accept_complete"
   }
 
   const confirmRoutingTask = newTask(
-    { id: taskId(next.id, "confirm_routing"), catalogId: "confirm_routing", owner: "clerk", kind: "action", title: "Confirm reviewers and due dates", phase: "review" },
+    { id: taskId(next.id, "confirm_routing"), catalogId: "confirm_routing", owner: "clerk", kind: "action", title: CITY_TASKS.confirm_routing.title, phase: "review" },
     ctx,
     "system",
   );

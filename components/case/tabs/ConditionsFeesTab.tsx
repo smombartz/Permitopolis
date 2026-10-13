@@ -38,7 +38,7 @@ function ConditionsFeesTab({ c }: ConditionsFeesTabProps) {
   return (
     <div className="flex flex-col gap-8">
       <Section title="Conditions">
-        {c.conditions.length > 0 ? <ConditionList conditions={c.conditions} /> : <p className="text-sm text-fg-secondary">No conditions yet.</p>}
+        {c.conditions.length > 0 ? <ConditionList conditions={c.conditions} showMerged /> : <p className="text-sm text-fg-secondary">No conditions yet.</p>}
       </Section>
       <Section title="Fees">
         {c.feeLines.length > 0 ? (

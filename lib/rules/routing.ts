@@ -50,15 +50,27 @@ function reasonFor(id: TriggerId, cfg: RulesConfig): string | undefined {
 /** What routing needs of a classification. classify() calls this before it has the rest. */
 export type RoutingBasis = Pick<Classification, "tier" | "triggers" | "blockPartyException">;
 
+/** The one section that stands for every vendor's card: the catalogue's own title is "Health permit: {vendor}". */
+const PER_VENDOR_SECTION = "Vendor health permits";
+
+/**
+ * What a department checks on this plan: the documents and forms that name it as reviewer, and
+ * anything else that goes to it for a check. A card it only receives (the submission, the
+ * signature, the payment), a meeting it holds and a download are not things it reviews.
+ */
 function sectionsFor(dept: Dept, a: EventAnswers, basis: RoutingBasis): string[] {
   // A card's `when` reads only the tier and the block-party exception.
-  return CARD_CATALOG.filter((c) => c.stage === "plan" && c.reviewer === dept && c.when(a, basis as Classification)).map((c) => c.title);
+  return CARD_CATALOG.filter((c) => c.stage === "plan" && c.reviewer === dept && c.when(a, basis as Classification))
+    .filter((c) => c.kind === "document" || c.kind === "form" || c.needsCheck)
+    .map((c) => (c.perVendor ? PER_VENDOR_SECTION : c.title));
 }
 
 function checksSentence(dept: Dept, sections: string[]): string {
   if (sections.length === 0) return `${PARTY_LABEL[dept]} reviews your application.`;
-  const list = sections.length === 1 ? sections[0] : `${sections.slice(0, -1).join(", ")} and ${sections.at(-1)}`;
-  return `${PARTY_LABEL[dept]} checks your ${list.replace(/^[A-Z]/, (ch) => ch.toLowerCase())}.`;
+  // Mid-sentence, every title reads lower-case: "your certificate of insurance, vendor list and ...".
+  const items = sections.map((section) => section.replace(/^[A-Z]/, (ch) => ch.toLowerCase()));
+  const list = items.length === 1 ? items[0] : `${items.slice(0, -1).join(", ")} and ${items.at(-1)}`;
+  return `${PARTY_LABEL[dept]} checks your ${list}.`;
 }
 
 export function buildRouting(

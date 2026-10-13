@@ -67,6 +67,9 @@ function ReviewDecidePanel({ caseId, role, onClose }: ActionPanelProps) {
   // carries none, and that decision needs at least one or it says something that is not so.
   const withConditions = choice === "approve_with_conditions"
   const needsCondition = withConditions && conditions.length === 0
+  // A named fee line with no quantity would be a $0 charge. It is never left out in silence:
+  // the reviewer gives it a quantity or takes it off.
+  const unquantified = choice === "approve" || withConditions ? feeRows.find((r) => r.label.trim().length > 0 && !(r.qty > 0)) : undefined
 
   function openRequestInfo() {
     router.replace(
@@ -147,14 +150,20 @@ function ReviewDecidePanel({ caseId, role, onClose }: ActionPanelProps) {
           </>
         ) : null}
 
-        <InlineAlert variant="info">{needsCondition ? "Add at least one condition, or choose Approve." : summaryFor(choice, withConditions ? conditions : [], feeRows)}</InlineAlert>
+        <InlineAlert variant="info">
+          {needsCondition
+            ? "Add at least one condition, or choose Approve."
+            : unquantified
+              ? `Give ${unquantified.label.trim()} a quantity, or remove the line.`
+              : summaryFor(choice, withConditions ? conditions : [], feeRows)}
+        </InlineAlert>
       </PanelBody>
       <PanelActions
         error={error}
         onCancel={onClose}
         submitLabel={choice === "request_info" ? "Continue" : CHOICE_LABEL[choice]}
         submitVariant={choice === "deny" ? "destructive" : "primary"}
-        disabled={choice !== "request_info" && (!check.ok || needsCondition)}
+        disabled={choice !== "request_info" && (!check.ok || needsCondition || unquantified !== undefined)}
         onSubmit={submit}
       />
     </>

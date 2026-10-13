@@ -13,7 +13,7 @@ import type { ActionPanelProps } from "../types"
 
 /** Closes a work order (with its own detail: what, how many, for which event, due), or a meeting already held. */
 function CompleteCityTaskPanel({ caseId, arg, role, onClose }: ActionPanelProps) {
-  const { c } = useCaseContext(caseId)
+  const { c, today } = useCaseContext(caseId)
   const [note, setNote] = React.useState("")
   const [error, setError] = React.useState<string | null>(null)
   const dispatch = useCaseDispatch(caseId)
@@ -21,7 +21,7 @@ function CompleteCityTaskPanel({ caseId, arg, role, onClose }: ActionPanelProps)
 
   const task = c.tasks.find((t) => t.id === arg)
   if (!task) return null
-  const check = checkCompleteCityTask(c, arg, role)
+  const check = checkCompleteCityTask(c, arg, role, today)
   const isWorkOrder = task.catalogId.startsWith("work_order:")
   // A meeting is held, a work order is done: the Reviews tab's button says "Mark held" too.
   const isMeeting = task.kind === "meeting"

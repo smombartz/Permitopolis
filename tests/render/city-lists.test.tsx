@@ -51,6 +51,22 @@ describe("My queue", () => {
     for (const other of rows.filter((a) => !reviews.includes(a))) expect(other).not.toHaveTextContent(/Day \d+ of \d+/);
   });
 
+  it("a reviewer's row names why the case came to it, not every trigger on the case", async () => {
+    await renderScreen(<QueueScreen />, { role: "hl", path: routes.city.queue() });
+    const rows = screen.getAllByRole("link").filter((a) => a.hasAttribute("data-row-nav"));
+    const fiveK = rows.find((a) => /Riverfront Summer 5K/.test(a.textContent ?? ""))!;
+    // Health & Legal has the 5K for its insurance and its accessibility plan. The route closure,
+    // the crowd and the sound are Public Works & Safety's reasons.
+    expect(within(fiveK).getByText("Insurance verification, Accessibility plan")).toBeInTheDocument();
+    expect(fiveK).not.toHaveTextContent(/Route closure|Amplified sound|City services/);
+
+    switchRole("pws");
+    const pwsRows = screen.getAllByRole("link").filter((a) => a.hasAttribute("data-row-nav"));
+    const market = pwsRows.find((a) => /Riverside Farmers Market/.test(a.textContent ?? ""))!;
+    expect(market).toHaveTextContent(/Tents or stages/);
+    expect(market).not.toHaveTextContent(/Insurance verification/);
+  });
+
   it("an empty queue is a designed state", async () => {
     await renderScreen(<QueueScreen />, { role: "clerk", path: routes.city.queue(), cases: [] });
     expect(screen.getByText("Nothing is waiting on you.")).toBeInTheDocument();
@@ -235,7 +251,8 @@ describe("Intake queue", () => {
     const { user } = await renderScreen(<IntakeScreen />, { role: "clerk", path: routes.city.intake() });
     await user.click(screen.getByRole("tab", { name: /Reviewed/ }));
     const row = within(screen.getByText("Maple Street block party").closest("tr")!);
-    expect(row.getByText("9 of 12 items")).toBeInTheDocument();
+    // A block party's count is its neighbor sign-offs, and the column says so.
+    expect(row.getByText("9 of 12 sign-offs")).toBeInTheDocument();
     const button = row.getByRole("button", { name: "Accept as complete" });
     expect(button).toBeDisabled();
     expect(row.getByText("Waiting on 3 neighbor sign-offs")).toBeInTheDocument();

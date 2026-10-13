@@ -20,10 +20,15 @@ interface ConditionListProps extends React.ComponentProps<"div"> {
   /** Controlled accepted state while editable; falls back to each condition's own flag. */
   acceptedIds?: string[]
   onToggleAccept?: (id: string) => void
+  /**
+   * Marks the conditions the Clerk's quote carried ("Merged"). City screens set it; it is the
+   * Clerk's bookkeeping, so the applicant's quote, the permit and the public check leave it off.
+   */
+  showMerged?: boolean
 }
 
-/** Conditions grouped by department, with merged and accepted marks and an optional accept checkbox. */
-function ConditionList({ conditions, editable = false, acceptedIds, onToggleAccept, className, ...props }: ConditionListProps) {
+/** Conditions grouped by department, with accepted marks, merged marks for city staff, and an optional accept checkbox. */
+function ConditionList({ conditions, editable = false, acceptedIds, onToggleAccept, showMerged = false, className, ...props }: ConditionListProps) {
   const groups = groupConditionsByDept(conditions)
   return (
     <div data-slot="condition-list" className={cn("flex flex-col gap-5", className)} {...props}>
@@ -59,7 +64,7 @@ function ConditionList({ conditions, editable = false, acceptedIds, onToggleAcce
                   <div className="flex min-w-0 flex-1 flex-col gap-1">
                     <p className="text-sm text-fg">{condition.text}</p>
                     <div className="flex flex-wrap items-center gap-2">
-                      {condition.mergedByClerk ? <Badge variant="secondary">Merged</Badge> : null}
+                      {showMerged && condition.mergedByClerk ? <Badge variant="secondary">Merged</Badge> : null}
                       {accepted ? (
                         <Badge variant="success">Accepted</Badge>
                       ) : !editable ? (

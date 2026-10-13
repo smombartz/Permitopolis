@@ -19,6 +19,7 @@ import {
   isVisibleToCity,
   leadTimeRisk,
   queueFor,
+  taskDueDate,
   waitingOn,
   waitingOnOthers,
   whoIsUp,
@@ -81,11 +82,6 @@ export function emptyQueueMessage(others: WaitingOnOthersItem[]): string {
   return `Nothing is waiting on you. ${others.length} ${noun} with other parties.`;
 }
 
-/** For a reviewer's row: the triggers that routed the case, in plain words. */
-export function triggerLabels(c: EventCase): string[] {
-  return c.triggers.map((t) => t.label);
-}
-
 /** The day a task most recently became actionable (todo or changes requested), for the reason line. */
 function lastOpenedOn(task: Task): ISODate | null {
   const opened = [...task.history].reverse().find((h) => h.status === "todo" || h.status === "changes_requested");
@@ -94,7 +90,7 @@ function lastOpenedOn(task: Task): ISODate | null {
 
 /**
  * A one-line reason a queue row is this role's move, e.g. "Insurance certificate re-uploaded
- * Apr 30", "Routed Apr 20", "A reviewer denied". Officials triage by deadline more than by
+ * Apr 30", "Routed Apr 20", "Answer received May 3", "A reviewer denied". Officials triage by deadline more than by
  * state (the PRD's push); this is the "why now" a due date alone does not say.
  */
 export function queueReasonLine(item: QueueItem): string {
@@ -110,7 +106,14 @@ export function queueReasonLine(item: QueueItem): string {
       return since ? `${card.title} ${verb} ${since}` : `${card.title} ${verb}`;
     }
   }
-  if (task.catalogId.startsWith("review:")) return since ? `Routed ${since}` : "Routed";
+  if (task.catalogId.startsWith("review:")) {
+    // Parked on a request and back: the row is here because the applicant answered. `since` is
+    // then the day the review reopened, not the day the case was routed.
+    const parkedAt = task.history.findLastIndex((h) => h.status === "locked");
+    if (parkedAt !== -1 && parkedAt < task.history.length - 1) return since ? `Answer received ${since}` : "Answer received";
+    const routedOn = c.reviews.find((r) => r.dept === task.owner)?.clock.startedOn ?? when;
+    return routedOn ? `Routed ${fmtMonthDay(routedOn)}` : "Routed";
+  }
   if (task.catalogId === "intake_check") return c.submittedAt ? `Submitted ${fmtMonthDay(c.submittedAt)}` : "Submitted";
   if (task.catalogId === "confirm_routing") return since ? `Accepted as complete ${since}` : "Accepted as complete";
   if (task.catalogId === "consolidate") return task.payload.denied === true ? "A reviewer denied" : "Every review is in";
@@ -417,6 +420,11 @@ export const TABLE_COLUMN_LABEL: Record<TableColumn, string> = {
   risk: "Risk",
 };
 
+/** Oldest due first, undated last; ties keep their order (the applicant's before the city's). */
+function byTaskDue(a: Task, b: Task): number {
+  return (taskDueDate(a) ?? "9999-12-31").localeCompare(taskDueDate(b) ?? "9999-12-31");
+}
+
 function deptStatusOf(c: EventCase, dept: Dept) {
   return c.reviews.find((r) => r.dept === dept)?.status ?? "not_routed";
 }
@@ -435,12 +443,13 @@ export interface PipelineTableRow {
 export function pipelineTableRow(c: EventCase, today: ISODate, cfg: RulesConfig): PipelineTableRow {
   const parties = waitingOn(c, today);
   const upNow = parties.filter((p) => p.status === "up_now");
-  const firstTask = upNow.map((p) => p.openTasks[0]).find((t) => t !== undefined);
-  const due = upNow
-    .map((p) => p.oldestDue)
-    .filter((d): d is ISODate => d !== null)
-    .sort()
-    .at(0) ?? null;
+  // Next action and Due are one task's: of everything open for a party that is up, the one due
+  // soonest (an undated one last). Each party's own list is already in that order.
+  const firstTask = upNow
+    .flatMap((p) => p.openTasks)
+    .sort(byTaskDue)
+    .at(0);
+  const due = firstTask ? taskDueDate(firstTask) : null;
   const depts: Dept[] = c.reviews.some((r) => r.dept === "clerk") ? ["clerk", "pws", "hl"] : ["pws", "hl"];
   return {
     case: c,
@@ -521,17 +530,24 @@ export function intakeCounts(cases: EventCase[]): Record<IntakeTab, number> {
   };
 }
 
+export interface IntakeCompleteness {
+  done: number;
+  total: number;
+  /** What is being counted, for "9 of 12 sign-offs". */
+  unit: "items" | "sign-offs";
+}
+
 /**
  * "7 of 8 items": the case's pre-submit cards, done or submitted over the total. A block
- * party's neighbor sign-offs stand in for that count instead, since that is what intake is
- * really waiting on (the Clerk cannot accept until every household has signed).
+ * party's neighbor sign-offs stand in for that count instead ("9 of 12 sign-offs"), since that
+ * is what intake is really waiting on (the Clerk cannot accept until every household has signed).
  */
-export function intakeCompleteness(c: EventCase): { done: number; total: number } {
+export function intakeCompleteness(c: EventCase): IntakeCompleteness {
   const signoff = c.tasks.find((t) => t.catalogId === "neighbor_signoff");
-  if (signoff?.payload.progress) return { done: signoff.payload.progress.done, total: signoff.payload.progress.total };
+  if (signoff?.payload.progress) return { done: signoff.payload.progress.done, total: signoff.payload.progress.total, unit: "sign-offs" };
   const items = c.tasks.filter((t) => t.owner === "applicant" && (CARD_BY_ID as Record<string, CardSpec>)[t.catalogId as CatalogId]?.preSubmit);
   const done = items.filter((t) => t.status === "submitted" || t.status === "done").length;
-  return { done, total: items.length };
+  return { done, total: items.length, unit: "items" };
 }
 
 const HOLD_SUFFIX = " has this date held";
@@ -559,7 +575,7 @@ export function competingApplication(c: EventCase, cases: EventCase[], cfg: Rule
 
 export interface IntakeRow {
   case: EventCase;
-  completeness: { done: number; total: number };
+  completeness: IntakeCompleteness;
   competing: { reason: string } | null;
   risk: "ok" | "at_risk";
   daysInIntake: number;

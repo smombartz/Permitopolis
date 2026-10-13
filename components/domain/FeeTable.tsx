@@ -2,6 +2,7 @@ import { cn } from "cn"
 import { Badge } from "@/components/ui/badge"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Money } from "@/components/domain/Money"
+import { fmtQty } from "@/lib/format"
 import { DEPTS, PARTY_LABEL, type Dept, type FeeLine } from "@/lib/types"
 
 /** Fee and late-fee lines grouped by department; deposit lines never group under one. */
@@ -71,7 +72,7 @@ function CompactLines({ lines, showActual }: { lines: FeeLine[]; showActual: boo
                 <LineLabel line={line} />
               </span>
               <span className="block font-mono text-xs text-fg-label tabular-nums">
-                {line.qty} {line.unit} × <Money amount={line.unitPrice} className="text-xs" />
+                {fmtQty(line.qty, line.unit)} × <Money amount={line.unitPrice} className="text-xs" />
               </span>
             </TableCell>
             <TableCell numeric className="h-auto py-2 text-right align-top">
@@ -103,7 +104,9 @@ function FeeTable({ lines, showActual = false, compact = false, className, ...pr
   const feesSubtotal = sumFeeLines(feeLines)
   const depositTotal = sumFeeLines(depositLines)
   const total = feesSubtotal + depositTotal
-  const actualTotal = showActual ? lines.reduce((sum, l) => sum + (l.actual ?? l.estimate), 0) : null
+  // What the event actually cost, to read against the subtotal of fees. The deposit is not a
+  // cost: with it in, the row showed an amount nobody is charged ($10,395 on S6).
+  const actualFees = showActual ? feeLines.reduce((sum, l) => sum + (l.actual ?? l.estimate), 0) : null
 
   return (
     <div data-slot="fee-table" className={cn("flex flex-col gap-5", className)} {...props}>
@@ -137,7 +140,7 @@ function FeeTable({ lines, showActual = false, compact = false, className, ...pr
                       <LineLabel line={line} />
                     </TableCell>
                     <TableCell numeric className="text-right">
-                      {line.qty} {line.unit}
+                      {fmtQty(line.qty, line.unit)}
                     </TableCell>
                     <TableCell numeric className="text-right">
                       <Money amount={line.unitPrice} />
@@ -169,7 +172,7 @@ function FeeTable({ lines, showActual = false, compact = false, className, ...pr
           <SummaryRow key={line.id} label={line.label} amount={line.estimate} />
         ))}
         <SummaryRow label="Total" amount={total} emphasized />
-        {showActual && actualTotal !== null ? <SummaryRow label="Actual total" amount={actualTotal} /> : null}
+        {showActual && actualFees !== null ? <SummaryRow label="Actual fees" amount={actualFees} /> : null}
       </div>
     </div>
   )

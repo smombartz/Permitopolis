@@ -10,17 +10,24 @@ interface WizardStepperProps extends React.ComponentProps<"ol"> {
   steps: WizardStepDef[]
   /** 0-based index of the step in view. */
   current: number
-  /** Called for a done step, so it can be reopened for editing. Steps ahead of `current` are never clickable. */
+  /**
+   * 0-based index of the furthest step reached so far. Defaults to `current`. Someone who goes
+   * back from step 4 to step 2 has still done steps 3 and 4: they keep their mark and their link.
+   */
+  reached?: number
+  /** Called for a done step, so it can be reopened for editing. Steps past `reached` are never clickable. */
   onStepSelect?: (index: number) => void
 }
 
 /**
- * The wizard's 1-to-5 stepper. Done steps are clickable to go back and edit; labels
- * collapse to numbered markers alone below the `sm` breakpoint ("compact on mobile"). The label
- * is only hidden from sight there (`sr-only`, never `display: none`): the marker is decorative,
- * so the label and "Step N" are each step's whole accessible name.
+ * The wizard's 1-to-5 stepper. Done steps (every step up to the furthest one reached, but the
+ * one in view) are clickable to go and edit; labels collapse to numbered markers alone below
+ * the `sm` breakpoint ("compact on mobile"). The label is only hidden from sight there
+ * (`sr-only`, never `display: none`): the marker is decorative, so the label and "Step N" are
+ * each step's whole accessible name.
  */
-function WizardStepper({ steps, current, onStepSelect, className, ...props }: WizardStepperProps) {
+function WizardStepper({ steps, current, reached, onStepSelect, className, ...props }: WizardStepperProps) {
+  const furthest = Math.max(current, reached ?? current)
   return (
     <ol
       data-slot="wizard-stepper"
@@ -29,8 +36,8 @@ function WizardStepper({ steps, current, onStepSelect, className, ...props }: Wi
       {...props}
     >
       {steps.map((step, index) => {
-        const done = index < current
         const isCurrent = index === current
+        const done = !isCurrent && index <= furthest
         const clickable = done && Boolean(onStepSelect)
         const marker = (
           <span
@@ -78,7 +85,7 @@ function WizardStepper({ steps, current, onStepSelect, className, ...props }: Wi
             {index < steps.length - 1 ? (
               <span
                 aria-hidden="true"
-                className={cn("h-px flex-1 sm:w-8", done ? "bg-indigo-650" : "bg-line-subtle")}
+                className={cn("h-px flex-1 sm:w-8", index < furthest ? "bg-indigo-650" : "bg-line-subtle")}
               />
             ) : null}
           </li>

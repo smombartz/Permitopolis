@@ -60,7 +60,8 @@ export function PermitopolisMap({ highlights, selectedId, onSelect, className }:
   const overlapCounts = React.useMemo(() => {
     const counts: Record<string, number> = {};
     for (const highlight of highlights) {
-      for (const id of occupiedIds(highlight.location)) counts[id] = (counts[id] ?? 0) + 1;
+      // Once per booking: a route that laps a segment four times does not overlap itself.
+      for (const id of new Set(occupiedIds(highlight.location))) counts[id] = (counts[id] ?? 0) + 1;
     }
     return counts;
   }, [highlights]);
@@ -95,10 +96,10 @@ export function PermitopolisMap({ highlights, selectedId, onSelect, className }:
                   isOverlapping ? " · Overlaps another booking" : ""
                 }`}
               </title>
-              {shapes.map((shape) =>
+              {shapes.map((shape, index) =>
                 shape.kind === "rect" ? (
                   <rect
-                    key={shape.id}
+                    key={`${shape.id}-${index}`}
                     x={shape.rect.x}
                     y={shape.rect.y}
                     width={shape.rect.w}
@@ -117,7 +118,7 @@ export function PermitopolisMap({ highlights, selectedId, onSelect, className }:
                   />
                 ) : (
                   <line
-                    key={shape.id}
+                    key={`${shape.id}-${index}`}
                     x1={shape.line.x1}
                     y1={shape.line.y1}
                     x2={shape.line.x2}

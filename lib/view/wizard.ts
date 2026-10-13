@@ -72,6 +72,19 @@ export function previousWizardStep(step: WizardStep): WizardStep | null {
   return i > 0 ? WIZARD_STEPS[i - 1] : null;
 }
 
+/**
+ * The furthest of steps 1 to 4 the answers show the applicant has been to: the last one that
+ * holds an answer of its own. The stepper keeps every step up to it as an edit link, so going
+ * back to Where does not strand a draft that already has its date and its size. The plan
+ * (step 5) holds no answer: it counts as reached once it has been seen.
+ */
+export function furthestAnsweredStep(answers: EventAnswers): number {
+  if (answers.attendance !== null) return wizardStepIndex("size");
+  if (answers.schedule) return wizardStepIndex("when");
+  if (answers.location) return wizardStepIndex("where");
+  return wizardStepIndex("what");
+}
+
 /* ---------- step 1: event type ---------- */
 
 export const EVENT_TYPES: EventType[] = [

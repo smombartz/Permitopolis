@@ -138,7 +138,7 @@ function IntakeTabTable({
               <TableCell numeric>{c.submittedAt ? <DateText date={c.submittedAt.slice(0, 10)} short /> : "—"}</TableCell>
               <TableCell numeric>{plural(row.daysInIntake, "day")}</TableCell>
               <TableCell>
-                {row.completeness.done} of {row.completeness.total} items
+                {row.completeness.done} of {row.completeness.total} {row.completeness.unit}
               </TableCell>
               <TableCell>{row.competing ? <span className="text-danger-fg">{row.competing.reason}</span> : <span className="text-fg-secondary">None</span>}</TableCell>
               <TableCell>

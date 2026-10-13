@@ -98,6 +98,9 @@ describe("CheckoutScreen: QUOTE (demo path 5)", () => {
     });
 
     expect(screen.getByText(/Pay by.*to keep your date/)).toBeInTheDocument();
+    // Every condition went through the Clerk's quote. That is not the applicant's to know.
+    expect(storedCase(S5).conditions.every((cond) => cond.mergedByClerk)).toBe(true);
+    expect(screen.queryByText("Merged")).not.toBeInTheDocument();
 
     // Step 1: accept every condition, then sign.
     for (const checkbox of screen.getAllByRole("checkbox", { name: /^I accept:/ })) {

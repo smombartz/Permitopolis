@@ -11,6 +11,7 @@ import { PlusIcon } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Money } from "@/components/domain"
 import { FeeLineFields, feeLineAmount } from "@/components/case/FeeLineFields"
+import { fmtQty } from "@/lib/format"
 import type { FeeLineDraft } from "@/lib/state/actions"
 import type { FeeLine } from "@/lib/types"
 
@@ -69,7 +70,7 @@ function FeeLineBuilder({ presets, existing, value, onChange }: FeeLineBuilderPr
             {existing.map((l) => (
               <li key={l.id} className="flex items-center justify-between gap-3 text-xs text-fg-secondary">
                 <span>
-                  {l.label} &middot; {l.qty} {l.unit}
+                  {l.label} &middot; {fmtQty(l.qty, l.unit)}
                 </span>
                 <Money amount={l.estimate} className="font-mono" />
               </li>

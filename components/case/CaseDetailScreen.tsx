@@ -14,7 +14,7 @@ import { applicantNameOf } from "@/lib/data/people"
 import { routes } from "@/lib/routes"
 import { availableActions, eventDate, isStalled, isVisibleToCity, nextMove, waitingOn, useDemo } from "@/lib/state"
 import { ENDING_LABEL, STATE_LABEL, type Dept, type Party } from "@/lib/types"
-import { CASE_TABS, CASE_TAB_LABEL, caseBackLink, headerReviewClock, isCaseTab, isHoldExpiringTomorrow, resolveOpenKey } from "@/lib/view/caseDetail"
+import { CASE_TABS, CASE_TAB_LABEL, caseBackLink, headerReviewClock, isCaseTab, isHoldExpiringTomorrow, ownTaskRows, resolveOpenKey } from "@/lib/view/caseDetail"
 import { ActionSheet } from "./ActionSheet"
 import { ActionsPanel } from "./ActionsPanel"
 import { ActivityTab } from "./tabs/ActivityTab"
@@ -97,6 +97,8 @@ function CaseDetailScreen() {
   const sentence = nextMove(c, today, applicantName)
   const ctx = { today, cases, cfg }
   const actions = isDept(role) ? availableActions(c, role, ctx) : []
+  // What the role has open and no row above reaches: on any tab but Overview, the only way to it.
+  const ownTasks = isDept(role) ? ownTaskRows(c, role, statuses.find((s) => s.party === role)?.openTasks ?? [], actions) : []
   const headerClock = isDept(role) ? headerReviewClock(c, role, today) : null
 
   return (
@@ -154,7 +156,7 @@ function CaseDetailScreen() {
           </TabsContent>
         </Tabs>
 
-        <ActionsPanel role={role} stateLabel={c.ending ? ENDING_LABEL[c.ending] : STATE_LABEL[c.state]} actions={actions} whoIsUpNote={sentence} onOpen={(key) => go({ task: key })} />
+        <ActionsPanel role={role} stateLabel={c.ending ? ENDING_LABEL[c.ending] : STATE_LABEL[c.state]} tasks={ownTasks} actions={actions} whoIsUpNote={sentence} onOpen={(key) => go({ task: key })} />
       </div>
 
       <ActionSheet caseId={c.id} openKey={openKey} role={role} onOpenChange={(open) => !open && go({ task: null })} />

@@ -63,7 +63,11 @@ export const CONDITION_TEMPLATES: Record<Dept, string[]> = {
   ],
 };
 
-/** Common "we need something" wording for request_info. `{vendor}` is replaced for per-vendor asks. */
+/**
+ * Common "we need something" wording for request_info. `{vendor}` is filled in when the template
+ * is picked (`fillRequestTemplate()` in lib/view/clerkTools.ts): the ticked card's vendor, or
+ * "each vendor".
+ */
 export const REQUEST_TEMPLATES: Record<Dept, string[]> = {
   clerk: [
     "Please upload your alcohol vendor's liquor liability certificate",

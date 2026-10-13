@@ -300,7 +300,7 @@ describe("the board's card sheet: a card the applicant no longer holds", () => {
 });
 
 describe("the board's Cancel dialog", () => {
-  it("S2 after Pay and book: today's refund is the $20 that was paid, and cancelling refunds exactly that", async () => {
+  it("S2 after Pay and book: today's refund is the $20 that was paid less the $10 processing fee, and cancelling refunds exactly that", async () => {
     const { user } = await renderScreen(<BoardScreen />, { role: "applicant", personaId: "sunrise-yoga-club", path: routes.event(S2) });
     act(() => {
       useDemo.getState().dispatch(S2, { type: "book_and_pay", method: "card" }, "applicant");
@@ -310,12 +310,12 @@ describe("the board's Cancel dialog", () => {
     await user.click(screen.getByRole("menuitem", { name: "Cancel" }));
 
     const dialog = screen.getByRole("dialog");
-    expect(dialog).toHaveTextContent("Today's refund: $20 (");
+    expect(dialog).toHaveTextContent("Today's refund: $10 (30 or more days before: full refund minus a $10 processing fee)");
     expect(dialog).not.toHaveTextContent("$250");
 
     await user.click(within(dialog).getByRole("button", { name: "Cancel permit" }));
     expect(storedCase(S2).ending).toBe("cancelled");
-    expect(storedCase(S2).payments.at(-1)).toMatchObject({ kind: "refund", amount: -20 });
+    expect(storedCase(S2).payments.at(-1)).toMatchObject({ kind: "refund", amount: -10 });
   });
 });
 

@@ -3,16 +3,45 @@
 ## 2026-10-13 - Phase 4 review fixes
 
 **What Changed:**
-- The Phase 4 acceptance review returned 18 findings (1 high, 8 medium, 9 low). Plan, and what turned out differently from it: `docs/plans/2026-10-13-phase-4-review-fixes.md`. Each finding was confirmed in the code and given a test that failed before its fix
+- The Phase 4 acceptance review returned 18 findings (1 high, 8 medium, 9 low). All 18 were confirmed in the code and fixed, each with a test that fails without its fix (the last finding was four tests that did not render the state they named, and is fixed in the tests). Plan, and what turned out differently from it: `docs/plans/2026-10-13-phase-4-review-fixes.md`
 - **High, demo path 4's first screen:** the applicant's "With the city" note counted the days since a card was uploaded and said the current holder had had it that long. S4's cards read "31 days at intake with the City Clerk" while the Clerk's Intake row said 20 days, and "31 days with Health & Legal" on the day it was routed. `withCityInfo()` now counts from the day the party it names got the card: the day the application went in for a card at intake, the day of routing for a card under a review, the day its verify task opened for a card under one, or the day it was sent when that was later. `tests/both-sides.test.ts` compares the figure with `intakeRows().daysInIntake` and `queueFor().daysWaiting` for every such card on the seed, and walks S4 from intake to routed; demo path 4's click-through reads "20 days" on the board and on the Intake row, and "0 days" on the board and in the queue after routing
+- **Medium:**
+  - Cases table: "Next action" and "Due" are one task's, the open task due soonest among the parties that are up (`pipelineTableRow()`). S5 read "Accept conditions and sign" beside Health & Legal's May 7
+  - Routing sections (`lib/rules/routing.ts`) are what a reviewer checks: documents, forms and anything sent for a check. Every vendor's permit is one section, "Vendor health permits"; the catalogue's "Health permit: {vendor}" reached the wizard's reviewers line and Confirm routing's Sections box. The sentence lower-cases each item
+  - Request information: a template's `{vendor}` is filled when the template is picked (`fillRequestTemplate()`): the ticked card's vendor, or "each vendor". It was stored and shown to the applicant as typed
+  - A review back from a request: My queue says "Answer received May 3" (and "Routed" from the review clock's start), `queueFor().daysWaiting` counts from the start of the stretch the task has been open for now, and `respond_to_request` moves the review's due date and its task's by the days paused. The row read "Routed May 3 · Due today · 14 days waiting · Day 11 of 14"
+  - Case detail: "Your actions" lists the role's own open tasks that no row covers, ahead of the rows (`ownTaskRows()`): Health & Legal's document to verify, Public Works & Safety's work orders, the Clerk's meeting to schedule
+  - Reviews tab: "Mark held" asks `checkCompleteCityTask()` and is off with the reason under it. The engine names what unlocks a locked card ("Unlocks when the permit is issued") and refuses a meeting before its day
+  - Wizard stepper: `WizardStepper` takes `reached`; every step up to it but the one in view keeps its mark and its link. `WizardScreen` passes the furthest step seen on this visit or answered on the draft (`furthestAnsweredStep()`)
+  - A series' cancellation refund applies the band to the fees paid, in `cancellationRefund()`: Sunrise Yoga's $20 less the $10 processing fee is $10, where the page said "full refund minus a $10 processing fee" and then $20
+- **Low:**
+  - The board's status strip reads off `involvement()`: "Starts after intake" for a department a card names before routing, "Nothing to review" for the Clerk on an Instant event
+  - A reviewer's queue row shows `routingReasons()`, not every trigger on the case; `triggerLabels()` is gone
+  - One name per step: seven `CITY_TASKS` titles start with their button's words ("Send quote: consolidate the reviews"), and the quote builder's sheet is headed "Send quote"
+  - `ConditionList` shows "Merged" only with `showMerged`, which the city's screens pass
+  - A fee preset starts at 1 when the plan gives 0, and a named line with no quantity stops the decision ("Give Police a quantity, or remove the line.")
+  - `FeeTable`'s closeout row is "Actual fees", without the deposit; a quantity reads as a count (`fmtQty()`: "40 officer-hours")
+  - `waitingOnOthers()` leaves out a case nobody is up on, unless it is stalled
+  - Map shapes are keyed by id and position on the thumbnail and the display map; a route that laps a segment no longer counts as overlapping itself (found beside the key fix)
+  - Copy: "(automatic for Instant)" on Instant plans only; "Not routed" once routing is behind the case; a cancelled case's reason is a sentence with the amount; Intake's "9 of 12 sign-offs"
+  - States matrix: the four entries that did not render their state now do (an empty queue with a case waiting on somebody else; a choice the engine refuses in Confirm routing and in Schedule; B08's overdue card on its board; the Stalled chip in the queue)
+- **Docs:** `docs/readme.md` has "What the Phase 4 review changed", the engine notes that changed, and nine questions for the owner; the main plan has a Changes line
 
 **Why:**
-- The review found the first screen of a P0 demo path showing a figure the next screen contradicted
+- The review found the first screen of a P0 demo path showing a figure the next screen contradicted, and seventeen smaller places where two screens, or a screen and the engine, disagreed about one thing
 
 **Files Modified:**
-- `lib/view/board.ts`, `lib/state/core.ts` (comment)
-- `tests/both-sides.test.ts`, `tests/render/board.test.tsx`, `tests/render/handoffs.test.tsx`
-- `docs/readme.md`, `docs/log.md`, `docs/plans/2026-10-13-phase-4-review-fixes.md` (new)
+- `lib/view/board.ts`, `lib/view/cityLists.ts`, `lib/view/caseDetail.ts`, `lib/view/clerkTools.ts`, `lib/view/reviewTools.ts`, `lib/view/wizard.ts`, and their tests; `lib/view/permit.test.ts`
+- `lib/rules/routing.ts`, `lib/rules/cancellation.ts`, `lib/rules/requirements.ts`, `lib/rules/catalog.ts`, `lib/rules/classify.test.ts`, `lib/rules/routing.test.ts`, `lib/rules/cancellation.test.ts`
+- `lib/state/selectors.ts`, `lib/state/checks.ts`, `lib/state/waitingOn.ts`, `lib/state/core.ts` (comment), `lib/state/transitions/applicant.ts`, `lib/state/transitions/city.ts`, `lib/state/transitions/clerk.ts`, and their tests
+- `lib/format.ts`, `lib/format.test.ts`, `lib/data/templates.ts` (comment)
+- `components/case/ActionsPanel.tsx`, `CaseDetailScreen.tsx`, `tabs/ReviewsTab.tsx`, `tabs/ConditionsFeesTab.tsx`, `review/FeeLineBuilder.tsx`, `clerk/DepartmentConsolidation.tsx`
+- `components/case/actions/generic/RequestInfo.tsx`, `ReviewDecide.tsx`, `SendQuote.tsx`, `IssuePermit.tsx`, `CompleteCityTask.tsx`
+- `components/city/lists/QueueScreen.tsx`, `IntakeScreen.tsx`; `components/wizard/WizardScreen.tsx`; `components/ui/wizard-stepper.tsx`; `components/kit/KitScreen.tsx`
+- `components/domain/ConditionList.tsx`, `FeeTable.tsx`; `components/map/MapThumbnail.tsx`, `PermitopolisMap.tsx`; and their tests
+- `tests/both-sides.test.ts`, `tests/demo-paths.test.ts`, `tests/engines.test.ts`, `tests/seed.test.ts`
+- `tests/render/handoffs.test.tsx`, `board.test.tsx`, `case-detail.test.tsx`, `role-tools.test.tsx`, `review-tools.test.tsx`, `city-lists.test.tsx`, `states-matrix.test.tsx`, `wizard.test.tsx`, `permit.test.tsx`, `checkout.test.tsx`, `map.test.tsx`, `blocks-seed.test.tsx`
+- `docs/readme.md`, `docs/log.md`, `docs/plans/2026-10-13-phase-4-review-fixes.md` (new), `docs/plans/2026-10-12-permitopolis-prototype.md`
 
 ---
 

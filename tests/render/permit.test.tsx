@@ -25,15 +25,17 @@ describe("PermitScreen", () => {
     expect(screen.getByRole("button", { name: "Download PDF" })).toBeInTheDocument();
   });
 
-  it("S2 after Pay and book (demo path 1): cancelling today refunds the $20 that was paid, not the $250 the 13 sessions come to", async () => {
+  it("S2 after Pay and book (demo path 1): cancelling today refunds $10, the $20 paid minus the $10 processing fee of the band marked \"Applies today\", not the $250 the 13 sessions come to", async () => {
     await renderScreen(<PermitScreen />, { role: "applicant", personaId: "sunrise-yoga-club", path: routes.permit(S2) });
     act(() => {
       useDemo.getState().dispatch(S2, { type: "book_and_pay", method: "card" }, "applicant");
     });
     expect(storedCase(S2).state).toBe("permitted");
 
+    const todays = within(screen.getByRole("list", { name: "Cancellation schedule" })).getAllByRole("listitem").filter((band) => band.getAttribute("aria-current") === "true");
+    expect(todays.map((band) => band.textContent)).toEqual(["30 or more days before: full refund minus a $10 processing fee · Applies today"]);
     const line = screen.getByText(/If cancelled today/);
-    expect(within(line).getByText("$20")).toBeInTheDocument();
+    expect(within(line).getByText("$10")).toBeInTheDocument();
     expect(screen.queryByText("$250")).not.toBeInTheDocument();
   });
 
@@ -48,6 +50,21 @@ describe("PermitScreen", () => {
     expect(todays).toHaveLength(1);
     expect(todays[0]).toHaveTextContent(/10 to 29 days/);
     expect(todays[0]).toHaveTextContent(/Applies today/);
+  });
+
+  it("the conditions carry no \"Merged\" badge: that is the Clerk's bookkeeping, not something an applicant or an officer reads", async () => {
+    // Cascade Trail Runners' ultra is permitted, and both its conditions went through the Clerk's quote.
+    const ULTRA = "PMT-27-0030";
+    const permit = await renderScreen(<PermitScreen />, { role: "applicant", personaId: "cascade-trail-runners", path: routes.permit(ULTRA) });
+    expect(storedCase(ULTRA).conditions.map((cond) => cond.mergedByClerk)).toEqual([true, true]);
+    expect(document.querySelector('[data-slot="condition-list"]')).not.toBeNull();
+    expect(screen.queryByText("Merged")).not.toBeInTheDocument();
+    permit.unmount();
+
+    // The public check an officer opens from the QR code.
+    await renderScreen(<VerifyScreen />, { path: routes.verify(ULTRA) });
+    expect(document.querySelector('[data-slot="condition-list"]')).not.toBeNull();
+    expect(screen.queryByText("Merged")).not.toBeInTheDocument();
   });
 
   it("S6 (in Closeout, the event is over) has no \"If cancelled today\" line", async () => {

@@ -144,3 +144,67 @@ describe("work orders and meetings", () => {
     expect(sheet().getByRole("button", { name: "Schedule" })).toBeDisabled();
   });
 });
+
+describe("review decide: a fee line with no quantity is not dropped in silence", () => {
+  it("a preset starts at 1; cleared to 0 it stops the decision and says which line; with a quantity it goes out", async () => {
+    const { user } = await renderScreen(<CaseDetailScreen />, { path: routes.city.case(S3, { tab: "reviews" }), role: "hl" });
+    // The applicant answers, so Health & Legal's review is open to decide. S3 asked for no police.
+    await act(async () => {
+      useDemo.getState().dispatch(S3, { type: "respond_to_request", taskId: `${S3}:vendor_health_permit:1`, files: [{ name: "health-permit.pdf", size: 120_000, type: "application/pdf" }] }, "applicant");
+    });
+    await user.click(screen.getAllByRole("button", { name: "Decide your review" })[0]);
+    await user.click(sheet().getByRole("button", { name: "Food or vendor permit" }));
+    expect(sheet().getByLabelText("Quantity: Food or vendor permit")).toHaveValue(1);
+
+    fireEvent.change(sheet().getByLabelText("Quantity: Food or vendor permit"), { target: { value: "0" } });
+    expect(sheet().getByText("Give Food or vendor permit a quantity, or remove the line.")).toBeInTheDocument();
+    expect(sheet().getByRole("button", { name: "Approve" })).toBeDisabled();
+    expect(storedCase(S3).reviews.find((r) => r.dept === "hl")?.status).toBe("pending");
+
+    fireEvent.change(sheet().getByLabelText("Quantity: Food or vendor permit"), { target: { value: "2" } });
+    await user.click(sheet().getByRole("button", { name: "Approve" }));
+    const decided = storedCase(S3);
+    expect(decided.reviews.find((r) => r.dept === "hl")?.status).toBe("approved");
+    expect(decided.feeLines.filter((l) => l.dept === "hl").at(-1)).toMatchObject({ label: "Food or vendor permit", qty: 2, estimate: 150 });
+  });
+});
+
+describe("meetings on the Reviews tab: Mark held asks the engine before it is offered", () => {
+  const meetingRow = (title: string) => within(screen.getByText(title).closest('[data-slot="meeting-row"]') as HTMLElement);
+
+  it("S5 before the permit: the walkthrough's Mark held is off for the Clerk and for Public Works & Safety, and says what unlocks it", async () => {
+    await renderScreen(<CaseDetailScreen />, { path: routes.city.case(S5, { tab: "reviews" }), role: "clerk" });
+    for (const role of ["clerk", "pws"] as const) {
+      act(() => useDemo.getState().setRole(role));
+      const row = meetingRow("Site walkthrough");
+      expect(row.getByText("Scheduled for Fri, Jul 2, 2027")).toBeInTheDocument();
+      expect(row.getByRole("button", { name: "Mark held" })).toBeDisabled();
+      expect(row.getByText("Unlocks when the permit is issued")).toBeInTheDocument();
+      // Moving the date is still open to both.
+      expect(row.getByRole("button", { name: "Reschedule" })).toBeEnabled();
+    }
+  });
+
+  it("S5 once the permit is out: still off, weeks before Fri, Jul 2, and on from that day", async () => {
+    const { user } = await renderScreen(<CaseDetailScreen />, { path: routes.city.case(S5, { tab: "reviews" }), role: "pws" });
+    await act(async () => {
+      const dispatch = useDemo.getState().dispatch;
+      dispatch(S5, { type: "verify_document", taskId: `${S5}:insurance_certificate` }, "hl");
+      dispatch(S5, { type: "accept_and_sign", signature: "Priya Raman" }, "applicant");
+      dispatch(S5, { type: "pay", amount: 6530, method: "card", kind: "quote" }, "applicant");
+      dispatch(S5, { type: "issue_permit" }, "clerk");
+    });
+    expect(storedCase(S5).state).toBe("permitted");
+    const row = () => meetingRow("Site walkthrough");
+    expect(row().getByRole("button", { name: "Mark held" })).toBeDisabled();
+    expect(row().getByText("Scheduled for Fri, Jul 2; mark it held on or after that day.")).toBeInTheDocument();
+
+    await act(async () => {
+      useDemo.getState().setDemoToday("2027-07-02");
+    });
+    expect(row().getByRole("button", { name: "Mark held" })).toBeEnabled();
+    await user.click(row().getByRole("button", { name: "Mark held" }));
+    await user.click(sheet().getByRole("button", { name: "Mark held" }));
+    expect(storedCase(S5).tasks.find((t) => t.catalogId === "site_walkthrough")?.status).toBe("done");
+  });
+});

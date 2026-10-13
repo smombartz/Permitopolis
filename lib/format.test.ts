@@ -9,6 +9,7 @@ import {
   fmtFileSize,
   fmtMiles,
   fmtMoney,
+  fmtQty,
   fmtTime,
   fmtTimeRange,
   isOverdue,
@@ -81,6 +82,14 @@ describe("small helpers", () => {
     expect(plural(1, "session")).toBe("1 session");
     expect(plural(13, "session")).toBe("13 sessions");
     expect(plural(1200, "person", "people")).toBe("1,200 people");
+    expect([fmtQty(40, "officer-hour"), fmtQty(1, "barricade-day"), fmtQty(3.1, "mile"), fmtQty(4, "each"), fmtQty(1, "flat"), fmtQty(0, "hour")]).toEqual([
+      "40 officer-hours",
+      "1 barricade-day",
+      "3.1 miles",
+      "4 each",
+      "1 flat",
+      "0 hours",
+    ]);
     expect(fmtMiles(3.1)).toBe("3.1 miles");
     expect(fmtMiles(1)).toBe("1 mile");
     expect(fmtFileSize(248 * 1024)).toBe("248 KB");

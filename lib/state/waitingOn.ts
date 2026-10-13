@@ -108,7 +108,7 @@ function nextToUnlock(c: EventCase, party: Party): Task | undefined {
  * What a locked task waits for, by the event that unlocks it. Who's up is read by the applicant
  * and by city staff alike, so these say "the quote", not "your quote" as the cards themselves do.
  */
-const UNLOCK_NOTE: Partial<Record<UnlockEvent, string>> = {
+export const UNLOCK_NOTE: Partial<Record<UnlockEvent, string>> = {
   presubmit_done: "Unlocks when every card before submitting is done",
   accepted: "Unlocks when the City Clerk accepts the application",
   quote_sent: "Unlocks when the quote is ready",

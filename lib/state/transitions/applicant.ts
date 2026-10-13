@@ -5,7 +5,7 @@
 import { addDaysISO, daysBetween } from "@/lib/dates";
 import { fmtMoney } from "@/lib/format";
 import { classify, dueDate, estimateFees, requirements } from "@/lib/rules";
-import { CARD_BY_ID, type CardSpec } from "@/lib/rules/catalog";
+import { CARD_BY_ID, CITY_TASKS, type CardSpec } from "@/lib/rules/catalog";
 import type { FeeEstimate, RulesCtx } from "@/lib/rules/types";
 import type { Actor, EventAnswers, EventCase, Task } from "@/lib/types";
 import type { Action } from "../actions";
@@ -249,7 +249,7 @@ export function submit(c: EventCase, _action: Extract_<"submit">, actor: Actor, 
       catalogId: "intake_check",
       owner: "clerk",
       kind: "review",
-      title: "Check the application is complete",
+      title: CITY_TASKS.intake_check.title,
       dueDate: awaitingSignoffs ? null : dueDate(ctx.today, ctx.cfg.sla.intakeDays, ctx.cfg),
       status: awaitingSignoffs ? "locked" : "todo",
       payload: awaitingSignoffs ? { awaitingSignoffs: true } : {},
@@ -277,13 +277,17 @@ export function respondToRequest(c: EventCase, action: Extract_<"respond_to_requ
   const deptStillWaiting = next.tasks.some((t) => t.request && !t.request.resolved && t.request.from === dept);
   if (review && !deptStillWaiting) {
     const pausedDays = review.clock.pausedSince ? daysBetween(review.clock.pausedSince, ctx.today) : 0;
+    // The days it waited on the applicant are given back to the department: the due date moves
+    // with the clock, on the review and on its task, so "Day 11 of 14" is never also "Due today".
+    const pushed = (date: string | null) => (date && pausedDays > 0 ? addDaysISO(date, pausedDays) : date);
     next = {
       ...next,
       reviews: next.reviews.map((r) =>
         r.dept === dept
-          ? { ...r, status: "pending", clock: { ...r.clock, pausedSince: null, pausedDays: r.clock.pausedDays + pausedDays } }
+          ? { ...r, status: "pending", dueDate: pushed(r.dueDate), clock: { ...r.clock, pausedSince: null, pausedDays: r.clock.pausedDays + pausedDays } }
           : r,
       ),
+      tasks: next.tasks.map((t) => (t.id === taskId(next.id, `review:${dept}`) && t.status !== "done" ? { ...t, dueDate: pushed(t.dueDate) } : t)),
     };
   }
   const anyOpenRequest = next.tasks.some((t) => t.request && !t.request.resolved);
@@ -334,7 +338,9 @@ export function cancel(c: EventCase, _action: Extract_<"cancel">, actor: Actor, 
   // The same figure the permit page and the Cancel dialog showed before the button was pressed.
   const result = refundIfCancelled(c, ctx.today, ctx.cfg);
   const refund = result.refund;
-  let next: EventCase = { ...c, ending: "cancelled", endingReason: result.rule, dateHold: releaseHold(c.dateHold) };
+  // The banner on the case reads this: who ended it and what went back, with the band that set it.
+  const endingReason = `Cancelled by the applicant. ${refund > 0 ? `Refunded ${fmtMoney(refund)}` : "Nothing refunded"} (${result.rule}).`;
+  let next: EventCase = { ...c, ending: "cancelled", endingReason, dateHold: releaseHold(c.dateHold) };
   if (refund > 0) {
     next = {
       ...next,

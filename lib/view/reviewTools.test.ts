@@ -89,6 +89,22 @@ describe("feePresetsFor", () => {
     expect(barricades.unitPrice).toBe(DEFAULT_CONFIG.fees.barricadeEachPerDay);
   });
 
+  it("a preset the plan has no number for starts at 1, never at a quantity of 0 and $0", () => {
+    // S3, Jazz in the Plaza: no city services, no street, no tents; S1 has no vendors either.
+    const jazz = caseById(buildSeed(), "PMT-27-0118");
+    expect(jazz.addOns.cityServices).toBeNull();
+    expect(feePresetsFor("pws", jazz, DEFAULT_CONFIG).map((p) => [p.label, p.qty])).toEqual([
+      ["Police", 1],
+      ["Barricades", 1],
+      ["Street closure", 1],
+      ["Structure fire inspection", 1],
+    ]);
+    expect(feePresetsFor("hl", caseById(buildSeed(), "PMT-27-0109"), DEFAULT_CONFIG)[0].qty).toBe(1);
+    for (const c of buildSeed()) {
+      for (const dept of ["clerk", "pws", "hl"] as const) for (const preset of feePresetsFor(dept, c, DEFAULT_CONFIG)) expect(preset.qty, `${c.id} ${preset.label}`).toBeGreaterThan(0);
+    }
+  });
+
   it("builds Health & Legal's vendor-permit preset from the vendor count", () => {
     const c = caseById(buildSeed(), "PMT-27-0031");
     const presets = feePresetsFor("hl", c, DEFAULT_CONFIG);

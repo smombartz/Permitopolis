@@ -318,7 +318,7 @@ Every one is pure. Read cases, the date and the config from the store
 | Surface | Selectors |
 |---|---|
 | My events, board | `applicantCases(cases, personaId)`, `boardColumns(c)` (cards by column, Do now in the PRD's order), `boardColumn(task)`, `taskDueDate(task)`, `taskSubmittedOn(task)` (the day a card last went to the city), `eventDate(c, today)`, `daysUntilEvent(c, today)`, `caseTotals(c)` |
-| My queue | `queueFor(cases, role, today)`: `{ case, task, group, daysWaiting }`, oldest due first; `waitingOnOthers(cases, role, today)`. A task with no due date is `later` while fresh and `this_week` once it has been open more than seven days |
+| My queue | `queueFor(cases, role, today)`: `{ case, task, group, daysWaiting }`, oldest due first; `daysWaiting` counts from the start of the stretch the task has been open for now (a review parked on a request counts from the answer). `waitingOnOthers(cases, role, today)`: the cases where somebody else is up, never one nobody is up on (unless it is stalled). A task with no due date is `later` while fresh and `this_week` once it has been open more than seven days |
 | Money | `caseTotals(c)`; `dueAtQuote`, `quoteBalance`, `quotePaid` (the quote); `refundIfCancelled(c, today, cfg)`: `{ refund, deposit, rule, canCancel }`, what `cancel` pays back today; `closeoutSettlement(c)`: `{ over, deposit, fromDeposit, refund, bill }`, what `reconcile_close` does. Show these, never a sum of your own: each is the figure its transition uses |
 | Cases pipeline | `isVisibleToCity(c)`, `isOpen(c)`, `involves(c, role)`, `involvement(c, party)`, `whoIsUp(c, today)`, `leadTimeRisk(c, today, cfg)`, `reviewClock(c, dept, today)` |
 | Case detail | `waitingOn(c, today)`, `nextMove(c, today, applicantName)`, `availableActions(c, role, { today, cases, cfg })`, `actorsFor(type)` |
@@ -507,8 +507,10 @@ Seven surfaces, each built on its own and then joined. Every one is a client scr
   `WhoIsUp`; Reviews, one section per department, the viewer's own first and actionable;
   Documents, by reviewer, with Verify; Conditions and fees, with Actual and Difference from
   closeout on and the payments made; Activity, newest first, by day and by party); and the sticky
-  "Your actions" panel, one button per row of `availableActions(c, role, ctx)`. A disabled row
-  shows the engine's reason under it. A Draft is explained as not visible to the city; an ended
+  "Your actions" panel: first the role's own open tasks that no row covers (`ownTaskRows()`: a
+  document to verify, a work order, a meeting to schedule; each button opens the task's own
+  panel), then one button per row of `availableActions(c, role, ctx)`. A disabled row shows the
+  engine's reason under it. A Draft is explained as not visible to the city; an ended
   case offers only "Add a note".
 
 **The action registry.** Every action a city role can take has one panel, opened in a sheet.
@@ -631,7 +633,7 @@ its own tests against the real seed.
 |---|---|---|---|
 | `request_info` | `RequestInfo.tsx` | The Clerk at intake; a department while its review is open | The applicant's cards as checkboxes, grouped by where each stands; "Something new" opens a card; a message with templates; a due date from `sla.requestResponseDays`; a preview of the card as the applicant will see it, drawn with the board's own `TaskCard`. One `request_info` per chosen card |
 | `confirm_routing` | `ConfirmRouting.tsx` | City Clerk | A row per department: the suggested ones checked, with their reasons and sections, the others unchecked ("Not suggested by this plan."). The due date defaults to today plus the tier's review days, never a weekend. "N days of lead time left after the latest due date". The engine's refusal for the list as it stands, before the click |
-| `send_quote` | `SendQuote.tsx`, `clerk/*` | City Clerk | "Consolidation and quote": each routed department's decision side by side (`DepartmentConsolidation`); conflicts flagged (the same condition twice, or the same phrase with different numbers or times from two departments); one merged conditions list to edit, reorder, remove and add to (`ConditionsEditor`); the fee lines by department, each editable (`QuoteLinesEditor`), the deposit as a fixed line, a prompt when the late fee applies and is not on the quote; totals and "Due now" |
+| `send_quote` | `SendQuote.tsx`, `clerk/*` | City Clerk | "Send quote", the consolidation and quote builder: each routed department's decision side by side (`DepartmentConsolidation`); conflicts flagged (the same condition twice, or the same phrase with different numbers or times from two departments); one merged conditions list to edit, reorder, remove and add to (`ConditionsEditor`); the fee lines by department, each editable (`QuoteLinesEditor`), the deposit as a fixed line, a prompt when the late fee applies and is not on the quote; totals and "Due now" |
 | `pay` | `Pay.tsx` | City Clerk | A payment at the counter. When more than one session of a series sits due, the Clerk picks which |
 | `issue_permit` | `IssuePermit.tsx` | City Clerk | The checklist (signed, paid, insurance verified): who owes each and since when. The conditions and components the permit will carry, and what issuing sets off |
 | `reconcile_close` | `ReconcileClose.tsx` | City Clerk | The cleanup result, estimate against actual line by line (`FeeTable showActual`), and the settlement (`CloseoutSettlementStats`) |
@@ -745,7 +747,8 @@ one with `makeCase()` and `makeTask()` from `lib/state/testSupport.ts`. A new sc
 rows to one of the two files.
 
 What 4F added to the lists while covering them: a queue row's one-line "why now"
-(`queueReasonLine()`: "Certificate of insurance re-uploaded Apr 30", "Routed Apr 20"); the Cases
+(`queueReasonLine()`: "Certificate of insurance re-uploaded Apr 30", "Routed Apr 20" from the
+review clock's start, "Answer received May 3" for a review back from a request); the Cases
 board's "Group by" State or Event date (`?group=event_date`: this week, next two weeks, this
 month, later, past, with the state as a chip on each card); the table's column chips and density
 (`?cols=`, `?density=compact`; ID and Depts are off by default); a "Sent to commission" marker
@@ -835,6 +838,38 @@ other way passes whatever the panel does.
   (an accordion); the Stalled and commission markers, which are focusable so their tooltips can
   be read, and add a tab stop per row. 4E's 375px pass covered the files it owned.
 
+### What the Phase 4 review changed
+
+The acceptance review's 18 findings (1 high, 8 medium, 9 low) were all confirmed and fixed; the
+plan is `docs/plans/2026-10-13-phase-4-review-fixes.md`. What a builder will meet:
+
+- **"With the city" days are the holder's** (`withCityInfo()`), see "The applicant's side (4E)".
+- **Cases table.** Next action and Due are one task's: the open task due soonest among the
+  parties that are up (`pipelineTableRow()`).
+- **Routing sections** are what a reviewer checks, with "Vendor health permits" for the
+  per-vendor card; the wizard's reviewers sentence is lower-cased item by item.
+- **Request templates.** `{vendor}` is filled when the template is picked
+  (`fillRequestTemplate()`): the ticked card's vendor, or "each vendor".
+- **A review back from a request**: "Answer received May 3" in My queue, days waiting from the
+  answer, and a due date moved by the days paused.
+- **Your actions** lists the role's own open tasks first (`ownTaskRows()`).
+- **Mark held** on the Reviews tab is off, with the engine's reason, while the card is locked or
+  the meeting's day is still ahead.
+- **Wizard stepper.** `WizardStepper` takes `reached`: every step up to it but the one in view
+  is a button with the done mark. `WizardScreen` passes the furthest step seen on this visit or
+  answered on the draft (`furthestAnsweredStep()`), so going back to Where keeps When and Size
+  one click away.
+- **A series' cancellation refund** applies the band to what was paid.
+- **Smaller ones.** The board's status strip reads off `involvement()` ("Starts after intake",
+  "Nothing to review"); a reviewer's queue row shows `routingReasons()`; one name per step for a
+  task, its button and its panel; `ConditionList` shows "Merged" only with `showMerged` (city
+  screens); a fee preset starts at 1 and a zero-quantity line stops the decision; `FeeTable`'s
+  closeout row is "Actual fees", without the deposit, and units read as counts (`fmtQty()`:
+  "40 officer-hours"); "Waiting on others" leaves out a case nobody is up on; map shapes are
+  keyed by position, and a route that laps a segment no longer overlaps itself; "(automatic for
+  Instant)" only on Instant plans; "Not routed" once routing is behind the case; Intake's
+  "9 of 12 sign-offs".
+
 ### What is still a placeholder
 
 - **Routes.** `/events/[id]/amend` (5A; the board's menu already links to it), `/city/payments`
@@ -860,6 +895,12 @@ Things a screen builder needs to know that the type signatures do not say.
   reviewer on every Special event (coordination). `routing(answers, cls, cfg?)`, which prefills
   the Clerk's `confirm_routing`, adds the Clerk only for alcohol. Prefill from `routing()`, and
   pass the store's config: the crowd reason quotes the configured threshold.
+- **A reviewer's `sections` are what it checks**: the plan's documents and forms that name it,
+  and anything else sent to it for a check (the community notice). Not the cards it only
+  receives (Submit application, the signature, the payment), a meeting or a download. Every
+  vendor's health permit is one section, "Vendor health permits" (the catalogue's title is
+  "Health permit: {vendor}"); `reviewMaterial()` reads that name as all of them. `checks` is the
+  wizard's sentence, each item lower-cased.
 - **The date gate** (`dateGate()`): `fixes` is empty when the gate passes. A date that is only
   too close offers a new date, dropping an add-on (when `droppable` has one) and the late fee. A
   date that is booked or blacked out offers a new date and nothing else. With no date chosen
@@ -954,7 +995,11 @@ Things a screen builder needs to know that the type signatures do not say.
     the click; without the last argument it answers only who may schedule.
   - `complete_city_task` closes a work order (its owner), a meeting that was held (its
     department or the Clerk), or a `verify:*` task (which also accepts the card). Every other
-    city task is finished by its own action; the refusal names it.
+    city task is finished by its own action; the refusal names it. A locked card says what
+    unlocks it ("Unlocks when the permit is issued"), and a meeting is held on or after its
+    day: before it, "Scheduled for Fri, Jul 2; mark it held on or after that day."
+    `checkCompleteCityTask(c, id, actor, today)` gives a button the same reason before the
+    click (the Reviews tab's "Mark held" asks it); without `today` it leaves the day out.
   - `confirm_routing` needs at least one reviewer, each department once, and a due date for each
     that is today or later (the date is the review's allowance; none gave "Day 0 of NaN"). It
     also needs every department that checks one of the applicant's documents or forms: a list
@@ -990,6 +1035,12 @@ Things a screen builder needs to know that the type signatures do not say.
   `verify:vendor_health_permit:1`), `work_order:<barricades|police|closure|trash|power>`, and the
   plain ids in `CITY_TASKS`. Meeting cards belong to the applicant and are closed by the city with
   `complete_city_task`.
+- **A city task is named for the button that finishes it.** Its title starts with the words on
+  that action's row and panel: "Accept as complete: check the application", "Confirm routing:
+  reviewers and due dates", "Send quote: consolidate the reviews", "Issue permit", "Log
+  closeout: cleanup inspection", "Log closeout: actual hours", "Reconcile and close" and
+  "Reconcile and close: resolve the exception". Take a title from `CITY_TASKS`, never a literal
+  (`lib/view/caseDetail.test.ts` holds each to its button).
 - **A request parks the asker.** While a department waits on the applicant, its own review (or
   the Clerk's intake check) is `locked` with `payload.awaitingAnswer`, so it leaves the queue and
   "Who's up" shows the applicant alone. The answer gives it back. A card with an open request is
@@ -1018,7 +1069,10 @@ Things a screen builder needs to know that the type signatures do not say.
   `clock.allowedDays` from the `dueDate` in its payload; the config's `sla.reviewDays` only
   prefills that date in the routing panel). So the due date reads "Day 14 of 14", or "Day 35 of
   35" for S5's five weeks, and the next day is over. It stops on the day the department decides.
-  A second request while it is paused keeps the first pause's start.
+  A second request while it is paused keeps the first pause's start. When the applicant answers
+  the last open request, the days paused are given back: `respond_to_request` moves the review's
+  `dueDate`, and its task's, forward by them, so "Day 11 of 14 · paused 3 days" is due in three
+  days and never "Due today".
 - **`nextMove(case, today, applicantName)`** takes the persona's name for the "Next:" sentence.
 - **Issue permit** is a Clerk task created locked by `send_quote`. It unlocks when the case is
   signed, the quote is paid and the insurance card is done, whichever comes last. Re-uploading
@@ -1039,9 +1093,12 @@ Things a screen builder needs to know that the type signatures do not say.
   from deposit, refund or final bill), as the Conditions and fees tab and the Reconcile and close
   panel do; `reconcile_close` then does exactly that.
 - **Cancelling.** `refundIfCancelled(c, today, cfg)` is what `cancel` refunds: the schedule's
-  share of the fees plus the deposit, never more than was paid (a series that paid one session of
-  13 gets that session back, not the schedule's figure for all 13). The permit page and the
-  board's Cancel dialog print it. `cancellationRefund()` in `lib/rules` is the schedule alone.
+  share of the fees plus the deposit, never more than was paid. The permit page and the board's
+  Cancel dialog print it. `cancellationRefund()` in `lib/rules` is the schedule alone. For a
+  series it applies the band to the fees paid so far, not to every session on the fee line: one
+  $20 session of 13 paid, 30 or more days out, is $20 minus the $10 processing fee. The case's
+  `endingReason` is a sentence with the amount: "Cancelled by the applicant. Refunded $62.50
+  (10 to 29 days before: ...)."
 - **Money after the event.** `closeout.balance` is what the event ran over the estimate and
   `closeout.refund` what goes back from the deposit (null when a final bill is owed; the amount is
   on the `final_bill_or_refund` card). After reconciliation `caseTotals()` no longer counts the
@@ -1303,4 +1360,46 @@ Raised while the Phase 4 role tools were built and joined:
   is a route and a move, not a rebuild. Not yet looked at in a browser.
 - **The case header shows a long name in full.** A 90-character event name wraps on the case's
   own page and on the board; it is truncated with a tooltip only in lists.
+
+From the Phase 4 review fixes (2026-10-13):
+
+- **"With the city" counts the holder's days, not the days since the upload.** A card uploaded to
+  a Draft on Apr 2 and submitted on Apr 13 reads "20 days at intake with the City Clerk" on May 3,
+  and "0 days with Health & Legal" on the day it is routed. The review's other option was to keep
+  the upload count and reword it: "Sent 31 days ago · now with Health & Legal". The city's
+  Documents tab still counts from the upload ("Submitted Fri, Apr 2 · waiting 31 days"). Say if
+  either should read the other way.
+- **A review's due date moves with its pause.** When the applicant answers a reviewer's request,
+  the days the review waited are added to its due date (S3: asked Apr 30, answered May 3, due
+  May 6 instead of May 3). The alternative is to hold the Clerk's original date and let the row
+  read overdue. The pushed date is not rolled off a weekend.
+- **A series cancelled part-way.** The cancellation band now applies to the fees paid so far
+  (Sunrise Yoga, one $20 session paid, 30 or more days out: $10 back after the $10 processing
+  fee). It does not yet tell a session already held from one still to come: a series cancelled
+  mid-run in the 50% band gets half of everything paid, held sessions included. The PRD's
+  schedule is written for a single event. Should a held session be left out of the refund?
+- **A meeting is marked held on or after its day.** "Mark held" on a meeting scheduled for a later
+  date is refused ("Scheduled for Fri, Jul 2; mark it held on or after that day."). To close one
+  early, reschedule it to today first. Say if the Clerk should be able to override.
+- **Your actions lists the role's open tasks as primary buttons.** Health & Legal's "Verify
+  Certificate of insurance", the Clerk's "Schedule the pre-application meeting" and each of Public
+  Works & Safety's work orders (three on the 5K) sit above the state's own rows, all filled. Say
+  if a case with several should show one primary and the rest quiet.
+- **One name per step.** The Clerk's and the closeout's tasks now start with the button's words
+  ("Send quote: consolidate the reviews", "Reconcile and close: resolve the exception"), and the
+  quote builder's sheet is headed "Send quote". "Review your sections" (button: "Decide your
+  review") and "Decide: a reviewer denied" (button: "Deny") were not in the review's list and
+  are as they were.
+- **What "City Clerk checks" on the wizard's reviewers line.** With actions and meetings out, the
+  Clerk's line on a Special plan reads "City Clerk checks your community notification", with the
+  alcohol details first when there is alcohol. The community notice is kept because completing
+  it sends it to the Clerk for a check. Say if the line should name the Clerk's coordination
+  instead.
+- **The board's status strip on an Instant event** reads "City Clerk · Nothing to review" (the
+  PRD's seed table says "Nobody; permit active"). The other choice was to leave the Clerk out of
+  the strip for Instant events. A department named on a card before routing reads "Starts after
+  intake".
+- **A fee preset starts at 1.** "Police" on an event that asked for no officers adds one
+  officer-hour for the reviewer to change, and a named line left at 0 stops the decision with
+  "Give Police a quantity, or remove the line."
 

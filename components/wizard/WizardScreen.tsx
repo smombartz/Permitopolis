@@ -19,6 +19,7 @@ import {
   WIZARD_STEPS,
   WIZARD_STEP_LABEL,
   buildResultPanel,
+  furthestAnsweredStep,
   nextWizardStep,
   previousWizardStep,
   removeAddOnForTrigger,
@@ -87,6 +88,16 @@ function WizardScreen() {
   const step: WizardStep = resolveWizardStep(stepParam, draft?.wizardStep ?? "what");
 
   const answers: EventAnswers = draft ?? pendingAnswers;
+  // The furthest step shown on this visit, for the draft it was shown for (a blank wizard keeps
+  // its count when its first entry starts the draft; another draft starts over). With the step
+  // the answers themselves reach, it is how far the stepper's edit links go: a presenter who
+  // goes back from Size to Where still has When and Size one click away.
+  const stepIndex = wizardStepIndex(step);
+  const seenFor = draftId ?? null;
+  const [seen, setSeen] = React.useState<{ draftId: string | null; index: number }>({ draftId: seenFor, index: stepIndex });
+  const seenIndex = seen.draftId === seenFor || seen.draftId === null ? seen.index : 0;
+  if (seen.draftId !== seenFor || stepIndex > seen.index) setSeen({ draftId: seenFor, index: Math.max(stepIndex, seenIndex) });
+  const reached = Math.max(stepIndex, seenIndex, furthestAnsweredStep(answers));
   const ctx = { today: demoToday, cases, cfg };
   const panel = buildResultPanel(answers, ctx, { lateFee: draft?.flags.lateFee, ignoreCaseId: draft?.id });
 
@@ -251,7 +262,8 @@ function WizardScreen() {
       <div className="flex items-center justify-between gap-3">
         <WizardStepper
           steps={WIZARD_STEPS.map((s) => ({ label: WIZARD_STEP_LABEL[s] }))}
-          current={wizardStepIndex(step)}
+          current={stepIndex}
+          reached={reached}
           onStepSelect={(index) => goToStep(WIZARD_STEPS[index])}
           className="flex-1"
         />

@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
-import { checkScheduleMeeting } from "../checks";
+import type { EventCase } from "@/lib/types";
+import { checkCompleteCityTask, checkScheduleMeeting } from "../checks";
 import { taskDueDate } from "../core";
 import { makeCase, makeCtx, makeTask } from "../testSupport";
 import { transition } from "../transition";
@@ -52,6 +53,43 @@ describe("request_info (Jazz in the Plaza style)", () => {
     expect(answered.case.tasks.find((t) => t.id === hlTask.id)?.status).toBe("todo");
     // The review it got back is the re-review task: no second task is created for the same answer.
     expect(answered.case.tasks.filter((t) => t.owner === "hl")).toHaveLength(1);
+  });
+
+  it("the days a review waited on the applicant are given back: its due date, and its task's, move by the days paused", () => {
+    const review = { dept: "hl" as const, sections: ["Vendor list"], status: "pending" as const, dueDate: "2027-05-03", decidedOn: null, clock: { startedOn: "2027-04-19", pausedSince: null, pausedDays: 0, allowedDays: 14 }, internalNote: "", messageToApplicant: "" };
+    const pwsReview = { ...review, dept: "pws" as const, sections: ["Sound details"] };
+    const card = makeTask({ id: "PMT-27-0118:vendor_health_permit:1", catalogId: "vendor_health_permit", reviewer: "hl" });
+    const other = makeTask({ id: "PMT-27-0118:vendor_list", catalogId: "vendor_list", reviewer: "hl" });
+    const hlTask = makeTask({ id: "PMT-27-0118:review:hl", catalogId: "review:hl", owner: "hl", kind: "review", dueDate: "2027-05-03" });
+    const pwsTask = makeTask({ id: "PMT-27-0118:review:pws", catalogId: "review:pws", owner: "pws", kind: "review", dueDate: "2027-05-03" });
+    const c = makeCase({ id: "PMT-27-0118", state: "in_review", reviews: [pwsReview, review], tasks: [card, other, hlTask, pwsTask] });
+    const on = (today: string) => makeCtx({ today, now: `${today}T09:00` });
+    const dueDates = (next: EventCase) => [next.reviews.find((r) => r.dept === "hl")?.dueDate, next.tasks.find((t) => t.id === hlTask.id)?.dueDate];
+    const ask = (from: EventCase, taskId: string, today: string) => {
+      const result = transition(from, { type: "request_info", taskId, message: "Please send this again", dueDate: "2027-05-10" }, "hl", on(today));
+      if (!result.ok) throw new Error(result.reason);
+      return result.case;
+    };
+    const answer = (from: EventCase, taskId: string, today: string) => {
+      const result = transition(from, { type: "respond_to_request", taskId, files: [{ name: "permit.pdf", size: 10, type: "application/pdf" }] }, "applicant", on(today));
+      if (!result.ok) throw new Error(result.reason);
+      return result.case;
+    };
+
+    // Asked Apr 30, answered May 3: three days paused, so three days later, on both.
+    let next = answer(ask(c, card.id, "2027-04-30"), card.id, "2027-05-03");
+    expect(next.reviews.find((r) => r.dept === "hl")?.clock).toMatchObject({ pausedSince: null, pausedDays: 3 });
+    expect(dueDates(next)).toEqual(["2027-05-06", "2027-05-06"]);
+    // Another department's review was never paused, and keeps its date.
+    expect([next.reviews.find((r) => r.dept === "pws")?.dueDate, next.tasks.find((t) => t.id === pwsTask.id)?.dueDate]).toEqual(["2027-05-03", "2027-05-03"]);
+
+    // Two requests out at once: the date moves once, when the last one is answered, by the whole pause.
+    next = ask(ask(next, card.id, "2027-05-04"), other.id, "2027-05-04");
+    next = answer(next, card.id, "2027-05-05");
+    expect(dueDates(next)).toEqual(["2027-05-06", "2027-05-06"]);
+    next = answer(next, other.id, "2027-05-06");
+    expect(next.reviews.find((r) => r.dept === "hl")?.clock).toMatchObject({ pausedSince: null, pausedDays: 5 });
+    expect(dueDates(next)).toEqual(["2027-05-08", "2027-05-08"]);
   });
 
   it("a Clerk's request at intake parks the intake check, and the answer returns the case to Submitted", () => {
@@ -174,7 +212,7 @@ describe("review_decide", () => {
     const tasks = [
       makeTask({ id: "PMT-27-0001:review:pws", catalogId: "review:pws", owner: "pws", kind: "review" }),
       makeTask({ id: "PMT-27-0001:review:hl", catalogId: "review:hl", owner: "hl", kind: "review" }),
-      makeTask({ id: "PMT-27-0001:consolidate", catalogId: "consolidate", owner: "clerk", kind: "action", title: "Consolidate reviews and send the quote", status: "locked" }),
+      makeTask({ id: "PMT-27-0001:consolidate", catalogId: "consolidate", owner: "clerk", kind: "action", title: "Send quote: consolidate the reviews", status: "locked" }),
     ];
     const routed = makeCase({ state: "in_review", reviews: [pending, { ...pending, dept: "hl" as const, sections: ["Certificate of insurance"] }], tasks });
     const clerk = (c: typeof routed) => waitingOn(c, "2027-05-03").find((p) => p.party === "clerk")!;
@@ -188,7 +226,7 @@ describe("review_decide", () => {
     const last = first.ok ? transition(first.case, { type: "review_decide", decision: "approve", conditions: [], feeLines: [] }, "hl", makeCtx()) : first;
     expect(last.ok).toBe(true);
     if (!last.ok) return;
-    expect(last.case.tasks.filter((t) => t.catalogId === "consolidate")).toMatchObject([{ status: "todo", title: "Consolidate reviews and send the quote" }]);
+    expect(last.case.tasks.filter((t) => t.catalogId === "consolidate")).toMatchObject([{ status: "todo", title: "Send quote: consolidate the reviews" }]);
     expect(clerk(last.case)).toMatchObject({ status: "up_now" });
     expect(clerk(last.case).nextTask).toBeUndefined();
   });
@@ -197,7 +235,7 @@ describe("review_decide", () => {
     const review = { dept: "hl" as const, sections: ["Insurance"], status: "pending" as const, dueDate: "2027-05-17", decidedOn: null, clock: { startedOn: "2027-04-19", pausedSince: null, pausedDays: 0, allowedDays: 30 }, internalNote: "", messageToApplicant: "" };
     const tasks = [
       makeTask({ id: "PMT-27-0001:review:hl", catalogId: "review:hl", owner: "hl", kind: "review" }),
-      makeTask({ id: "PMT-27-0001:consolidate", catalogId: "consolidate", owner: "clerk", kind: "action", title: "Consolidate reviews and send the quote", status: "locked" }),
+      makeTask({ id: "PMT-27-0001:consolidate", catalogId: "consolidate", owner: "clerk", kind: "action", title: "Send quote: consolidate the reviews", status: "locked" }),
     ];
     const result = transition(makeCase({ state: "in_review", reviews: [review], tasks }), { type: "review_decide", decision: "deny", conditions: [], feeLines: [] }, "hl", makeCtx());
     expect(result.ok && result.case.tasks.filter((t) => t.catalogId === "consolidate")).toMatchObject([{ status: "todo", title: "Decide: a reviewer denied", payload: { denied: true } }]);
@@ -296,9 +334,28 @@ describe("schedule_meeting and complete_city_task", () => {
     expect(moved.case.tasks.find((t) => t.id === meeting.id)?.payload.scheduledFor).toBe("2027-05-12");
     expect(moved.case.tasks.find((t) => t.id === scheduler.id)?.history.filter((h) => h.status === "done")).toHaveLength(1);
 
-    const held = transition(moved.case, { type: "complete_city_task", taskId: meeting.id }, "clerk", makeCtx());
+    // Held on the day it was moved to.
+    const held = transition(moved.case, { type: "complete_city_task", taskId: meeting.id }, "clerk", makeCtx({ today: "2027-05-12", now: "2027-05-12T15:00" }));
     expect(held.ok && held.case.tasks.find((t) => t.id === meeting.id)?.status).toBe("done");
     expect(held.ok && transition(held.case, { type: "schedule_meeting", taskId: meeting.id, date: "2027-05-14" }, "clerk", makeCtx())).toEqual({ ok: false, reason: "That meeting has already been held." });
+  });
+
+  it("a meeting is marked held on or after its day, and a locked one says what unlocks it", () => {
+    // S5's walkthrough: scheduled for Fri, Jul 2 while its card still waits for the permit.
+    const locked = makeTask({ id: "PMT-27-0001:site_walkthrough", catalogId: "site_walkthrough", kind: "meeting", reviewer: "pws", status: "locked", unlocksOn: "permitted", dueDate: "2027-07-02", payload: { scheduledFor: "2027-07-02" } });
+    const before = makeCase({ state: "quote_sent", tier: "special", tasks: [locked] });
+    const hold = (c: EventCase, today: string) => transition(c, { type: "complete_city_task", taskId: locked.id }, "pws", makeCtx({ today, now: `${today}T10:00` }));
+    expect(hold(before, "2027-05-03")).toEqual({ ok: false, reason: "Unlocks when the permit is issued" });
+    expect(checkCompleteCityTask(before, locked.id, "clerk", "2027-05-03")).toEqual({ ok: false, reason: "Unlocks when the permit is issued" });
+
+    // The permit is out and the card is open: still weeks before the day.
+    const open = makeCase({ state: "permitted", tier: "special", tasks: [{ ...locked, status: "todo", unlocksOn: null }] });
+    expect(hold(open, "2027-05-03")).toEqual({ ok: false, reason: "Scheduled for Fri, Jul 2; mark it held on or after that day." });
+    expect(hold(open, "2027-07-01")).toEqual({ ok: false, reason: "Scheduled for Fri, Jul 2; mark it held on or after that day." });
+    expect(hold(open, "2027-07-02").ok).toBe(true);
+    expect(hold(open, "2027-07-06").ok).toBe(true);
+    // A panel that asks without a day gets no reason about the day.
+    expect(checkCompleteCityTask(open, locked.id, "pws")).toEqual({ ok: true });
   });
 
   it("holding the pre-application meeting without scheduling it first still clears the Clerk's scheduling task", () => {

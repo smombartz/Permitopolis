@@ -187,6 +187,38 @@ describe("reviewerRows", () => {
     const rows = reviewerRows(find(S2));
     expect(rows.every((r) => r.label === "Not involved" && r.status === "not_routed")).toBe(true);
   });
+
+  it("S1, an Instant permit: nobody reviews it, so the Clerk is not \"Reviewing\"", () => {
+    expect(reviewerRows(find(S1))).toEqual([
+      { dept: "clerk", status: "not_routed", label: "Nothing to review" },
+      { dept: "pws", status: "not_routed", label: "Not involved" },
+      { dept: "hl", status: "not_routed", label: "Not involved" },
+    ]);
+    // A closed Instant case, and one on its event day, read the same.
+    for (const id of ["PMT-27-0017", B16]) expect(reviewerRows(find(id))[0], id).toEqual({ dept: "clerk", status: "not_routed", label: "Nothing to review" });
+  });
+
+  it("S4, before routing: the Clerk is checking the application, and the departments its cards name start after intake", () => {
+    expect(reviewerRows(find(S4))).toEqual([
+      { dept: "clerk", status: "pending", label: "Reviewing" },
+      { dept: "pws", status: "not_routed", label: "Starts after intake" },
+      { dept: "hl", status: "not_routed", label: "Starts after intake" },
+    ]);
+  });
+
+  it("on the seed, a department a \"With the city\" card names is never \"Not involved\"", () => {
+    let named = 0;
+    for (const c of buildSeed()) {
+      const rows = reviewerRows(c);
+      for (const card of boardColumns(c).with_city) {
+        const info = withCityInfo(c, card, TODAY);
+        if (!info) continue;
+        expect(rows.find((r) => r.dept === info.reviewer)?.label, `${c.id} ${card.catalogId}`).not.toBe("Not involved");
+        named += 1;
+      }
+    }
+    expect(named).toBeGreaterThan(20);
+  });
 });
 
 describe("waitingOnChipItems", () => {

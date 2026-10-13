@@ -5,7 +5,7 @@
  * construction instead of by convention.
  */
 import { daysBetween } from "@/lib/dates";
-import { fmtDate, plural } from "@/lib/format";
+import { fmtDate, fmtDateShort, plural } from "@/lib/format";
 import { availability as availabilityRule, citywideBlackoutOn, occupiedWindow, occurrences } from "@/lib/rules";
 import { CARD_BY_ID, type CardSpec } from "@/lib/rules/catalog";
 import { tier as higherTier } from "@/lib/rules/shared";
@@ -15,6 +15,7 @@ import type { RulesConfig, RulesCtx } from "@/lib/rules/types";
 import type { ActionType, RoutedReviewer } from "./actions";
 import { sessionDates } from "./clock";
 import { findTask, idSuffix, preSubmitCardsIn, quoteBalance, quotePaid, reviewFor, signoffsLeft, taskId } from "./core";
+import { UNLOCK_NOTE } from "./waitingOn";
 
 function unlockHintFor(catalogId: string): string | undefined {
   return (CARD_BY_ID as Record<string, CardSpec>)[catalogId]?.unlockHint;
@@ -569,8 +570,12 @@ function ownActionFor(catalogId: string): string | undefined {
  * complete_city_task closes a work order, a meeting that was held, or a re-review with no
  * change. Nothing else: an applicant's card is the applicant's to finish, a department's task
  * is its own, and a task with its own action is finished by that action.
+ *
+ * A locked task says what unlocks it, in the words Who's up uses for city staff. With `today`
+ * (transition() always passes it; a button asks with the day it is shown on), a meeting set for
+ * a later day is refused: it cannot have been held yet.
  */
-export function checkCompleteCityTask(c: EventCase, taskIdArg: string, actor: Actor): CheckResult {
+export function checkCompleteCityTask(c: EventCase, taskIdArg: string, actor: Actor, today?: ISODate): CheckResult {
   const open = requireOpen(c);
   if (!open.ok) return open;
   const task = findTask(c, taskIdArg);
@@ -584,8 +589,10 @@ export function checkCompleteCityTask(c: EventCase, taskIdArg: string, actor: Ac
     const ownAction = ownActionFor(task.catalogId);
     if (ownAction) return fail(`${ownAction} to finish this task.`);
   }
-  if (task.status === "locked") return fail("That card is locked.");
+  if (task.status === "locked") return fail((task.unlocksOn ? UNLOCK_NOTE[task.unlocksOn] : undefined) ?? "That card is locked.");
   if (task.status === "done") return fail("Already done.");
+  const scheduledFor = task.kind === "meeting" ? task.payload.scheduledFor : undefined;
+  if (today && scheduledFor && scheduledFor > today) return fail(`Scheduled for ${fmtDateShort(scheduledFor)}; mark it held on or after that day.`);
   return OK;
 }
 

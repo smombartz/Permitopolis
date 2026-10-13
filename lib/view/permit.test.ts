@@ -118,16 +118,16 @@ describe("refundIfCancelled (what the permit page and the Cancel dialog show, an
     expect(refundIfCancelled(s1, TODAY, DEFAULT_CONFIG)).toMatchObject({ refund: 62.5, deposit: 0, canCancel: true });
   });
 
-  it("S2 after Pay and book: capped at the $20 paid for the first of 13 sessions, and it is what cancel refunds", () => {
+  it("S2 after Pay and book: the $20 paid for the first of 13 sessions, minus the $10 processing fee its band names, and it is what cancel refunds", () => {
     const booked = transition(caseById(cases, "PMT-27-0142"), { type: "book_and_pay", method: "card" }, "applicant", ctx);
     if (!booked.ok) throw new Error(booked.reason);
-    // The schedule itself works from all 13 sessions.
-    expect(cancellationRefund(booked.case, TODAY).refund).toBe(250);
-    expect(refundIfCancelled(booked.case, TODAY, DEFAULT_CONFIG).refund).toBe(20);
+    // "Full refund minus a $10 processing fee" of what was paid: not $250 of 13 sessions, capped back to the whole $20.
+    expect(cancellationRefund(booked.case, TODAY)).toMatchObject({ refund: 10, rule: "30 or more days before: full refund minus a $10 processing fee" });
+    expect(refundIfCancelled(booked.case, TODAY, DEFAULT_CONFIG).refund).toBe(10);
 
     const cancelled = transition(booked.case, { type: "cancel" }, "applicant", ctx);
     if (!cancelled.ok) throw new Error(cancelled.reason);
-    expect(cancelled.case.payments.at(-1)).toMatchObject({ kind: "refund", amount: -20 });
+    expect(cancelled.case.payments.at(-1)).toMatchObject({ kind: "refund", amount: -10 });
   });
 
   it("a permit with a deposit counts it in: the figure the Cancel dialog shows is the one cancel pays", () => {

@@ -7,7 +7,7 @@
  * case-detail.test.tsx, active.test.tsx); this file is the one place every cell in the brief's
  * matrix has a test of its own, so the matrix itself can be read off the describe blocks below.
  */
-import { act, render, screen, within } from "@testing-library/react";
+import { act, fireEvent, render, screen, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { CityShell } from "@/components/shell";
 import { QueueScreen } from "@/components/city/lists/QueueScreen";
@@ -15,6 +15,7 @@ import { CasesScreen } from "@/components/city/lists/CasesScreen";
 import { IntakeScreen } from "@/components/city/lists/IntakeScreen";
 import { CaseDetailScreen } from "@/components/case/CaseDetailScreen";
 import { ActiveScreen } from "@/components/active/ActiveScreen";
+import { BoardScreen } from "@/components/board/BoardScreen";
 import { addDaysISO } from "@/lib/dates";
 import { routes } from "@/lib/routes";
 import { DEFAULT_DEMO_TODAY, STORAGE_KEY } from "@/lib/rules";
@@ -28,6 +29,7 @@ const TODAY = DEFAULT_DEMO_TODAY; // Mon, May 3, 2027
 
 // Real seeded cases used as edge/error fixtures throughout (lib/state/seed/background, scenarios).
 const S2_DRAFT = "PMT-27-0142"; // Sunrise Yoga Club: Instant series, still a Draft
+const S4 = "PMT-27-0126"; // Maple Street block party: Submitted, three sign-offs short
 const S5 = "PMT-27-0097"; // Riverfront Summer 5K: holds its date, Health & Legal re-verifying
 const B05_LONG_NAME = "PMT-27-0012"; // St. Agnes Parish...: 90+ char name, lead-time risk
 const B06_COMMISSION = "PMT-27-0014"; // Permitopolis Rotary Club charity gala: sent to commission
@@ -66,11 +68,23 @@ describe("EMPTY: a role with nothing in its queue", () => {
   });
 
   it("names the cases waiting on other parties instead of saying nothing at all", async () => {
-    await renderScreen(<QueueScreen />, { role: "hl", path: routes.city.queue() });
-    const others = screen.queryByText(/Waiting on others/);
-    // Health & Legal is the one role the seed's briefing line still shows as "0 later" never
-    // happens to be fully empty, so assert on the shape of the message instead of the count.
-    expect(others === null || /\(\d+\)/.test(others.textContent ?? "")).toBe(true);
+    // One case, and the move on it is the applicant's: the Clerk has nothing, and is told who has.
+    const theirs = makeCase({
+      id: "PMT-27-0608",
+      name: "Somebody else's move fair",
+      state: "in_review",
+      tasks: [makeTask({ id: "PMT-27-0608:insurance_certificate", catalogId: "insurance_certificate", title: "Certificate of insurance" })],
+    });
+    const { user } = await renderScreen(<QueueScreen />, { role: "clerk", path: routes.city.queue(), cases: [theirs] });
+
+    expect(screen.getByText("Nothing is waiting on you. 1 case is with other parties.")).toBeInTheDocument();
+    await user.click(screen.getByText("Waiting on others (1)"));
+    // Who has it, and for how long: the applicant, since today.
+    const chips = screen.getByRole("link", { name: /Somebody else's move fair/ }).querySelector('[data-slot="waiting-on-chips"]');
+    expect(chips).toHaveTextContent(/Applicant/);
+    expect(chips).toHaveTextContent("0d");
+    // It opens the case, with the queue to come back to.
+    expect(screen.getByRole("link", { name: /Somebody else's move fair/ })).toHaveAttribute("href", routes.city.case(theirs.id, { from: routes.city.queue() }));
   });
 });
 
@@ -229,6 +243,48 @@ describe("ERROR: an action refused by the engine", () => {
     // Nothing lost: the case is exactly as it was.
     expect(storedCase(S5).state).toBe("quote_sent");
   });
+
+  it("a choice made in an open panel that the engine refuses: routing without the department a card names", async () => {
+    // S4 with its last three sign-offs in and accepted: Confirm routing is open to the Clerk.
+    const { user } = await renderScreen(<CaseDetailScreen />, { path: routes.city.case(S4), role: "clerk" });
+    await act(async () => {
+      const dispatch = useDemo.getState().dispatch;
+      for (let i = 0; i < 3; i++) dispatch(S4, { type: "simulate_signoff" }, "neighbor");
+      dispatch(S4, { type: "accept_complete" }, "clerk");
+    });
+    await user.click(within(screen.getByLabelText("Your actions")).getByRole("button", { name: "Confirm routing" }));
+    const dialog = within(screen.getByRole("dialog"));
+    expect(dialog.getByRole("button", { name: "Confirm routing" })).toBeEnabled();
+    const before = storedCase(S4);
+
+    // An enabled control, used: Health & Legal is taken off the list. The engine refuses that list.
+    await user.click(dialog.getByRole("checkbox", { name: "Route to Health & Legal" }));
+    expect(dialog.getByText('Route Health & Legal too: it checks "Certificate of insurance".')).toBeInTheDocument();
+    expect(dialog.getByRole("button", { name: "Confirm routing" })).toBeDisabled();
+    // The panel's reason is the one a dispatch of that list gets, and the case is untouched by either.
+    let refused: ReturnType<ReturnType<typeof useDemo.getState>["dispatch"]> | undefined;
+    await act(async () => {
+      refused = useDemo.getState().dispatch(S4, { type: "confirm_routing", reviewers: [{ dept: "pws", sections: ["City services request"], dueDate: "2027-05-17" }] }, "clerk");
+    });
+    expect(refused).toEqual({ ok: false, reason: 'Route Health & Legal too: it checks "Certificate of insurance".' });
+    expect(storedCase(S4)).toEqual(before);
+
+    // Put back, the same button goes through.
+    await user.click(dialog.getByRole("checkbox", { name: "Route to Health & Legal" }));
+    await user.click(dialog.getByRole("button", { name: "Confirm routing" }));
+    expect(storedCase(S4).state).toBe("in_review");
+  });
+
+  it("a date typed into an open panel that the engine refuses: a walkthrough on Memorial Day", async () => {
+    await renderScreen(<CaseDetailScreen />, { path: routes.city.case(S5, { task: `schedule_meeting:${S5}:site_walkthrough` }), role: "pws" });
+    const dialog = within(screen.getByRole("dialog"));
+    expect(dialog.getByRole("button", { name: "Schedule" })).toBeEnabled();
+
+    fireEvent.change(dialog.getByLabelText("Date"), { target: { value: "2027-05-31" } });
+    expect(dialog.getByText("That date is a citywide blackout.")).toBeInTheDocument();
+    expect(dialog.getByRole("button", { name: "Schedule" })).toBeDisabled();
+    expect(storedCase(S5).tasks.find((t) => t.catalogId === "site_walkthrough")?.payload.scheduledFor).toBe("2027-07-02");
+  });
 });
 
 describe("ERROR: a deep link ?task= naming a task that no longer exists", () => {
@@ -319,10 +375,17 @@ describe("EDGE: a task overdue for each of the four parties", () => {
     }
   });
 
-  it("the applicant's own overdue task exists in the seed too (B08), read off the seed directly", () => {
-    const b08 = buildSeed().find((c) => c.id === "PMT-27-0018")!;
-    const overdue = b08.tasks.find((t) => t.owner === "applicant" && t.dueDate !== null && t.dueDate < TODAY && (t.status === "todo" || t.status === "changes_requested"));
-    expect(overdue).toBeDefined();
+  it("the applicant's own overdue card (B08's insurance, due Thu, Apr 29) is marked overdue on their board", async () => {
+    const B08 = "PMT-27-0018"; // Westside Youth Soccer League spring tournament
+    const b08 = buildSeed().find((c) => c.id === B08)!;
+    const overdue = b08.tasks.find((t) => t.owner === "applicant" && t.dueDate !== null && t.dueDate < TODAY && (t.status === "todo" || t.status === "changes_requested"))!;
+    expect(overdue).toMatchObject({ title: "Certificate of insurance", dueDate: "2027-04-29" });
+
+    await renderScreen(<BoardScreen />, { role: "applicant", personaId: b08.applicantId, path: routes.event(B08) });
+    const card = screen.getByRole("button", { name: /Certificate of insurance/ });
+    const chip = card.querySelector('[data-overdue="true"]');
+    expect(chip).not.toBeNull();
+    expect(chip).toHaveTextContent(/Overdue/);
   });
 });
 
@@ -433,8 +496,14 @@ describe("the Stalled chip", () => {
     const stalledCase = makeCase({ id: "PMT-27-0606", name: "Nobody is up event", state: "in_review", reviews: [] });
     expect(isStalled(stalledCase, TODAY)).toBe(true);
 
-    await renderScreen(<CaseDetailScreen />, { role: "clerk", path: routes.city.case(stalledCase.id), cases: [stalledCase] });
+    const onCase = await renderScreen(<CaseDetailScreen />, { role: "clerk", path: routes.city.case(stalledCase.id), cases: [stalledCase] });
     expect(screen.getByText("Stalled")).toBeInTheDocument();
+    onCase.unmount();
+
+    // The queue: nobody is up on it, and it is still listed, because that is the bug the chip is for.
+    const { user } = await renderScreen(<QueueScreen />, { role: "clerk", path: routes.city.queue(), cases: [stalledCase] });
+    await user.click(screen.getByText("Waiting on others (1)"));
+    expect(within(screen.getByRole("link", { name: /Nobody is up event/ })).getByText("Stalled")).toBeInTheDocument();
   });
 
   it("never shown in a production build", async () => {

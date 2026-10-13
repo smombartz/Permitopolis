@@ -204,6 +204,22 @@ describe("queueFor", () => {
   });
 });
 
+describe("queueFor: days waiting", () => {
+  it("counts from the start of the stretch the task has been open for now: a review parked on a request counts from the answer, a check reopened by a second upload from that upload", () => {
+    const entry = (at: string, status: "todo" | "locked" | "done" | "changes_requested") => ({ at: `${at}T09:00`, actor: "system" as const, status });
+    const tasks = [
+      // Routed Apr 19, parked on a request Apr 30, back when the applicant answered on May 3.
+      makeTask({ id: "resumed", catalogId: "review:hl", owner: "hl", kind: "review", history: [entry("2027-04-19", "todo"), entry("2027-04-30", "locked"), entry("2027-05-03", "todo")] }),
+      // Never parked: since routing.
+      makeTask({ id: "steady", catalogId: "review:hl", owner: "hl", kind: "review", history: [entry("2027-04-19", "todo")] }),
+      // Verified on Apr 20, opened again by a new upload on Apr 30.
+      makeTask({ id: "reopened", catalogId: "verify:insurance_certificate", owner: "hl", kind: "review", history: [entry("2027-04-12", "todo"), entry("2027-04-20", "done"), entry("2027-04-30", "todo")] }),
+    ];
+    const days = Object.fromEntries(queueFor([makeCase({ state: "in_review", tasks })], "hl", "2027-05-03").map((item) => [item.task.id, item.daysWaiting]));
+    expect(days).toEqual({ resumed: 0, steady: 14, reopened: 3 });
+  });
+});
+
 describe("queueFor: a task with no due date", () => {
   const opened = (id: string, at: string) => makeTask({ id, catalogId: id, owner: "clerk", kind: "action", history: [{ at, actor: "system", status: "todo" }] });
 

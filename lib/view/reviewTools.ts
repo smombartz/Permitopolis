@@ -61,7 +61,7 @@ export function reviewMaterial(c: EventCase, dept: Dept): ReviewSectionMaterial[
   }));
 }
 
-/** The triggers that routed this department to the case, in the same words as My queue. */
+/** The triggers that routed this department to the case: the review panel's header, and its My queue row. */
 export function routingReasons(c: EventCase, dept: Dept, cfg: RulesConfig): string[] {
   const cls = classify(c, cfg);
   return routing(c, cls, cfg).find((r) => r.dept === dept)?.reasons ?? [];
@@ -75,22 +75,25 @@ export function routingReasons(c: EventCase, dept: Dept, cfg: RulesConfig): stri
  * alcohol license. Quantities default from the applicant's own request (city services, the
  * street segments drawn, the vendor count, the structures added) so the reviewer starts from
  * what was asked for, not from zero, and can still edit every field before adding the line.
+ * Where the plan asked for none, the line starts at 1: a reviewer who adds police to an event
+ * that requested none means at least one officer-hour, not a $0 row.
  */
 export function feePresetsFor(dept: Dept, c: EventCase, cfg: RulesConfig): FeeLineDraft[] {
   const fees = cfg.fees;
+  const orOne = (qty: number) => (qty > 0 ? qty : 1);
   if (dept === "pws") {
     const svc = c.addOns.cityServices;
     const blocks = c.location?.mode === "streets" ? c.location.segmentIds.length : 0;
     const structures = c.addOns.tentsStages?.count ?? 0;
     return [
-      { dept, label: "Police", qty: svc ? round2(svc.policeOfficers * svc.policeHours) : 0, unit: "officer-hour", unitPrice: fees.policePerOfficerHour },
-      { dept, label: "Barricades", qty: svc?.barricades ?? 0, unit: "barricade-day", unitPrice: fees.barricadeEachPerDay },
-      { dept, label: "Street closure", qty: blocks, unit: "block-day", unitPrice: fees.streetClosurePerBlockPerDay },
-      { dept, label: "Structure fire inspection", qty: structures, unit: "structure", unitPrice: fees.structureInspectionEach },
+      { dept, label: "Police", qty: orOne(svc ? round2(svc.policeOfficers * svc.policeHours) : 0), unit: "officer-hour", unitPrice: fees.policePerOfficerHour },
+      { dept, label: "Barricades", qty: orOne(svc?.barricades ?? 0), unit: "barricade-day", unitPrice: fees.barricadeEachPerDay },
+      { dept, label: "Street closure", qty: orOne(blocks), unit: "block-day", unitPrice: fees.streetClosurePerBlockPerDay },
+      { dept, label: "Structure fire inspection", qty: orOne(structures), unit: "structure", unitPrice: fees.structureInspectionEach },
     ];
   }
   if (dept === "hl") {
-    return [{ dept, label: "Food or vendor permit", qty: c.addOns.foodVending?.vendors ?? 0, unit: "vendor", unitPrice: fees.vendorPermitEach }];
+    return [{ dept, label: "Food or vendor permit", qty: orOne(c.addOns.foodVending?.vendors ?? 0), unit: "vendor", unitPrice: fees.vendorPermitEach }];
   }
   return [{ dept, label: "Temporary alcohol license", qty: 1, unit: "day", unitPrice: fees.alcoholLicensePerDay }];
 }

@@ -68,6 +68,58 @@ describe("cancellationRefund", () => {
     expect(result.rule).toMatch(/Under 10 days/i);
   });
 
+  describe("a series is billed session by session, so the band applies to what was paid", () => {
+    // Sunrise Yoga: 13 Sunday sessions at $20, the first one paid at booking.
+    const dates = ["2027-06-06", "2027-06-13", "2027-06-20", "2027-06-27", "2027-07-04", "2027-07-11", "2027-07-18", "2027-07-25", "2027-08-01", "2027-08-08", "2027-08-15", "2027-08-22", "2027-08-29"];
+    const yoga = (paidSessions: number) =>
+      eventCase({
+        id: "PMT-27-0007",
+        state: "permitted",
+        feeLines: [{ id: "f1", dept: "clerk", label: "Field reservation", qty: 13, unit: "session", unitPrice: 20, estimate: 260, actual: null, kind: "fee" }],
+        schedule: {
+          date: dates[0],
+          start: "07:00",
+          end: "08:00",
+          recurrence: { frequency: "weekly", weekday: 0, until: "2027-08-29" },
+          occurrences: dates.map((date, i) => ({ date, availability: { status: "open" as const }, billing: i < paidSessions ? ("paid" as const) : ("upcoming" as const) })),
+        },
+        payments: Array.from({ length: paidSessions }, (_, i) => ({ id: `p${i + 1}`, at: "2027-05-03T09:00", amount: 20, method: "card" as const, kind: i === 0 ? ("booking" as const) : ("session" as const), occurrenceDate: dates[i] })),
+      });
+
+    it("one session paid, 34 days out: the $20 paid minus the $10 processing fee, not $250 of sessions never paid for", () => {
+      expect(cancellationRefund(yoga(1), "2027-05-03")).toMatchObject({ refund: 10, kept: 10, rule: "30 or more days before: full refund minus a $10 processing fee" });
+    });
+
+    it("never more than the fee lines, and nothing when nothing was paid", () => {
+      expect(cancellationRefund(yoga(13), "2027-05-03").refund).toBe(250);
+      expect(cancellationRefund(yoga(0), "2027-05-03").refund).toBe(0);
+    });
+
+    it("a deposit and a late fee paid with the quote are not fees the band refunds", () => {
+      const c = yoga(1);
+      const quoted = {
+        ...c,
+        feeLines: [
+          ...c.feeLines,
+          { id: "f2", dept: "clerk" as const, label: "Refundable cleanup deposit", qty: 1, unit: "deposit", unitPrice: 250, estimate: 250, actual: null, kind: "deposit" as const },
+          { id: "f3", dept: "clerk" as const, label: "Late fee", qty: 1, unit: "fee", unitPrice: 65, estimate: 65, actual: null, kind: "late_fee" as const },
+        ],
+        payments: [{ id: "p1", at: "2027-05-03T09:00", amount: 335, method: "card" as const, kind: "quote" as const }],
+      };
+      // $335 paid: the $250 deposit, the $65 late fee and one $20 session.
+      expect(cancellationRefund(quoted, "2027-05-03").refund).toBe(10);
+    });
+
+    it("a single event is not capped by its payments: the schedule is its fee lines", () => {
+      const single = eventCase({
+        id: "PMT-27-0008",
+        feeLines: [{ id: "f1", dept: "clerk", label: "Shelter reservation", qty: 5, unit: "hour", unitPrice: 25, estimate: 125, actual: null, kind: "fee" }],
+        schedule: { date: "2027-07-01", start: "10:00", end: "15:00", occurrences: [] },
+      });
+      expect(cancellationRefund(single, "2027-05-03").refund).toBe(115);
+    });
+  });
+
   it("a session skipped for a blackout is never the next session", () => {
     const c = eventCase({
       id: "PMT-27-0006",

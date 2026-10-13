@@ -162,7 +162,9 @@ describe("case detail: S6, closeout", () => {
 
     switchRole("clerk");
     navigate(routes.city.case(S6));
-    await user.click(screen.getByRole("button", { name: "Reconcile and close" }));
+    // One name for the step: Who's up lists the task "Reconcile and close" and Your actions has the button.
+    expect(screen.getAllByRole("button", { name: "Reconcile and close" })).toHaveLength(2);
+    await user.click(within(screen.getByLabelText("Your actions")).getByRole("button", { name: "Reconcile and close" }));
     await user.click(sheetButton("Reconcile and close"));
 
     const closed = storedCase(S6);
@@ -224,7 +226,7 @@ describe("case detail: S6 once the hours are in", () => {
     switchRole("clerk");
     navigate(routes.city.case(S6));
 
-    await user.click(screen.getByRole("button", { name: "Reconcile and close" }));
+    await user.click(within(screen.getByLabelText("Your actions")).getByRole("button", { name: "Reconcile and close" }));
     const sheet = screen.getByRole("dialog");
     expect(statValue(sheet, "Over estimate")).toHaveTextContent("$750");
     expect(statValue(sheet, "From deposit")).toHaveTextContent("$750");
@@ -245,6 +247,58 @@ describe("case detail: S6 once the hours are in", () => {
     expect(statValue(tab, "From deposit")).toHaveTextContent(fmtMoney(settlement.fromDeposit));
     expect(statValue(tab, "Refund")).toHaveTextContent(fmtMoney(settlement.refund!));
     expect(within(tab).queryByText("Due")).not.toBeInTheDocument();
+  });
+});
+
+describe("case detail: Your actions lists the role's own open tasks, on every tab", () => {
+  const actions = () => within(screen.getByLabelText("Your actions"));
+  const labels = () => actions().getAllByRole("button").map((b) => b.textContent);
+
+  it("S5 as Health & Legal: \"Verify Certificate of insurance\" is there, first, and opens the check from the Documents tab", async () => {
+    const { user } = await renderScreen(<CaseDetailScreen />, { path: routes.city.case(S5, { tab: "activity" }), role: "hl" });
+    // Who's up is on Overview only; on any other tab this panel is where the role's action is.
+    expect(labels()).toEqual(["Verify Certificate of insurance", "Send a reminder", "Add a note"]);
+
+    await user.click(actions().getByRole("button", { name: "Verify Certificate of insurance" }));
+    await user.click(sheetButton("Verify"));
+    expect(storedCase(S5).tasks.find((t) => t.catalogId === "insurance_certificate")?.status).toBe("done");
+    // Done: the button goes with the task.
+    expect(labels()).toEqual(["Send a reminder", "Add a note"]);
+  });
+
+  it("Public Works & Safety's work orders after the permit, each closed from here", async () => {
+    const ULTRA = "PMT-27-0030"; // Cascade Trail Runners: Permitted, three work orders open
+    const { user } = await renderScreen(<CaseDetailScreen />, { path: routes.city.case(ULTRA, { tab: "reviews" }), role: "pws" });
+    expect(labels()).toEqual(["Deliver barricades", "Staff police officers", "Close the street", "Send a reminder", "Add a note"]);
+
+    await user.click(actions().getByRole("button", { name: "Deliver barricades" }));
+    await user.click(sheetButton("Mark done"));
+    expect(storedCase(ULTRA).tasks.find((t) => t.catalogId === "work_order:barricades")?.status).toBe("done");
+    expect(labels()).toEqual(["Staff police officers", "Close the street", "Send a reminder", "Add a note"]);
+  });
+
+  it("the Clerk on F1 once it is accepted: Schedule the pre-application meeting, beside Confirm routing", async () => {
+    const { user } = await renderScreen(<CaseDetailScreen />, { path: routes.city.case(F1), role: "clerk" });
+    expect(labels()).toEqual(["Accept as complete", "Request information", "Deny"]);
+    await act(async () => {
+      useDemo.getState().dispatch(F1, { type: "accept_complete" }, "clerk");
+    });
+    expect(labels()).toEqual(["Schedule the pre-application meeting", "Confirm routing"]);
+
+    await user.click(actions().getByRole("button", { name: "Schedule the pre-application meeting" }));
+    expect(within(screen.getByRole("dialog")).getByRole("button", { name: "Schedule" })).toBeInTheDocument();
+  });
+
+  it("a task a row already opens is not there twice: a reviewer has one Decide your review", async () => {
+    await renderScreen(<CaseDetailScreen />, { path: routes.city.case("PMT-27-0070"), role: "pws" });
+    expect(labels()).toEqual(["Decide your review", "Request information", "Send a reminder", "Add a note"]);
+  });
+});
+
+describe("case detail: the Conditions and fees tab", () => {
+  it("marks the conditions the Clerk's quote carried as Merged, for city staff", async () => {
+    await renderScreen(<CaseDetailScreen />, { path: routes.city.case("PMT-27-0030", { tab: "conditions" }), role: "clerk" });
+    expect(within(screen.getByRole("tabpanel", { name: "Conditions and fees" })).getAllByText("Merged")).toHaveLength(2);
   });
 });
 
@@ -324,6 +378,19 @@ describe("case detail: the Reviews tab on a case the Clerk has no license review
     expect(storedCase(S3).reviews.some((r) => r.dept === "clerk")).toBe(false);
     expect(screen.getByText("No license review on this case.")).toBeInTheDocument();
     expect(screen.queryByText("The City Clerk has not routed this case to this department.")).not.toBeInTheDocument();
+  });
+
+  it("\"Not routed yet\" is only said while routing is still to come: S4 before it, never S3 or S5 after", async () => {
+    const reviews = () => within(screen.getByRole("tabpanel", { name: "Reviews" }));
+    await renderScreen(<CaseDetailScreen />, { path: routes.city.case(S4, { tab: "reviews" }), role: "clerk" });
+    expect(reviews().getAllByText("Not routed yet")).toHaveLength(3);
+
+    for (const id of [S3, S5]) {
+      navigate(routes.city.case(id, { tab: "reviews" }));
+      expect(storedCase(id).reviews.some((r) => r.dept === "clerk"), id).toBe(false);
+      expect(reviews().queryByText("Not routed yet"), id).not.toBeInTheDocument();
+      expect(reviews().getAllByText("Not routed"), id).toHaveLength(1);
+    }
   });
 });
 

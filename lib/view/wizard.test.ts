@@ -8,6 +8,7 @@ import {
   addOnsForEventType,
   buildResultPanel,
   dateGateSatisfied,
+  furthestAnsweredStep,
   groupTasksByPhase,
   isWizardStep,
   lateFeeCarriesDate,
@@ -189,6 +190,18 @@ describe("weekdayName", () => {
   it("0 is Sunday", () => {
     expect(weekdayName(0)).toBe("Sunday");
     expect(weekdayName(6)).toBe("Saturday");
+  });
+});
+
+describe("furthestAnsweredStep: how far the stepper's edit links reach on the answers alone", () => {
+  it("is the last of steps 1 to 4 holding an answer, and never the plan", () => {
+    const blank: EventAnswers = { eventType: null, name: "", location: null, schedule: null, attendance: null, addOns: EMPTY_ADDONS };
+    expect(furthestAnsweredStep(blank)).toBe(wizardStepIndex("what"));
+    expect(furthestAnsweredStep({ ...blank, location: baseAnswers.location })).toBe(wizardStepIndex("where"));
+    expect(furthestAnsweredStep({ ...blank, schedule: baseAnswers.schedule })).toBe(wizardStepIndex("when"));
+    // A size typed before the place was chosen still counts: Size has been reached.
+    expect(furthestAnsweredStep({ ...blank, attendance: 40 })).toBe(wizardStepIndex("size"));
+    expect(furthestAnsweredStep(baseAnswers)).toBe(wizardStepIndex("size"));
   });
 });
 

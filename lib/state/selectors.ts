@@ -12,7 +12,7 @@ import { checkCancel } from "./checks";
 import { lastSessionDate, sessionDates } from "./clock";
 import { byDueDate, sumFeeLines, totalPaid } from "./core";
 import type { BoardColumn, CaseTotals, PermitSession, QueueGroup, QueueItem, ReviewClockView, StateApi, WaitingOnOthersItem } from "./types";
-import { involvement, waitingOn } from "./waitingOn";
+import { involvement, isStalled, waitingOn } from "./waitingOn";
 
 export const boardColumn: StateApi["boardColumn"] = (task: Task): BoardColumn => {
   if (task.status === "done") return "done";
@@ -115,11 +115,20 @@ function dueGroup(dueDate: ISODate | null, today: ISODate, daysWaiting: number):
   return withinWeek ? "this_week" : "later";
 }
 
-/** Days since the task last became this party's to act on (it may have been locked, or parked, before). */
+/**
+ * Days since the task last became this party's to act on: the start of the stretch it has been
+ * open for now. It may have been locked before, parked on a request to the applicant (those
+ * days are the applicant's, not the reviewer's), or done and opened again by a second upload.
+ */
 function daysActionable(task: Task, today: ISODate): number {
-  const firstOpen = task.history.find((h) => h.status === "todo" || h.status === "changes_requested" || h.status === "submitted");
-  if (!firstOpen) return 0;
-  return Math.max(0, daysBetween(firstOpen.at.slice(0, 10), today));
+  let since: string | null = null;
+  for (let i = task.history.length - 1; i >= 0; i--) {
+    const status = task.history[i].status;
+    if (status !== "todo" && status !== "changes_requested") break;
+    since = task.history[i].at;
+  }
+  if (!since) return 0;
+  return Math.max(0, daysBetween(since.slice(0, 10), today));
 }
 
 /** Days since the task was last opened to its owner: what an undated task's group goes by. */
@@ -143,13 +152,21 @@ export const queueFor: StateApi["queueFor"] = (cases: EventCase[], role: Dept, t
   return items.sort((a, b) => byDueDate(a.task, b.task));
 };
 
+/**
+ * The cases where the move is someone else's, with who (PRD, My queue). A case nobody is up on
+ * (a permit three weeks from its day) is not waiting on anyone, so it is left out. The one
+ * exception is a case that is stalled: before its permit with nobody up is a bug, and the row
+ * is where the dev-only Stalled chip shows it.
+ */
 export const waitingOnOthers: StateApi["waitingOnOthers"] = (cases: EventCase[], role: Dept, today: ISODate): WaitingOnOthersItem[] => {
   const items: WaitingOnOthersItem[] = [];
   for (const c of cases) {
     if (!isOpen(c) || !involves(c, role)) continue;
     const parties = waitingOn(c, today);
     const mine = parties.find((p) => p.party === role);
-    if (mine && mine.status !== "up_now") items.push({ case: c, parties: parties.filter((p) => p.status === "up_now") });
+    if (!mine || mine.status === "up_now") continue;
+    const up = parties.filter((p) => p.status === "up_now");
+    if (up.length > 0 || isStalled(c, today)) items.push({ case: c, parties: up });
   }
   return items;
 };
@@ -236,8 +253,9 @@ export interface CancelRefund {
 }
 
 /**
- * The cancellation schedule works from the fee lines, which for a series cover sessions not yet
- * paid for, and it leaves the deposit out. This is the amount that actually goes back.
+ * The cancellation schedule works from the fees (for a series, the ones paid so far) and leaves
+ * the deposit out. This is the amount that actually goes back: the schedule's share plus the
+ * deposit.
  */
 export function refundIfCancelled(c: EventCase, today: ISODate, cfg: RulesConfig): CancelRefund {
   const result = cancellationRefund(c, today, cfg);

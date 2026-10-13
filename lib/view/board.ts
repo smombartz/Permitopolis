@@ -16,6 +16,7 @@ import {
   closeoutSettlement,
   eventDate,
   hasActivePermit,
+  involvement,
   taskDueDate,
   taskSubmittedOn,
   whoIsUp,
@@ -241,16 +242,25 @@ export interface ReviewerRow {
   label: string;
 }
 
-/** Each department's status in the applicant's plain words (PRD: Approved / Approved with conditions / Asked you for something / Reviewing / Not involved). */
+/**
+ * Each department's status in the applicant's plain words (PRD: Approved / Approved with
+ * conditions / Asked you for something / Reviewing / Not involved). A department with no review
+ * yet reads as `involvement()` has it, so the strip agrees with the city's Who's up: one named
+ * on a card before routing "starts after intake", it is not "not involved".
+ */
 export function reviewerRows(c: EventCase): ReviewerRow[] {
   return DEPTS.map((dept): ReviewerRow => {
     const review = c.reviews.find((r) => r.dept === dept);
     if (review) return { dept, status: review.status, label: REVIEW_STATUS_WORD[review.status] ?? "Reviewing" };
-    if (dept !== "clerk") return { dept, status: "not_routed", label: "Not involved" };
+    if (dept !== "clerk") return { dept, status: "not_routed", label: involvement(c, dept) === "awaiting_routing" ? "Starts after intake" : "Not involved" };
     // The Clerk owns the case even when it is never a formal "reviewer" on it. "Needs info"
     // can land here from before routing (an intake request) or after (a reviewer's request),
     // so this reads whether reviewers exist yet rather than the exact state.
     if (c.state === "draft") return { dept, status: "not_routed", label: "Not involved" };
+    // An Instant event is booked, never reviewed (PRD, S1: "Nobody; permit active"), and a
+    // case past its permit with no review has nothing left for anybody to review either.
+    const atIntake = c.state === "submitted" || c.state === "needs_info";
+    if (c.reviews.length === 0 && (c.tier === "instant" || !atIntake)) return { dept, status: "not_routed", label: "Nothing to review" };
     if (c.reviews.length === 0) return { dept, status: "pending", label: "Reviewing" };
     if (c.state === "in_review" || c.state === "needs_info") return { dept, status: "pending", label: "Waiting on reviews" };
     return { dept, status: "approved", label: "Approved" };

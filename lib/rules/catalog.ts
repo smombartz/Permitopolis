@@ -536,6 +536,10 @@ export const CARD_BY_ID: Record<CatalogId, CardSpec> = Object.fromEntries(
  * City-owned tasks, created inside transition(). Ids are `${caseId}:${id}`; review tasks
  * add the department (`:review:pws`) and verification tasks add the card
  * (`:verify:insurance_certificate`, `:verify:vendor_health_permit:1`).
+ *
+ * A task that one action finishes is named for it: the title starts with the words on that
+ * action's button and its panel ("Send quote: consolidate the reviews"), so Who's up, My queue,
+ * Your actions and the sheet call one step one thing.
  */
 export const CITY_TASKS = {
   /**
@@ -543,9 +547,9 @@ export const CITY_TASKS = {
    * party's neighbor sign-offs are still out (the last sign-off opens it). Done by
    * accept_complete. A request at intake parks it until the applicant answers.
    */
-  intake_check: { owner: "clerk", kind: "review", title: "Check the application is complete" },
+  intake_check: { owner: "clerk", kind: "review", title: "Accept as complete: check the application" },
   /** Clerk. Created by accept_complete. Done by confirm_routing. */
-  confirm_routing: { owner: "clerk", kind: "action", title: "Confirm reviewers and due dates" },
+  confirm_routing: { owner: "clerk", kind: "action", title: "Confirm routing: reviewers and due dates" },
   /** Clerk, Special events. Created by accept_complete. Done by schedule_meeting on the applicant's pre_application_meeting card. */
   schedule_pre_application_meeting: { owner: "clerk", kind: "meeting", title: "Schedule the pre-application meeting" },
   /** One per routed department. Created by confirm_routing. Done by review_decide. */
@@ -561,7 +565,7 @@ export const CITY_TASKS = {
    * a department denies its section, titled "Decide: a reviewer denied" (payload.denied): the
    * Clerk's move is then deny.
    */
-  consolidate: { owner: "clerk", kind: "action", title: "Consolidate reviews and send the quote" },
+  consolidate: { owner: "clerk", kind: "action", title: "Send quote: consolidate the reviews" },
   /**
    * Clerk. Created by send_quote, locked until the applicant has signed and paid the quote and
    * insurance is verified; locked again if verified insurance is re-uploaded. Done by issue_permit.
@@ -570,12 +574,12 @@ export const CITY_TASKS = {
   /** Public Works & Safety. Created by issue_permit, one per approved service: `:work_order:barricades`, `:work_order:police`, `:work_order:closure`, `:work_order:trash`, `:work_order:power`. Done by complete_city_task. */
   work_order: { owner: "pws", kind: "action", title: "Work order" },
   /** Public Works & Safety. Created when the case enters Closeout. Both done by log_closeout. */
-  cleanup_inspection: { owner: "pws", kind: "inspection", title: "Cleanup inspection" },
-  log_actual_hours: { owner: "pws", kind: "action", title: "Log actual hours" },
+  cleanup_inspection: { owner: "pws", kind: "inspection", title: "Log closeout: cleanup inspection" },
+  log_actual_hours: { owner: "pws", kind: "action", title: "Log closeout: actual hours" },
   /** Clerk. Created when the case enters Closeout, locked until hours are logged. Done by reconcile_close. */
-  reconcile: { owner: "clerk", kind: "action", title: "Reconcile costs and close" },
+  reconcile: { owner: "clerk", kind: "action", title: "Reconcile and close" },
   /** Clerk. Created for an Instant event's Closeout exception (damage or dispute). Done by reconcile_close. */
-  instant_exception: { owner: "clerk", kind: "review", title: "Resolve the exception" },
+  instant_exception: { owner: "clerk", kind: "review", title: "Reconcile and close: resolve the exception" },
 } as const;
 
 export type CityTaskId = keyof typeof CITY_TASKS;

@@ -35,6 +35,7 @@ import {
   type BoardColumn,
 } from "@/lib/state";
 import { EMPTY_ADDONS, type Dept, type EventAnswers, type EventCase, type FileRef, type ISODate, type Location, type Party, type Task } from "@/lib/types";
+import { queueReasonLine } from "@/lib/view/cityLists";
 
 const TODAY = DEFAULT_DEMO_TODAY;
 const S1 = "PMT-27-0109";
@@ -345,6 +346,12 @@ describe("Path 3 · Answer a request (S3)", () => {
     // The review clock ran three days paused, and runs again.
     expect(get(S3).reviews.find((r) => r.dept === "hl")).toMatchObject({ status: "pending", clock: { pausedSince: null, pausedDays: 3 } });
     expect(reviewClock(get(S3), "hl", TODAY)?.label).toBe("Day 11 of 14 · paused 3 days");
+    // The three days it waited on the applicant are not Health & Legal's: its due date moves with
+    // the clock (three days left, due Thu, May 6), and its queue row counts from the answer.
+    expect(get(S3).reviews.find((r) => r.dept === "hl")?.dueDate).toBe("2027-05-06");
+    const resumed = queueFor(cases(), "hl", TODAY).find((item) => item.case.id === S3)!;
+    expect(resumed).toMatchObject({ task: { catalogId: "review:hl", dueDate: "2027-05-06" }, group: "this_week", daysWaiting: 0 });
+    expect(queueReasonLine(resumed)).toBe("Answer received May 3");
     // The Clerk cannot send a quote yet, and says why.
     expect(panel(S3, "clerk", "send_quote")).toMatchObject({ enabled: false, reason: "Waiting on every reviewer to approve." });
 

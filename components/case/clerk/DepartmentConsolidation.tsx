@@ -29,7 +29,7 @@ function DepartmentCard({ summary }: { summary: ReviewSummary }) {
       ) : (
         <>
           {summary.conditions.length > 0 ? (
-            <ConditionList conditions={summary.conditions} />
+            <ConditionList conditions={summary.conditions} showMerged />
           ) : (
             <p className="text-sm text-fg-secondary">No conditions from this department.</p>
           )}

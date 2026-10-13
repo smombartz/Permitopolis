@@ -44,10 +44,11 @@ export function MapThumbnail({ highlight, className }: MapThumbnailProps) {
         className="w-full rounded-panel border border-line-subtle bg-surface-1"
       >
         <CityBackground />
-        {shapes.map((shape) =>
+        {/* A route may run one segment several times (laps), so a shape's id alone is not a key. */}
+        {shapes.map((shape, index) =>
           shape.kind === "rect" ? (
             <rect
-              key={shape.id}
+              key={`${shape.id}-${index}`}
               x={shape.rect.x}
               y={shape.rect.y}
               width={shape.rect.w}
@@ -58,7 +59,7 @@ export function MapThumbnail({ highlight, className }: MapThumbnailProps) {
             />
           ) : (
             <line
-              key={shape.id}
+              key={`${shape.id}-${index}`}
               x1={shape.line.x1}
               y1={shape.line.y1}
               x2={shape.line.x2}

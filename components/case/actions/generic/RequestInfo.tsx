@@ -12,7 +12,7 @@ import { TaskCard } from "@/components/domain"
 import { REQUEST_TEMPLATES } from "@/lib/data/templates"
 import { dueDate } from "@/lib/rules"
 import { checkRequestInfo, useDemo } from "@/lib/state"
-import { previewRequestCard, requestableCardGroups } from "@/lib/view/clerkTools"
+import { fillRequestTemplate, previewRequestCard, requestableCardGroups } from "@/lib/view/clerkTools"
 import type { Dept } from "@/lib/types"
 import { PanelActions, PanelBody, PanelHeader, useCaseContext } from "../panelKit"
 import type { ActionPanelProps } from "../types"
@@ -104,7 +104,7 @@ function RequestInfoPanel({ caseId, arg, role, onClose }: ActionPanelProps) {
 
         {templates.length > 0 ? (
           <Field label="Start from a template">
-            <Select value="" onValueChange={(v) => setMessage(v)}>
+            <Select value="" onValueChange={(v) => setMessage(fillRequestTemplate(v, c.tasks.filter((t) => selected.has(t.id))))}>
               <SelectTrigger className="w-full">
                 <SelectValue placeholder="Pick wording to start from" />
               </SelectTrigger>

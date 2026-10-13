@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
+import { CITY_TASKS } from "@/lib/rules/catalog";
 import { DEFAULT_CONFIG, DEFAULT_DEMO_TODAY } from "@/lib/rules/config";
-import { buildSeed, checkCompleteCityTask, checkScheduleMeeting, queueFor } from "@/lib/state";
+import { availableActions, buildSeed, checkCompleteCityTask, checkScheduleMeeting, queueFor, transition, waitingOn } from "@/lib/state";
 import { makeCase, makeTask } from "@/lib/state/testSupport";
 import {
   activityActors,
@@ -18,6 +19,7 @@ import {
   lastActedAt,
   openKeyForAction,
   openKeyForTask,
+  ownTaskRows,
   parseOpenKey,
   resolveOpenKey,
   reviewSummaries,
@@ -443,6 +445,95 @@ describe("resolveOpenKey: what ?task= opens", () => {
   it("the Clerk's Instant exception opens Reconcile and close", () => {
     const picnic = cases.find((c) => c.id === "PMT-27-0017")!; // Brightline Logistics company picnic
     expect(resolveOpenKey(picnic, "PMT-27-0017:instant_exception", "clerk")).toBe("reconcile_close");
+  });
+});
+
+describe("ownTaskRows: the viewer's open tasks that Your actions has no row for", () => {
+  const ctx = { today: TODAY, cases, cfg: DEFAULT_CONFIG };
+  const rowsFor = (c: (typeof cases)[number], role: "clerk" | "pws" | "hl") => {
+    const open = waitingOn(c, TODAY).find((p) => p.party === role)?.openTasks ?? [];
+    return ownTaskRows(c, role, open, availableActions(c, role, ctx)).map((t) => t.title);
+  };
+
+  it("S5: Health & Legal's one real action is its check of the insurance; the Clerk's and Public Works & Safety's lists are as they were", () => {
+    expect(rowsFor(S5, "hl")).toEqual(["Verify Certificate of insurance"]);
+    expect(rowsFor(S5, "clerk")).toEqual([]);
+    expect(rowsFor(S5, "pws")).toEqual([]);
+  });
+
+  it("a task whose panel a row already opens is not listed twice: a review, an intake check, the closeout log", () => {
+    expect(rowsFor(S4, "clerk")).toEqual([]);
+    expect(rowsFor(S6, "pws")).toEqual([]);
+    const farmersMarket = cases.find((c) => c.id === "PMT-27-0070")!;
+    expect(waitingOn(farmersMarket, TODAY).find((p) => p.party === "pws")?.openTasks.map((t) => t.catalogId)).toEqual(["review:pws"]);
+    expect(rowsFor(farmersMarket, "pws")).toEqual([]);
+  });
+
+  it("work orders after the permit, and the Clerk's meeting to schedule after accepting a Special event", () => {
+    const ultra = cases.find((c) => c.id === "PMT-27-0030")!; // Cascade Trail Runners: Permitted, three work orders open
+    expect(rowsFor(ultra, "pws")).toEqual(["Deliver barricades", "Staff police officers", "Close the street"]);
+    const f1 = cases.find((c) => c.id === "PMT-27-0121")!; // Downtown Art Walk: Special, Submitted
+    const accepted = transition(f1, { type: "accept_complete" }, "clerk", { ...ctx, now: `${TODAY}T09:00` });
+    if (!accepted.ok) throw new Error(accepted.reason);
+    expect(rowsFor(accepted.case, "clerk")).toEqual(["Schedule the pre-application meeting"]);
+  });
+
+  it("on the seed, every open task of a city role is one click away in Your actions: through a row, or through its own button", () => {
+    let own = 0;
+    for (const c of cases.filter((candidate) => candidate.state !== "draft")) {
+      for (const role of ["clerk", "pws", "hl"] as const) {
+        const actions = availableActions(c, role, ctx);
+        const open = waitingOn(c, TODAY).find((p) => p.party === role)?.openTasks ?? [];
+        const rows = ownTaskRows(c, role, open, actions);
+        own += rows.length;
+        for (const task of open) {
+          const key = openKeyForTask(c, task, role);
+          if (key === null) continue;
+          const byRow = actions.some((a) => a.type === parseOpenKey(key).action);
+          expect(byRow !== rows.includes(task), `${c.id} ${role}: ${task.title}`).toBe(true);
+        }
+      }
+    }
+    // S5's insurance check, another case's, and Cascade's three work orders.
+    expect(own).toBeGreaterThanOrEqual(5);
+  });
+});
+
+describe("one name per step: a city task starts with the words on the button that finishes it", () => {
+  const ctx = { today: TODAY, cases, cfg: DEFAULT_CONFIG };
+  const STEPS: [catalogId: keyof typeof CITY_TASKS, button: string][] = [
+    ["intake_check", "Accept as complete"],
+    ["confirm_routing", "Confirm routing"],
+    ["consolidate", "Send quote"],
+    ["issue_permit", "Issue permit"],
+    ["cleanup_inspection", "Log closeout"],
+    ["log_actual_hours", "Log closeout"],
+    ["reconcile", "Reconcile and close"],
+    ["instant_exception", "Reconcile and close"],
+  ];
+
+  it.each(STEPS)("%s is titled for \"%s\"", (catalogId, button) => {
+    expect(CITY_TASKS[catalogId].title.startsWith(button), CITY_TASKS[catalogId].title).toBe(true);
+  });
+
+  it("on the seed, each of those tasks carries the catalogue's title, and its owner's Your actions has a row with those words", () => {
+    const seen = new Set<string>();
+    for (const c of cases.filter((candidate) => candidate.ending === null)) {
+      for (const [catalogId, button] of STEPS) {
+        const task = c.tasks.find((t) => t.catalogId === catalogId && t.status !== "done");
+        if (!task || task.payload.denied === true) continue;
+        expect(task.title, `${c.id} ${catalogId}`).toBe(CITY_TASKS[catalogId].title);
+        expect(availableActions(c, task.owner, ctx).map((a) => a.label), `${c.id} ${catalogId}`).toContain(button);
+        seen.add(catalogId);
+      }
+    }
+    // Every step but routing is open somewhere on the seed; routing follows an acceptance.
+    expect([...seen].sort()).toEqual(STEPS.map(([id]) => id).filter((id) => id !== "confirm_routing").sort());
+    const f1 = cases.find((c) => c.id === "PMT-27-0121")!;
+    const accepted = transition(f1, { type: "accept_complete" }, "clerk", { ...ctx, now: `${TODAY}T09:00` });
+    if (!accepted.ok) throw new Error(accepted.reason);
+    expect(accepted.case.tasks.find((t) => t.catalogId === "confirm_routing")?.title).toBe("Confirm routing: reviewers and due dates");
+    expect(availableActions(accepted.case, "clerk", ctx).map((a) => a.label)).toContain("Confirm routing");
   });
 });
 

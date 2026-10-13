@@ -20,11 +20,17 @@ describe("groupConditionsByDept", () => {
 });
 
 describe("ConditionList", () => {
-  it("marks merged and accepted conditions in read-only mode", () => {
-    render(<ConditionList conditions={CONDITIONS} />);
+  it("marks accepted conditions in read-only mode, and merged ones for city staff only", () => {
+    const { unmount } = render(<ConditionList conditions={CONDITIONS} showMerged />);
     expect(screen.getByText("Merged")).toBeInTheDocument();
     expect(screen.getByText("Accepted")).toBeInTheDocument();
     expect(screen.getAllByText("Not yet accepted").length).toBe(2);
+    unmount();
+
+    // The applicant's quote, the permit and the public check: "Merged" is the Clerk's bookkeeping.
+    render(<ConditionList conditions={CONDITIONS} />);
+    expect(screen.queryByText("Merged")).not.toBeInTheDocument();
+    expect(screen.getByText("Accepted")).toBeInTheDocument();
   });
 
   it("shows an accept checkbox per condition in editable mode and calls back on toggle", async () => {

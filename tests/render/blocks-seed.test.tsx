@@ -166,7 +166,7 @@ describe("what the scenarios show through the shared components", () => {
     expect(within(row("applicant")).getByText("Downtown Arts Collective")).toBeInTheDocument();
     expect(within(row("applicant")).getByText("3 days holding")).toBeInTheDocument();
     expect(within(row("clerk")).getByText("Waiting")).toBeInTheDocument();
-    expect(within(row("clerk")).getByText("Consolidate reviews and send the quote")).toBeInTheDocument();
+    expect(within(row("clerk")).getByText("Send quote: consolidate the reviews")).toBeInTheDocument();
     expect(within(row("clerk")).getByText("Unlocks when every review is in")).toBeInTheDocument();
   });
 

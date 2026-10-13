@@ -162,7 +162,7 @@ describe("cancel", () => {
     const cancelled = run(s1, { type: "cancel" }, "applicant", "2027-05-03");
 
     expect(cancelled.ending).toBe("cancelled");
-    expect(cancelled.endingReason).toMatch(/^10 to 29 days before/);
+    expect(cancelled.endingReason).toBe("Cancelled by the applicant. Refunded $62.50 (10 to 29 days before: 50% of space and permit fees; the application fee is kept).");
     expect(cancelled.payments.at(-1)).toMatchObject({ kind: "refund", amount: -62.5 });
     expect(caseTotals(cancelled)).toMatchObject({ paid: 62.5, due: 0 });
     // The case keeps the state it ended in (Permitted), but it no longer takes the slot.
@@ -214,6 +214,28 @@ describe("confirm_routing and the plan's cards", () => {
       const named = c.tasks.filter((t) => t.owner === "applicant" && (t.kind === "document" || t.kind === "form") && t.reviewer && t.reviewer !== "clerk").map((t) => t.reviewer);
       for (const dept of named) expect(suggested.has(dept!), `${script.key}: ${dept} is named on a card and not suggested`).toBe(true);
     }
+  });
+
+  it("no routing() section or reviewers sentence on any seed script carries a raw placeholder, and every section names a card on the plan", () => {
+    let withVendors = 0;
+    for (const script of SEED_SCRIPTS) {
+      const createdOn = script.createdAt.slice(0, 10);
+      const planned = draft(script.id, script.answers, createdOn);
+      if (planned.tier === "instant") continue;
+      const c = run(planned, { type: "create_board" }, "applicant", createdOn);
+      const cards = c.tasks.filter((t) => t.owner === "applicant");
+      for (const reviewer of classify(c, DEFAULT_CONFIG).reviewers) {
+        expect(`${reviewer.sections.join(" | ")} | ${reviewer.checks}`, `${script.key} ${reviewer.dept}`).not.toContain("{");
+        for (const section of reviewer.sections) {
+          // The same reading the review panel gives a section: a card by title, or every vendor's permit.
+          const named = section === "Vendor health permits" ? cards.filter((t) => t.catalogId === "vendor_health_permit") : cards.filter((t) => t.title === section);
+          expect(named.length, `${script.key} ${reviewer.dept}: "${section}" names no card`).toBeGreaterThan(0);
+          for (const card of named) expect(card.reviewer, `${script.key}: ${section}`).toBe(reviewer.dept);
+          if (section === "Vendor health permits") withVendors += 1;
+        }
+      }
+    }
+    expect(withVendors).toBeGreaterThan(3);
   });
 
   it("leaving a card's reviewer off the list is refused, with the department and the card", () => {

@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { DEFAULT_CONFIG } from "@/lib/rules";
-import { buildSeed, queueFor } from "@/lib/state";
+import { fmtMonthDay } from "@/lib/format";
+import { buildSeed, isStalled, queueFor, taskDueDate, transition, waitingOn, whoIsUp } from "@/lib/state";
+import { makeCase } from "@/lib/state/testSupport";
 import type { EventCase } from "@/lib/types";
 import {
   activeFilterChips,
@@ -103,6 +105,28 @@ describe("queueReasonLine: the one-line reason a row is this role's move", () =>
     expect(queueReasonLine(row!)).toMatch(/^Routed [A-Z][a-z]{2} \d{1,2}$/);
   });
 
+  it("every seeded review row is \"Routed\" on the day its review clock started", () => {
+    let rows = 0;
+    for (const role of ["clerk", "pws", "hl"] as const) {
+      for (const item of queueFor(seed(), role, TODAY).filter((i) => i.task.catalogId.startsWith("review:"))) {
+        const startedOn = item.case.reviews.find((r) => r.dept === role)!.clock.startedOn!;
+        expect(queueReasonLine(item), item.case.id).toBe(`Routed ${fmtMonthDay(startedOn)}`);
+        rows += 1;
+      }
+    }
+    expect(rows).toBeGreaterThanOrEqual(5);
+  });
+
+  it("S3 once the applicant answers: Health & Legal's review is back because the answer came, not because it was routed today", () => {
+    const s3 = find(seed(), S3);
+    expect(s3.reviews.find((r) => r.dept === "hl")?.clock.startedOn).toBe("2027-04-19");
+    const answered = transition(s3, { type: "respond_to_request", taskId: `${S3}:vendor_health_permit:1`, files: [{ name: "health-permit.pdf", size: 120_000, type: "application/pdf" }] }, "applicant", { today: TODAY, now: `${TODAY}T09:00`, cases: [s3], cfg: CFG });
+    if (!answered.ok) throw new Error(answered.reason);
+    const row = queueFor([answered.case], "hl", TODAY).find((i) => i.task.catalogId === "review:hl")!;
+    expect(queueReasonLine(row)).toBe("Answer received May 3");
+    expect(row.daysWaiting).toBe(0);
+  });
+
   it("never throws for any item in any role's queue", () => {
     for (const role of ["clerk", "pws", "hl"] as const) {
       for (const item of queueFor(seed(), role, TODAY)) expect(() => queueReasonLine(item)).not.toThrow();
@@ -115,6 +139,24 @@ describe("waiting on others and the empty state", () => {
     const others = queueWaitingOnOthers(seed(), "clerk", TODAY);
     expect(others.length).toBeGreaterThan(0);
     for (const item of others) expect(item.parties.every((p) => p.status === "up_now")).toBe(true);
+  });
+
+  it("the move is always somebody's: a permitted case with nothing open for anybody is not \"waiting on others\"", () => {
+    for (const role of ["clerk", "pws", "hl"] as const) {
+      for (const item of queueWaitingOnOthers(seed(), role, TODAY)) expect(item.parties.length, `${role} ${item.case.id} ${item.case.name}`).toBeGreaterThan(0);
+    }
+    // Maya Chen's picnic: Instant, Permitted, three weeks out. Nobody is up, and nobody is waited on.
+    const clerk = queueWaitingOnOthers(seed(), "clerk", TODAY).map((item) => item.case.id);
+    expect(whoIsUp(find(seed(), "PMT-27-0109"), TODAY)).toEqual([]);
+    expect(clerk).not.toContain("PMT-27-0109");
+    // S3 is the applicant's move, S5 the applicant's and Health & Legal's.
+    expect(clerk).toEqual(expect.arrayContaining([S3, S5]));
+  });
+
+  it("a stalled case (before its permit, nobody up) stays listed, so the dev-only Stalled chip has a row", () => {
+    const stalled = makeCase({ id: "PMT-27-0900", state: "in_review", tasks: [] });
+    expect(isStalled(stalled, TODAY)).toBe(true);
+    expect(queueWaitingOnOthers([stalled], "clerk", TODAY)).toEqual([{ case: stalled, parties: [] }]);
   });
 
   it("the empty-queue line counts the others, or omits the second sentence", () => {
@@ -262,6 +304,30 @@ describe("pipeline table row model", () => {
   it("pipelineTableRows maps one row per case", () => {
     const cases = seed();
     expect(pipelineTableRows(cases, TODAY, CFG)).toHaveLength(cases.length);
+  });
+
+  it("S5: Next action and Due are one task's, the one due soonest: Health & Legal's check on Fri, May 7, not the signature due May 14", () => {
+    const row = pipelineTableRow(find(seed(), S5), TODAY, CFG);
+    expect([row.nextAction, row.due]).toEqual(["Verify Certificate of insurance", "2027-05-07"]);
+  });
+
+  it("on every seeded row the due date belongs to the task named, and no open task of a party that is up is due sooner", () => {
+    let dated = 0;
+    for (const c of seed().filter((candidate) => candidate.state !== "draft")) {
+      const row = pipelineTableRow(c, TODAY, CFG);
+      const open = waitingOn(c, TODAY).filter((p) => p.status === "up_now").flatMap((p) => p.openTasks);
+      if (c.ending || open.length === 0) {
+        expect(row.due, c.id).toBeNull();
+        continue;
+      }
+      const named = open.filter((t) => t.title === row.nextAction);
+      expect(named.length, `${c.id}: "${row.nextAction}" is not an open task of a party that is up`).toBeGreaterThan(0);
+      expect(named.map(taskDueDate), `${c.id}: ${row.nextAction}`).toContain(row.due);
+      const dates = open.map(taskDueDate).filter((d): d is string => d !== null).sort();
+      expect(row.due, c.id).toBe(dates[0] ?? null);
+      if (row.due) dated += 1;
+    }
+    expect(dated).toBeGreaterThan(15);
   });
 });
 
@@ -456,7 +522,9 @@ describe("active filter chips", () => {
 describe("intake: completeness and the competing-application finder", () => {
   it("the Maple Street block party is 9 of 12, with Accept disabled", () => {
     const c = find(seed(), S4);
-    expect(intakeCompleteness(c)).toEqual({ done: 9, total: 12 });
+    expect(intakeCompleteness(c)).toEqual({ done: 9, total: 12, unit: "sign-offs" });
+    // Any other application counts its cards before submitting.
+    expect(intakeCompleteness(find(seed(), F1))).toMatchObject({ unit: "items" });
     const rows = intakeRows(seed(), "reviewed", TODAY, CFG);
     const row = rows.find((r) => r.case.id === S4);
     expect(row).toBeDefined();
@@ -498,6 +566,6 @@ describe("intake: completeness and the competing-application finder", () => {
     const rows = instantExceptionRows(seed(), TODAY);
     expect(rows.some((r) => r.case.name.includes("Brightline Logistics"))).toBe(true);
     const row = rows.find((r) => r.case.name.includes("Brightline Logistics"));
-    expect(row?.task?.title).toBe("Resolve the exception");
+    expect(row?.task?.title).toBe("Reconcile and close: resolve the exception");
   });
 });

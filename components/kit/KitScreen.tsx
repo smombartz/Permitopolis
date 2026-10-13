@@ -1282,7 +1282,7 @@ function KitScreen() {
         {/* ---- Domain: ConditionList ---- */}
         <KitSection id="domain-conditions" title="Domain: ConditionList" description="Read-only (the permit) and editable (accept and sign) modes.">
           <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
-            <ConditionList conditions={SAMPLE_CONDITIONS} />
+            <ConditionList conditions={SAMPLE_CONDITIONS} showMerged />
             <ConditionList conditions={SAMPLE_CONDITIONS} editable acceptedIds={acceptedIds} onToggleAccept={toggleAccept} />
           </div>
         </KitSection>

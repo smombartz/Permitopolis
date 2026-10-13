@@ -67,6 +67,14 @@ export function plural(count: number, noun: string, pluralNoun?: string): string
   return `${fmtNumber(count)} ${count === 1 ? noun : (pluralNoun ?? `${noun}s`)}`;
 }
 
+/**
+ * A fee line's quantity with its unit, read as a count: "40 officer-hours", "1 structure",
+ * "3.1 miles". "each" and "flat" are not things that are counted, so they stay as they are.
+ */
+export function fmtQty(qty: number, unit: string): string {
+  return unit === "each" || unit === "flat" ? `${fmtNumber(qty)} ${unit}` : plural(qty, unit);
+}
+
 /** "46 days to go", "Tomorrow", "Today", "9 days ago" */
 export function fmtDaysToGo(eventDate: ISODate, today: ISODate): string {
   const days = daysBetween(today, eventDate);

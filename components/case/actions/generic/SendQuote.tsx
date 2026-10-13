@@ -79,7 +79,7 @@ function SendQuotePanel({ caseId, role, onClose }: ActionPanelProps) {
   return (
     <>
       <PanelHeader
-        title="Consolidation and quote"
+        title="Send quote"
         description="Every department's decision, merged into one set of conditions and one quote. Unlocks the applicant's sign and pay cards once sent."
       />
       <PanelBody>

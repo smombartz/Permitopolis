@@ -46,6 +46,17 @@ export function requestableCardGroups(c: EventCase): RequestableGroup[] {
   })).filter((group) => group.cards.length > 0);
 }
 
+/**
+ * A request template as it goes into the message: `{vendor}` is the vendor of the one per-vendor
+ * card ticked, or "each vendor" when none or several are, since the same words go out on every
+ * card chosen. The message is stored and shown to the applicant as written, so nothing later
+ * could fill the placeholder in.
+ */
+export function fillRequestTemplate(template: string, cards: Task[]): string {
+  const vendors = cards.map((t) => t.payload.vendorName).filter((name): name is string => typeof name === "string" && name.length > 0);
+  return template.replaceAll("{vendor}", vendors.length === 1 ? vendors[0] : "each vendor");
+}
+
 /** A preview of the card the applicant will see once this request goes out. */
 export function previewRequestCard(target: Task | null, dept: Dept, item: string, message: string, dueDate: ISODate, now: string): Task {
   const base: Task = target ?? {

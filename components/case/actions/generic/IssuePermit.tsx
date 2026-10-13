@@ -70,7 +70,7 @@ function IssuePermitPanel({ caseId, onClose }: ActionPanelProps) {
         {c.conditions.length > 0 ? (
           <div className="flex flex-col gap-2">
             <p className="text-eyebrow font-bold tracking-[.12em] text-fg-label uppercase">Conditions the permit will carry</p>
-            <ConditionList conditions={c.conditions} />
+            <ConditionList conditions={c.conditions} showMerged />
           </div>
         ) : null}
 

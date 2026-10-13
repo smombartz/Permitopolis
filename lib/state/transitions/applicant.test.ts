@@ -642,6 +642,8 @@ describe("withdraw and cancel", () => {
     expect(result.case.dateHold.status).toBe("released");
     expect(result.case.payments.at(-1)).toMatchObject({ kind: "refund", amount: -62.5 });
     expect(result.case.activity.at(-1)?.text).toContain("Refunded $62.50");
+    // The banner's reason is a sentence with the amount, not the bare band of the schedule.
+    expect(result.case.endingReason).toBe("Cancelled by the applicant. Refunded $62.50 (10 to 29 days before: 50% of space and permit fees; the application fee is kept).");
   });
 
   it("cancel never refunds more than was paid (a series pays one session at a time)", () => {
@@ -673,6 +675,7 @@ describe("withdraw and cancel", () => {
     if (!result.ok) return;
     expect(result.case.payments).toHaveLength(1);
     expect(result.case.activity.at(-1)?.text).toContain("Nothing to refund");
+    expect(result.case.endingReason).toBe("Cancelled by the applicant. Nothing refunded (Under 10 days: no refund of fees).");
   });
 
   it("cancel fails once the last session has passed", () => {

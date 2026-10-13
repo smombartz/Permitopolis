@@ -378,6 +378,21 @@ export function resolveOpenKey(c: EventCase, param: string | null, role: Party):
   return (ACTION_TYPES as string[]).includes(parseOpenKey(param).action) ? param : null;
 }
 
+/**
+ * The viewer's own open tasks that the sticky panel has no row for. `availableActions()` lists
+ * what a role can do in a state, never a task: a document to verify, a work order, a meeting to
+ * schedule. Each is the role's real next step, and Who's up, which lists it, is on the Overview
+ * tab only. A task whose panel a row already opens (a review, the intake check, the closeout
+ * log) is left to that row. `openTasks` is the viewer's own row of `waitingOn()`.
+ */
+export function ownTaskRows(c: EventCase, role: Party, openTasks: Task[], actions: ActionAvailability[]): Task[] {
+  const covered = new Set<string>(actions.map((action) => openKeyForAction(action.type)));
+  return openTasks.filter((task) => {
+    const key = openKeyForTask(c, task, role);
+    return key !== null && !covered.has(parseOpenKey(key).action);
+  });
+}
+
 /** True when the role's action panel has nothing enabled or disabled to show at all. */
 export function hasNothingToDo(actions: ActionAvailability[]): boolean {
   return actions.length === 0;

@@ -590,7 +590,7 @@ describe("PRD seed table: the six scenarios", () => {
     });
 
     it("the City Clerk is waiting on reviews: its consolidate step is locked until every review is in", () => {
-      expect(card(s3, "consolidate")).toMatchObject({ owner: "clerk", status: "locked", title: "Consolidate reviews and send the quote" });
+      expect(card(s3, "consolidate")).toMatchObject({ owner: "clerk", status: "locked", title: "Send quote: consolidate the reviews" });
       expect(row(s3, "clerk")).toMatchObject({ status: "waiting", note: "Unlocks when every review is in", nextTask: { catalogId: "consolidate" }, openTasks: [] });
       expect(queued("clerk", s3)).toEqual([]);
     });
@@ -881,7 +881,7 @@ describe("each city role opens to work", () => {
       ["B17", "reconcile", null, "this_week"],
       ["B18", "reconcile", null, "this_week"],
     ]);
-    expect(queued("clerk", seeded("F7")).map((item) => `${item.case.name}: ${item.task.title}`)).toEqual(["Brightline Logistics company picnic: Resolve the exception"]);
+    expect(queued("clerk", seeded("F7")).map((item) => `${item.case.name}: ${item.task.title}`)).toEqual(["Brightline Logistics company picnic: Reconcile and close: resolve the exception"]);
   });
 
   it("the six scenarios alone give the Clerk nothing: S4 waits on neighbors and S6 on Public Works & Safety", () => {
@@ -1060,7 +1060,7 @@ describe("PRD filler cases", () => {
     expect(f7.closeout).toMatchObject({ cleanup: "issues", notes: "One picnic table at Shelter 4 was broken during the event; recommend repair.", hoursLoggedOn: "2027-04-17" });
     expect(f7.feeLines.at(-1)).toMatchObject({ label: "Broken picnic table repair", estimate: 0, actual: 95 });
     expect(whoIsUp(f7, TODAY)).toEqual(["clerk"]);
-    expect(card(f7, "instant_exception")).toMatchObject({ owner: "clerk", status: "todo", title: "Resolve the exception" });
+    expect(card(f7, "instant_exception")).toMatchObject({ owner: "clerk", status: "todo", title: "Reconcile and close: resolve the exception" });
     expect(reasonFor(f7, { type: "reconcile_close" }, "clerk")).toBeNull();
   });
 });
@@ -1248,7 +1248,7 @@ describe("background cases (plan 6.2)", () => {
     const endings: [string, Ending, string, string][] = [
       ["B22", "denied", "Public Works & Safety could not approve the sound plan for this location.", "Denied: Public Works & Safety could not approve the sound plan for this location."],
       ["B23", "withdrawn", "Withdrawn by the applicant.", "Withdrew the application."],
-      ["B24", "cancelled", "30 or more days before: full refund minus a $10 processing fee", "Cancelled. 30 or more days before: full refund minus a $10 processing fee. Refunded $140."],
+      ["B24", "cancelled", "Cancelled by the applicant. Refunded $140 (30 or more days before: full refund minus a $10 processing fee).", "Cancelled. 30 or more days before: full refund minus a $10 processing fee. Refunded $140."],
       ["B25", "hold_expired", "The date hold expired before the quote was paid.", "The date hold expired. The space and date were released."],
     ];
     for (const [key, ending, reason, logged] of endings) {

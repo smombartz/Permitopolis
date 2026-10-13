@@ -1,7 +1,10 @@
 import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { MapDevScreen } from "@/components/map/MapDevScreen";
+import { MapThumbnail } from "@/components/map/MapThumbnail";
+import { PermitopolisMap } from "@/components/map/PermitopolisMap";
+import { buildSeed } from "@/lib/state";
 
 describe("MapDevScreen", () => {
   it("mounts without throwing, with all four picker modes, the display map and the calendars", () => {
@@ -67,6 +70,27 @@ describe("Phase 1 review fix: tier is never a dot alone", () => {
     expect(figure).not.toBeNull();
     expect(figure?.querySelector(".sr-only")).toBeNull();
     expect(figure).toHaveTextContent("Instant");
+  });
+
+  it("MapThumbnail draws a route that runs the same segments more than once (Four Bridges Ultra's four laps) without a duplicate-key error", () => {
+    const ultra = buildSeed().find((c) => c.name === "Four Bridges Ultra")!;
+    const segments = ultra.location!.segmentIds;
+    expect(new Set(segments).size).toBeLessThan(segments.length);
+
+    const errors = vi.spyOn(console, "error").mockImplementation(() => {});
+    try {
+      const { container } = render(<MapThumbnail highlight={{ id: ultra.id, location: ultra.location!, status: "permitted", tier: ultra.tier, label: ultra.location!.label }} />);
+      // Every lap is drawn.
+      expect(container.querySelectorAll("svg > line").length).toBeGreaterThanOrEqual(segments.length);
+      expect(errors.mock.calls.map((call) => String(call[0])).filter((message) => message.includes("same key"))).toEqual([]);
+      // The display map (Active permits, on the ultra's day) draws the same shapes.
+      render(<PermitopolisMap highlights={[{ id: ultra.id, location: ultra.location!, status: "permitted", tier: ultra.tier, label: ultra.name }]} />);
+      expect(errors.mock.calls.map((call) => String(call[0])).filter((message) => message.includes("same key"))).toEqual([]);
+      // Alone on the map, its own laps are not another booking to overlap with.
+      expect(screen.queryByText("Overlap")).not.toBeInTheDocument();
+    } finally {
+      errors.mockRestore();
+    }
   });
 
   it("gives the PermitopolisMap list rows the system focus ring", () => {

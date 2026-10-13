@@ -49,6 +49,36 @@ describe("FeeTable", () => {
     expect(screen.getAllByText("$25").length).toBe(2);
   });
 
+  it("closeout mode totals the actual fees without the deposit, beside the subtotal of fees it is compared with", () => {
+    render(<FeeTable lines={LINES} showActual />);
+    // 50 + 125 + 150 + 75: what the event actually cost. The $250 deposit is refundable, not a cost.
+    const actual = screen.getByText("Actual fees").parentElement!;
+    expect(actual).toHaveTextContent("$400");
+    expect(screen.queryByText("Actual total")).not.toBeInTheDocument();
+    // $650 (the actual fees plus the deposit) is an amount nobody is charged.
+    expect(screen.queryByText("$650")).not.toBeInTheDocument();
+    expect(screen.getByText("Subtotal of fees").parentElement).toHaveTextContent("$375");
+  });
+
+  it("a unit reads as a count: plural after any quantity but one, and \"each\" and \"flat\" as they are", () => {
+    const lines: FeeLine[] = [
+      { id: "u1", dept: "pws", label: "Police", qty: 40, unit: "officer-hour", unitPrice: 85, estimate: 3400, actual: null, kind: "fee" },
+      { id: "u2", dept: "pws", label: "Barricades", qty: 40, unit: "barricade-day", unitPrice: 10, estimate: 400, actual: null, kind: "fee" },
+      { id: "u3", dept: "pws", label: "Structure fire inspection", qty: 1, unit: "structure", unitPrice: 60, estimate: 60, actual: null, kind: "fee" },
+      { id: "u4", dept: "clerk", label: "Shelter reservation", qty: 8, unit: "hour", unitPrice: 25, estimate: 200, actual: null, kind: "fee" },
+      { id: "u5", dept: "clerk", label: "Route", qty: 3.1, unit: "mile", unitPrice: 400, estimate: 1240, actual: null, kind: "fee" },
+      { id: "u6", dept: "hl", label: "Cones", qty: 4, unit: "each", unitPrice: 5, estimate: 20, actual: null, kind: "fee" },
+    ];
+    const qty = (label: string) => within(screen.getByText(label).closest("tr")!).getAllByRole("cell")[1].textContent;
+    const { unmount } = render(<FeeTable lines={lines} />);
+    expect(["Police", "Barricades", "Structure fire inspection", "Shelter reservation", "Route", "Cones"].map(qty)).toEqual(["40 officer-hours", "40 barricade-days", "1 structure", "8 hours", "3.1 miles", "4 each"]);
+    unmount();
+
+    render(<FeeTable lines={lines} compact />);
+    expect(screen.getByText("Police").closest("td")).toHaveTextContent("40 officer-hours × $85");
+    expect(screen.getByText("Structure fire inspection").closest("td")).toHaveTextContent("1 structure × $60");
+  });
+
   it("omits the Actual column by default", () => {
     render(<FeeTable lines={LINES} />);
     expect(screen.queryByText("Actual")).not.toBeInTheDocument();

@@ -3,6 +3,7 @@ import { addDaysISO } from "@/lib/dates";
 import { DEFAULT_CONFIG, DEFAULT_DEMO_TODAY, dueDate } from "@/lib/rules";
 import { buildSeed, closeoutSettlement, transition } from "@/lib/state";
 import { makeCase } from "@/lib/state/testSupport";
+import { REQUEST_TEMPLATES } from "@/lib/data/templates";
 import type { EventCase } from "@/lib/types";
 import {
   addConditionRow,
@@ -14,6 +15,7 @@ import {
   defaultReviewDueDate,
   depositAmountFor,
   detectConditionConflicts,
+  fillRequestTemplate,
   issuePermitChecklist,
   leadTimeLeftAfterRouting,
   moveConditionRow,
@@ -247,6 +249,33 @@ describe("requestableCardGroups", () => {
     // The pinned request sits on the health permit card, still "todo" with the request attached.
     const pinned = groups.find((g) => g.status === "todo")?.cards.find((t) => t.id === `${s3.id}:vendor_health_permit:1`);
     expect(pinned?.request?.resolved).toBe(false);
+  });
+});
+
+describe("fillRequestTemplate: a template's {vendor} is a name by the time anybody reads it", () => {
+  const market = caseById(buildSeed(), "PMT-27-0070"); // Riverside Farmers Market: twelve vendors
+  const permit = (n: number) => market.tasks.find((t) => t.id === `${market.id}:vendor_health_permit:${n}`)!;
+  const insurance = market.tasks.find((t) => t.catalogId === "insurance_certificate")!;
+  const template = REQUEST_TEMPLATES.hl[0];
+
+  it("one vendor's card ticked: that vendor, by name", () => {
+    expect(template).toContain("{vendor}");
+    expect(fillRequestTemplate(template, [permit(3)])).toBe("Please upload Market Stall 3's current health permit");
+    expect(fillRequestTemplate(template, [insurance, permit(3)])).toBe("Please upload Market Stall 3's current health permit");
+  });
+
+  it("no vendor's card ticked, or several: each vendor, since the same words go out on every card", () => {
+    expect(fillRequestTemplate(template, [])).toBe("Please upload each vendor's current health permit");
+    expect(fillRequestTemplate(template, [insurance])).toBe("Please upload each vendor's current health permit");
+    expect(fillRequestTemplate(template, [permit(1), permit(2)])).toBe("Please upload each vendor's current health permit");
+  });
+
+  it("no template of any department leaves a placeholder behind, whatever is ticked", () => {
+    for (const templates of Object.values(REQUEST_TEMPLATES)) {
+      for (const t of templates) {
+        for (const cards of [[], [permit(1)], [permit(1), permit(2)]]) expect(fillRequestTemplate(t, cards)).not.toMatch(/[{}]/);
+      }
+    }
   });
 });
 

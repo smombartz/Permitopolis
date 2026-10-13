@@ -14,6 +14,7 @@ import { isStalled, reviewClock, taskDueDate, useDemo, type QueueItem } from "@/
 import { applicantNameOf } from "@/lib/data/people";
 import { routes } from "@/lib/routes";
 import { plural } from "@/lib/format";
+import type { RulesConfig } from "@/lib/rules/types";
 import { PARTY_LABEL, type Dept, type Party } from "@/lib/types";
 import {
   QUEUE_GROUP_LABEL,
@@ -24,15 +25,18 @@ import {
   queueReasonLine,
   queueTotal,
   queueWaitingOnOthers,
-  triggerLabels,
 } from "@/lib/view/cityLists";
+import { routingReasons } from "@/lib/view/reviewTools";
 
 function isDept(role: Party): role is Dept {
   return role !== "applicant";
 }
 
-function QueueRow({ item, role, today, reviewer }: { item: QueueItem; role: Dept; today: string; reviewer: boolean }) {
+function QueueRow({ item, role, today, cfg, reviewer }: { item: QueueItem; role: Dept; today: string; cfg: RulesConfig; reviewer: boolean }) {
   const { case: c, task, daysWaiting } = item;
+  // The triggers that routed the case to this department (PRD, Review queue), in the words its
+  // review panel heads with: not every trigger on the case.
+  const reasons = reviewer ? routingReasons(c, role, cfg) : [];
   // The department's review clock belongs to its review. On a work order, a closeout task or a
   // document check it would be a clock that stopped weeks ago, next to a due date of its own.
   const clock = reviewer && task.catalogId.startsWith("review:") ? reviewClock(c, role, today) : null;
@@ -54,7 +58,7 @@ function QueueRow({ item, role, today, reviewer }: { item: QueueItem; role: Dept
         <div className="flex min-w-0 flex-col gap-1 sm:w-64">
           <p className="truncate text-sm font-medium text-fg">{task.title}</p>
           <p className="truncate text-xs text-fg-secondary">{queueReasonLine(item)}</p>
-          {reviewer && c.triggers.length > 0 ? <p className="truncate text-xs text-fg-secondary">{triggerLabels(c).join(", ")}</p> : null}
+          {reasons.length > 0 ? <p className="truncate text-xs text-fg-secondary">{reasons.join(", ")}</p> : null}
         </div>
         <div className="flex shrink-0 flex-wrap items-center gap-3">
           {due ? <DueDate date={due} today={today} /> : <span className="text-xs text-fg-secondary">No due date</span>}
@@ -72,6 +76,7 @@ function QueueScreen() {
   const cases = useDemo((s) => s.cases);
   const today = useDemo((s) => s.demoToday);
   const role = useDemo((s) => s.role);
+  const cfg = useDemo((s) => s.cfg);
   const containerRef = React.useRef<HTMLDivElement>(null);
   useRovingListNav(containerRef, "[data-row-nav]");
 
@@ -101,7 +106,7 @@ function QueueScreen() {
                 </h2>
                 <ul className="flex flex-col gap-2">
                   {items.map((item) => (
-                    <QueueRow key={item.task.id} item={item} role={role} today={today} reviewer={reviewer} />
+                    <QueueRow key={item.task.id} item={item} role={role} today={today} cfg={cfg} reviewer={reviewer} />
                   ))}
                 </ul>
               </section>

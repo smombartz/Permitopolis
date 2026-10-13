@@ -219,7 +219,7 @@ function finishScheduling(c: EventCase, ctx: RulesCtx, actor: Actor): EventCase 
 }
 
 export function completeCityTask(c: EventCase, action: Extract_<"complete_city_task">, actor: Actor, ctx: RulesCtx): TransitionResult {
-  const check = checkCompleteCityTask(c, action.taskId, actor);
+  const check = checkCompleteCityTask(c, action.taskId, actor, ctx.today);
   if (!check.ok) return check;
   const task = findTask(c, action.taskId) as Task;
   let next = moveTask(c, task.id, "done", ctx, actor, { payload: { ...task.payload, note: action.note } });
