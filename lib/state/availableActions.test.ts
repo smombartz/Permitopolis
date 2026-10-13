@@ -2,6 +2,8 @@ import { describe, expect, it } from "vitest";
 import { makeCase, makeCtx, makeTask } from "./testSupport";
 import { availableActions } from "./availableActions";
 import { actorsFor } from "./checks";
+import { buildSeed } from "./seed";
+import { transition } from "./transition";
 
 describe("availableActions: Clerk in Quote sent (S5)", () => {
   it("shows issue_permit (primary), pay, remind and add_note", () => {
@@ -69,7 +71,44 @@ describe("availableActions: asking the applicant for something", () => {
       availableActions(makeCase({ state: status === "needs_info" ? "needs_info" : "in_review", reviews: [review("pws", status)] }), "pws", makeCtx()).map((i) => i.type);
     expect(types("pending")).toEqual(["review_decide", "request_info", "remind", "add_note"]);
     expect(types("needs_info")).toEqual(["review_decide", "request_info", "remind", "add_note"]);
-    expect(types("approved")).toEqual(["review_decide", "remind", "add_note"]);
+    // Decided: nothing left to decide or ask. The Reviews tab shows the decision.
+    expect(types("approved")).toEqual(["remind", "add_note"]);
+  });
+
+  it("a decided review never puts a dead \"Decide your review\" above the department's real action (S6 in Closeout)", () => {
+    const closeout = makeCase({ state: "closeout", tier: "special", reviews: [review("pws", "approved")] });
+    expect(availableActions(closeout, "pws", makeCtx()).map((i) => [i.type, i.enabled, i.primary ?? false])).toEqual([
+      ["log_closeout", true, true],
+      ["remind", true, false],
+      ["add_note", true, false],
+    ]);
+  });
+
+  it("the Clerk in Needs info on a routed case: the quote says whose answer it waits for", () => {
+    const card = makeTask({ id: "PMT-27-0001:vendor_health_permit:1", catalogId: "vendor_health_permit", reviewer: "hl", request: { from: "hl", message: "Send the permit.", at: "2027-04-30T09:00", dueDate: "2027-05-05", resolved: false } });
+    const c = makeCase({ state: "needs_info", flags: { sentToCommission: false, lateFee: false, signed: false, acceptedComplete: true, amendmentPending: false }, reviews: [review("pws", "approved"), review("hl", "needs_info")], tasks: [card] });
+    const items = availableActions(c, "clerk", makeCtx());
+    expect(items.find((i) => i.type === "send_quote")).toMatchObject({ enabled: false, primary: true, reason: "Waiting on the applicant's response to Health & Legal's request." });
+    expect(items.map((i) => i.type)).toEqual(["send_quote", "send_to_commission", "deny", "remind", "add_note"]);
+  });
+
+  it("the Clerk in Needs info at intake (asked before accepting): the intake set, not the quote or the commission", () => {
+    const card = makeTask({ id: "PMT-27-0001:respond_to_request:1", catalogId: "respond_to_request", kind: "action", reviewer: "clerk", request: { from: "clerk", message: "Which entrance?", at: "2027-04-30T09:00", dueDate: "2027-05-05", resolved: false } });
+    const c = makeCase({ state: "needs_info", tier: "reviewed", tasks: [card] });
+    expect(availableActions(c, "clerk", makeCtx()).map((i) => [i.type, i.enabled, i.reason])).toEqual([
+      ["accept_complete", false, "Waiting on the applicant's response to your request"],
+      ["request_info", true, undefined],
+      ["deny", true, undefined],
+      ["remind", true, undefined],
+      ["add_note", true, undefined],
+    ]);
+  });
+
+  it("Send to commission is offered once: after it is sent, the row says so", () => {
+    const flags = { sentToCommission: true, lateFee: false, signed: false, acceptedComplete: true, amendmentPending: false };
+    const c = makeCase({ state: "in_review", flags, reviews: [review("pws", "pending")] });
+    expect(availableActions(c, "clerk", makeCtx()).find((i) => i.type === "send_to_commission")).toMatchObject({ enabled: false, reason: "Already sent to commission." });
+    expect(transition(c, { type: "send_to_commission" }, "clerk", makeCtx())).toEqual({ ok: false, reason: "Already sent to commission." });
   });
 
   it("a department that is not routed has nothing to decide or ask", () => {
@@ -139,6 +178,18 @@ describe("availableActions: reviewer", () => {
     const instantEventDay = availableActions(makeCase({ state: "event_day", tier: "instant" }), "pws", makeCtx());
     expect(instantEventDay.map((i) => i.type)).toContain("log_closeout");
   });
+
+  it("log_closeout is taken once: after the hours are in, the row is disabled and says who has the case", () => {
+    const logged = makeCase({ state: "closeout", tier: "special", closeout: { cleanup: "pass", notes: "", hoursLoggedOn: "2027-05-03", balance: null, refund: null, feedback: null } });
+    expect(availableActions(logged, "pws", makeCtx()).find((i) => i.type === "log_closeout")).toMatchObject({
+      enabled: false,
+      reason: "Hours were logged on Mon, May 3, 2027; the City Clerk is reconciling.",
+    });
+    expect(transition(logged, { type: "log_closeout", cleanup: "pass", actuals: [], extraLines: [] }, "pws", makeCtx())).toEqual({
+      ok: false,
+      reason: "Hours were logged on Mon, May 3, 2027; the City Clerk is reconciling.",
+    });
+  });
 });
 
 describe("availableActions: a case that has ended", () => {
@@ -171,6 +222,12 @@ describe("availableActions: payments", () => {
     const quoted = makeCase({ state: "quote_sent", feeLines: [fee] });
     expect(availableActions(quoted, "applicant", makeCtx()).find((i) => i.type === "pay")).toMatchObject({ label: "Pay fees and deposit", enabled: true });
     expect(availableActions(quoted, "clerk", makeCtx()).find((i) => i.type === "pay")).toMatchObject({ label: "Record an in-person payment", enabled: true });
+  });
+
+  it("a quote already paid in full takes no payment: both rows are disabled and say so", () => {
+    const paid = makeCase({ state: "quote_sent", feeLines: [fee], payments: [{ id: "p1", at: "2027-05-03T09:00", amount: 715, method: "card", kind: "quote" }] });
+    expect(availableActions(paid, "clerk", makeCtx()).find((i) => i.type === "pay")).toMatchObject({ enabled: false, reason: "The quote is paid in full." });
+    expect(availableActions(paid, "applicant", makeCtx()).find((i) => i.type === "pay")).toMatchObject({ enabled: false, reason: "The quote is paid in full." });
   });
 
   it("a closed case that still owes its final bill offers the payment, to the applicant and at the counter (B20)", () => {
@@ -230,5 +287,32 @@ describe("availableActions: payments", () => {
     expect(availableActions(closed, "applicant", makeCtx()).find((i) => i.type === "submit_feedback")).toMatchObject({ enabled: true, primary: true });
     const given = { ...closed, closeout: { ...closed.closeout, feedback: { rating: 5, comment: "Smooth process." } } };
     expect(availableActions(given, "applicant", makeCtx()).find((i) => i.type === "submit_feedback")).toMatchObject({ enabled: false, primary: false, reason: "Feedback is already in. Thank you." });
+  });
+});
+
+describe("availableActions on the seed: a case in Needs info", () => {
+  const seed = buildSeed();
+  const ctx = makeCtx({ cases: seed });
+  const clerkRows = (id: string) => availableActions(seed.find((c) => c.id === id)!, "clerk", ctx);
+
+  it("S3 (routed, Health & Legal asked): Send quote says what it waits for", () => {
+    expect(clerkRows("PMT-27-0118").find((i) => i.type === "send_quote")).toMatchObject({
+      enabled: false,
+      reason: "Waiting on the applicant's response to Health & Legal's request.",
+    });
+  });
+
+  it("PMT-27-0020 (asked at intake, not accepted): Accept as complete leads, and there is no quote or commission to send", () => {
+    const rows = clerkRows("PMT-27-0020");
+    expect(rows.map((i) => i.type)).toEqual(["accept_complete", "request_info", "deny", "remind", "add_note"]);
+    expect(rows[0]).toMatchObject({ primary: true, enabled: false, reason: "Waiting on the applicant's response to your request" });
+  });
+
+  it("no reason shown anywhere on the seed is a raw state name", () => {
+    for (const c of seed) {
+      for (const role of ["applicant", "clerk", "pws", "hl"] as const) {
+        for (const item of availableActions(c, role, ctx)) expect(item.reason ?? "", `${c.id} ${role} ${item.label}`).not.toMatch(/This case is (needs info|in review|quote sent|event day)/);
+      }
+    }
   });
 });

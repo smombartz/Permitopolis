@@ -4,7 +4,7 @@ import { cn } from "@/lib/utils";
 import { TIER_LABEL } from "@/lib/types";
 import { TIER_ICON } from "@/components/domain/icons";
 import { blackoutOn, dayOfMonth, groupItemsByDate, impactedOn, weekDays, weekdayShortLabel } from "./utils";
-import { TIER_DOT_CLASS } from "./tierStyles";
+import { SELECTED_DAY, TIER_DOT_CLASS } from "./tierStyles";
 import type { CalendarItem } from "./types";
 import type { ISODate } from "@/lib/types";
 
@@ -17,11 +17,13 @@ export interface WeekGridProps {
   weekStart: ISODate;
   onSelectItem?: (id: string) => void;
   onSelectDay?: (date: ISODate) => void;
+  /** The chosen day, marked with a ring and `aria-pressed`. Leave it out where a day cannot be chosen. */
+  selected?: ISODate;
   className?: string;
 }
 
 /** One week, one column per day, each session shown with its time. */
-export function WeekGrid({ items, today, weekStart, onSelectItem, onSelectDay, className }: WeekGridProps) {
+export function WeekGrid({ items, today, weekStart, onSelectItem, onSelectDay, selected, className }: WeekGridProps) {
   const days = weekDays(weekStart);
   const byDate = groupItemsByDate(items);
 
@@ -38,10 +40,12 @@ export function WeekGrid({ items, today, weekStart, onSelectItem, onSelectDay, c
               type="button"
               onClick={() => onSelectDay?.(date)}
               aria-current={isToday ? "date" : undefined}
+              aria-pressed={selected === undefined ? undefined : date === selected}
               className={cn(
                 "mb-1 block w-full rounded px-1 py-0.5 text-left text-xs font-semibold text-fg-label",
                 FOCUS_RING,
                 isToday && "bg-pill text-fg-pill",
+                date === selected && SELECTED_DAY,
               )}
             >
               {weekdayShortLabel(date)} {dayOfMonth(date)}

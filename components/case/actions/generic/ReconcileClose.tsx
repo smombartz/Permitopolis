@@ -3,6 +3,7 @@
 import * as React from "react"
 import { InlineAlert } from "@/components/ui/inline-alert"
 import { checkReconcileClose } from "@/lib/state"
+import { CloseoutSettlementStats } from "../../CloseoutSettlementStats"
 import { PanelActions, PanelBody, PanelHeader, useCaseContext, useCaseDispatch } from "../panelKit"
 import type { ActionPanelProps } from "../types"
 
@@ -28,7 +29,7 @@ function ReconcileClosePanel({ caseId, onClose }: ActionPanelProps) {
         description="Compares the actual costs Public Works & Safety logged against the estimate. Any overage comes out of the deposit; what is left is refunded, or a final bill is issued for the rest. The case then closes."
       />
       <PanelBody>
-        {!check.ok ? <InlineAlert variant="warning">{check.reason}</InlineAlert> : <InlineAlert variant="info">The Conditions and fees tab will show the actual figures once this is done.</InlineAlert>}
+        {!check.ok ? <InlineAlert variant="warning">{check.reason}</InlineAlert> : <CloseoutSettlementStats c={c} />}
       </PanelBody>
       <PanelActions error={error} onCancel={onClose} submitLabel="Reconcile and close" disabled={!check.ok} onSubmit={submit} />
     </>

@@ -2,12 +2,13 @@
  * Render tests for /city/active (workstream 3G), owned here along with lib/view/active.ts.
  * Mounted directly, as CityShell would show it to each of the three city roles.
  */
-import { act, screen, within } from "@testing-library/react";
+import { act, fireEvent, screen, within } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 import { ActiveScreen } from "@/components/active/ActiveScreen";
 import { routes } from "@/lib/routes";
 import { useDemo } from "@/lib/state";
 import { navigate, renderScreen, storedCase, switchRole } from "./harness";
+import { navState } from "./setup";
 
 const S2 = "PMT-27-0142"; // Sunrise Yoga Club: Instant series, Draft until booked (demo path 1)
 const S5_NAME = "Riverfront Summer 5K";
@@ -81,6 +82,72 @@ describe("Active permits: the shared list", () => {
     switchRole("pws");
 
     expect(screen.getByRole("columnheader", { name: "Work orders" })).toBeInTheDocument();
+  });
+});
+
+describe("Active permits: choosing a day", () => {
+  const dayButton = (name: RegExp) => within(screen.getByRole("list", { name: "Today and the next 7 days" })).getByRole("button", { name });
+
+  it("a day in the Today strip opens that day's map: never a click that changes nothing", async () => {
+    const { user } = await renderScreen(<ActiveScreen />, { role: "clerk", path: routes.city.active() });
+    expect(screen.getByRole("tab", { name: "List" })).toHaveAttribute("aria-selected", "true");
+
+    await user.click(dayButton(/^Sat, May 8/));
+
+    expect(navState.search.get("view")).toBe("map");
+    expect(navState.search.get("date")).toBe("2027-05-08");
+    expect(screen.getByRole("tab", { name: "Map" })).toHaveAttribute("aria-selected", "true");
+    expect(screen.getByText("Sat, May 8, 2027")).toBeInTheDocument();
+    // The strip marks the day the map is on.
+    expect(dayButton(/^Sat, May 8/)).toHaveAttribute("aria-pressed", "true");
+    expect(dayButton(/^Mon, May 3/)).toHaveAttribute("aria-pressed", "false");
+  });
+
+  it("the Map's date field goes straight to Jul 11, where the 5K's route is", async () => {
+    const { user } = await renderScreen(<ActiveScreen />, { role: "clerk", path: `${routes.city.active({ view: "map" })}&holds=1` });
+    expect(screen.queryAllByText(S5_NAME)).toHaveLength(0);
+
+    const field = screen.getByLabelText("Go to a date");
+    expect(field).toHaveValue("2027-05-03");
+    fireEvent.change(field, { target: { value: "2027-07-11" } });
+
+    expect(navState.search.get("date")).toBe("2027-07-11");
+    expect(screen.getByText("Sun, Jul 11, 2027")).toBeInTheDocument();
+    expect(screen.getAllByText(S5_NAME).length).toBeGreaterThan(0);
+    await user.click(screen.getByRole("button", { name: "Today" }));
+    expect(navState.search.get("date")).toBeNull();
+  });
+
+  it("a day clicked in the month grid is marked as the chosen one", async () => {
+    const { user } = await renderScreen(<ActiveScreen />, { role: "clerk", path: routes.city.active({ view: "calendar" }) });
+    const grid = screen.getByRole("tabpanel");
+
+    const eleventh = within(grid).getAllByRole("button", { name: "11" })[0];
+    expect(eleventh).toHaveAttribute("aria-pressed", "false");
+    await user.click(eleventh);
+
+    expect(navState.search.get("date")).toBe("2027-05-11");
+    const pressed = within(screen.getByRole("tabpanel")).getAllByRole("button", { pressed: true });
+    expect(pressed).toHaveLength(1);
+    expect(pressed[0]).toHaveTextContent("11");
+    expect(pressed[0].className).toContain("ring-2");
+  });
+});
+
+describe("Active permits: the role overlay's side panel", () => {
+  it("Health & Legal on the Calendar: 25 of 25 vendor permits, the active permits' own, not 25 of 52", async () => {
+    await renderScreen(<ActiveScreen />, { role: "hl", path: routes.city.active({ view: "calendar" }) });
+
+    expect(screen.getByText("25 of 25")).toBeInTheDocument();
+    expect(screen.queryByText("25 of 52")).not.toBeInTheDocument();
+  });
+
+  it("Public Works & Safety on the Map: the work orders of the permits on show", async () => {
+    await renderScreen(<ActiveScreen />, { role: "pws", path: routes.city.active({ view: "map" }) });
+
+    const panel = within(document.querySelector('[data-slot="sticky-aside"]') as HTMLElement);
+    expect(panel.getByText("Done").nextElementSibling).toHaveTextContent("7");
+    expect(panel.getByText("3 closures and 3 walkthroughs scheduled.")).toBeInTheDocument();
   });
 });
 

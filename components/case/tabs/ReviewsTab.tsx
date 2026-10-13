@@ -23,7 +23,7 @@ function ReviewsTab({ c, role, onOpen }: ReviewsTabProps) {
         <Section
           key={summary.dept}
           title={<ReviewStatusDot dept={summary.dept} status={summary.review?.status ?? "not_routed"} />}
-          description={summary.routed ? summary.review!.sections.join(", ") : "Not routed to this case."}
+          description={summary.routed ? summary.review!.sections.join(", ") : summary.dept === "clerk" ? "Nothing here for the City Clerk to review." : "Not routed to this case."}
           actions={
             summary.isOwn && summary.review && (summary.review.status === "pending" || summary.review.status === "needs_info") ? (
               <div className="flex items-center gap-2">
@@ -39,7 +39,11 @@ function ReviewsTab({ c, role, onOpen }: ReviewsTabProps) {
         >
           {!summary.routed ? (
             <p className="text-sm text-fg-secondary">
-              {c.ending ? "This case ended before it could be routed here." : "The City Clerk has not routed this case to this department."}
+              {summary.dept === "clerk"
+                ? "No license review on this case."
+                : c.ending
+                  ? "This case ended before it could be routed here."
+                  : "The City Clerk has not routed this case to this department."}
             </p>
           ) : (
             <div className="flex flex-col gap-4">

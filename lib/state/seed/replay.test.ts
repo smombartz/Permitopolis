@@ -43,13 +43,13 @@ describe("replayScripts", () => {
       { at: "2027-04-27T10:00", actor: "applicant", action: { type: "book_and_pay", method: "card" } },
     ]);
     expect(() => replayScripts([twice])).toThrow(
-      "Seed script T1 (PMT-27-9001): step 3, book_and_pay by applicant at 2027-04-27T10:00, was refused: This case is permitted.",
+      "Seed script T1 (PMT-27-9001): step 3, book_and_pay by applicant at 2027-04-27T10:00, was refused: Not available while the case is in Permitted.",
     );
     try {
       replayScripts([twice]);
     } catch (error) {
       expect(error).toBeInstanceOf(SeedReplayError);
-      expect(error).toMatchObject({ scriptKey: "T1", caseId: "PMT-27-9001", stepNumber: 3, reason: "This case is permitted." });
+      expect(error).toMatchObject({ scriptKey: "T1", caseId: "PMT-27-9001", stepNumber: 3, reason: "Not available while the case is in Permitted." });
     }
   });
 

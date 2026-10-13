@@ -807,11 +807,14 @@ describe("the demo paths that cross surfaces have a control for every step", () 
     await user.click(row.getByRole("button", { name: "Accept as complete" }));
     expect(storedCase(S4).dateHold.status).toBe("held");
 
-    // Routing is the Clerk's next task: its queue row opens the case with Confirm routing.
-    await user.click(screen.getByRole("link", { name: /^My queue/ }));
-    const routing = queueFor(useDemo.getState().cases, "clerk", useDemo.getState().demoToday).find((r) => r.case.id === S4)!;
-    await user.click(linkTo(routes.city.case(S4, { task: routing.task.id, from: routes.city.queue() })));
+    // Routing is the Clerk's next step, and accepting goes straight on to it: the case, with
+    // its date now held and Confirm routing open, and Intake to go back to.
+    expect(here()).toBe(routes.city.case(S4, { task: "confirm_routing", from: `${routes.city.intake()}?tab=reviewed` }));
+    expectRealScreen();
     expect(within(screen.getByRole("dialog")).getByRole("heading", { name: "Confirm routing" })).toBeInTheDocument();
+    // The same step is in My queue too, for a Clerk who comes back to it later.
+    const routing = queueFor(useDemo.getState().cases, "clerk", useDemo.getState().demoToday).find((r) => r.case.id === S4)!;
+    expect(routing.task.catalogId).toBe("confirm_routing");
     await user.click(panelButton("Confirm routing"));
     expect(storedCase(S4).state).toBe("in_review");
     expect(screen.getByText("Date held")).toBeInTheDocument();

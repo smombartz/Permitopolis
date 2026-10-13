@@ -120,7 +120,7 @@ function addOnsSummary(c: EventCase): string | null {
   if (a.amplifiedSound) items.push("Amplified sound");
   if (a.alcohol) items.push("Alcohol");
   if (a.foodVending) items.push(plural(a.foodVending.vendors, "food vendor"));
-  if (a.tentsStages) items.push(plural(a.tentsStages.count, "tent or stage"));
+  if (a.tentsStages) items.push(plural(a.tentsStages.count, "tent or stage", "tents or stages"));
   if (a.cookingGenerators) items.push("Cooking or generators");
   if (a.fireworksDrones) items.push("Fireworks or drones");
   if (a.admission) items.push("Admission charged");
@@ -163,9 +163,11 @@ export function buildOverview(c: EventCase, cfg: RulesConfig): OverviewData {
     { label: "Place", value: c.location?.label ?? null },
     { label: "Date and hours", value: sched ? `${fmtDate(sched.date)}, ${fmtTimeRange(sched.start, sched.end)}` : null },
     { label: "Setup and teardown", value: setupTeardownText(c) },
-    { label: "Sessions", value: seriesSummary(c) },
+    // A single event has no sessions to list: the row is left out, not shown as "Not provided".
+    ...(sched?.recurrence ? [{ label: "Sessions", value: seriesSummary(c) }] : []),
     { label: "Attendance", value: c.attendance !== null ? fmtNumber(c.attendance) : null },
-    { label: "Add-ons", value: addOnsSummary(c) },
+    // No add-ons is an answer ("None"), not a missing one.
+    { label: "Add-ons", value: addOnsSummary(c) ?? "None" },
   ];
   return { rows, triggers: c.triggers, components: classify(c, cfg).components, mapHighlight: mapHighlightFor(c) };
 }
@@ -301,6 +303,12 @@ function cityTaskAction(c: EventCase, task: Task): { action: ActionType; arg?: s
  * whoever holds it instead. Returns null when nothing is mapped (so the click is a no-op).
  */
 export function openKeyForTask(c: EventCase, task: Task, role: Party): string | null {
+  // A meeting card is the applicant's, but the city runs the meeting: the Clerk, or the
+  // department that holds it, sets its date and closes it once it has been held. Nobody else
+  // can finish the card, so without this it stays "Up now" for good.
+  if (task.owner === "applicant" && task.kind === "meeting" && task.status !== "done" && (role === "clerk" || role === task.reviewer)) {
+    return `${task.payload.scheduledFor ? "complete_city_task" : "schedule_meeting"}:${task.id}`;
+  }
   if (task.owner === "applicant") return "remind:applicant";
   if (task.owner !== role) return `remind:${task.owner}`;
   const mapped = cityTaskAction(c, task);

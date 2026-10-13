@@ -7,6 +7,7 @@ import { CARD_BY_ID, type CardSpec, type CatalogId } from "@/lib/rules/catalog";
 import { availability, occupiedWindow, occurrences } from "@/lib/rules";
 import type { RulesConfig, RulesCtx } from "@/lib/rules/types";
 import { daysBetween } from "@/lib/dates";
+import { fmtMonthDay } from "@/lib/format";
 import { applicantNameOf } from "@/lib/data/people";
 import type { CasesFilters, CasesView } from "@/lib/routes";
 import {
@@ -137,8 +138,8 @@ export function parseCasesFilters(search: URLSearchParams, role: Party): CasesLi
     tier: tier === "instant" || tier === "reviewed" || tier === "special" ? tier : undefined,
     state: isCaseStateOrOffPath(state) ? state : undefined,
     waiting: isWaitingValue(waiting) ? waiting : undefined,
-    from: search.get("from") || undefined,
-    to: search.get("to") || undefined,
+    from: isoDateParam(search.get("from")),
+    to: isoDateParam(search.get("to")),
     involvesMe: involvesParam === null ? defaultInvolvesMe(role) : involvesParam === "1",
     closedAndEnded: search.get("closed") === "1",
     q: search.get("q") ?? "",
@@ -146,6 +147,11 @@ export function parseCasesFilters(search: URLSearchParams, role: Party): CasesLi
     sort: SORT_FIELDS.includes(search.get("sort") as SortField) ? (search.get("sort") as SortField) : "event_date",
     dir: SORT_DIRS.includes(search.get("dir") as SortDir) ? (search.get("dir") as SortDir) : "asc",
   };
+}
+
+/** A date param is a date or nothing: anything else in the URL (a hand-edited link) is ignored, not shown. */
+function isoDateParam(value: string | null): ISODate | undefined {
+  return value !== null && /^\d{4}-\d{2}-\d{2}$/.test(value) && !Number.isNaN(Date.parse(value)) ? value : undefined;
 }
 
 function isCaseStateOrOffPath(value: string | null): value is CaseState | "off_path" {
@@ -228,12 +234,18 @@ export interface FilterChipView {
   label: string;
 }
 
+/** "Event date Jun 1 to Aug 1", "Event date from Jun 1", "Event date to Aug 1": never a raw ISO date. */
+function dateRangeLabel(from: ISODate | undefined, to: ISODate | undefined): string {
+  if (from && to) return `Event date ${fmtMonthDay(from)} to ${fmtMonthDay(to)}`;
+  return from ? `Event date from ${fmtMonthDay(from)}` : `Event date to ${fmtMonthDay(to!)}`;
+}
+
 export function activeFilterChips(filters: CasesListFilters): FilterChipView[] {
   const chips: FilterChipView[] = [];
   if (filters.tier) chips.push({ key: "tier", label: TIER_LABEL[filters.tier] });
   if (filters.state) chips.push({ key: "state", label: filters.state === "off_path" ? "Ended" : STATE_LABEL[filters.state] });
   if (filters.waiting) chips.push({ key: "waiting", label: `Waiting on ${filters.waiting === "me" ? "me" : PARTY_LABEL[filters.waiting]}` });
-  if (filters.from || filters.to) chips.push({ key: "dates", label: `Event date ${filters.from ?? "any"} – ${filters.to ?? "any"}` });
+  if (filters.from || filters.to) chips.push({ key: "dates", label: dateRangeLabel(filters.from, filters.to) });
   if (filters.q) chips.push({ key: "q", label: `"${filters.q}"` });
   return chips;
 }
@@ -246,14 +258,21 @@ export function activeFilterChips(filters: CasesListFilters): FilterChipView[] {
  * The board's columns for the cases it is given: the seven pipeline states, and Closed after
  * them once a closed case is among those shown (the "Closed and ended" toggle, or the Closed
  * state filter). An ended case sits in the state it ended in, so it needs no column of its own.
+ *
+ * With a State filter the board is that one column: every other column could only be empty,
+ * and at 1280px three columns fit, so "3 of 28 cases" stood over a row of "Nothing here" with
+ * the matches scrolled out of view. "Ended" keeps the columns that hold a case.
  */
-export function pipelineBoardStates(cases: EventCase[]): CaseState[] {
-  return cases.some((c) => c.state === "closed") ? [...PIPELINE_BOARD_STATES, "closed"] : PIPELINE_BOARD_STATES;
+export function pipelineBoardStates(cases: EventCase[], stateFilter?: CasesListFilters["state"]): CaseState[] {
+  const all: CaseState[] = cases.some((c) => c.state === "closed") ? [...PIPELINE_BOARD_STATES, "closed"] : PIPELINE_BOARD_STATES;
+  if (!stateFilter) return all;
+  if (stateFilter === "off_path") return all.filter((state) => cases.some((c) => c.state === state));
+  return [stateFilter];
 }
 
 /** One column per state, each already in event-date order. Columns with no case stay, empty. */
-export function pipelineBoardColumns(cases: EventCase[], today: ISODate): Record<CaseState, EventCase[]> {
-  const columns = Object.fromEntries(pipelineBoardStates(cases).map((s) => [s, [] as EventCase[]])) as Record<CaseState, EventCase[]>;
+export function pipelineBoardColumns(cases: EventCase[], today: ISODate, stateFilter?: CasesListFilters["state"]): Record<CaseState, EventCase[]> {
+  const columns = Object.fromEntries(pipelineBoardStates(cases, stateFilter).map((s) => [s, [] as EventCase[]])) as Record<CaseState, EventCase[]>;
   const sorted = [...cases].sort((a, b) => (eventDate(a, today) ?? "9999-12-31").localeCompare(eventDate(b, today) ?? "9999-12-31"));
   for (const c of sorted) {
     if (c.state in columns) columns[c.state as CaseState].push(c);

@@ -16,6 +16,7 @@ export type CalendarSubView = "month" | "week";
 
 interface ActiveCalendarViewProps {
   items: CalendarItem[];
+  /** The cases on show (the active permits, with held dates when that is on): what the side panel totals. */
   cases: EventCase[];
   today: ISODate;
   role: Dept;
@@ -72,9 +73,9 @@ export function ActiveCalendarView({ items, cases, today, role, date, onDateChan
         </div>
         <TierLegend aria-label="Calendar legend: tiers" />
         {subView === "month" ? (
-          <MonthGrid items={items} today={today} month={monthAnchor} onSelectItem={onSelectItem} onSelectDay={onDateChange} />
+          <MonthGrid items={items} today={today} month={monthAnchor} onSelectItem={onSelectItem} onSelectDay={onDateChange} selected={date} />
         ) : (
-          <WeekGrid items={items} today={today} weekStart={weekStart} onSelectItem={onSelectItem} onSelectDay={onDateChange} />
+          <WeekGrid items={items} today={today} weekStart={weekStart} onSelectItem={onSelectItem} onSelectDay={onDateChange} selected={date} />
         )}
       </div>
       <StickyAside>

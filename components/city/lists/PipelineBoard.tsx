@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { CountBadge } from "@/components/ui/count-badge";
-import { CaseId, EventTitle, StateChip, TierBadge, WaitingOnChips } from "@/components/domain";
+import { CaseId, DateText, EventTitle, StateChip, TierBadge, WaitingOnChips } from "@/components/domain";
 import { routes } from "@/lib/routes";
 import { fmtDaysToGo } from "@/lib/format";
 import { eventDate } from "@/lib/state";
@@ -21,9 +21,17 @@ function PipelineCard({ c, today, from }: { c: EventCase; today: ISODate; from: 
           <EventTitle name={c.name} applicantName={applicantNameOf(c)} className="flex-1" />
           <TierBadge tier={c.tier} />
         </div>
-        <div className="flex items-center justify-between gap-2 text-xs text-fg-secondary">
+        <div className="flex flex-wrap items-center justify-between gap-x-2 gap-y-0.5 text-xs text-fg-secondary">
           <CaseId id={c.id} />
-          {date ? <span>{fmtDaysToGo(date, today)}</span> : <span>No date yet</span>}
+          {date ? (
+            <span className="flex items-center gap-1.5">
+              <DateText date={date} short className="text-xs" />
+              <span aria-hidden="true">·</span>
+              <span>{fmtDaysToGo(date, today)}</span>
+            </span>
+          ) : (
+            <span>No date yet</span>
+          )}
         </div>
         {c.ending ? <StateChip state={c.state} ending={c.ending} /> : <WaitingOnChips items={waiting} emptyText="Nothing waiting" />}
       </Link>
@@ -32,7 +40,8 @@ function PipelineCard({ c, today, from }: { c: EventCase; today: ISODate; from: 
 }
 
 /**
- * One column per state; columns scroll independently and an empty one stays, with a count of 0.
+ * One column per state (one column only under a State filter: see pipelineBoardStates);
+ * columns scroll independently and an empty one stays, with a count of 0.
  * `from` is this list's own URL: a case opened from a card comes back to it.
  */
 function PipelineBoard({ columns, today, from }: { columns: Record<CaseState, EventCase[]>; today: ISODate; from: string }) {
@@ -41,7 +50,9 @@ function PipelineBoard({ columns, today, from }: { columns: Record<CaseState, Ev
       {(Object.keys(columns) as CaseState[]).map((state) => {
         const cases = columns[state];
         return (
-          <div key={state} className="flex w-72 shrink-0 flex-col gap-2 rounded-panel border border-line-subtle bg-surface-2 p-2">
+          // Flexible, so the seven states share the 932px a 1280px window leaves beside the
+          // sidebar (cards truncate); the row still scrolls sideways when they cannot.
+          <div key={state} data-state={state} className="flex min-w-44 flex-1 basis-0 flex-col gap-2 rounded-panel border border-line-subtle bg-surface-2 p-2">
             <div className="flex items-center justify-between gap-2 px-1 pt-1">
               <h3 className="text-eyebrow font-bold tracking-[.12em] text-fg-label uppercase">{STATE_LABEL[state]}</h3>
               <CountBadge count={cases.length} />

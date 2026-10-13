@@ -18,7 +18,11 @@ function LogCloseoutPanel({ caseId, onClose }: ActionPanelProps) {
   const lines = c?.feeLines.filter((l) => l.kind !== "deposit") ?? []
   const [cleanup, setCleanup] = React.useState<"pass" | "issues">("pass")
   const [notes, setNotes] = React.useState("")
-  const [qtyByLine, setQtyByLine] = React.useState<Record<string, string>>(() => Object.fromEntries(lines.map((l) => [l.id, String(l.qty)])))
+  // Each field starts at what is on the line now: the quantity already logged when there is one
+  // (reopened after logging, it must not show the estimate again under "Actual"), else the estimate.
+  const [qtyByLine, setQtyByLine] = React.useState<Record<string, string>>(() =>
+    Object.fromEntries(lines.map((l) => [l.id, String(l.actual !== null && l.unitPrice > 0 ? Math.round((l.actual / l.unitPrice) * 100) / 100 : l.qty)])),
+  )
   const [crewHours, setCrewHours] = React.useState("")
   const [error, setError] = React.useState<string | null>(null)
   const dispatch = useCaseDispatch(caseId)
@@ -27,7 +31,11 @@ function LogCloseoutPanel({ caseId, onClose }: ActionPanelProps) {
   const check = checkLogCloseout(c)
 
   function submit() {
-    const actuals = lines.map((l) => ({ feeLineId: l.id, qty: Number(qtyByLine[l.id] ?? l.qty) || 0 }))
+    // A cleared field is "not changed", as the description says: it is left out, and the engine
+    // keeps that line's estimate. It is never sent as 0.
+    const actuals = lines
+      .filter((l) => (qtyByLine[l.id] ?? "").trim() !== "" && Number.isFinite(Number(qtyByLine[l.id])))
+      .map((l) => ({ feeLineId: l.id, qty: Number(qtyByLine[l.id]) }))
     const hours = Number(crewHours) || 0
     const extraLines =
       hours > 0 ? [{ dept: "pws" as const, label: "Cleanup crew", qty: hours, unit: "hour", unitPrice: cfg.fees.cleanupCrewPerWorkerHour }] : []
@@ -38,7 +46,7 @@ function LogCloseoutPanel({ caseId, onClose }: ActionPanelProps) {
 
   return (
     <>
-      <PanelHeader title="Log closeout" description="Pass or flag the cleanup check, then log the actual quantity for every fee line. Anything left as is keeps its estimate." />
+      <PanelHeader title="Log closeout" description="Pass or flag the cleanup check, then log the actual quantity for every fee line. A line left as it is, or cleared, keeps its estimate." />
       <PanelBody>
         {!check.ok ? <InlineAlert variant="warning">{check.reason}</InlineAlert> : null}
         <fieldset className="flex flex-col gap-2">
@@ -81,6 +89,7 @@ function LogCloseoutPanel({ caseId, onClose }: ActionPanelProps) {
                   className="w-28"
                   aria-label={`Actual: ${line.label}`}
                   value={qtyByLine[line.id] ?? ""}
+                  disabled={!check.ok}
                   onChange={(e) => setQtyByLine((cur) => ({ ...cur, [line.id]: e.target.value }))}
                 />
               </div>

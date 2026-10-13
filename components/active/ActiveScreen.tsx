@@ -6,7 +6,7 @@ import { Label } from "@/components/ui/label";
 import { PageHeader } from "@/components/ui/page-header";
 import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { useDemo } from "@/lib/state";
+import { activePermits, useDemo } from "@/lib/state";
 import { routes, type ActiveView } from "@/lib/routes";
 import type { Dept, ISODate } from "@/lib/types";
 import { activeCalendarItems, activeListRows, activeMapHighlights, blackoutLabelOn, closeoutRows, todayLine } from "@/lib/view/active";
@@ -81,6 +81,12 @@ export function ActiveScreen() {
   const closeout = React.useMemo(() => closeoutRows(cases, today), [cases, today]);
   const headline = React.useMemo(() => todayLine(cases, today), [cases, today]);
   const blackoutLabel = blackoutLabelOn(date);
+  // What the role overlay's side panel totals: the permits on show, not every case in the store
+  // (drafts, applications in review and closed cases have no place in "25 of 25 verified").
+  const shown = React.useMemo(() => activePermits(cases, today, { includeHolds }), [cases, today, includeHolds]);
+  // A day in the strip opens that day's map: on the List and Closeout tabs a date changes
+  // nothing on screen, so there the click would be a dead one.
+  const openDay = React.useCallback((next: ISODate) => setParams({ date: next === today ? null : next, view: "map" }), [setParams, today]);
 
   return (
     <div className="flex flex-col gap-6">
@@ -98,7 +104,7 @@ export function ActiveScreen() {
         }
       />
 
-      <TodayStrip headline={headline} items={calendarItems} today={today} onSelectDay={setDate} onSelectCase={openCase} />
+      <TodayStrip headline={headline} items={calendarItems} today={today} onSelectDay={openDay} selected={view === "list" || view === "closeout" ? undefined : date} onSelectCase={openCase} />
 
       <Tabs value={view} onValueChange={(v) => setView(v as ActiveView)}>
         <TabsList>
@@ -123,7 +129,7 @@ export function ActiveScreen() {
         <TabsContent value="calendar" className="pt-4">
           <ActiveCalendarView
             items={calendarItems}
-            cases={cases}
+            cases={shown}
             today={today}
             role={role}
             date={date}
@@ -137,7 +143,7 @@ export function ActiveScreen() {
         <TabsContent value="map" className="pt-4">
           <ActiveMapView
             highlights={mapHighlights}
-            cases={cases}
+            cases={shown}
             today={today}
             role={role}
             date={date}

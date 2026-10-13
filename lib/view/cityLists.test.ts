@@ -27,6 +27,8 @@ import {
 
 const TODAY = "2027-05-03";
 const CFG = DEFAULT_CONFIG;
+/** The Clerk's pipeline as it opens: no filter, Involves me off. */
+const CLERK_DEFAULTS: CasesListFilters = parseCasesFilters(new URLSearchParams(), "clerk");
 
 // Real seeded case ids (lib/state/seed/scenarios, lib/state/seed/background).
 const S3 = "PMT-27-0118"; // Jazz in the Plaza
@@ -47,13 +49,14 @@ function find(cases: EventCase[], id: string): EventCase {
 }
 
 describe("queueGroups and queueBriefing", () => {
-  it("City Clerk: 8 things, 1 overdue, 3 due this week", () => {
+  it("City Clerk: 8 things, 1 overdue, 7 for this week (3 dated, and 4 undated steps that have waited over a week)", () => {
     const groups = queueGroups(seed(), "clerk", TODAY);
     expect(groups.overdue).toHaveLength(1);
-    expect(groups.this_week).toHaveLength(3);
-    expect(groups.later).toHaveLength(4);
+    expect(groups.this_week).toHaveLength(7);
+    expect(groups.this_week.filter((item) => item.task.dueDate !== null)).toHaveLength(3);
+    expect(groups.later).toHaveLength(0);
     expect(queueTotal(groups)).toBe(8);
-    expect(queueBriefing(groups)).toBe("8 things need you: 1 overdue, 3 due this week.");
+    expect(queueBriefing(groups)).toBe("8 things need you: 1 overdue, 7 due this week.");
   });
 
   it("Public Works & Safety: 7 things, 1 overdue, 3 due this week", () => {
@@ -119,6 +122,46 @@ describe("pipeline board columns", () => {
   it("empty columns stay, as an empty array", () => {
     const columns = pipelineBoardColumns([], TODAY);
     expect(columns.in_review).toEqual([]);
+  });
+
+  it("a State filter leaves that one column: the matches are never off-screen behind empty ones", () => {
+    for (const state of ["quote_sent", "permitted", "event_day", "closeout", "closed"] as const) {
+      const shown = filteredCases(seed(), "clerk", { ...CLERK_DEFAULTS, state }, TODAY);
+      const columns = pipelineBoardColumns(shown, TODAY, state);
+      expect(Object.keys(columns), state).toEqual([state]);
+      expect(columns[state]).toHaveLength(shown.length);
+    }
+    // A state with no case right now is still its own, empty, column.
+    expect(Object.keys(pipelineBoardColumns([], TODAY, "event_day"))).toEqual(["event_day"]);
+  });
+
+  it("the Ended filter keeps only the columns that hold an ended case", () => {
+    const ended = filteredCases(seed(), "clerk", { ...CLERK_DEFAULTS, state: "off_path" }, TODAY);
+    expect(ended.length).toBeGreaterThan(0);
+    const columns = pipelineBoardColumns(ended, TODAY, "off_path");
+    expect(Object.keys(columns).length).toBeGreaterThan(0);
+    for (const cases of Object.values(columns)) expect(cases.length).toBeGreaterThan(0);
+    expect(Object.values(columns).flat()).toHaveLength(ended.length);
+  });
+});
+
+describe("date filters in the URL", () => {
+  it("a from or to that is not a date is ignored, so it can never reach a date formatter", () => {
+    const parsed = parseCasesFilters(new URLSearchParams("from=/city/cases&to=soon"), "clerk");
+    expect(parsed.from).toBeUndefined();
+    expect(parsed.to).toBeUndefined();
+    expect(activeFilterChips(parsed)).toEqual([]);
+    expect(parseCasesFilters(new URLSearchParams("from=2027-06-01&to=2027-13-45"), "clerk")).toMatchObject({ from: "2027-06-01", to: undefined });
+  });
+});
+
+describe("filter chips", () => {
+  it("the date range reads as dates, never as raw ISO strings", () => {
+    const label = (from?: string, to?: string) => activeFilterChips({ ...CLERK_DEFAULTS, from, to }).find((chip) => chip.key === "dates")?.label;
+    expect(label("2027-06-01", "2027-08-01")).toBe("Event date Jun 1 to Aug 1");
+    expect(label("2027-06-01", undefined)).toBe("Event date from Jun 1");
+    expect(label(undefined, "2027-08-01")).toBe("Event date to Aug 1");
+    expect(label(undefined, undefined)).toBeUndefined();
   });
 });
 

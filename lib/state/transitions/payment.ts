@@ -11,7 +11,7 @@ import { maybeUnlockIssuePermit } from "./shared";
 type PayAction = Extract<Action, { type: "pay" }>;
 
 export function pay(c: EventCase, action: PayAction, actor: Actor, ctx: RulesCtx): TransitionResult {
-  const check = checkPay(c, action);
+  const check = checkPay(c, action, ctx.cfg);
   if (!check.ok) return check;
 
   let next: EventCase = {

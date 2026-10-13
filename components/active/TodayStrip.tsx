@@ -9,11 +9,13 @@ interface TodayStripProps {
   items: CalendarItem[];
   today: ISODate;
   onSelectDay: (date: ISODate) => void;
+  /** The day the views below are on, marked in the strip. */
+  selected?: ISODate;
   onSelectCase: (caseId: string) => void;
 }
 
 /** Today in words, then the next 7 days, each with its own events (PRD "Active permits"). */
-export function TodayStrip({ headline, items, today, onSelectDay, onSelectCase }: TodayStripProps) {
+export function TodayStrip({ headline, items, today, onSelectDay, selected, onSelectCase }: TodayStripProps) {
   function onSelectItem(id: string) {
     const [caseId] = id.split(":");
     onSelectCase(caseId);
@@ -22,7 +24,7 @@ export function TodayStrip({ headline, items, today, onSelectDay, onSelectCase }
   return (
     <div className="flex flex-col gap-2">
       <p className="text-sm font-semibold text-fg">{headline}</p>
-      <DayStrip items={items} today={today} onSelectDay={onSelectDay} onSelectItem={onSelectItem} />
+      <DayStrip items={items} today={today} onSelectDay={onSelectDay} selected={selected} onSelectItem={onSelectItem} />
     </div>
   );
 }

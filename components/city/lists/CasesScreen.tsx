@@ -32,6 +32,8 @@ const SELECT_CLASS = "h-8 shrink-0 rounded-control border border-line-subtle bg-
 const TIER_OPTIONS: Tier[] = ["instant", "reviewed", "special"];
 const STATE_OPTIONS: CaseState[] = ["submitted", "in_review", "needs_info", "quote_sent", "permitted", "event_day", "closeout", "closed"];
 const WAITING_OPTIONS: ("me" | Party)[] = ["me", "applicant", "clerk", "pws", "hl"];
+/** How long the search box waits after the last key before it writes the URL. */
+const SEARCH_URL_DELAY_MS = 200;
 
 /** /city/cases: Board and Table views of the same filtered cases, all state in the URL. */
 function CasesScreen() {
@@ -44,9 +46,33 @@ function CasesScreen() {
   const search = useSearchParams();
   const containerRef = React.useRef<HTMLDivElement>(null);
 
-  const filters = parseCasesFilters(search, role);
-  // A case opened from here comes back to this list as it is: view, filters and sort.
-  const query = search.toString();
+  const urlFilters = parseCasesFilters(search, role);
+  // The search text lives here, not in the URL. A router.replace() is a transition (an RSC round
+  // trip under `next dev`), so an input drawn from the URL is put back to its old value after
+  // every key until the navigation commits: letters drop and the caret jumps. The field and the
+  // list follow this state at once; the URL is written after a pause in the typing.
+  const [q, setQ] = React.useState(urlFilters.q);
+  // The URL's own q as last seen, and every q this screen has written there and not yet seen
+  // come back (two writes can be in flight). A URL q that is neither came from outside (Back, a
+  // link), and the field takes it.
+  const [seenUrlQ, setSeenUrlQ] = React.useState(urlFilters.q);
+  const [sentQs, setSentQs] = React.useState<string[]>([]);
+  if (urlFilters.q !== seenUrlQ) {
+    setSeenUrlQ(urlFilters.q);
+    const arrived = sentQs.lastIndexOf(urlFilters.q);
+    if (arrived >= 0) {
+      setSentQs(sentQs.slice(arrived));
+    } else {
+      setSentQs([]);
+      setQ(urlFilters.q);
+    }
+  }
+  const filters: CasesListFilters = { ...urlFilters, q };
+  const searchTimer = React.useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // A case opened from here comes back to this list as it is: view, filters and sort, with
+  // the search as typed even if the URL has not caught up with it yet.
+  const query = casesQueryString(filters, role);
   const here = query ? `${pathname}?${query}` : pathname;
 
   React.useEffect(() => {
@@ -65,8 +91,37 @@ function CasesScreen() {
   }, []);
 
   function update(patch: Partial<CasesListFilters>) {
-    const qs = casesQueryString({ ...filters, ...patch }, role);
+    if (searchTimer.current) {
+      clearTimeout(searchTimer.current);
+      searchTimer.current = null;
+    }
+    const next = { ...filters, ...patch };
+    if (patch.q !== undefined) setQ(patch.q);
+    // A write that leaves the URL's q as it is, with none on its way, has nothing to wait for.
+    setSentQs((sent) => (sent.length === 0 && next.q === urlFilters.q ? sent : [...sent, next.q]));
+    const qs = casesQueryString(next, role);
     router.replace(qs ? `${pathname}?${qs}` : pathname);
+  }
+
+  // The newest `update`, for the timer below: it must write the filters as they are when it
+  // fires, not as they were when the key was pressed.
+  const updateRef = React.useRef(update);
+  React.useEffect(() => {
+    updateRef.current = update;
+  });
+  React.useEffect(() => {
+    return () => {
+      if (searchTimer.current) clearTimeout(searchTimer.current);
+    };
+  }, []);
+
+  function handleSearch(value: string) {
+    setQ(value);
+    if (searchTimer.current) clearTimeout(searchTimer.current);
+    searchTimer.current = setTimeout(() => {
+      searchTimer.current = null;
+      updateRef.current({});
+    }, SEARCH_URL_DELAY_MS);
   }
 
   function handleSort(field: SortField) {
@@ -90,7 +145,7 @@ function CasesScreen() {
   const universe = filteredCases(cases, role, { ...filters, tier: undefined, state: undefined, waiting: undefined, from: undefined, to: undefined, q: "", involvesMe: false }, today);
   const chips = activeFilterChips(filters);
   const rows = sortTableRows(pipelineTableRows(visible, today, cfg), filters.sort, filters.dir, today);
-  const columns = pipelineBoardColumns(visible, today);
+  const columns = pipelineBoardColumns(visible, today, filters.state);
 
   return (
     <div ref={containerRef} className="flex flex-col gap-6">
@@ -100,7 +155,7 @@ function CasesScreen() {
         {visible.length} of {universe.length} cases
       </p>
 
-      <FilterBar searchValue={filters.q} onSearchChange={(value) => update({ q: value })} searchPlaceholder="Search cases" searchShortcut="/" onClear={clearFilters}>
+      <FilterBar searchValue={q} onSearchChange={handleSearch} searchPlaceholder="Search cases" searchShortcut="/" onClear={clearFilters}>
         <FilterChip active={filters.involvesMe} onClick={() => update({ involvesMe: !filters.involvesMe })}>
           Involves me
         </FilterChip>

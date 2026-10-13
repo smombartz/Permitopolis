@@ -110,7 +110,8 @@ describe("WizardScreen: a new applicant watches the tier move (demo path 2)", ()
     await user.clear(attendance);
     await user.type(attendance, "1200");
     expect(panel().getByText("Special event")).toBeInTheDocument();
-  });
+    // Some forty interactions: more than the default 5s when the whole suite runs in parallel.
+  }, 30_000);
 });
 
 describe("WizardScreen: availability and the lead-time gate", () => {

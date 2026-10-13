@@ -320,3 +320,14 @@ describe("scope: what each party covers on the case", () => {
     expect(scope.clerk).toBe("Intake, routing, quote, permit and closeout");
   });
 });
+
+describe("nextMove: a case that has ended", () => {
+  it("says how it ended as a sentence, not as the raw ending", () => {
+    const sentence = (ending: "withdrawn" | "denied" | "cancelled" | "hold_expired") => nextMove(makeCase({ state: "in_review", ending, endingReason: "" }), "2027-05-03");
+    expect(sentence("withdrawn")).toBe("Next: nothing further; this case was withdrawn.");
+    expect(sentence("denied")).toBe("Next: nothing further; this case was denied.");
+    expect(sentence("cancelled")).toBe("Next: nothing further; this case was cancelled.");
+    // Never "this case is hold expired."
+    expect(sentence("hold_expired")).toBe("Next: nothing further; this case lost its date hold.");
+  });
+});

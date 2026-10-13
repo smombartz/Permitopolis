@@ -15,7 +15,9 @@ import type { ActionPanelProps } from "../types"
 /** What is owed right now, and the label for it: the quote, the next session, or the final bill. */
 function paymentAsk(c: EventCase, cfg: RulesConfig) {
   if (c.state === "quote_sent") {
-    return { kind: "quote" as Payment["kind"], label: "Quote balance", amount: quoteBalance(c, cfg) }
+    // A quote already paid in full has nothing to take (the engine refuses it too).
+    const balance = quoteBalance(c, cfg)
+    return balance > 0 ? { kind: "quote" as Payment["kind"], label: "Quote balance", amount: balance } : null
   }
   if (c.state === "permitted" || c.state === "event_day") {
     const occurrenceDate = nextUnpaidSession(c)

@@ -192,6 +192,18 @@ describe("confirm_routing: the list the Clerk confirms", () => {
     expect(result).toEqual({ ok: false, reason: "Health & Legal is on the list twice; route each department once." });
   });
 
+  it("refuses a reviewer with no due date: the review's allowance would be NaN (\"Day 0 of NaN\")", () => {
+    const result = transition(accepted(), { type: "confirm_routing", reviewers: [{ ...hl, dueDate: "" }] }, "clerk", makeCtx());
+    expect(result).toEqual({ ok: false, reason: "Give Health & Legal a due date." });
+  });
+
+  it("refuses a due date that has already passed; today is the earliest", () => {
+    const yesterday = transition(accepted(), { type: "confirm_routing", reviewers: [{ ...hl, dueDate: "2027-05-02" }] }, "clerk", makeCtx());
+    expect(yesterday).toEqual({ ok: false, reason: "Health & Legal's due date has passed; choose today or later." });
+    const today = transition(accepted(), { type: "confirm_routing", reviewers: [{ ...hl, dueDate: "2027-05-03" }] }, "clerk", makeCtx());
+    expect(today.ok && today.case.reviews[0].clock.allowedDays).toBe(0);
+  });
+
   it("a list with each department once goes through", () => {
     const result = transition(accepted(), { type: "confirm_routing", reviewers: [{ dept: "pws", sections: ["Sound details"], dueDate: "2027-05-17" }, hl] }, "clerk", makeCtx());
     expect(result.ok && result.case.reviews.map((r) => r.dept)).toEqual(["pws", "hl"]);

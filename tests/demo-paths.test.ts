@@ -192,7 +192,7 @@ describe("Path 1 · Instant in two minutes (S2)", () => {
     expect(booked.activity.at(-1)?.text).toBe("Paid $20 and booked the date. The permit is issued.");
     expect(up(S2)).toEqual([]);
     // Paying twice is refused.
-    expect(refusal(S2, { type: "book_and_pay", method: "card" })).toBe("This case is permitted.");
+    expect(refusal(S2, { type: "book_and_pay", method: "card" })).toBe("Not available while the case is in Permitted.");
     // The other twelve sessions are paid one at a time: the next one has its own control.
     expect(availableActions(booked, "applicant", ctx()).map((a) => [a.type, a.label, a.enabled])).toEqual([
       ["pay", "Pay the next session", true],

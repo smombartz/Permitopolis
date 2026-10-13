@@ -1,9 +1,10 @@
-import { act, screen, within } from "@testing-library/react";
+import { act, fireEvent, screen, within } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 import { CaseDetailScreen } from "@/components/case/CaseDetailScreen";
 import { routes } from "@/lib/routes";
 import { DEFAULT_DEMO_TODAY } from "@/lib/rules/config";
-import { nextMove, useDemo } from "@/lib/state";
+import { fmtMoney } from "@/lib/format";
+import { closeoutSettlement, nextMove, useDemo } from "@/lib/state";
 import { makeCase } from "@/lib/state/testSupport";
 import { navigate, renderScreen, storedCase, switchRole } from "./harness";
 
@@ -12,6 +13,7 @@ const S3 = "PMT-27-0118"; // Jazz in the Plaza, Needs info
 const S4 = "PMT-27-0126"; // Maple Street block party, Submitted
 const S5 = "PMT-27-0097"; // Riverfront Summer 5K, Quote sent
 const S6 = "PMT-27-0031"; // Main Street Food Truck Festival, Closeout
+const F1 = "PMT-27-0121"; // Downtown Art Walk, Submitted and ready to accept
 
 /** The sheet's own submit button, scoped away from the sticky panel's row of the same label. */
 function sheetButton(name: string) {
@@ -166,6 +168,162 @@ describe("case detail: S6, closeout", () => {
     const closed = storedCase(S6);
     expect(closed.state).toBe("closed");
     expect(closed.closeout).toMatchObject({ balance: 750, refund: 250 });
+  });
+});
+
+describe("case detail: S6 once the hours are in", () => {
+  async function logHours() {
+    const view = await renderScreen(<CaseDetailScreen />, { path: routes.city.case(S6), role: "pws" });
+    const { user } = view;
+    await user.click(screen.getByRole("button", { name: "Log closeout" }));
+    const policeInput = screen.getByRole("spinbutton", { name: "Actual: Police" });
+    await user.clear(policeInput);
+    await user.type(policeInput, "72");
+    await user.type(screen.getByRole("spinbutton", { name: /Cleanup crew hours/ }), "4");
+    await user.click(sheetButton("Log closeout"));
+    return view;
+  }
+
+  const statValue = (scope: HTMLElement, label: string) => within(scope).getByText(label).nextElementSibling;
+
+  it("Log closeout is taken once: the row is disabled and says the Clerk has the case, with no dead review row above it", async () => {
+    await logHours();
+
+    expect(screen.getByRole("button", { name: "Log closeout" })).toBeDisabled();
+    expect(screen.getByText("Hours were logged on Mon, May 3, 2027; the City Clerk is reconciling.")).toBeInTheDocument();
+    // Public Works & Safety approved weeks ago: nothing left to decide.
+    expect(screen.queryByRole("button", { name: "Decide your review" })).not.toBeInTheDocument();
+    expect(storedCase(S6).feeLines.filter((l) => l.label === "Cleanup crew")).toHaveLength(1);
+  });
+
+  it("a line whose field is cleared keeps its estimate: it is never logged as 0", async () => {
+    const { user } = await renderScreen(<CaseDetailScreen />, { path: routes.city.case(S6), role: "pws" });
+    await user.click(screen.getByRole("button", { name: "Log closeout" }));
+    await user.clear(screen.getByRole("spinbutton", { name: "Actual: Police" }));
+    await user.click(sheetButton("Log closeout"));
+
+    const police = storedCase(S6).feeLines.find((l) => l.label === "Police")!;
+    expect(police.actual).toBe(police.estimate);
+  });
+
+  it("the Conditions and fees tab says how it settles ($750 over, from the deposit, $250 back), not \"Due $750\"", async () => {
+    await logHours();
+    switchRole("clerk");
+    navigate(routes.city.case(S6, { tab: "conditions" }));
+
+    const tab = screen.getByRole("tabpanel");
+    expect(statValue(tab, "Over estimate")).toHaveTextContent("$750");
+    expect(statValue(tab, "From deposit")).toHaveTextContent("$750");
+    expect(statValue(tab, "Refund")).toHaveTextContent("$250");
+    expect(statValue(tab, "Deposit held")).toHaveTextContent("$1,000");
+    expect(within(tab).queryByText("Due")).not.toBeInTheDocument();
+  });
+
+  it("the Reconcile and close panel shows the same three figures above its button, and then does exactly that", async () => {
+    const { user } = await logHours();
+    switchRole("clerk");
+    navigate(routes.city.case(S6));
+
+    await user.click(screen.getByRole("button", { name: "Reconcile and close" }));
+    const sheet = screen.getByRole("dialog");
+    expect(statValue(sheet, "Over estimate")).toHaveTextContent("$750");
+    expect(statValue(sheet, "From deposit")).toHaveTextContent("$750");
+    expect(statValue(sheet, "Refund")).toHaveTextContent("$250");
+    expect(within(sheet).queryByText(/will show the actual figures/)).not.toBeInTheDocument();
+
+    await user.click(sheetButton("Reconcile and close"));
+    expect(storedCase(S6).closeout).toMatchObject({ balance: 750, refund: 250 });
+    expect(storedCase(S6).payments.at(-1)).toMatchObject({ kind: "refund", amount: -250 });
+  });
+
+  it("a seeded case already in Closeout with its hours in (PMT-27-0038) opens on its settlement, not on an amount due", async () => {
+    await renderScreen(<CaseDetailScreen />, { path: routes.city.case("PMT-27-0038", { tab: "conditions" }), role: "clerk" });
+
+    const settlement = closeoutSettlement(storedCase("PMT-27-0038"));
+    expect(settlement.bill).toBeNull();
+    const tab = screen.getByRole("tabpanel");
+    expect(statValue(tab, "From deposit")).toHaveTextContent(fmtMoney(settlement.fromDeposit));
+    expect(statValue(tab, "Refund")).toHaveTextContent(fmtMoney(settlement.refund!));
+    expect(within(tab).queryByText("Due")).not.toBeInTheDocument();
+  });
+});
+
+describe("case detail: an action that can no longer be taken says why", () => {
+  const actions = () => within(screen.getByLabelText("Your actions"));
+
+  it("S3 in Needs info: the Clerk's Send quote names whose answer it waits for", async () => {
+    await renderScreen(<CaseDetailScreen />, { path: routes.city.case(S3), role: "clerk" });
+
+    expect(actions().getByRole("button", { name: "Send quote" })).toBeDisabled();
+    expect(actions().getByText("Waiting on the applicant's response to Health & Legal's request.")).toBeInTheDocument();
+    expect(actions().queryByText(/This case is/)).not.toBeInTheDocument();
+  });
+
+  it("a case asked for information at intake (PMT-27-0020) keeps the intake actions", async () => {
+    await renderScreen(<CaseDetailScreen />, { path: routes.city.case("PMT-27-0020"), role: "clerk" });
+
+    expect(actions().getByRole("button", { name: "Accept as complete" })).toBeDisabled();
+    expect(actions().getByText("Waiting on the applicant's response to your request")).toBeInTheDocument();
+    expect(actions().queryByRole("button", { name: "Send quote" })).not.toBeInTheDocument();
+    expect(actions().queryByRole("button", { name: "Send to commission" })).not.toBeInTheDocument();
+    expect(actions().getByRole("button", { name: "Request information" })).toBeEnabled();
+  });
+
+  it("a quote already paid in full (PMT-27-0024): Record an in-person payment is disabled and says so", async () => {
+    await renderScreen(<CaseDetailScreen />, { path: routes.city.case("PMT-27-0024"), role: "clerk" });
+
+    expect(actions().getByRole("button", { name: "Record an in-person payment" })).toBeDisabled();
+    expect(actions().getByText("The quote is paid in full.")).toBeInTheDocument();
+  });
+
+  it("Send to commission is sent once", async () => {
+    const { user } = await renderScreen(<CaseDetailScreen />, { path: routes.city.case(S3), role: "clerk" });
+
+    await user.click(actions().getByRole("button", { name: "Send to commission" }));
+    await user.click(sheetButton("Send to commission"));
+    expect(storedCase(S3).flags.sentToCommission).toBe(true);
+
+    expect(actions().getByRole("button", { name: "Send to commission" })).toBeDisabled();
+    expect(actions().getByText("Already sent to commission.")).toBeInTheDocument();
+    expect(storedCase(S3).activity.filter((a) => /commission/i.test(a.text))).toHaveLength(1);
+  });
+});
+
+describe("case detail: Confirm routing needs a due date for every reviewer it routes", () => {
+  it("a cleared date, or one already passed, disables Confirm routing and says which row", async () => {
+    const { user } = await renderScreen(<CaseDetailScreen />, { path: routes.city.case(F1), role: "clerk" });
+    await user.click(screen.getByRole("button", { name: "Accept as complete" }));
+    await user.click(sheetButton("Accept as complete"));
+    await user.click(screen.getByRole("button", { name: "Confirm routing" }));
+
+    const sheet = within(screen.getByRole("dialog"));
+    expect(sheetButton("Confirm routing")).toBeEnabled();
+    const firstDate = sheet.getAllByLabelText("Due date")[0];
+
+    fireEvent.change(firstDate, { target: { value: "" } });
+    expect(sheet.getByText("Choose a due date.")).toBeInTheDocument();
+    expect(sheetButton("Confirm routing")).toBeDisabled();
+
+    fireEvent.change(firstDate, { target: { value: "2027-04-30" } });
+    expect(sheet.getByText("The due date has passed; choose today or later.")).toBeInTheDocument();
+    expect(sheetButton("Confirm routing")).toBeDisabled();
+
+    fireEvent.change(firstDate, { target: { value: "2027-05-24" } });
+    expect(sheetButton("Confirm routing")).toBeEnabled();
+    await user.click(sheetButton("Confirm routing"));
+    const routed = storedCase(F1);
+    expect(routed.state).toBe("in_review");
+    for (const review of routed.reviews) expect(Number.isFinite(review.clock.allowedDays)).toBe(true);
+  });
+});
+
+describe("case detail: the Reviews tab on a case the Clerk has no license review on", () => {
+  it("says so in the Clerk's own section, not that the Clerk has not routed the case to itself", async () => {
+    await renderScreen(<CaseDetailScreen />, { path: routes.city.case(S3, { tab: "reviews" }), role: "clerk" });
+
+    expect(storedCase(S3).reviews.some((r) => r.dept === "clerk")).toBe(false);
+    expect(screen.getByText("No license review on this case.")).toBeInTheDocument();
+    expect(screen.queryByText("The City Clerk has not routed this case to this department.")).not.toBeInTheDocument();
   });
 });
 

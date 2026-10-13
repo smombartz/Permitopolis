@@ -49,8 +49,14 @@ function IntakeScreen() {
 
   function accept(caseId: string) {
     const result = dispatch(caseId, { type: "accept_complete" });
-    if (!result.ok) toast.error(result.reason ?? "That could not be accepted.");
-    else toast.success("Accepted as complete; the date is held.");
+    if (!result.ok) {
+      toast.error(result.reason ?? "That could not be accepted.");
+      return;
+    }
+    toast.success("Accepted as complete; the date is held.");
+    // The row leaves this table, and what comes next is the Clerk's too: straight on to the
+    // case, where the header reads "Date held" and Confirm routing is open.
+    router.push(routes.city.case(caseId, { task: "confirm_routing", from: here }));
   }
 
   return (

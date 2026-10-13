@@ -237,7 +237,10 @@ export function logCloseout(c: EventCase, action: Extract_<"log_closeout">, acto
   const check = checkLogCloseout(c);
   if (!check.ok) return check;
   const actualsByLine = new Map(action.actuals.map((a) => [a.feeLineId, a.qty]));
-  const feeLines = c.feeLines.map((line) => {
+  // An extra line (cleanup crew hours) is one that was never estimated. Logging it again
+  // replaces it: the same label is never billed twice.
+  const extraLabels = new Set(action.extraLines.map((fl) => fl.label));
+  const feeLines = c.feeLines.filter((line) => !(line.estimate === 0 && line.kind !== "deposit" && extraLabels.has(line.label))).map((line) => {
     const qty = actualsByLine.get(line.id);
     return qty !== undefined ? { ...line, actual: lineAmount(qty, line.unitPrice) } : { ...line, actual: line.estimate };
   });

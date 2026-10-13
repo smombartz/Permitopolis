@@ -871,10 +871,12 @@ describe("each city role opens to work", () => {
       ["B04", "intake_check", "2027-05-03", "this_week"],
       ["F1", "intake_check", "2027-05-03", "this_week"],
       ["F5", "intake_check", "2027-05-04", "this_week"],
-      ["B06", "consolidate", null, "later"],
-      ["F7", "instant_exception", null, "later"],
-      ["B17", "reconcile", null, "later"],
-      ["B18", "reconcile", null, "later"],
+      // The Clerk's own steps carry no due date. One that has waited more than a week is this
+      // week's work, not "Later": the consolidation has waited 49 days, the reconciliations 12 and 21.
+      ["B06", "consolidate", null, "this_week"],
+      ["F7", "instant_exception", null, "this_week"],
+      ["B17", "reconcile", null, "this_week"],
+      ["B18", "reconcile", null, "this_week"],
     ]);
     expect(queued("clerk", seeded("F7")).map((item) => `${item.case.name}: ${item.task.title}`)).toEqual(["Brightline Logistics company picnic: Resolve the exception"]);
   });

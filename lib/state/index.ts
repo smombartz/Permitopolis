@@ -21,9 +21,11 @@ export {
   checkLogCloseout,
   checkReconcileClose,
   checkRequestInfo,
+  checkPay,
   checkReviewDecide,
   checkScheduleMeeting,
   checkSendQuote,
+  checkSendToCommission,
   checkVerifyOrReject,
   insideLeadTime,
   lateFeeApplies,
@@ -42,6 +44,7 @@ export {
   boardColumn,
   boardColumns,
   caseTotals,
+  closeoutSettlement,
   daysUntilEvent,
   eventDate,
   hasActivePermit,
@@ -58,6 +61,7 @@ export {
   waitingOnOthers,
   whoIsUp,
   type CancelRefund,
+  type CloseoutSettlement,
 } from "./selectors";
 export { demoToday, hydrateDemoStore, resetDemoStoreForTests, useDemo, useHydrated } from "./store";
 export { transition } from "./transition";

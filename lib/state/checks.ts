@@ -9,11 +9,11 @@ import { fmtDate, plural } from "@/lib/format";
 import { availability as availabilityRule, occupiedWindow, occurrences } from "@/lib/rules";
 import { CARD_BY_ID, type CardSpec } from "@/lib/rules/catalog";
 import { tier as higherTier } from "@/lib/rules/shared";
-import { PARTY_LABEL, type Actor, type Availability, type Dept } from "@/lib/types";
-import type { EventCase, Task } from "@/lib/types";
-import type { RulesCtx } from "@/lib/rules/types";
+import { PARTY_LABEL, STATE_LABEL, type Actor, type Availability, type Dept } from "@/lib/types";
+import type { EventCase, ISODate, Task } from "@/lib/types";
+import type { RulesConfig, RulesCtx } from "@/lib/rules/types";
 import type { ActionType, RoutedReviewer } from "./actions";
-import { findTask, idSuffix, preSubmitCardsIn, quotePaid, reviewFor, signoffsLeft, taskId } from "./core";
+import { findTask, idSuffix, preSubmitCardsIn, quoteBalance, quotePaid, reviewFor, signoffsLeft, taskId } from "./core";
 
 function unlockHintFor(catalogId: string): string | undefined {
   return (CARD_BY_ID as Record<string, CardSpec>)[catalogId]?.unlockHint;
@@ -137,8 +137,14 @@ export function requireOpen(c: EventCase): CheckResult {
 export function requireState(c: EventCase, ...states: EventCase["state"][]): CheckResult {
   const open = requireOpen(c);
   if (!open.ok) return open;
-  if (!states.includes(c.state)) return fail(`This case is ${c.state.replace("_", " ")}.`);
+  // A sentence a person can read under a disabled button: "…in Needs info", not "is needs info".
+  if (!states.includes(c.state)) return fail(`Not available while the case is in ${STATE_LABEL[c.state]}.`);
   return OK;
+}
+
+/** The department whose request the applicant has still to answer, if any (the first one asked). */
+function openRequestFrom(c: EventCase): Dept | undefined {
+  return c.tasks.find((t) => t.request && !t.request.resolved)?.request?.from;
 }
 
 export function checkCreateBoard(c: EventCase): CheckResult {
@@ -214,6 +220,10 @@ export function checkSubmit(c: EventCase, ctx: RulesCtx): CheckResult {
 }
 
 export function checkAcceptComplete(c: EventCase, ctx: RulesCtx): CheckResult {
+  // Asked for information at intake: the application comes back to Submitted when it is answered.
+  if (!c.ending && c.state === "needs_info" && !c.flags.acceptedComplete && openRequestFrom(c) === "clerk") {
+    return fail("Waiting on the applicant's response to your request");
+  }
   const state = requireState(c, "submitted");
   if (!state.ok) return state;
   if (c.flags.acceptedComplete) return fail("Already accepted as complete.");
@@ -230,8 +240,9 @@ export function checkAcceptComplete(c: EventCase, ctx: RulesCtx): CheckResult {
  * `reviewers` is the list the Clerk confirms; availableActions() leaves it out, since the
  * panel has not been filled in yet. Routing nobody would move the case to In review with no
  * review to wait for, and routing a department twice would give it two reviews of one case.
+ * Every reviewer needs a due date, on or after `today` (the day of routing) when that is given.
  */
-export function checkConfirmRouting(c: EventCase, reviewers?: RoutedReviewer[]): CheckResult {
+export function checkConfirmRouting(c: EventCase, reviewers?: RoutedReviewer[], today?: ISODate): CheckResult {
   const state = requireState(c, "submitted");
   if (!state.ok) return state;
   if (!c.flags.acceptedComplete) return fail("Accept the application as complete first.");
@@ -241,6 +252,11 @@ export function checkConfirmRouting(c: EventCase, reviewers?: RoutedReviewer[]):
     if (reviewers.length === 0) return fail("Choose at least one reviewer.");
     const twice = reviewers.find((r, i) => reviewers.findIndex((other) => other.dept === r.dept) !== i);
     if (twice) return fail(`${PARTY_LABEL[twice.dept]} is on the list twice; route each department once.`);
+    // The due date is the review's allowance (days from routing): none gives "Day 0 of NaN".
+    const undated = reviewers.find((r) => !/^\d{4}-\d{2}-\d{2}$/.test(r.dueDate ?? ""));
+    if (undated) return fail(`Give ${PARTY_LABEL[undated.dept]} a due date.`);
+    const past = today ? reviewers.find((r) => r.dueDate < today) : undefined;
+    if (past) return fail(`${PARTY_LABEL[past.dept]}'s due date has passed; choose today or later.`);
   }
   return OK;
 }
@@ -253,7 +269,9 @@ export function checkConfirmRouting(c: EventCase, reviewers?: RoutedReviewer[]):
 export function checkRequestInfo(c: EventCase, actor: string, taskIdArg?: string): CheckResult {
   const open = requireOpen(c);
   if (!open.ok) return open;
-  const atIntake = c.state === "submitted" && actor === "clerk";
+  // Intake lasts until the application is accepted: a first request moves the case to Needs
+  // info, and the Clerk may still ask for something else while that one is out.
+  const atIntake = actor === "clerk" && (c.state === "submitted" || (c.state === "needs_info" && c.reviews.length === 0 && !c.flags.acceptedComplete));
   if (!atIntake) {
     const review = c.state === "in_review" || c.state === "needs_info" ? c.reviews.find((r) => r.dept === actor) : undefined;
     if (!review) return fail("Can't request information in this state.");
@@ -300,6 +318,11 @@ export function checkReviewDecide(c: EventCase, dept: Dept): CheckResult {
 }
 
 export function checkSendQuote(c: EventCase): CheckResult {
+  // In Needs info the quote waits for an answer: say whose request, not only the state.
+  if (!c.ending && c.state === "needs_info") {
+    const asker = openRequestFrom(c);
+    return fail(asker ? `Waiting on the applicant's response to ${PARTY_LABEL[asker]}'s request.` : "Waiting on the applicant's response.");
+  }
   const state = requireState(c, "in_review");
   if (!state.ok) return state;
   const denied = c.reviews.find((r) => r.status === "denied");
@@ -329,15 +352,19 @@ export interface PaymentAsk {
  * `pay` records three kinds of payment: toward a quote, for one session of a series, and for a
  * final bill, each in the state it belongs to. A booking payment and a refund are written by
  * the actions that cause them (book_and_pay; cancel, withdraw and reconcile_close), never
- * through `pay`. An ended case takes no payment at all.
+ * through `pay`. An ended case takes no payment at all, and neither does a quote that is already
+ * paid in full (`cfg` is what the balance is worked out with; transition() always passes it).
  */
-export function checkPay(c: EventCase, ask: PaymentAsk): CheckResult {
+export function checkPay(c: EventCase, ask: PaymentAsk, cfg?: RulesConfig): CheckResult {
   const open = requireOpen(c);
   if (!open.ok) return open;
   if (ask.amount !== undefined && !(ask.amount > 0)) return fail("Enter an amount above $0.");
   switch (ask.kind) {
     case "quote":
-      return c.state === "quote_sent" ? OK : fail("No quote to pay.");
+      if (c.state !== "quote_sent") return fail("No quote to pay.");
+      // A quote already covered has nothing left to take: no row for it, and no overpayment.
+      if (cfg && quoteBalance(c, cfg) <= 0) return fail("The quote is paid in full.");
+      return OK;
     case "session": {
       if (!c.schedule?.recurrence) return fail("Only a series is paid by session.");
       const occurrence = c.schedule.occurrences.find((o) => o.date === ask.occurrenceDate);
@@ -384,6 +411,9 @@ export function checkReconcileClose(c: EventCase): CheckResult {
 export function checkLogCloseout(c: EventCase): CheckResult {
   const open = requireOpen(c);
   if (!open.ok) return open;
+  // Logged once: a second log would write the estimates back over the actuals and add the
+  // extra lines again. From here the case is the Clerk's to reconcile.
+  if (c.closeout.hoursLoggedOn) return fail(`Hours were logged on ${fmtDate(c.closeout.hoursLoggedOn)}; the City Clerk is reconciling.`);
   if (c.state === "closeout") return OK;
   if (c.tier === "instant" && c.state === "event_day") return OK;
   return fail("Nothing to close out yet.");
@@ -447,7 +477,10 @@ export function checkAmendedDate(before: EventCase, amended: EventCase, ctx: Rul
 }
 
 export function checkSendToCommission(c: EventCase): CheckResult {
-  return requireState(c, "in_review", "needs_info");
+  const state = requireState(c, "in_review", "needs_info");
+  if (!state.ok) return state;
+  if (c.flags.sentToCommission) return fail("Already sent to commission.");
+  return OK;
 }
 
 /**

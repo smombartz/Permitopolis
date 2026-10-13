@@ -14,6 +14,7 @@ import {
   advanceClock,
   boardColumn,
   caseTotals,
+  closeoutSettlement,
   leadTimeRisk,
   newCase,
   nextMove,
@@ -256,6 +257,18 @@ describe("closeout (S6)", () => {
       "2027-05-03",
     );
     expect(task(c, "reconcile")?.status).toBe("todo");
+
+    // Logged once. A second log would put the estimate back over the 72 hours just logged and
+    // bill the cleanup crew twice ($480 due instead of $240), so the engine refuses it.
+    const loggedTwice = transition(
+      c,
+      { type: "log_closeout", cleanup: "pass", actuals: [], extraLines: [{ dept: "pws", label: "Cleanup crew", qty: 4, unit: "worker-hour", unitPrice: DEFAULT_CONFIG.fees.cleanupCrewPerWorkerHour }] },
+      "pws",
+      ctx("2027-05-03", [c]),
+    );
+    expect(loggedTwice).toEqual({ ok: false, reason: "Hours were logged on Mon, May 3, 2027; the City Clerk is reconciling." });
+    expect(c.feeLines.filter((line) => line.label === "Cleanup crew")).toHaveLength(1);
+    expect(closeoutSettlement(c)).toEqual({ over: 750, deposit: 1000, fromDeposit: 750, refund: 250, bill: null });
 
     c = run(c, { type: "reconcile_close" }, "clerk", "2027-05-03");
     expect(c.state).toBe("closed");

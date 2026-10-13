@@ -198,6 +198,14 @@ components. Start here, then read "How the engine behaves" for the engine's fine
   browser's Back would), `switchRole(role)`, `storedCase(id)`, and `prepareScreen(options)` with
   `flushHydration()` for a test that needs the page before the stored demo is read
   (`tests/render/hydration.test.tsx` renders the prerendered HTML that way).
+- **The mocked router is synchronous; the real one is not.** In the app `router.push()` and
+  `router.replace()` are transitions: the call returns at once and `useSearchParams()` catches up
+  later (after an RSC round trip under `next dev`). A screen that draws an input from the URL, or
+  decides "is there a draft" from it, or re-reads the case right after a payment, misbehaves in
+  that gap, and the mock hides it. `holdNavigation()` keeps the location where it is while pushes
+  and replaces are still recorded (`lastPush()`, `lastReplace()`); `releaseNavigation()`, inside
+  `act()`, lands on the last one. Use them for any state that is written to the URL as the user
+  types or clicks (the wizard's first keystrokes, the pipeline's search box, checkout after Pay).
 
   ```tsx
   // tests/render/case-detail.test.tsx
@@ -267,8 +275,9 @@ one in every state. Reach for these before writing markup of your own.
 | `TaskCard`, `StackedTaskCard` | The applicant board's cards. A card with an open request shows as pinned with the reviewer's message. Pass `unlockHint` for a locked card (the catalogue's `CARD_BY_ID[catalogId].unlockHint`); a locked card with a date shows it under the hint. Read off the task itself: "Scheduled for Mon, Jun 21" on a scheduled meeting, "Changes requested" with who sent it back and why (`payload.rejectedReason`), an "Amendment" chip (`tags`), and "Done Apr 21" from its history. `StackedTaskCard` is the "Vendor health permits · 25 of 25" stack |
 | `WhoIsUp` | The case detail's centerpiece, with its own "Who's up" heading (an `<h2>`; do not wrap it in a titled `Section`): `items={waitingOn(c, today)}`, `nextMove={nextMove(c, today, applicantName)}` and `applicantName`, shown under "Applicant". The parties that are up come first. It lists every open action with its due date (`onSelectTask` makes them buttons); a waiting party shows the task it waits to do over what it waits for ("Issue permit", "Unlocks when paid and verified") |
 | `WaitingOnChips`, `DeptStatusDots` | The compact forms for a table row: who is up, and each department's review status. `DeptStatusDots` pairs the department's icon with a glyph for the status and is one tab stop per row: focus or hover shows every department's status in words |
-| `FeeTable` | Fee lines by department with subtotal, deposit and total. `showActual` adds Actual and Difference for closeout |
-| `ConditionList` | Conditions by department. `editable` adds the "I accept" checkboxes for the quote |
+| `FeeTable` | Fee lines by department with subtotal, deposit and total. `showActual` adds Actual and Difference for closeout. `compact` is two columns (the line over "qty unit × price", and the amount) for a box narrower than about 430px: the wizard's result panel, and any screen below 640px (`useIsNarrow("(max-width: 639px)")`) |
+| `FormAnswers` | A card's form read back in words (`formRows()` in `lib/view/cardForms.ts`): the labels the applicant saw, Yes or No, 12-hour times, a list entry per line. Never print `task.payload.form` yourself |
+| `ConditionList` | Conditions by department. `editable` adds a checkbox per condition with a visible "I accept" label; its accessible name is "I accept: <the condition>" |
 | `ActivityTimeline` | The activity log; pass the items in the order to show, and `collapsedCount` for "Show all" |
 | `EndingBanner` | A case that ended: Withdrawn, Denied, Cancelled or Hold expired, with `case.endingReason` |
 | `EventTitle` | A list row's identity cell: event name over applicant name, both truncated |
@@ -285,6 +294,13 @@ one in every state. Reach for these before writing markup of your own.
   from the selector: `const rc = reviewClock(c, dept, today)`, then `{ dayCount: rc.day,
   allowedDays: rc.of, paused: rc.paused, pausedDays: rc.pausedDays }`. Pass `null` before routing.
 - `CaseHeader` takes `eventDate={eventDate(c, today)}`, which is null for a Draft with no date.
+  Pass `compactStepper={useIsNarrow()}`: below 768px the stepper is markers and the one current
+  label, since eight labels in a row need about 385px and cannot wrap.
+- A `Sheet` is a bottom sheet below 640px whatever its `side`. In `components/ui/sheet.tsx` the
+  left, right and top placement rules are `sm:`-scoped for that reason: a rule with a data
+  attribute outranks a plain `max-sm:` rule, so never add an unscoped `data-[side=...]:` one.
+- `MonthGrid`, `WeekGrid` and `DayStrip` take `selected` (a date): that day gets the indigo ring
+  and `aria-pressed`.
 - `PartyChip` is neutral now: the party's hue is on its avatar tile only.
 - `StateStepper compact` shows the current state's label under its dots.
 - A new raw `<button>` or link gets the system focus ring:
@@ -301,7 +317,8 @@ Every one is pure. Read cases, the date and the config from the store
 | Surface | Selectors |
 |---|---|
 | My events, board | `applicantCases(cases, personaId)`, `boardColumns(c)` (cards by column, Do now in the PRD's order), `boardColumn(task)`, `taskDueDate(task)`, `eventDate(c, today)`, `daysUntilEvent(c, today)`, `caseTotals(c)` |
-| My queue | `queueFor(cases, role, today)`: `{ case, task, group, daysWaiting }`, oldest due first; `waitingOnOthers(cases, role, today)` |
+| My queue | `queueFor(cases, role, today)`: `{ case, task, group, daysWaiting }`, oldest due first; `waitingOnOthers(cases, role, today)`. A task with no due date is `later` while fresh and `this_week` once it has been open more than seven days |
+| Money | `caseTotals(c)`; `dueAtQuote`, `quoteBalance`, `quotePaid` (the quote); `refundIfCancelled(c, today, cfg)`: `{ refund, deposit, rule, canCancel }`, what `cancel` pays back today; `closeoutSettlement(c)`: `{ over, deposit, fromDeposit, refund, bill }`, what `reconcile_close` does. Show these, never a sum of your own: each is the figure its transition uses |
 | Cases pipeline | `isVisibleToCity(c)`, `isOpen(c)`, `involves(c, role)`, `involvement(c, party)`, `whoIsUp(c, today)`, `leadTimeRisk(c, today, cfg)`, `reviewClock(c, dept, today)` |
 | Case detail | `waitingOn(c, today)`, `nextMove(c, today, applicantName)`, `availableActions(c, role, { today, cases, cfg })`, `actorsFor(type)` |
 | Active permits | `activePermits(cases, today, { includeHolds })`, `permitSessions(cases, { from, to, includeHolds })` (one entry per held session, for the calendar and map), `hasActivePermit(c)`, `holdsDateAtQuote(c)`, `sessionDates(c)`, `isSessionDate(c, date)`, `lastSessionDate(c)` |
@@ -566,6 +583,32 @@ Seven surfaces, each built on its own and then joined. Every one is a client scr
   Clerk (always "No log entries yet" until 6B builds the log).
 - **For later phases**: 5C's `/city/map` shows closures for a date range; this map shows one day.
 
+### What the Phase 3 review changed
+
+All 38 findings and what was done about each: `docs/plans/2026-10-13-phase-3-review-fixes.md`.
+What a later builder will run into:
+
+- **Wizard.** The step is the URL's, with or without a draft; a draft is created by the first
+  answer, never by Next. `WizardScreen` keeps the id of the draft it created until the URL has
+  it, and owns the tier-change announcement (`role="status"`) and highlight, since `ResultPanel`
+  is not mounted on a phone while its sheet is shut. `DateGateBanner` (the gate, its three fixes,
+  and "Remove the late fee" once the fee is chosen) is on steps 3 and 5. A date change goes
+  through `scheduleOnDate()`, which moves a series' weekday with it.
+- **Board card sheet.** A card the applicant no longer holds is read-only: a form is read back
+  with `FormAnswers`, an accepted document shows its file and "Replace this file" (armed only by
+  a new file, offered only while `checkCompleteTask` passes), and a payment, sign-off or permit
+  card shows `cardRecord()`: what was paid or signed, when, and a link.
+- **Checkout.** After a payment the screen shows "Booked and paid", "Session paid" or "Final
+  bill paid" until the next page arrives (`onPaid` from the panels to `CheckoutScreen`).
+- **Cases pipeline.** The search box keeps its text in local state and writes the URL 200 ms
+  after the last key; the list filters at once. Under a State filter the board is that one
+  column (`pipelineBoardColumns(cases, today, state)`). Table rows are rows again: the event's
+  name is the link, and the sorted column has `aria-sort`. A `from` or `to` in the URL that is
+  not a date is ignored.
+- **Active permits.** A day in the Today strip opens that day's map; the Map has a date field;
+  the role overlay's side panel totals `activePermits(cases, today, { includeHolds })`.
+- **Intake.** Accept as complete goes on to the case with Confirm routing open.
+
 ### What is still a placeholder
 
 `/events/[id]/amend` (5A; the board's menu already links to it), `/city/payments` (5B),
@@ -628,6 +671,19 @@ Things a screen builder needs to know that the type signatures do not say.
   `review_decide` for the Clerk's own license review, ahead of the quote. Every row is built
   from the check `transition()` runs, so an enabled row always goes through and a disabled one
   carries the engine's reason (`tests/seed.test.ts` holds this for every role on all 38 cases).
+  A review's two rows (`review_decide`, `request_info`) are listed only while it is pending or
+  waiting on an answer: once decided, the Reviews tab shows the decision and the panel shows the
+  department's real action. A case asked for information at intake (Needs info, not accepted,
+  no reviews) keeps the Clerk's intake set, with Accept as complete waiting on the answer; the
+  Clerk may ask again meanwhile. In Needs info on a routed case, Send quote reads "Waiting on the
+  applicant's response to Health & Legal's request." A refusal for the wrong state reads "Not
+  available while the case is in Needs info." (`STATE_LABEL`), never the raw state.
+- **Actions taken once.** `log_closeout`: after the hours are in it is refused ("Hours were logged
+  on Mon, May 3, 2027; the City Clerk is reconciling."), because a second log would put the
+  estimates back over the actuals; an extra line with a label already logged replaces it. A
+  field left empty in the panel is left out of `actuals`, and the engine keeps that line's
+  estimate. `send_to_commission`: "Already sent to commission." `pay` toward a quote that is paid
+  in full: "The quote is paid in full." (a part payment still leaves a balance to pay).
 - **An ended case offers a note and nothing else.** A city role gets `add_note`; the applicant
   gets no actions. Its board (`boardColumns()`) has nothing in Do now, With the city or Coming
   up: only what was done. Show the `EndingBanner` and the Done column.
@@ -657,7 +713,11 @@ Things a screen builder needs to know that the type signatures do not say.
   - `complete_city_task` closes a work order (its owner), a meeting that was held (its
     department or the Clerk), or a `verify:*` task (which also accepts the card). Every other
     city task is finished by its own action; the refusal names it.
-  - `confirm_routing` needs at least one reviewer, and each department once.
+  - `confirm_routing` needs at least one reviewer, each department once, and a due date for each
+    that is today or later (the date is the review's allowance; none gave "Day 0 of NaN").
+  - A meeting card (`kind: "meeting"`) is the applicant's, but only the city can move it:
+    `openKeyForTask()` opens `schedule_meeting` for the Clerk and the department that holds it
+    while it has no date, and `complete_city_task` once it has one.
 - **Who's up.** `waitingOn().openTasks` and `queueFor()` are oldest due first; a task with no
   date goes last. A department named on cards before routing is `waiting`, "Starts when the City
   Clerk routes the case"; once the case is routed without it, it is `not_involved`. A waiting
@@ -721,6 +781,15 @@ Things a screen builder needs to know that the type signatures do not say.
 - **Payments.** `pay` takes `quote`, `session` and `final_invoice` only, each in the state it
   belongs to, and never an amount of $0 or less. A part payment of a quote leaves `pay_fees` open
   with the balance as its amount. `withdraw` after a payment refunds what was paid.
+- **Money in Closeout.** Between `log_closeout` and `reconcile_close` nothing is "due" the way
+  a quote is: `caseTotals(c).due` would read $750 with a $1,000 deposit in hand. Show
+  `closeoutSettlement(c)` there (`components/case/CloseoutSettlementStats.tsx`: over estimate,
+  from deposit, refund or final bill), as the Conditions and fees tab and the Reconcile and close
+  panel do; `reconcile_close` then does exactly that.
+- **Cancelling.** `refundIfCancelled(c, today, cfg)` is what `cancel` refunds: the schedule's
+  share of the fees plus the deposit, never more than was paid (a series that paid one session of
+  13 gets that session back, not the schedule's figure for all 13). The permit page and the
+  board's Cancel dialog print it. `cancellationRefund()` in `lib/rules` is the schedule alone.
 - **Money after the event.** `closeout.balance` is what the event ran over the estimate and
   `closeout.refund` what goes back from the deposit (null when a final bill is owed; the amount is
   on the `final_bill_or_refund` card). After reconciliation `caseTotals()` no longer counts the
@@ -903,3 +972,31 @@ Raised while the Phase 3 screens were built and joined:
   map in `CardSheet.tsx`.
 - **Amend is on the board's menu before it exists.** "Amend" opens "This screen is being built"
   until 5A. Say if the item should be hidden until then.
+
+Raised by the Phase 3 review fixes:
+
+- **A step with no due date moves up after a week.** The Clerk's own steps (confirm the
+  reviewers, send the quote, issue the permit, reconcile, resolve an exception) are created
+  without a due date, so they sat in "Later" however long they had waited: on the seed, a
+  consolidation 49 days old. An undated task that has been open more than seven days is now
+  grouped "Due this week", and the Clerk's opening line reads "8 things need you: 1 overdue, 7
+  due this week." The other way is to give these steps a due date of their own when they open (a
+  new `sla.clerkStepDays`), which would also let them go overdue. Say which you want.
+- **A quote paid in full takes no more money.** `pay` toward a covered quote is refused ("The
+  quote is paid in full."), for the applicant and at the counter. Before, the Clerk could record
+  any amount on top. If a deliberate overpayment should be possible (a deposit top-up), it needs
+  its own kind of payment.
+- **Closeout hours are logged once.** After Public Works & Safety logs the closeout the action is
+  closed to them and the case is the Clerk's to reconcile. A wrong figure can then only be
+  settled by the Clerk; there is no "correct the hours" step. Should Public Works & Safety be
+  able to reopen its log until the Clerk reconciles (4C)?
+- **Accepting at Intake leaves Intake.** Accept as complete now opens the case with Confirm
+  routing, because routing is the same person's next step and the demo script goes there. The
+  other option was to stay on the Intake list and put a "Confirm routing" link in the toast, for
+  a Clerk working down the list. Say if batch intake matters more.
+- **A day in the Today strip opens the Map.** On the List and Closeout tabs choosing a day
+  changed nothing on screen. It now switches to that day's map. If the week view of the calendar
+  is the better landing, it is one word in `ActiveScreen`.
+- **Next on an empty wizard starts nothing.** Stepping through the wizard without answering
+  anything creates no draft; the first answer does. So a visitor who only looks leaves nothing in
+  My events.

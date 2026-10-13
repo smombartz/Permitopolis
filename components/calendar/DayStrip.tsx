@@ -5,7 +5,7 @@ import { fmtDateShort, plural } from "@/lib/format";
 import { TIER_LABEL } from "@/lib/types";
 import { TIER_ICON } from "@/components/domain/icons";
 import { groupItemsByDate, nextDays } from "./utils";
-import { TIER_DOT_CLASS } from "./tierStyles";
+import { SELECTED_DAY, TIER_DOT_CLASS } from "./tierStyles";
 import type { CalendarItem } from "./types";
 import type { ISODate } from "@/lib/types";
 
@@ -17,6 +17,8 @@ export interface DayStripProps {
   today: ISODate;
   onSelectItem?: (id: string) => void;
   onSelectDay?: (date: ISODate) => void;
+  /** The chosen day, marked with a ring and `aria-pressed`. Leave it out where a day cannot be chosen. */
+  selected?: ISODate;
   className?: string;
 }
 
@@ -26,7 +28,7 @@ function summary(count: number, isToday: boolean): string {
 }
 
 /** Today, then the next 7 days. "Mon, May 3: no events today". */
-export function DayStrip({ items, today, onSelectItem, onSelectDay, className }: DayStripProps) {
+export function DayStrip({ items, today, onSelectItem, onSelectDay, selected, className }: DayStripProps) {
   const days = nextDays(today, 8);
   const byDate = groupItemsByDate(items);
 
@@ -48,7 +50,8 @@ export function DayStrip({ items, today, onSelectItem, onSelectDay, className }:
               type="button"
               onClick={() => onSelectDay?.(date)}
               aria-current={isToday ? "date" : undefined}
-              className={cn("block w-full rounded px-1 text-left text-xs font-medium text-fg-label", FOCUS_RING)}
+              aria-pressed={selected === undefined ? undefined : date === selected}
+              className={cn("block w-full rounded px-1 text-left text-xs font-medium text-fg-label", FOCUS_RING, date === selected && SELECTED_DAY)}
             >
               {fmtDateShort(date)}: {summary(dayItems.length, isToday)}
             </button>

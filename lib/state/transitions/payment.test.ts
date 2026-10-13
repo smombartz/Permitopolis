@@ -2,15 +2,27 @@ import { describe, expect, it } from "vitest";
 import { makeCase, makeCtx, makeTask } from "../testSupport";
 import { transition } from "../transition";
 
+const QUOTE_FEE = { id: "f1", dept: "clerk" as const, label: "Fee", qty: 1, unit: "flat", unitPrice: 715, estimate: 715, actual: null, kind: "fee" as const };
+
 describe("pay", () => {
   it("kind quote finishes pay_fees and records the payment", () => {
     const payFees = makeTask({ id: "PMT-27-0001:pay_fees", catalogId: "pay_fees", kind: "payment" });
-    const c = makeCase({ state: "quote_sent", tasks: [payFees] });
+    const c = makeCase({ state: "quote_sent", tasks: [payFees], feeLines: [QUOTE_FEE] });
     const result = transition(c, { type: "pay", amount: 715, method: "card", kind: "quote" }, "applicant", makeCtx());
     expect(result.ok).toBe(true);
     if (!result.ok) return;
     expect(result.case.payments).toHaveLength(1);
     expect(result.case.tasks[0].status).toBe("done");
+  });
+
+  it("a quote paid in full takes no further payment, from the applicant or at the counter", () => {
+    const paid = makeCase({ state: "quote_sent", feeLines: [QUOTE_FEE], payments: [{ id: "p1", at: "2027-05-03T09:00", amount: 715, method: "card", kind: "quote" }] });
+    for (const [actor, method] of [["applicant", "card"], ["clerk", "in_person"]] as const) {
+      expect(transition(paid, { type: "pay", amount: 20, method, kind: "quote" }, actor, makeCtx())).toEqual({ ok: false, reason: "The quote is paid in full." });
+    }
+    // A part payment leaves a balance, and the balance can still be paid.
+    const part = { ...paid, payments: [{ ...paid.payments[0], amount: 400 }] };
+    expect(transition(part, { type: "pay", amount: 315, method: "in_person", kind: "quote" }, "clerk", makeCtx()).ok).toBe(true);
   });
 
   it("fails kind quote outside Quote sent", () => {

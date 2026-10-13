@@ -12,3 +12,6 @@ export const TIER_CHIP_CLASS: Record<Tier, string> = {
   reviewed: "bg-tier-reviewed-surface text-tier-reviewed-fg",
   special: "bg-tier-special-surface text-tier-special-fg",
 };
+
+/** The chosen day in the month grid, the week grid and the day strip: the indigo ring. */
+export const SELECTED_DAY = "ring-2 ring-indigo-650 ring-offset-1 ring-offset-surface-solid";

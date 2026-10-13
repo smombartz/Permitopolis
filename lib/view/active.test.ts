@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildSeed, sessionDates } from "@/lib/state";
+import { activePermits, buildSeed, sessionDates } from "@/lib/state";
 import { DEFAULT_DEMO_TODAY } from "@/lib/rules/config";
 import { addDaysISO } from "@/lib/dates";
 import { fmtDateShort } from "@/lib/format";
@@ -14,6 +14,7 @@ import {
   hlOverlayForCase,
   monthAnchorOf,
   pwsOverlayForCase,
+  roleOverlayTotal,
   shiftMonth,
   shiftWeek,
   todayLine,
@@ -173,6 +174,24 @@ describe("role overlays", () => {
   it("Health & Legal: all 25 of the Food Truck Festival's vendor health permits are verified", () => {
     const cases = buildSeed();
     expect(hlOverlayForCase(getCase(cases, S6))).toEqual({ vendorsVerified: 25, vendorsTotal: 25 });
+  });
+
+  it("the side panel totals the permits on show, not every case in the store", () => {
+    const cases = buildSeed();
+    const shown = activePermits(cases, TODAY);
+    // Every case, drafts and applications in review included, counts 52 vendor permits.
+    expect(roleOverlayTotal("hl", cases)).toMatchObject({ vendorsVerified: 25, vendorsTotal: 52 });
+    expect(roleOverlayTotal("hl", shown)).toMatchObject({ vendorsVerified: 25, vendorsTotal: 25 });
+    expect(roleOverlayTotal("pws", shown)).toMatchObject({ workOrdersDone: 7, closuresScheduled: 3, walkthroughsScheduled: 3 });
+  });
+
+  it("\"Include held dates\" adds the held cases to what the side panel totals", () => {
+    const cases = buildSeed();
+    const without = roleOverlayTotal("pws", activePermits(cases, TODAY));
+    const withHolds = roleOverlayTotal("pws", activePermits(cases, TODAY, { includeHolds: true }));
+    if (without.role !== "pws" || withHolds.role !== "pws") throw new Error("not the pws overlay");
+    // S5 holds its date and has a walkthrough scheduled.
+    expect(withHolds.walkthroughsScheduled).toBeGreaterThan(without.walkthroughsScheduled);
   });
 
   it("the Clerk: the day-of contact, and no compliance log entries yet", () => {

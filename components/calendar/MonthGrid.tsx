@@ -4,7 +4,7 @@ import { cn } from "@/lib/utils";
 import { TIER_LABEL } from "@/lib/types";
 import { TIER_ICON } from "@/components/domain/icons";
 import { blackoutOn, dayOfMonth, groupItemsByDate, impactedOn, isSameMonth, monthGridDays, monthLabel } from "./utils";
-import { TIER_DOT_CLASS } from "./tierStyles";
+import { SELECTED_DAY, TIER_DOT_CLASS } from "./tierStyles";
 import type { CalendarItem } from "./types";
 import type { ISODate } from "@/lib/types";
 
@@ -17,13 +17,15 @@ export interface MonthGridProps {
   month: ISODate;
   onSelectItem?: (id: string) => void;
   onSelectDay?: (date: ISODate) => void;
+  /** The chosen day, marked with a ring and `aria-pressed`. Leave it out where a day cannot be chosen. */
+  selected?: ISODate;
   className?: string;
 }
 
 const WEEKDAY_HEADS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
 /** A month of days, each cell listing the tier-colored items that land on it. */
-export function MonthGrid({ items, today, month, onSelectItem, onSelectDay, className }: MonthGridProps) {
+export function MonthGrid({ items, today, month, onSelectItem, onSelectDay, selected, className }: MonthGridProps) {
   const days = monthGridDays(month);
   const byDate = groupItemsByDate(items);
 
@@ -51,10 +53,12 @@ export function MonthGrid({ items, today, month, onSelectItem, onSelectDay, clas
                 type="button"
                 onClick={() => onSelectDay?.(date)}
                 aria-current={isToday ? "date" : undefined}
+                aria-pressed={selected === undefined ? undefined : date === selected}
                 className={cn(
                   "mb-1 flex w-full items-center justify-between rounded px-1 text-xs text-fg-secondary",
                   FOCUS_RING,
                   isToday && "bg-pill font-semibold text-fg-pill",
+                  date === selected && SELECTED_DAY,
                 )}
               >
                 <span>{dayOfMonth(date)}</span>

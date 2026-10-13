@@ -1,10 +1,12 @@
 "use client";
 
 import * as React from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ArrowDownIcon, ArrowUpIcon } from "lucide-react";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { CaseId, DateText, DeptStatusDots, DueDate, EventTitle, LeadTimeRisk, StateChip, TierBadge, WaitingOnChips } from "@/components/domain";
+import { CaseId, DateText, DeptStatusDots, DueDate, LeadTimeRisk, StateChip, TierBadge, WaitingOnChips } from "@/components/domain";
+import { Truncate } from "@/components/ui/truncate";
 import { useRovingListNav } from "@/components/city/lists/useRovingListNav";
 import { routes } from "@/lib/routes";
 import { eventDate } from "@/lib/state";
@@ -51,7 +53,7 @@ function PipelineTable({ rows, today, sort, dir, onSort, from }: PipelineTablePr
       <TableHeader>
         <TableRow>
           {COLUMNS.map((col) => (
-            <TableHead key={col.label}>
+            <TableHead key={col.label} aria-sort={col.field && sort === col.field ? (dir === "asc" ? "ascending" : "descending") : undefined}>
               {col.field ? (
                 <button
                   type="button"
@@ -75,10 +77,10 @@ function PipelineTable({ rows, today, sort, dir, onSort, from }: PipelineTablePr
           return (
             <TableRow
               key={c.id}
+              // A row, with its cells and column headers intact for a screen reader: the link to
+              // the case is the event's name. The row itself stays focusable for j/k and Enter.
               data-row-nav=""
-              role="link"
               tabIndex={0}
-              aria-label={`${c.name}, ${applicantNameOf(c)}`}
               className="cursor-pointer outline-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring"
               onClick={() => open(c.id)}
               onKeyDown={(event) => {
@@ -92,7 +94,18 @@ function PipelineTable({ rows, today, sort, dir, onSort, from }: PipelineTablePr
                 <CaseId id={c.id} />
               </TableCell>
               <TableCell>
-                <EventTitle name={c.name} applicantName={applicantNameOf(c)} className="max-w-56" />
+                <div data-slot="event-title" className="flex max-w-56 min-w-0 flex-col">
+                  <Link
+                    href={routes.city.case(c.id, { from })}
+                    title={c.name}
+                    // The row opens the case too: one navigation, not two.
+                    onClick={(event) => event.stopPropagation()}
+                    className="block truncate rounded-control text-sm font-semibold text-fg underline-offset-4 outline-none hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring"
+                  >
+                    {c.name}
+                  </Link>
+                  <Truncate text={applicantNameOf(c)} className="text-xs text-fg-secondary" />
+                </div>
               </TableCell>
               <TableCell>
                 <TierBadge tier={c.tier} />

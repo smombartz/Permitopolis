@@ -5,7 +5,7 @@
 import { daysBetween } from "@/lib/dates";
 import { plural } from "@/lib/format";
 import { ENDING_LABEL, PARTIES, PARTY_LABEL } from "@/lib/types";
-import type { EventCase, ISODate, Party, Task, UnlockEvent } from "@/lib/types";
+import type { Ending, EventCase, ISODate, Party, Task, UnlockEvent } from "@/lib/types";
 import { byDueDate, signoffsLeft, taskDueDate } from "./core";
 import type { Involvement, PartyStanding, PartyStatus, StateApi } from "./types";
 
@@ -270,8 +270,16 @@ function partyName(party: Party, applicantName?: string): string {
   return party === "applicant" ? applicantName || "The applicant" : PARTY_LABEL[party];
 }
 
+/** How an ended case reads in a sentence: "this case was denied", "lost its date hold". */
+const ENDING_PHRASE: Record<Ending, string> = {
+  withdrawn: "was withdrawn",
+  denied: "was denied",
+  cancelled: "was cancelled",
+  hold_expired: "lost its date hold",
+};
+
 export const nextMove: StateApi["nextMove"] = (c: EventCase, today: ISODate, applicantName?: string): string => {
-  if (c.ending) return `Next: nothing further; this case is ${ENDING_LABEL[c.ending].toLowerCase()}.`;
+  if (c.ending) return `Next: nothing further; this case ${ENDING_PHRASE[c.ending]}.`;
   if (c.state === "closed") return "Next: nothing further; this case is closed.";
 
   const statuses = waitingOn(c, today);

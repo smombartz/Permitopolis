@@ -103,17 +103,30 @@ export const involves: StateApi["involves"] = (c: EventCase, role: Party) => inv
 export const applicantCases: StateApi["applicantCases"] = (cases: EventCase[], applicantId: string) =>
   cases.filter((c) => c.applicantId === applicantId);
 
-function dueGroup(dueDate: ISODate | null, today: ISODate): QueueGroup {
-  if (!dueDate) return "later";
+/**
+ * A task with no due date is "Later" only while it is fresh. The Clerk's own steps (confirm the
+ * reviewers, send the quote, issue the permit, reconcile) are created without one, and they are
+ * the most actionable work the Clerk has: one that has waited more than a week is this week's.
+ */
+function dueGroup(dueDate: ISODate | null, today: ISODate, daysWaiting: number): QueueGroup {
+  if (!dueDate) return daysWaiting > 7 ? "this_week" : "later";
   if (dueDate < today) return "overdue";
   const withinWeek = daysBetween(today, dueDate) <= 7;
   return withinWeek ? "this_week" : "later";
 }
 
+/** Days since the task last became this party's to act on (it may have been locked, or parked, before). */
 function daysActionable(task: Task, today: ISODate): number {
   const firstOpen = task.history.find((h) => h.status === "todo" || h.status === "changes_requested" || h.status === "submitted");
   if (!firstOpen) return 0;
   return Math.max(0, daysBetween(firstOpen.at.slice(0, 10), today));
+}
+
+/** Days since the task was last opened to its owner: what an undated task's group goes by. */
+function daysOpen(task: Task, today: ISODate): number {
+  const opened = [...task.history].reverse().find((h) => h.status === "todo" || h.status === "changes_requested");
+  if (!opened) return 0;
+  return Math.max(0, daysBetween(opened.at.slice(0, 10), today));
 }
 
 export const queueFor: StateApi["queueFor"] = (cases: EventCase[], role: Dept, today: ISODate): QueueItem[] => {
@@ -123,7 +136,7 @@ export const queueFor: StateApi["queueFor"] = (cases: EventCase[], role: Dept, t
     for (const task of c.tasks) {
       if (task.owner !== role) continue;
       if (task.status !== "todo" && task.status !== "changes_requested") continue;
-      items.push({ case: c, task, group: dueGroup(task.dueDate, today), daysWaiting: daysActionable(task, today) });
+      items.push({ case: c, task, group: dueGroup(task.dueDate, today, daysOpen(task, today)), daysWaiting: daysActionable(task, today) });
     }
   }
   // My queue reads oldest due first, within each group and across them.
@@ -182,6 +195,33 @@ export const caseTotals: StateApi["caseTotals"] = (c: EventCase): CaseTotals => 
   const due = c.ending ? 0 : Math.max(0, round2(total - paid));
   return { fees, deposit, total, paid, due };
 };
+
+/** How a closeout settles once the actual costs are in: what `reconcile_close` then does. */
+export interface CloseoutSettlement {
+  /** Actual minus estimate across the fee lines, deposit excluded. Negative when the event came in under. */
+  over: number;
+  /** The deposit the city holds. */
+  deposit: number;
+  /** The part of the overage the deposit covers. */
+  fromDeposit: number;
+  /** What goes back to the applicant; null when the overage is more than the deposit. */
+  refund: number | null;
+  /** What is still owed after the deposit; null when the deposit covers the overage. */
+  bill: number | null;
+}
+
+/**
+ * In Closeout nothing is "due" in the quote's sense: an overage comes out of the deposit first,
+ * the rest of the deposit goes back, and only what the deposit cannot cover is billed.
+ * caseTotals() cannot say that before the Clerk reconciles (it reads $750 due with $1,000 held).
+ */
+export function closeoutSettlement(c: EventCase): CloseoutSettlement {
+  const over = round2(c.feeLines.filter((f) => f.kind !== "deposit").reduce((s, f) => s + ((f.actual ?? f.estimate) - f.estimate), 0));
+  const deposit = round2(c.feeLines.filter((f) => f.kind === "deposit").reduce((s, f) => s + f.estimate, 0));
+  const refund = over <= deposit ? round2(deposit - over) : null;
+  const bill = refund === null ? round2(over - deposit) : null;
+  return { over, deposit, fromDeposit: Math.max(0, Math.min(over, deposit)), refund, bill };
+}
 
 /** What cancelling a permit today would pay back: the figure every screen shows, and the one `cancel` refunds. */
 export interface CancelRefund {

@@ -43,14 +43,14 @@ again.
 
 ### Medium, city side
 
-- [ ] C1 Cases search keeps its text in local state and writes the URL after a pause
-- [ ] C2 Pipeline board: a State filter shows only that column; columns flex to fit
-- [ ] C3 Closeout: `closeoutSettlement()` drives `reconcile_close`, the tab and the panel
-- [ ] C4 Log closeout: refused once logged; the panel seeds from actuals and never doubles a line
-- [ ] C5 Needs info: `Send quote` says what it waits for; an intake request keeps the intake set
-- [ ] C6 Active permits: choosing a day opens its map; the day is marked; the map has a date field
-- [ ] C7 Role overlay totals count the permits shown, not every case
-- [ ] C8 Intake: Accept as complete goes on to Confirm routing
+- [x] C1 Cases search keeps its text in local state and writes the URL after a pause
+- [x] C2 Pipeline board: a State filter shows only that column; columns flex to fit
+- [x] C3 Closeout: `closeoutSettlement()` drives `reconcile_close`, the tab and the panel
+- [x] C4 Log closeout: refused once logged; the panel seeds from actuals and never doubles a line
+- [x] C5 Needs info: `Send quote` says what it waits for; an intake request keeps the intake set
+- [x] C6 Active permits: choosing a day opens its map; the day is marked; the map has a date field
+- [x] C7 Role overlay totals count the permits shown, not every case
+- [x] C8 Intake: Accept as complete goes on to Confirm routing
 
 ### Low (each a few lines)
 
@@ -61,16 +61,45 @@ again.
 - [x] L4 Wizard stepper labels stay available to assistive tech below `sm`
 - [x] L5 Vendor rows carry a status word; the quote's condition checkbox has a visible "I accept"
 - [x] L6 Demo guide table wraps; landing page landmarks
-- [ ] L7 In-person payment on a paid quote is disabled with a reason
-- [ ] L8 j/k and arrow navigation leaves modified keys, handled events and widgets alone
-- [ ] L9 My queue shows the review clock on review tasks only
-- [ ] L10 Meeting cards open Schedule or Close for the Clerk and the host department
-- [ ] L11 Confirm routing refuses a missing or past due date
-- [ ] L12 An undated task that has waited more than a week is "This week", not "Later"
-- [ ] L13 Copy: plurals, "None", endings, date chips, the Clerk's review row, board card date
-- [ ] L14 Decided reviews drop "Decide your review"; commission is sent once
-- [ ] L15 Cases table rows keep their semantics; sortable headers carry `aria-sort`
+- [x] L7 In-person payment on a paid quote is disabled with a reason
+- [x] L8 j/k and arrow navigation leaves modified keys, handled events and widgets alone
+- [x] L9 My queue shows the review clock on review tasks only
+- [x] L10 Meeting cards open Schedule or Close for the Clerk and the host department
+- [x] L11 Confirm routing refuses a missing or past due date
+- [x] L12 An undated task that has waited more than a week is "This week", not "Later"
+- [x] L13 Copy: plurals, "None", endings, date chips, the Clerk's review row, board card date
+- [x] L14 Decided reviews drop "Decide your review"; commission is sent once
+- [x] L15 Cases table rows keep their semantics; sortable headers carry `aria-sort`
 
 ## Changes
 
 - 2026-10-13: Plan created.
+- 2026-10-13: All 38 findings confirmed in the code and fixed; none skipped. What turned out
+  differently from the plan as written:
+  - **H2**: `formRows()` lives in `lib/view/cardForms.ts` (re-exported from
+    `lib/view/caseDetail.ts`) and `FormAnswers` in `components/domain`, because A2 reads the same
+    form back on the applicant's board and a surface may not import another surface.
+  - **A4**: Next on a blank wizard follows the URL's step and starts no draft. The review's first
+    suggestion (create the draft on Next) would have left an empty "New event" in My events for
+    every stray click.
+  - **A5, C1, A14** all live in the gap between `router.push()` and the URL catching up, which
+    the render harness's synchronous router hid. The harness gained `holdNavigation()` and
+    `releaseNavigation()` so each has a test that fails without its fix.
+  - **C1** uncovered a crash it would otherwise have introduced: `?from=` and `?to=` were passed
+    to the date formatter unchecked. `parseCasesFilters()` now ignores anything that is not a date.
+  - **C5**: `requireState()` reads "Not available while the case is in Needs info." for every
+    state (three test expectations of "This case is permitted." changed with it), and the Clerk
+    may ask again at intake while a first request is out, so "Request information" in the intake
+    set is a live button.
+  - **L7**: the engine refuses any payment toward a quote that is paid in full, not only the row
+    asked for with no amount. `tests/seed.test.ts` holds that a disabled row is refused for the
+    reason shown, so a row-only check would have broken that rule (and still recorded the
+    overpayment).
+  - **L12**: done in `dueGroup()` (an undated task that has waited more than seven days is "Due
+    this week"). The Clerk's opening queue in the seed changes with it: 1 overdue, 7 for this
+    week, none later; `tests/seed.test.ts` and `lib/view/cityLists.test.ts` assert the new rows.
+    It is recorded as an open question for the owner.
+  - **C8**: Intake's Accept goes on to the case with Confirm routing open (the review's first
+    option). Demo path 4's click-through in `tests/render/handoffs.test.tsx` follows the new step.
+  - Six product choices the review left open are in `docs/readme.md` under "Open questions for
+    the owner".

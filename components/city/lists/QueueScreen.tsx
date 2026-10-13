@@ -31,7 +31,9 @@ function isDept(role: Party): role is Dept {
 
 function QueueRow({ item, role, today, reviewer }: { item: QueueItem; role: Dept; today: string; reviewer: boolean }) {
   const { case: c, task, daysWaiting } = item;
-  const clock = reviewer ? reviewClock(c, role, today) : null;
+  // The department's review clock belongs to its review. On a work order, a closeout task or a
+  // document check it would be a clock that stopped weeks ago, next to a due date of its own.
+  const clock = reviewer && task.catalogId.startsWith("review:") ? reviewClock(c, role, today) : null;
   const due = taskDueDate(task);
   return (
     <li>

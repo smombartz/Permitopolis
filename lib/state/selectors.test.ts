@@ -1,12 +1,15 @@
 import { describe, expect, it } from "vitest";
 import { DEFAULT_CONFIG } from "@/lib/rules/config";
+import { buildSeed } from "./seed";
 import { makeCase, makeTask } from "./testSupport";
+import { transition } from "./transition";
 import {
   activePermits,
   applicantCases,
   boardColumn,
   boardColumns,
   caseTotals,
+  closeoutSettlement,
   daysUntilEvent,
   eventDate,
   hasActivePermit,
@@ -198,6 +201,73 @@ describe("queueFor", () => {
       ["later", "later"],
       ["undated", "later"],
     ]);
+  });
+});
+
+describe("queueFor: a task with no due date", () => {
+  const opened = (id: string, at: string) => makeTask({ id, catalogId: id, owner: "clerk", kind: "action", history: [{ at, actor: "system", status: "todo" }] });
+
+  it("is Later while it is fresh, and This week once it has waited more than a week", () => {
+    const c = makeCase({ state: "in_review", tasks: [opened("fresh", "2027-05-03T09:00"), opened("a_week", "2027-04-26T09:00"), opened("eight_days", "2027-04-25T09:00"), opened("seven_weeks", "2027-03-15T09:00")] });
+    const groups = Object.fromEntries(queueFor([c], "clerk", "2027-05-03").map((item) => [item.task.id, item.group]));
+    expect(groups).toEqual({ fresh: "later", a_week: "later", eight_days: "this_week", seven_weeks: "this_week" });
+  });
+
+  it("counts from when the task was last opened, not from when it was created locked", () => {
+    const unlockedToday = makeTask({
+      id: "consolidate",
+      catalogId: "consolidate",
+      owner: "clerk",
+      kind: "action",
+      history: [
+        { at: "2027-03-15T09:00", actor: "system", status: "locked" },
+        { at: "2027-05-03T09:00", actor: "system", status: "todo" },
+      ],
+    });
+    expect(queueFor([makeCase({ state: "in_review", tasks: [unlockedToday] })], "clerk", "2027-05-03")[0].group).toBe("later");
+  });
+
+  it("on the seed, the Clerk's long-waiting steps are no longer the bottom group", () => {
+    const waiting = queueFor(buildSeed(), "clerk", "2027-05-03").filter((item) => item.task.dueDate === null);
+    expect(waiting.length).toBeGreaterThan(0);
+    for (const item of waiting) expect(item.group, `${item.case.id} ${item.task.title}`).toBe(item.daysWaiting > 7 ? "this_week" : "later");
+    expect(waiting.some((item) => item.group === "this_week")).toBe(true);
+  });
+});
+
+describe("closeoutSettlement", () => {
+  const line = (id: string, estimate: number, actual: number | null, kind: "fee" | "deposit" = "fee") => ({ id, dept: "pws" as const, label: id, qty: 1, unit: "flat", unitPrice: estimate, estimate, actual, kind });
+
+  it("S6 once the hours are in: $750 over, all of it from the $1,000 deposit, $250 back, nothing billed", () => {
+    const c = makeCase({ state: "closeout", feeLines: [line("police", 5610, 6120), line("crew", 0, 240), line("deposit", 1000, null, "deposit")] });
+    expect(closeoutSettlement(c)).toEqual({ over: 750, deposit: 1000, fromDeposit: 750, refund: 250, bill: null });
+  });
+
+  it("an overage beyond the deposit: the deposit goes first and the rest is the final bill", () => {
+    const c = makeCase({ state: "closeout", feeLines: [line("crew", 0, 300), line("deposit", 250, null, "deposit")] });
+    expect(closeoutSettlement(c)).toEqual({ over: 300, deposit: 250, fromDeposit: 250, refund: null, bill: 50 });
+  });
+
+  it("nothing logged yet, or exactly on estimate: the whole deposit goes back", () => {
+    const c = makeCase({ state: "closeout", feeLines: [line("police", 5610, null), line("deposit", 1000, null, "deposit")] });
+    expect(closeoutSettlement(c)).toEqual({ over: 0, deposit: 1000, fromDeposit: 0, refund: 1000, bill: null });
+  });
+
+  it("is what reconcile_close does, for every seeded case in Closeout with its hours logged", () => {
+    const seed = buildSeed();
+    const ready = seed.filter((c) => c.state === "closeout" && c.ending === null && c.closeout.hoursLoggedOn !== null);
+    expect(ready.length).toBeGreaterThan(0);
+    for (const c of ready) {
+      const settlement = closeoutSettlement(c);
+      const result = transition(c, { type: "reconcile_close" }, "clerk", { today: "2027-05-03", cases: seed, cfg: DEFAULT_CONFIG });
+      if (!result.ok) throw new Error(result.reason);
+      expect(result.case.closeout.balance, c.id).toBe(settlement.over);
+      expect(result.case.closeout.refund, c.id).toBe(settlement.refund);
+      const refunded = result.case.payments.at(-1);
+      if (settlement.refund) expect(refunded, c.id).toMatchObject({ kind: "refund", amount: -settlement.refund });
+      // What caseTotals says is due after reconciling is the bill, and only the bill.
+      expect(caseTotals(result.case).due, c.id).toBe(settlement.bill ?? 0);
+    }
   });
 });
 

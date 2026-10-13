@@ -52,6 +52,14 @@ function ConfirmRoutingPanel({ caseId, onClose }: ActionPanelProps) {
   }
 
   const anyChecked = rows.some((r) => r.checked)
+  // A checked reviewer needs a date on or after today: it is the review's allowance. The engine
+  // refuses the same thing (checkConfirmRouting), so a richer panel inherits the guard.
+  const dateProblem = (row: Row): string | null => {
+    if (!row.checked) return null
+    if (!row.dueDate) return "Choose a due date."
+    return row.dueDate < today ? "The due date has passed; choose today or later." : null
+  }
+  const datesOk = rows.every((row) => dateProblem(row) === null)
 
   return (
     <>
@@ -73,13 +81,13 @@ function ConfirmRoutingPanel({ caseId, onClose }: ActionPanelProps) {
             <Field label="Sections">
               <Textarea rows={3} value={row.sections} onChange={(e) => updateRow(row.dept, { sections: e.target.value })} disabled={!row.checked} />
             </Field>
-            <Field label="Due date">
-              <Input type="date" value={row.dueDate} onChange={(e) => updateRow(row.dept, { dueDate: e.target.value })} disabled={!row.checked} className="w-44" />
+            <Field label="Due date" error={dateProblem(row) ?? undefined}>
+              <Input type="date" min={today} value={row.dueDate} onChange={(e) => updateRow(row.dept, { dueDate: e.target.value })} disabled={!row.checked} className="w-44" />
             </Field>
           </div>
         ))}
       </PanelBody>
-      <PanelActions error={error} onCancel={onClose} submitLabel="Confirm routing" disabled={!check.ok || !anyChecked} onSubmit={submit} />
+      <PanelActions error={error} onCancel={onClose} submitLabel="Confirm routing" disabled={!check.ok || !anyChecked || !datesOk} onSubmit={submit} />
     </>
   )
 }

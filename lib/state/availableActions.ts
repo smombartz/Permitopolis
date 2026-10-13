@@ -64,7 +64,7 @@ function applicantActions(c: EventCase, ctx: RulesCtx): ActionAvailability[] {
     items.push(row("withdraw", "Withdraw", checkWithdraw(c)));
   } else if (c.state === "quote_sent") {
     items.push(row("accept_and_sign", "Accept and sign", checkAcceptAndSign(c), !c.flags.signed));
-    items.push(row("pay", "Pay fees and deposit", checkPay(c, { kind: "quote" }), c.flags.signed));
+    items.push(row("pay", "Pay fees and deposit", checkPay(c, { kind: "quote" }, ctx.cfg), c.flags.signed));
     items.push(row("withdraw", "Withdraw", checkWithdraw(c)));
   } else if (c.state === "permitted" || c.state === "event_day") {
     const session = sessionPayRow(c, "Pay the next session");
@@ -96,10 +96,14 @@ function sessionPayRow(c: EventCase, label: string): ActionAvailability | null {
  */
 function reviewRows(c: EventCase, dept: Dept): ActionAvailability[] {
   const review = c.reviews.find((r) => r.dept === dept);
-  if (!review) return [];
-  const items = [row("review_decide", "Decide your review", checkReviewDecide(c, dept), review.status === "pending")];
-  if (review.status === "pending" || review.status === "needs_info") items.push(row("request_info", "Request information", checkRequestInfo(c, dept)));
-  return items;
+  // Once it is decided there is nothing left to decide or ask: the Reviews tab shows the
+  // decision, and a row that could only ever read "already approved" would sit above the
+  // department's real action for the rest of the case.
+  if (!review || (review.status !== "pending" && review.status !== "needs_info")) return [];
+  return [
+    row("review_decide", "Decide your review", checkReviewDecide(c, dept), review.status === "pending"),
+    row("request_info", "Request information", checkRequestInfo(c, dept)),
+  ];
 }
 
 function clerkActions(c: EventCase, ctx: RulesCtx): ActionAvailability[] {
@@ -112,6 +116,15 @@ function clerkActions(c: EventCase, ctx: RulesCtx): ActionAvailability[] {
     } else {
       items.push(row("confirm_routing", "Confirm routing", checkConfirmRouting(c), true));
     }
+  } else if (c.state === "needs_info" && c.reviews.length === 0 && !c.flags.acceptedComplete) {
+    // Asked for information at intake: still an application that has not been accepted or
+    // routed, so the intake set, with Accept waiting on the answer. Nothing to quote or send
+    // to commission yet.
+    items.push(row("accept_complete", "Accept as complete", checkAcceptComplete(c, ctx), true));
+    items.push(row("request_info", "Request information", checkRequestInfo(c, "clerk")));
+    items.push(row("deny", "Deny", checkDeny(c)));
+    items.push(remindRow());
+    items.push(addNoteRow());
   } else if (c.state === "in_review" || c.state === "needs_info") {
     // The Clerk's own review comes before the quote, which waits for every review anyway.
     const ownReview = c.reviews.find((r) => r.dept === "clerk");
@@ -124,7 +137,7 @@ function clerkActions(c: EventCase, ctx: RulesCtx): ActionAvailability[] {
     items.push(addNoteRow());
   } else if (c.state === "quote_sent") {
     items.push(row("issue_permit", "Issue permit", checkIssuePermit(c, ctx), true));
-    items.push(row("pay", IN_PERSON, checkPay(c, { kind: "quote" })));
+    items.push(row("pay", IN_PERSON, checkPay(c, { kind: "quote" }, ctx.cfg)));
     items.push(remindRow());
     items.push(addNoteRow());
   } else if (c.state === "closeout") {

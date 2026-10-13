@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { DEFAULT_CONFIG, DEFAULT_DEMO_TODAY } from "@/lib/rules/config";
-import { buildSeed, queueFor } from "@/lib/state";
+import { buildSeed, checkCompleteCityTask, checkScheduleMeeting, queueFor } from "@/lib/state";
 import { makeCase, makeTask } from "@/lib/state/testSupport";
 import {
   activityActors,
@@ -109,7 +109,8 @@ describe("buildOverview", () => {
     expect(byLabel["Attendance"]).toBe("1,200");
     expect(byLabel["Add-ons"]).toContain("Amplified sound");
     expect(byLabel["Add-ons"]).toContain("City services");
-    expect(byLabel["Sessions"]).toBeNull(); // a single event, not a series
+    // A single event, not a series: no Sessions row at all, never "Sessions: Not provided".
+    expect("Sessions" in byLabel).toBe(false);
     expect(overview.mapHighlight).not.toBeNull();
     expect(overview.mapHighlight!.status).toBe("held");
     expect(overview.components.length).toBeGreaterThan(0);
@@ -123,9 +124,59 @@ describe("buildOverview", () => {
     expect(byLabel["Place"]).toBeNull();
     expect(byLabel["Date and hours"]).toBeNull();
     expect(byLabel["Setup and teardown"]).toBeNull();
-    expect(byLabel["Sessions"]).toBeNull();
+    expect("Sessions" in byLabel).toBe(false);
     expect(byLabel["Attendance"]).toBeNull();
-    expect(byLabel["Add-ons"]).toBeNull();
+    // No add-ons is an answer, not a gap.
+    expect(byLabel["Add-ons"]).toBe("None");
+  });
+
+  it("a series has its Sessions row; tents and stages are counted in the plural", () => {
+    const s2 = cases.find((c) => c.id === "PMT-27-0142")!;
+    const byLabel = Object.fromEntries(buildOverview(s2, DEFAULT_CONFIG).rows.map((r) => [r.label, r.value]));
+    expect(byLabel["Sessions"]).toMatch(/^Weekly, 13 sessions/);
+
+    const tents = (count: number) =>
+      Object.fromEntries(buildOverview(makeCase({ addOns: { ...S5.addOns, amplifiedSound: false, cityServices: null, tentsStages: { count } } }), DEFAULT_CONFIG).rows.map((r) => [r.label, r.value]))["Add-ons"];
+    expect(tents(1)).toBe("1 tent or stage");
+    expect(tents(3)).toBe("3 tents or stages");
+  });
+});
+
+describe("openKeyForTask: a meeting card is the city's to schedule and to close", () => {
+  const meeting = (payload: Record<string, unknown> = {}, reviewer: "clerk" | "pws" = "pws") =>
+    makeTask({ id: "PMT-27-0001:site_walkthrough", catalogId: "site_walkthrough", kind: "meeting", owner: "applicant", reviewer, payload });
+
+  it("the Clerk and the host department schedule it while it has no date, and close it once it has one", () => {
+    const c = makeCase({ state: "permitted", tasks: [meeting()] });
+    expect(openKeyForTask(c, c.tasks[0], "clerk")).toBe("schedule_meeting:PMT-27-0001:site_walkthrough");
+    expect(openKeyForTask(c, c.tasks[0], "pws")).toBe("schedule_meeting:PMT-27-0001:site_walkthrough");
+
+    const scheduled = makeCase({ state: "permitted", tasks: [meeting({ scheduledFor: "2027-05-10" })] });
+    expect(openKeyForTask(scheduled, scheduled.tasks[0], "clerk")).toBe("complete_city_task:PMT-27-0001:site_walkthrough");
+    expect(openKeyForTask(scheduled, scheduled.tasks[0], "pws")).toBe("complete_city_task:PMT-27-0001:site_walkthrough");
+  });
+
+  it("a department that does not hold the meeting still only reminds the applicant", () => {
+    const c = makeCase({ state: "permitted", tasks: [meeting()] });
+    expect(openKeyForTask(c, c.tasks[0], "hl")).toBe("remind:applicant");
+  });
+
+  it("the key it gives is one the engine takes, on every open meeting card of the seed", () => {
+    let checked = 0;
+    for (const c of cases) {
+      if (c.ending !== null || c.state === "closed") continue;
+      for (const task of c.tasks) {
+        if (task.owner !== "applicant" || task.kind !== "meeting" || task.status === "done" || task.status === "locked") continue;
+        const key = openKeyForTask(c, task, "clerk")!;
+        const { action, arg } = parseOpenKey(key);
+        expect(["schedule_meeting", "complete_city_task"], `${c.id} ${task.title}`).toContain(action);
+        expect(arg).toBe(task.id);
+        const check = action === "schedule_meeting" ? checkScheduleMeeting(c, task.id, "clerk") : checkCompleteCityTask(c, task.id, "clerk");
+        expect(check, `${c.id} ${task.title}`).toEqual({ ok: true });
+        checked++;
+      }
+    }
+    expect(checked).toBeGreaterThan(0);
   });
 });
 

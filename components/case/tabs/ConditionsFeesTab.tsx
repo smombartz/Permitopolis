@@ -8,6 +8,7 @@ import { EmptyState } from "@/components/ui/empty-state"
 import { ReceiptIcon } from "lucide-react"
 import { caseTotals } from "@/lib/state"
 import type { EventCase } from "@/lib/types"
+import { CloseoutSettlementStats } from "../CloseoutSettlementStats"
 
 interface ConditionsFeesTabProps {
   c: EventCase
@@ -16,6 +17,8 @@ interface ConditionsFeesTabProps {
 function ConditionsFeesTab({ c }: ConditionsFeesTabProps) {
   const showActual = c.state === "closeout" || c.state === "closed"
   const totals = caseTotals(c)
+  // The actual costs are in and the Clerk has not reconciled yet.
+  const settling = c.state === "closeout" && c.ending === null && c.closeout.hoursLoggedOn !== null && c.closeout.balance === null
   const hasAnything = c.conditions.length > 0 || c.feeLines.length > 0
 
   if (!hasAnything) {
@@ -40,14 +43,26 @@ function ConditionsFeesTab({ c }: ConditionsFeesTabProps) {
           <p className="text-sm text-fg-secondary">No fee lines yet.</p>
         )}
       </Section>
-      <Section title="Payments and what is due">
-        <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
-          <Stat label="Total" value={fmtMoney(totals.total)} />
-          <Stat label="Paid" value={fmtMoney(totals.paid)} />
-          <Stat label="Due" value={fmtMoney(totals.due)} />
-          <Stat label="Deposit" value={fmtMoney(totals.deposit)} />
-        </div>
-      </Section>
+      {settling ? (
+        // In Closeout nothing is "due" the way a quote is: an overage comes out of the deposit
+        // first. Total, Paid, Due would read "$750 due" with a $1,000 deposit in hand.
+        <Section title="How this settles" description="The overage comes out of the deposit; what is left goes back, or the rest is billed.">
+          <div className="grid grid-cols-2 gap-4 sm:grid-cols-5">
+            <Stat label="Paid" value={fmtMoney(totals.paid)} />
+            <Stat label="Deposit held" value={fmtMoney(totals.deposit)} />
+            <CloseoutSettlementStats c={c} className="contents" />
+          </div>
+        </Section>
+      ) : (
+        <Section title="Payments and what is due">
+          <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+            <Stat label="Total" value={fmtMoney(totals.total)} />
+            <Stat label="Paid" value={fmtMoney(totals.paid)} />
+            <Stat label="Due" value={fmtMoney(totals.due)} />
+            <Stat label="Deposit" value={fmtMoney(totals.deposit)} />
+          </div>
+        </Section>
+      )}
     </div>
   )
 }
