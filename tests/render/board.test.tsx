@@ -1,10 +1,12 @@
-import { screen, within } from "@testing-library/react";
+import { act, screen, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { BoardScreen } from "@/components/board/BoardScreen";
 import { MyEventsScreen } from "@/components/board/MyEventsScreen";
 import { routes } from "@/lib/routes";
+import { useDemo } from "@/lib/state";
 import { lastPush, renderScreen, storedCase } from "./harness";
 
+const S2 = "PMT-27-0142";
 const S3 = "PMT-27-0118";
 const S4 = "PMT-27-0126";
 const S5 = "PMT-27-0097";
@@ -103,6 +105,26 @@ describe("the board (S6): after the event", () => {
     const comingUpColumn = comingUpHeading.parentElement!.parentElement!;
     expect(within(comingUpColumn).getByText("Final bill or refund")).toBeInTheDocument();
     expect(within(comingUpColumn).getByText("Tell us how it went")).toBeInTheDocument();
+  });
+});
+
+describe("the board's Cancel dialog", () => {
+  it("S2 after Pay and book: today's refund is the $20 that was paid, and cancelling refunds exactly that", async () => {
+    const { user } = await renderScreen(<BoardScreen />, { role: "applicant", personaId: "sunrise-yoga-club", path: routes.event(S2) });
+    act(() => {
+      useDemo.getState().dispatch(S2, { type: "book_and_pay", method: "card" }, "applicant");
+    });
+
+    await user.click(screen.getByRole("button", { name: "Board menu" }));
+    await user.click(screen.getByRole("menuitem", { name: "Cancel" }));
+
+    const dialog = screen.getByRole("dialog");
+    expect(dialog).toHaveTextContent("Today's refund: $20 (");
+    expect(dialog).not.toHaveTextContent("$250");
+
+    await user.click(within(dialog).getByRole("button", { name: "Cancel permit" }));
+    expect(storedCase(S2).ending).toBe("cancelled");
+    expect(storedCase(S2).payments.at(-1)).toMatchObject({ kind: "refund", amount: -20 });
   });
 });
 

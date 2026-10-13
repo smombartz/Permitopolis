@@ -10,9 +10,10 @@ import { Eyebrow } from "@/components/ui/eyebrow";
 import { Separator } from "@/components/ui/separator";
 import { CITY_STAFF_BY_DEPT } from "@/lib/data/people";
 import { fmtDate, fmtNumber, fmtTimeRange } from "@/lib/format";
-import { cancellationRefund, classify } from "@/lib/rules";
+import { classify } from "@/lib/rules";
 import type { RulesConfig } from "@/lib/rules";
 import { routes } from "@/lib/routes";
+import { refundIfCancelled } from "@/lib/state";
 import type { EventCase, ISODate } from "@/lib/types";
 import { sessionRows } from "@/lib/view/permit";
 
@@ -37,7 +38,9 @@ function useOrigin(): string {
 function PermitCard({ c, today, cfg }: { c: EventCase; today: ISODate; cfg: RulesConfig }) {
   const cls = classify(c, cfg);
   const contact = CITY_STAFF_BY_DEPT.clerk;
-  const refund = cancellationRefund(c, today, cfg);
+  // What `cancel` would pay back today: capped at what was paid, the deposit included.
+  const refund = refundIfCancelled(c, today, cfg);
+  const bands = [...cfg.cancellation].sort((a, b) => b.minDaysBefore - a.minDaysBefore);
   const rows = sessionRows(c);
   const isSeries = !!c.schedule?.recurrence;
   const verifyPath = routes.verify(c.id);
@@ -144,10 +147,27 @@ function PermitCard({ c, today, cfg }: { c: EventCase; today: ISODate; cfg: Rule
 
       <div className="flex flex-col gap-1.5">
         <p className="text-eyebrow font-bold tracking-[.12em] text-fg-label uppercase">Cancellation schedule</p>
-        <p className="text-sm text-fg">{refund.rule}</p>
-        <p className="text-sm text-fg">
-          If cancelled today ({fmtDate(today)}): <Money amount={refund.refund} /> refund.
-        </p>
+        <ul aria-label="Cancellation schedule" className="flex flex-col gap-1 text-sm">
+          {bands.map((band) => {
+            const appliesToday = refund.canCancel && band.label === refund.rule;
+            return (
+              <li key={band.label} aria-current={appliesToday ? "true" : undefined} className={appliesToday ? "font-semibold text-fg" : "text-fg-secondary"}>
+                {band.label}
+                {appliesToday ? <span className="font-medium text-fg-accent"> · Applies today</span> : null}
+              </li>
+            );
+          })}
+        </ul>
+        {refund.deposit > 0 ? (
+          <p className="text-sm text-fg-secondary">
+            Your <Money amount={refund.deposit} /> deposit is returned in full, whenever you cancel.
+          </p>
+        ) : null}
+        {refund.canCancel ? (
+          <p className="text-sm text-fg">
+            If cancelled today ({fmtDate(today)}): <Money amount={refund.refund} /> refund{refund.deposit > 0 && refund.refund >= refund.deposit ? ", deposit included" : ""}.
+          </p>
+        ) : null}
       </div>
     </div>
   );

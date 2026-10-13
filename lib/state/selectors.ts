@@ -4,10 +4,12 @@
  */
 import { daysBetween } from "@/lib/dates";
 import { plural } from "@/lib/format";
+import { cancellationRefund } from "@/lib/rules";
 import { round2 } from "@/lib/rules/shared";
 import type { Dept, EventCase, ISODate, Party, Task } from "@/lib/types";
 import type { RulesConfig } from "@/lib/rules/types";
-import { sessionDates } from "./clock";
+import { checkCancel } from "./checks";
+import { lastSessionDate, sessionDates } from "./clock";
 import { byDueDate, sumFeeLines, totalPaid } from "./core";
 import type { BoardColumn, CaseTotals, PermitSession, QueueGroup, QueueItem, ReviewClockView, StateApi, WaitingOnOthersItem } from "./types";
 import { involvement, waitingOn } from "./waitingOn";
@@ -180,6 +182,30 @@ export const caseTotals: StateApi["caseTotals"] = (c: EventCase): CaseTotals => 
   const due = c.ending ? 0 : Math.max(0, round2(total - paid));
   return { fees, deposit, total, paid, due };
 };
+
+/** What cancelling a permit today would pay back: the figure every screen shows, and the one `cancel` refunds. */
+export interface CancelRefund {
+  /** The whole refund: the schedule's share of the fees plus the deposit, never more than was paid. */
+  refund: number;
+  /** The deposit on the case, which is returned in full. 0 when there is none. */
+  deposit: number;
+  /** The band of the cancellation schedule that applies today, in plain language. */
+  rule: string;
+  /** False once `cancel` would be refused: no permit, the case ended, or the event is over. */
+  canCancel: boolean;
+}
+
+/**
+ * The cancellation schedule works from the fee lines, which for a series cover sessions not yet
+ * paid for, and it leaves the deposit out. This is the amount that actually goes back.
+ */
+export function refundIfCancelled(c: EventCase, today: ISODate, cfg: RulesConfig): CancelRefund {
+  const result = cancellationRefund(c, today, cfg);
+  const deposit = round2(c.feeLines.filter((f) => f.kind === "deposit").reduce((s, f) => s + f.estimate, 0));
+  // A refund never exceeds what the applicant has paid. To the cent, like every amount.
+  const refund = Math.min(round2(result.refund + deposit), Math.max(0, totalPaid(c)));
+  return { refund, deposit, rule: result.rule, canCancel: checkCancel(c, today, lastSessionDate(c)).ok };
+}
 
 export const leadTimeRisk: StateApi["leadTimeRisk"] = (c: EventCase, today: ISODate, cfg: RulesConfig): "ok" | "at_risk" => {
   const needed = cfg.risk.daysNeeded[c.state];

@@ -4,11 +4,13 @@ import * as React from "react"
 import { InlineAlert } from "@/components/ui/inline-alert"
 import { fmtFileSize } from "@/lib/format"
 import { checkVerifyOrReject } from "@/lib/state"
+import type { Task } from "@/lib/types"
+import { FormAnswers } from "../../FormAnswers"
 import { PanelActions, PanelBody, PanelHeader, useCaseContext, useCaseDispatch } from "../panelKit"
 import type { ActionPanelProps } from "../types"
 
 /** Shows the applicant's card content: what a mock document preview stands in for. */
-function CardContent({ task }: { task: { payload: { files?: { name: string; size: number; type: string }[]; form?: Record<string, unknown> } } }) {
+function CardContent({ task }: { task: Pick<Task, "catalogId" | "payload"> }) {
   const files = task.payload.files ?? []
   const form = task.payload.form
   if (files.length === 0 && (!form || Object.keys(form).length === 0)) {
@@ -28,16 +30,7 @@ function CardContent({ task }: { task: { payload: { files?: { name: string; size
           ))}
         </ul>
       ) : null}
-      {form && Object.keys(form).length > 0 ? (
-        <dl className="flex flex-col gap-1.5 rounded-control border border-line-subtle bg-surface-2 px-3 py-2 text-sm">
-          {Object.entries(form).map(([key, value]) => (
-            <div key={key} className="flex items-baseline justify-between gap-3">
-              <dt className="text-fg-label">{key}</dt>
-              <dd className="text-right text-fg">{String(value)}</dd>
-            </div>
-          ))}
-        </dl>
-      ) : null}
+      <FormAnswers task={task} />
     </div>
   )
 }

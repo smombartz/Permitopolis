@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { cancellationRefund, DEFAULT_DEMO_TODAY } from "@/lib/rules";
-import { buildSeed } from "@/lib/state";
+import { cancellationRefund, DEFAULT_CONFIG, DEFAULT_DEMO_TODAY } from "@/lib/rules";
+import { buildSeed, refundIfCancelled, transition } from "@/lib/state";
 import type { EventCase } from "@/lib/types";
 import { permitPageInfo, sessionRows, verifyStatus } from "./permit";
 
@@ -106,5 +106,45 @@ describe("cancellationRefund (lib/rules, read directly by the permit page)", () 
     const s1 = caseById(cases, "PMT-27-0109");
     const result = cancellationRefund(s1, TODAY);
     expect(result.refund).toBe(62.5);
+  });
+});
+
+describe("refundIfCancelled (what the permit page and the Cancel dialog show, and what cancel pays)", () => {
+  const cases = buildSeed();
+  const ctx = { today: TODAY, cases, cfg: DEFAULT_CONFIG };
+
+  it("S1 paid in full: the schedule's $62.50, no deposit", () => {
+    const s1 = caseById(cases, "PMT-27-0109");
+    expect(refundIfCancelled(s1, TODAY, DEFAULT_CONFIG)).toMatchObject({ refund: 62.5, deposit: 0, canCancel: true });
+  });
+
+  it("S2 after Pay and book: capped at the $20 paid for the first of 13 sessions, and it is what cancel refunds", () => {
+    const booked = transition(caseById(cases, "PMT-27-0142"), { type: "book_and_pay", method: "card" }, "applicant", ctx);
+    if (!booked.ok) throw new Error(booked.reason);
+    // The schedule itself works from all 13 sessions.
+    expect(cancellationRefund(booked.case, TODAY).refund).toBe(250);
+    expect(refundIfCancelled(booked.case, TODAY, DEFAULT_CONFIG).refund).toBe(20);
+
+    const cancelled = transition(booked.case, { type: "cancel" }, "applicant", ctx);
+    if (!cancelled.ok) throw new Error(cancelled.reason);
+    expect(cancelled.case.payments.at(-1)).toMatchObject({ kind: "refund", amount: -20 });
+  });
+
+  it("a permit with a deposit counts it in: the figure the Cancel dialog shows is the one cancel pays", () => {
+    const withDeposit = cases.filter((c) => c.permit && c.ending === null && c.feeLines.some((l) => l.kind === "deposit") && refundIfCancelled(c, TODAY, DEFAULT_CONFIG).canCancel);
+    expect(withDeposit.length).toBeGreaterThan(0);
+    for (const c of withDeposit) {
+      const quote = refundIfCancelled(c, TODAY, DEFAULT_CONFIG);
+      expect(quote.deposit).toBeGreaterThan(0);
+      const cancelled = transition(c, { type: "cancel" }, "applicant", ctx);
+      if (!cancelled.ok) throw new Error(cancelled.reason);
+      const refunded = cancelled.case.payments.at(-1);
+      expect(quote.refund > 0 ? refunded?.amount : 0).toBe(quote.refund > 0 ? -quote.refund : 0);
+    }
+  });
+
+  it("an event that is over cannot be cancelled", () => {
+    const s6 = caseById(cases, "PMT-27-0031");
+    expect(refundIfCancelled(s6, TODAY, DEFAULT_CONFIG).canCancel).toBe(false);
   });
 });

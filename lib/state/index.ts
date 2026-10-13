@@ -52,9 +52,11 @@ export {
   nextCaseId,
   permitSessions,
   queueFor,
+  refundIfCancelled,
   reviewClock,
   waitingOnOthers,
   whoIsUp,
+  type CancelRefund,
 } from "./selectors";
 export { demoToday, hydrateDemoStore, resetDemoStoreForTests, useDemo, useHydrated } from "./store";
 export { transition } from "./transition";

@@ -9,6 +9,7 @@ import {
   CASE_TABS,
   documentGroups,
   filterActivity,
+  formRows,
   hasNothingToDo,
   headerReviewClock,
   isCaseTab,
@@ -325,5 +326,77 @@ describe("hasNothingToDo", () => {
   it("is true only for an empty action list", () => {
     expect(hasNothingToDo([])).toBe(true);
     expect(hasNothingToDo([{ type: "add_note", label: "Add a note", enabled: true }])).toBe(false);
+  });
+});
+
+describe("formRows: a card's form as the applicant would read it back", () => {
+  it("no card of any seeded case prints a raw object, a raw key or a raw boolean", () => {
+    let rows = 0;
+    for (const c of cases) {
+      for (const group of documentGroups(c)) {
+        for (const card of group.cards) {
+          for (const row of formRows(card)) {
+            rows += 1;
+            const where = `${c.id} ${card.title}: ${row.label}`;
+            expect(row.value, where).not.toContain("[object");
+            for (const item of row.items ?? []) expect(item, where).not.toContain("[object");
+            expect(row.value, where).not.toMatch(/^(true|false|undefined|null)$/);
+            // A label is words, never a camelCase key.
+            expect(row.label, where).toMatch(/^[A-Z]/);
+            expect(row.label, where).not.toMatch(/[a-z][A-Z]/);
+          }
+        }
+      }
+    }
+    expect(rows).toBeGreaterThan(20);
+  });
+
+  it("S3's vendor list reads as a list of vendors, in the Health & Legal group", () => {
+    const hl = documentGroups(S3).find((g) => g.dept === "hl")!;
+    const vendorList = hl.cards.find((t) => t.catalogId === "vendor_list")!;
+    expect(formRows(vendorList)).toEqual([
+      { label: "Vendors", value: "Rolling Dumpling Co. · Dumplings and noodle bowls", items: ["Rolling Dumpling Co. · Dumplings and noodle bowls"] },
+    ]);
+  });
+
+  it("S6's vendor list has one line per vendor", () => {
+    const vendorList = S6.tasks.find((t) => t.catalogId === "vendor_list")!;
+    const [row] = formRows(vendorList);
+    expect(row.label).toBe("Vendors");
+    expect(row.items).toHaveLength(25);
+  });
+
+  it("uses the form's own field labels, 12-hour times and Yes or No", () => {
+    const sound = S3.tasks.find((t) => t.catalogId === "sound_details")!;
+    expect(formRows(sound)).toEqual([
+      { label: "Sound equipment", value: "Two powered speakers on stands, one wireless handheld mic" },
+      { label: "Sound check time", value: "5 pm" },
+    ]);
+
+    const services = makeTask({
+      id: "PMT-27-0001:city_services_request",
+      catalogId: "city_services_request",
+      kind: "form",
+      payload: { form: { barricades: 30, policeOfficers: 6, policeHours: 4, trash: false, power: true } },
+    });
+    expect(formRows(services)).toEqual([
+      { label: "Barricades", value: "30" },
+      { label: "Police officers", value: "6" },
+      { label: "Police hours", value: "4" },
+      { label: "Trash collection", value: "No" },
+      { label: "Power hookup", value: "Yes" },
+    ]);
+  });
+
+  it("a key nobody labelled falls back to its words, and an empty answer says so", () => {
+    const card = makeTask({ id: "PMT-27-0001:site_plan", catalogId: "site_plan", kind: "form", payload: { form: { fireExtinguishersOnSite: 2, notes: "" } } });
+    expect(formRows(card)).toEqual([
+      { label: "Fire extinguishers on site", value: "2" },
+      { label: "Site plan notes", value: "Not provided" },
+    ]);
+  });
+
+  it("a card with no form has no rows", () => {
+    expect(formRows(makeTask({ id: "PMT-27-0001:insurance_certificate", catalogId: "insurance_certificate" }))).toEqual([]);
   });
 });

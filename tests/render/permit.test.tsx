@@ -1,12 +1,15 @@
-import { screen } from "@testing-library/react";
+import { act, screen, within } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 import { PermitScreen } from "@/components/permit/PermitScreen";
 import { VerifyScreen } from "@/components/permit/VerifyScreen";
 import { routes } from "@/lib/routes";
-import { renderScreen } from "./harness";
+import { useDemo } from "@/lib/state";
+import { renderScreen, storedCase } from "./harness";
 
 const S1 = "PMT-27-0109";
+const S2 = "PMT-27-0142";
 const S5 = "PMT-27-0097";
+const S6 = "PMT-27-0031";
 
 describe("PermitScreen", () => {
   it("S1 shows the QR code, Shelter 3, Sat, May 22, 2027, 11 am to 4 pm and a $62.50 refund", async () => {
@@ -20,6 +23,38 @@ describe("PermitScreen", () => {
     expect(screen.getByText("$62.50")).toBeInTheDocument();
     expect(screen.getByText(/refund\./)).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Download PDF" })).toBeInTheDocument();
+  });
+
+  it("S2 after Pay and book (demo path 1): cancelling today refunds the $20 that was paid, not the $250 the 13 sessions come to", async () => {
+    await renderScreen(<PermitScreen />, { role: "applicant", personaId: "sunrise-yoga-club", path: routes.permit(S2) });
+    act(() => {
+      useDemo.getState().dispatch(S2, { type: "book_and_pay", method: "card" }, "applicant");
+    });
+    expect(storedCase(S2).state).toBe("permitted");
+
+    const line = screen.getByText(/If cancelled today/);
+    expect(within(line).getByText("$20")).toBeInTheDocument();
+    expect(screen.queryByText("$250")).not.toBeInTheDocument();
+  });
+
+  it("the cancellation schedule lists every band and marks the one that applies today", async () => {
+    await renderScreen(<PermitScreen />, { scenario: "S1" });
+
+    const schedule = screen.getByRole("list", { name: "Cancellation schedule" });
+    const bands = within(schedule).getAllByRole("listitem");
+    expect(bands.length).toBe(useDemo.getState().cfg.cancellation.length);
+    // S1 is 19 days out on May 3: the 10 to 29 day band.
+    const todays = bands.filter((band) => band.getAttribute("aria-current") === "true");
+    expect(todays).toHaveLength(1);
+    expect(todays[0]).toHaveTextContent(/10 to 29 days/);
+    expect(todays[0]).toHaveTextContent(/Applies today/);
+  });
+
+  it("S6 (in Closeout, the event is over) has no \"If cancelled today\" line", async () => {
+    await renderScreen(<PermitScreen />, { role: "applicant", personaId: "main-street-business-alliance", path: routes.permit(S6) });
+
+    expect(screen.getByRole("heading", { level: 1, name: "Main Street Food Truck Festival" })).toBeInTheDocument();
+    expect(screen.queryByText(/If cancelled today/)).not.toBeInTheDocument();
   });
 
   it("S5 (no permit yet) explains why and links to the board", async () => {

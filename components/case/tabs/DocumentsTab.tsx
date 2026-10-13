@@ -9,6 +9,7 @@ import { FileQuestionIcon } from "lucide-react"
 import { fmtFileSize, plural } from "@/lib/format"
 import { PARTY_LABEL, type EventCase, type Party, type Task, type TaskStatus } from "@/lib/types"
 import { documentGroups } from "@/lib/view/caseDetail"
+import { FormAnswers } from "../FormAnswers"
 
 const STATUS_BADGE: Record<TaskStatus, { variant: "secondary" | "default" | "warning" | "success"; text: string }> = {
   locked: { variant: "secondary", text: "Locked" },
@@ -20,7 +21,6 @@ const STATUS_BADGE: Record<TaskStatus, { variant: "secondary" | "default" | "war
 
 function DocumentCard({ task, role, onOpen }: { task: Task; role: Party; onOpen: (key: string) => void }) {
   const files = task.payload.files ?? []
-  const form = task.payload.form
   const badge = STATUS_BADGE[task.status]
   const canAct = task.status === "submitted" && (task.reviewer === role || task.request?.from === role)
 
@@ -48,16 +48,7 @@ function DocumentCard({ task, role, onOpen }: { task: Task; role: Party; onOpen:
           ))}
         </ul>
       ) : null}
-      {form && Object.keys(form).length > 0 ? (
-        <dl className="flex flex-col gap-1 rounded-control border border-line-subtle bg-surface-2 px-2.5 py-1.5 text-xs">
-          {Object.entries(form).map(([key, value]) => (
-            <div key={key} className="flex items-baseline justify-between gap-3">
-              <dt className="text-fg-label">{key}</dt>
-              <dd className="text-right text-fg">{String(value)}</dd>
-            </div>
-          ))}
-        </dl>
-      ) : null}
+      <FormAnswers task={task} size="xs" />
       {task.request && !task.request.resolved ? (
         <p className="text-xs text-fg-secondary">
           <span className="font-semibold text-fg">{PARTY_LABEL[task.request.from]} asked:</span> {task.request.message}

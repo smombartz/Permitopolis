@@ -54,6 +54,34 @@ describe("case detail: S5, two parties up at once", () => {
   });
 });
 
+describe("case detail: the Documents tab reads a card's form back in words", () => {
+  it("S3's vendor list names its vendor, and Sound details shows labels and a 12-hour time", async () => {
+    await renderScreen(<CaseDetailScreen />, { path: routes.city.case(S3, { tab: "documents" }), role: "hl" });
+
+    const vendorList = screen.getByTestId(`document-card-${S3}:vendor_list`);
+    expect(within(vendorList).getByText("Rolling Dumpling Co. · Dumplings and noodle bowls")).toBeInTheDocument();
+    expect(vendorList).not.toHaveTextContent("[object");
+    expect(within(vendorList).queryByText("vendors")).not.toBeInTheDocument();
+
+    const sound = screen.getByTestId(`document-card-${S3}:sound_details`);
+    expect(within(sound).getByText("Sound check time")).toBeInTheDocument();
+    expect(within(sound).getByText("5 pm")).toBeInTheDocument();
+    expect(within(sound).queryByText("soundCheckTime")).not.toBeInTheDocument();
+  });
+
+  it("S6 lists its 25 vendors once each, with Yes and No for the city services it asked for", async () => {
+    await renderScreen(<CaseDetailScreen />, { path: routes.city.case(S6, { tab: "documents" }), role: "hl" });
+
+    const vendorList = screen.getByTestId(`document-card-${S6}:vendor_list`);
+    expect(vendorList).not.toHaveTextContent("[object");
+    expect(within(vendorList).getAllByRole("listitem")).toHaveLength(25);
+
+    const services = screen.getByTestId(`document-card-${S6}:city_services_request`);
+    expect(within(services).getByText("Power hookup").nextElementSibling).toHaveTextContent("Yes");
+    expect(services).not.toHaveTextContent(/true|false/);
+  });
+});
+
 describe("case detail: S3, answering a request", () => {
   it("Health & Legal verifies the health permit and approves, then the Clerk sends the $715 quote", async () => {
     const { user } = await renderScreen(<CaseDetailScreen />, { path: routes.city.case(S3), role: "hl" });

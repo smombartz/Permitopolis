@@ -4,9 +4,8 @@
  */
 import { addDaysISO, daysBetween } from "@/lib/dates";
 import { fmtMoney } from "@/lib/format";
-import { cancellationRefund, classify, dueDate, estimateFees, requirements } from "@/lib/rules";
+import { classify, dueDate, estimateFees, requirements } from "@/lib/rules";
 import { CARD_BY_ID, type CardSpec } from "@/lib/rules/catalog";
-import { round2 } from "@/lib/rules/shared";
 import type { FeeEstimate, RulesCtx } from "@/lib/rules/types";
 import type { Actor, EventAnswers, EventCase, Task } from "@/lib/types";
 import type { Action } from "../actions";
@@ -48,7 +47,7 @@ import {
   taskId,
   totalPaid,
 } from "../core";
-import { eventDate, nextCaseId } from "../selectors";
+import { eventDate, nextCaseId, refundIfCancelled } from "../selectors";
 import type { TransitionResult } from "../types";
 import { maybeUnlockIssuePermit } from "./shared";
 
@@ -329,11 +328,9 @@ export function cancel(c: EventCase, _action: Extract_<"cancel">, actor: Actor, 
   const last = lastSessionDate(c);
   const check = checkCancel(c, ctx.today, last);
   if (!check.ok) return check;
-  const result = cancellationRefund(c, ctx.today, ctx.cfg);
-  const depositPaid = c.feeLines.filter((f) => f.kind === "deposit").reduce((s, f) => s + f.estimate, 0);
-  // The schedule works from the fee lines, which for a series cover sessions not yet paid for.
-  // A refund never exceeds what the applicant has paid. To the cent, like every amount.
-  const refund = Math.min(round2(result.refund + depositPaid), Math.max(0, totalPaid(c)));
+  // The same figure the permit page and the Cancel dialog showed before the button was pressed.
+  const result = refundIfCancelled(c, ctx.today, ctx.cfg);
+  const refund = result.refund;
   let next: EventCase = { ...c, ending: "cancelled", endingReason: result.rule, dateHold: releaseHold(c.dateHold) };
   if (refund > 0) {
     next = {

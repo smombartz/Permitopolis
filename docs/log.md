@@ -1,5 +1,25 @@
 # Change log
 
+## 2026-10-13 - Phase 3 review fixes
+
+**What Changed:**
+- The Phase 3 review returned 38 findings (2 high, 23 medium, 13 low). Plan: `docs/plans/2026-10-13-phase-3-review-fixes.md`
+- **High: the refund on the permit page and in the board's Cancel dialog is the one `cancel` pays.** Both printed `cancellationRefund()` off the fee lines, which for a series cover every session: after demo path 1 (S2 pays $20 for the first of 13 sessions) they read "$250" and the transition then refunded $20. `refundIfCancelled(c, today, cfg)` in `lib/state` is now the one figure (the schedule's share plus the deposit, capped at what was paid); `cancel()` uses it and both screens print it. The Cancel dialog reads the store's fee settings instead of the defaults
+- **High: a card's form is read back in words on the city's case detail.** The Documents tab and the Verify and Send back panels printed raw keys and `String(value)`: S3's vendor list read "vendors: [object Object]", S6's 25 times over. `formRows(task)` in `lib/view/caseDetail.ts` gives the label the applicant saw (a key nobody labelled reads as its own words), Yes or No, 12-hour times, and a list entry per line; `components/case/FormAnswers.tsx` prints it in both places. The field specs moved from `components/board/CardForms.tsx` to `lib/view/cardForms.ts` so both surfaces share them
+
+**Why:**
+- A read-only review of the applicant side and the city side after the Phase 3 integration. Each finding was confirmed in the code and has a test that fails without its fix
+
+**Files Modified:**
+- `lib/state/selectors.ts`, `lib/state/index.ts`, `lib/state/transitions/applicant.ts` - `refundIfCancelled()`
+- `components/permit/PermitCard.tsx`, `components/board/BoardMenu.tsx` - print it
+- `lib/view/cardForms.ts` (new), `lib/view/caseDetail.ts` - `FORM_FIELDS`, `formRows()`
+- `components/case/FormAnswers.tsx` (new), `components/case/tabs/DocumentsTab.tsx`, `components/case/actions/generic/VerifyDocument.tsx`, `components/board/CardForms.tsx`, `components/board/CardSheet.tsx`
+- `lib/view/permit.test.ts`, `lib/view/caseDetail.test.ts`, `tests/render/permit.test.tsx`, `tests/render/board.test.tsx`, `tests/render/case-detail.test.tsx`
+- `docs/plans/2026-10-13-phase-3-review-fixes.md` (new)
+
+---
+
 ## 2026-10-13 - Phase 3 integration: the seven surfaces meet
 
 **What Changed:**

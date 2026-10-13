@@ -8,9 +8,8 @@ import { Money } from "@/components/domain/Money"
 import { Button } from "@/components/ui/button"
 import { ConfirmDialog } from "@/components/ui/confirm-dialog"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
-import { cancellationRefund } from "@/lib/rules"
 import { routes } from "@/lib/routes"
-import { useDemo } from "@/lib/state"
+import { refundIfCancelled, useDemo } from "@/lib/state"
 import type { EventCase } from "@/lib/types"
 
 interface BoardMenuProps {
@@ -23,14 +22,15 @@ interface BoardMenuProps {
  */
 function BoardMenu({ c }: BoardMenuProps) {
   const today = useDemo((s) => s.demoToday)
+  const cfg = useDemo((s) => s.cfg)
   const [withdrawOpen, setWithdrawOpen] = React.useState(false)
   const [cancelOpen, setCancelOpen] = React.useState(false)
 
   if (c.ending !== null || c.state === "closed") return null
 
   const hasPermit = c.permit !== null
-  const refund = hasPermit ? cancellationRefund(c, today) : null
-  const deposit = c.feeLines.find((line) => line.kind === "deposit")
+  // The figure `cancel` pays back: capped at what was paid, the deposit included.
+  const refund = hasPermit ? refundIfCancelled(c, today, cfg) : null
 
   function withdraw() {
     const result = useDemo.getState().dispatch(c.id, { type: "withdraw" })
@@ -99,9 +99,9 @@ function BoardMenu({ c }: BoardMenuProps) {
               <span>
                 Today&apos;s refund: <Money amount={refund.refund} /> ({refund.rule})
               </span>
-              {deposit ? (
+              {refund.deposit > 0 && refund.refund >= refund.deposit ? (
                 <span>
-                  Plus the <Money amount={deposit.estimate} /> deposit.
+                  That includes your <Money amount={refund.deposit} /> deposit.
                 </span>
               ) : null}
             </span>
