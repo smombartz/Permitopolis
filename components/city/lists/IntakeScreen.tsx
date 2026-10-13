@@ -12,12 +12,13 @@ import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { CaseId, DateText, EventTitle, LeadTimeRisk, TierBadge } from "@/components/domain";
+import { applicantNameOf } from "@/lib/data/people";
 import { useDemo } from "@/lib/state";
 import { routes } from "@/lib/routes";
 import { plural } from "@/lib/format";
 import type { RulesConfig } from "@/lib/rules/types";
 import type { EventCase, ISODate } from "@/lib/types";
-import { INTAKE_TABS, INTAKE_TAB_LABEL, applicantNameOf, instantExceptionRows, intakeCounts, intakeRows, type IntakeTab } from "@/lib/view/cityLists";
+import { INTAKE_TABS, INTAKE_TAB_LABEL, instantExceptionRows, intakeCounts, intakeRows, type IntakeTab } from "@/lib/view/cityLists";
 
 function isIntakeTab(value: string | null): value is IntakeTab {
   return value === "special" || value === "reviewed" || value === "instant";
@@ -36,6 +37,9 @@ function IntakeScreen() {
   const tabParam = search.get("tab");
   const tab: IntakeTab = isIntakeTab(tabParam) ? tabParam : "special";
   const counts = intakeCounts(cases);
+  // A case opened from here comes back to this tab.
+  const query = search.toString();
+  const here = query ? `${pathname}?${query}` : pathname;
 
   function setTab(next: string) {
     const qs = new URLSearchParams();
@@ -45,12 +49,12 @@ function IntakeScreen() {
 
   function accept(caseId: string) {
     const result = dispatch(caseId, { type: "accept_complete" });
-    if (!result.ok) toast.error(result.reason ?? "That application cannot be accepted yet.");
-    else toast.success("Accepted as complete.");
+    if (!result.ok) toast.error(result.reason ?? "That could not be accepted.");
+    else toast.success("Accepted as complete; the date is held.");
   }
 
   return (
-    <div className="flex flex-col gap-5">
+    <div className="flex flex-col gap-6">
       <PageHeader eyebrow="City Clerk" title="Intake queue" description="Every application waiting to be accepted as complete, and the Instant exceptions after closeout." />
 
       <Tabs value={tab} onValueChange={setTab}>
@@ -65,12 +69,12 @@ function IntakeScreen() {
 
         {(["special", "reviewed"] as const).map((t) => (
           <TabsContent key={t} value={t} className="pt-2">
-            <IntakeTabTable tab={t} cases={cases} today={today} cfg={cfg} onAccept={accept} />
+            <IntakeTabTable tab={t} cases={cases} today={today} cfg={cfg} onAccept={accept} from={here} />
           </TabsContent>
         ))}
 
         <TabsContent value="instant" className="pt-2">
-          <InstantExceptionsTable cases={cases} today={today} />
+          <InstantExceptionsTable cases={cases} today={today} from={here} />
         </TabsContent>
       </Tabs>
     </div>
@@ -83,12 +87,14 @@ function IntakeTabTable({
   today,
   cfg,
   onAccept,
+  from,
 }: {
   tab: Exclude<IntakeTab, "instant">;
   cases: EventCase[];
   today: ISODate;
   cfg: RulesConfig;
   onAccept: (id: string) => void;
+  from: string;
 }) {
   const rows = intakeRows(cases, tab, today, cfg);
 
@@ -117,14 +123,13 @@ function IntakeTabTable({
           return (
             <TableRow key={c.id}>
               <TableCell>
-                <EventTitle name={c.name} applicantName={applicantNameOf(c)} className="max-w-56" />
-                <CaseId id={c.id} />
+                <CaseLink c={c} from={from} />
               </TableCell>
               <TableCell>
                 <TierBadge tier={c.tier} />
               </TableCell>
-              <TableCell numeric>{c.schedule ? <DateText date={c.schedule.date} /> : "—"}</TableCell>
-              <TableCell numeric>{c.submittedAt ? <DateText date={c.submittedAt.slice(0, 10)} /> : "—"}</TableCell>
+              <TableCell numeric>{c.schedule ? <DateText date={c.schedule.date} short /> : "—"}</TableCell>
+              <TableCell numeric>{c.submittedAt ? <DateText date={c.submittedAt.slice(0, 10)} short /> : "—"}</TableCell>
               <TableCell numeric>{plural(row.daysInIntake, "day")}</TableCell>
               <TableCell>
                 {row.completeness.done} of {row.completeness.total} items
@@ -143,7 +148,7 @@ function IntakeTabTable({
                   </Button>
                   {!row.accept.enabled && row.accept.reason ? <p className="max-w-40 text-xs text-danger-fg">{row.accept.reason}</p> : null}
                   <Button size="sm" variant="ghost" asChild>
-                    <Link href={routes.city.case(c.id, { task: row.intakeTaskId })}>Request info</Link>
+                    <Link href={routes.city.case(c.id, { task: "request_info", from })}>Request information</Link>
                   </Button>
                 </div>
               </TableCell>
@@ -155,7 +160,20 @@ function IntakeTabTable({
   );
 }
 
-function InstantExceptionsTable({ cases, today }: { cases: EventCase[]; today: ISODate }) {
+/** A row's identity cell: the event over its applicant, then the id, all one link to the case. */
+function CaseLink({ c, from }: { c: EventCase; from: string }) {
+  return (
+    <Link
+      href={routes.city.case(c.id, { from })}
+      className="flex w-fit flex-col rounded-control outline-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring"
+    >
+      <EventTitle name={c.name} applicantName={applicantNameOf(c)} className="max-w-56" />
+      <CaseId id={c.id} />
+    </Link>
+  );
+}
+
+function InstantExceptionsTable({ cases, today, from }: { cases: EventCase[]; today: ISODate; from: string }) {
   const rows = instantExceptionRows(cases, today);
 
   if (rows.length === 0) {
@@ -176,14 +194,13 @@ function InstantExceptionsTable({ cases, today }: { cases: EventCase[]; today: I
         {rows.map(({ case: c, task, daysInCloseout }) => (
           <TableRow key={c.id}>
             <TableCell>
-              <EventTitle name={c.name} applicantName={applicantNameOf(c)} className="max-w-56" />
-              <CaseId id={c.id} />
+              <CaseLink c={c} from={from} />
             </TableCell>
-            <TableCell numeric>{c.schedule ? <DateText date={c.schedule.date} /> : "—"}</TableCell>
+            <TableCell numeric>{c.schedule ? <DateText date={c.schedule.date} short /> : "—"}</TableCell>
             <TableCell numeric>{plural(daysInCloseout, "day")}</TableCell>
             <TableCell>
               <Button size="sm" variant="secondary" asChild>
-                <Link href={routes.city.case(c.id, { task: task?.id })}>{task?.title ?? "Resolve"}</Link>
+                <Link href={routes.city.case(c.id, { task: task?.id, from })}>{task?.title ?? "Resolve"}</Link>
               </Button>
             </TableCell>
           </TableRow>

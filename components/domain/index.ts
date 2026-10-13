@@ -1,5 +1,6 @@
 export * from "@/components/domain/icons";
 export { TierBadge } from "@/components/domain/TierBadge";
+export { TierLegend } from "@/components/domain/TierLegend";
 export { PartyChip } from "@/components/domain/PartyChip";
 export { PartyAvatar } from "@/components/domain/PartyAvatar";
 export { StateChip } from "@/components/domain/StateChip";
@@ -15,6 +16,7 @@ export { ReviewClock } from "@/components/domain/ReviewClock";
 export { PersonaAvatar } from "@/components/domain/PersonaAvatar";
 export { TaskKindLabel, TASK_KIND_LABEL } from "@/components/domain/TaskKindLabel";
 export { AvailabilityBadge } from "@/components/domain/AvailabilityBadge";
+export { BillingBadge } from "@/components/domain/BillingBadge";
 export { EndingBanner } from "@/components/domain/EndingBanner";
 export { EventTitle } from "@/components/domain/EventTitle";
 export { LeadTimeRisk } from "@/components/domain/LeadTimeRisk";

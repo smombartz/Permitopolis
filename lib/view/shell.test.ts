@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { makeCase } from "@/lib/state/testSupport";
 import { routes } from "@/lib/routes";
-import { applicantCaseIdFromHref, caseIdFromPath, cityPageIsFor, cityToolLinks, cityToolOwner, pathForCase, pathForPersona, resolveRoleSwitch } from "./shell";
+import { applicantCaseIdFromHref, caseIdFromPath, cityPageIsFor, cityToolLinks, cityToolOwner, pageIsFor, pathForCase, pathForPersona, resolveRoleSwitch } from "./shell";
 
 describe("caseIdFromPath", () => {
   it("reads a case id off an applicant event page and its subpages", () => {
@@ -221,6 +221,73 @@ describe("resolveRoleSwitch", () => {
         lastPathByRole: {},
       }),
     ).toEqual({ path: "/city/queue" });
+  });
+});
+
+describe("resolveRoleSwitch, on a page opened under the wrong role", () => {
+  const cases = [
+    makeCase({ id: "PMT-27-0097", applicantId: "riverfront-running-club", state: "quote_sent" }),
+    makeCase({ id: "PMT-27-0142", applicantId: "sunrise-yoga-club", state: "draft", wizardStep: "when" }),
+  ];
+  const remembered = { clerk: "/city/cases?tier=special", pws: "/city/work-orders", hl: "/city/verifications", applicant: "/events" };
+
+  it("the Applicant on a city case: each city role stays on that case, whatever it remembers", () => {
+    for (const toRole of ["clerk", "pws", "hl"] as const) {
+      expect(resolveRoleSwitch({ fromRole: "applicant", toRole, pathname: "/city/cases/PMT-27-0097", cases, lastPathByRole: remembered })).toEqual({ path: "/city/cases/PMT-27-0097" });
+    }
+  });
+
+  it("the Applicant on a shared city list stays there too", () => {
+    expect(resolveRoleSwitch({ fromRole: "applicant", toRole: "hl", pathname: "/city/active", cases, lastPathByRole: remembered })).toEqual({ path: "/city/active" });
+  });
+
+  it("the Applicant on a tool page: its owner stays, another role goes to its own last page", () => {
+    expect(resolveRoleSwitch({ fromRole: "applicant", toRole: "clerk", pathname: "/city/intake", cases, lastPathByRole: remembered })).toEqual({ path: "/city/intake" });
+    expect(resolveRoleSwitch({ fromRole: "applicant", toRole: "pws", pathname: "/city/intake", cases, lastPathByRole: remembered })).toEqual({ path: "/city/work-orders" });
+    expect(resolveRoleSwitch({ fromRole: "applicant", toRole: "hl", pathname: "/city/intake", cases, lastPathByRole: {} })).toEqual({ path: "/city/queue" });
+  });
+
+  it("a city role on an event page: the Applicant stays on it, as that event's own applicant", () => {
+    expect(resolveRoleSwitch({ fromRole: "clerk", toRole: "applicant", pathname: "/events/PMT-27-0097/quote", cases, lastPathByRole: remembered })).toEqual({
+      path: "/events/PMT-27-0097/quote",
+      personaId: "riverfront-running-club",
+    });
+    // My events is about nobody's case, and an unknown id is the page's own to explain.
+    expect(resolveRoleSwitch({ fromRole: "pws", toRole: "applicant", pathname: "/events", cases, lastPathByRole: {} })).toEqual({ path: "/events" });
+    expect(resolveRoleSwitch({ fromRole: "pws", toRole: "applicant", pathname: "/events/PMT-27-9999", cases, lastPathByRole: remembered })).toEqual({ path: "/events/PMT-27-9999" });
+  });
+
+  it("a city role on the wizard: the Applicant stays, as the draft's owner when the link names one", () => {
+    expect(resolveRoleSwitch({ fromRole: "hl", toRole: "applicant", pathname: "/apply", search: "?case=PMT-27-0142&step=when", cases, lastPathByRole: remembered })).toEqual({
+      path: "/apply",
+      personaId: "sunrise-yoga-club",
+    });
+    expect(resolveRoleSwitch({ fromRole: "hl", toRole: "applicant", pathname: "/apply", cases, lastPathByRole: remembered })).toEqual({ path: "/apply" });
+  });
+
+  it("between two city roles on an event page nothing moves: the page still asks for the Applicant", () => {
+    expect(resolveRoleSwitch({ fromRole: "clerk", toRole: "pws", pathname: "/events/PMT-27-0097", cases, lastPathByRole: {} })).toEqual({ path: "/events/PMT-27-0097" });
+  });
+});
+
+describe("pageIsFor", () => {
+  it("the wizard and the event pages are the Applicant's; city pages are a city role's, tools by owner", () => {
+    for (const path of ["/apply", "/events", "/events/PMT-27-0097", "/events/PMT-27-0097/quote?pay=final"]) {
+      expect(pageIsFor("applicant", path), path).toBe(true);
+      expect(pageIsFor("clerk", path), path).toBe(false);
+    }
+    for (const path of ["/city/queue", "/city/cases?tier=special", "/city/cases/PMT-27-0097", "/city/active"]) {
+      expect(pageIsFor("applicant", path), path).toBe(false);
+      for (const role of ["clerk", "pws", "hl"] as const) expect(pageIsFor(role, path), `${role} ${path}`).toBe(true);
+    }
+    expect(pageIsFor("clerk", "/city/intake")).toBe(true);
+    expect(pageIsFor("pws", "/city/intake")).toBe(false);
+  });
+
+  it("the landing page, the demo guide and the public check are nobody's", () => {
+    for (const path of ["/", "/demo", "/verify/PMT-27-0109"]) {
+      for (const role of ["applicant", "clerk", "pws", "hl"] as const) expect(pageIsFor(role, path), `${role} ${path}`).toBe(false);
+    }
   });
 });
 

@@ -45,6 +45,9 @@ function CasesScreen() {
   const containerRef = React.useRef<HTMLDivElement>(null);
 
   const filters = parseCasesFilters(search, role);
+  // A case opened from here comes back to this list as it is: view, filters and sort.
+  const query = search.toString();
+  const here = query ? `${pathname}?${query}` : pathname;
 
   React.useEffect(() => {
     function onKeyDown(event: KeyboardEvent) {
@@ -90,7 +93,7 @@ function CasesScreen() {
   const columns = pipelineBoardColumns(visible, today);
 
   return (
-    <div ref={containerRef} className="flex flex-col gap-5">
+    <div ref={containerRef} className="flex flex-col gap-6">
       <PageHeader eyebrow="City" title="Cases pipeline" description="Every case the city is tracking, as a board or a table." />
 
       <p className="text-sm text-fg-secondary" aria-live="polite">
@@ -124,7 +127,7 @@ function CasesScreen() {
               {STATE_LABEL[s]}
             </option>
           ))}
-          <option value="off_path">Closed or ended</option>
+          <option value="off_path">Ended</option>
         </select>
         <select
           aria-label="Waiting on"
@@ -172,9 +175,9 @@ function CasesScreen() {
           action={<Button variant="secondary" onClick={clearFilters}>Clear filters</Button>}
         />
       ) : filters.view === "table" ? (
-        <PipelineTable rows={rows} today={today} sort={filters.sort} dir={filters.dir} onSort={handleSort} />
+        <PipelineTable rows={rows} today={today} sort={filters.sort} dir={filters.dir} onSort={handleSort} from={here} />
       ) : (
-        <PipelineBoard columns={columns} today={today} />
+        <PipelineBoard columns={columns} today={today} from={here} />
       )}
 
       {filters.view === "table" ? <KeyboardFooter /> : null}

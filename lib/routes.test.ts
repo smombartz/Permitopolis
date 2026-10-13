@@ -18,6 +18,9 @@ describe("routes", () => {
     expect(routes.city.case("PMT-27-0097", { task: "PMT-27-0097:verify_document" })).toBe(
       "/city/cases/PMT-27-0097?task=PMT-27-0097%3Averify_document",
     );
+    expect(routes.city.case("PMT-27-0097", { from: "/city/cases?view=table&tier=special" })).toBe(
+      "/city/cases/PMT-27-0097?from=%2Fcity%2Fcases%3Fview%3Dtable%26tier%3Dspecial",
+    );
     expect(routes.city.cases({ tier: "special", waiting: "me" })).toBe("/city/cases?tier=special&waiting=me");
     expect(routes.city.active({ view: "calendar" })).toBe("/city/active?view=calendar");
   });

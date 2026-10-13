@@ -1,15 +1,18 @@
 import { describe, expect, it } from "vitest";
 import { DEFAULT_CONFIG, DEFAULT_DEMO_TODAY } from "@/lib/rules/config";
 import { boardColumns, buildSeed } from "@/lib/state";
+import { makeTask } from "@/lib/state/testSupport";
 import { routes } from "@/lib/routes";
 import {
   boardColumnsGrouped,
   dateHoldFootnote,
   directLinkHref,
   groupColumnEntries,
+  isUnplannedDraft,
   myEvents,
   nextActionFor,
   opensSessionSchedule,
+  permitHrefFor,
   phaseGroups,
   reviewerRows,
   seriesSessions,
@@ -24,6 +27,9 @@ const S4 = "PMT-27-0126"; // Maple Street block captain, Reviewed, submitted (9 
 const S5 = "PMT-27-0097"; // Riverfront Running Club, Special, quote_sent
 const S6 = "PMT-27-0031"; // Main Street Business Alliance, Special, closeout
 const WITHDRAWN_B23 = "PMT-27-0048"; // Sunnyvale Block Association, withdrawn before a permit
+const B02 = "PMT-27-0004"; // Riverside Garden Society, Reviewed, a Draft with no board yet
+const B16 = "PMT-27-0034"; // Riverside Tai Chi Circle, Instant series, Event day today
+const F2 = "PMT-27-0070"; // Riverside Farmers Market, Reviewed series, In review
 
 function find(id: string) {
   const c = buildSeed().find((c) => c.id === id);
@@ -46,6 +52,15 @@ describe("myEvents", () => {
     expect(active[0].permitHref).toBeNull();
   });
 
+  it("sends a Draft that already has its board to the board: its cards are what it needs next", () => {
+    // What the wizard's last step leaves behind for a Reviewed event: still a Draft, with cards.
+    const cases = buildSeed().map((c) =>
+      c.id === B02 ? { ...c, tasks: [makeTask({ id: `${B02}:insurance_certificate`, catalogId: "insurance_certificate" })] } : c,
+    );
+    const { active } = myEvents(cases, "riverside-garden-society", TODAY);
+    expect(active[0].href).toBe(routes.event(B02));
+  });
+
   it("is empty for a persona with no events", () => {
     const { active, past } = myEvents(buildSeed(), "new", TODAY);
     expect(active).toEqual([]);
@@ -64,6 +79,21 @@ describe("myEvents", () => {
     const { active } = myEvents(cases, "downtown-arts-collective", TODAY);
     expect(active[0].case.id).toBe(S3);
     expect(active[0].needsApplicant).toBe(true);
+  });
+});
+
+describe("isUnplannedDraft and permitHrefFor", () => {
+  it("a Draft with no cards is still only wizard answers", () => {
+    expect(isUnplannedDraft(find(S2))).toBe(true);
+    expect(isUnplannedDraft(find(B02))).toBe(true);
+    expect(isUnplannedDraft(find(S4))).toBe(false);
+  });
+
+  it("links to the permit only while it is live", () => {
+    expect(permitHrefFor(find(S1))).toBe(routes.permit(S1));
+    expect(permitHrefFor(find(S5))).toBeNull(); // quote sent, no permit yet
+    expect(permitHrefFor(find("PMT-27-0050"))).toBeNull(); // cancelled
+    expect(permitHrefFor(find("PMT-27-0040"))).toBeNull(); // closed
   });
 });
 
@@ -183,13 +213,30 @@ describe("directLinkHref", () => {
     expect(directLinkHref(c, pay)).toBeNull();
   });
 
-  it("a series' pay_fees card opens the session schedule instead of linking out", () => {
-    const c = find(S2);
-    const pay = c.tasks.find((t) => t.catalogId === "pay_fees");
-    if (pay && pay.status === "todo") {
-      expect(directLinkHref(c, pay)).toBeNull();
-      expect(opensSessionSchedule(c, pay)).toBe(true);
-    }
+  it("a series' pay_fees card opens the session schedule once the booking is paid", () => {
+    const c = find(B16);
+    const pay = c.tasks.find((t) => t.catalogId === "pay_fees")!;
+    expect(pay.status).toBe("done");
+    expect(directLinkHref(c, pay)).toBeNull();
+    expect(opensSessionSchedule(c, pay)).toBe(true);
+  });
+
+  it("a series' pay_fees card is the quote's own payment while the quote is open", () => {
+    // The Farmers Market, moved to Quote sent: the card asks for the first session and the
+    // one-off lines, and that is paid on the quote, not session by session.
+    const market = find(F2);
+    const c = { ...market, state: "quote_sent" as const, tasks: market.tasks.map((t) => (t.catalogId === "pay_fees" ? { ...t, status: "todo" as const } : t)) };
+    const pay = c.tasks.find((t) => t.catalogId === "pay_fees")!;
+    expect(directLinkHref(c, pay)).toBe(routes.quote(F2));
+    expect(opensSessionSchedule(c, pay)).toBe(false);
+  });
+
+  it("a series' pay_fees card opens as a locked card before its quote, not as a schedule", () => {
+    const c = find(F2);
+    const pay = c.tasks.find((t) => t.catalogId === "pay_fees")!;
+    expect(pay.status).toBe("locked");
+    expect(directLinkHref(c, pay)).toBeNull();
+    expect(opensSessionSchedule(c, pay)).toBe(false);
   });
 });
 
@@ -199,6 +246,20 @@ describe("seriesSessions", () => {
     expect(rows).toHaveLength(13);
     expect(rows.every((r) => r.amount === 20)).toBe(true);
     expect(rows[0].date).toBe("2027-06-06");
+  });
+
+  it("offers a pay link only for a session the checkout takes now", () => {
+    // A Draft: nothing is booked, so no session can be paid yet.
+    expect(seriesSessions(find(S2), DEFAULT_CONFIG).every((r) => r.payHref === null)).toBe(true);
+
+    // On Event day: every session still owed has its link; paid and skipped ones have none.
+    const rows = seriesSessions(find(B16), DEFAULT_CONFIG);
+    for (const row of rows) {
+      const owed = row.billing === "due" || row.billing === "upcoming";
+      expect(row.payHref).toBe(owed ? routes.quote(B16, { pay: "session", date: row.date }) : null);
+    }
+    expect(rows.some((r) => r.billing === "due")).toBe(true);
+    expect(rows.some((r) => r.billing === "skipped")).toBe(true);
   });
 
   it("a single event has no session schedule", () => {

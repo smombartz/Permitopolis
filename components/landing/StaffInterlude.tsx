@@ -4,8 +4,7 @@ import Link from "next/link";
 import { CalendarDaysIcon, ListChecksIcon, SearchCheckIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { routes } from "@/lib/routes";
-import { useHydrated } from "@/lib/state";
-import { useRoleSwitch } from "@/components/shell";
+import { useDoors } from "./hooks";
 import { fmtMonthDay, fmtTime } from "@/lib/format";
 import type { EventCase } from "@/lib/types";
 import { SectionHeading } from "./SectionHeading";
@@ -40,16 +39,9 @@ interface StaffInterludeProps {
  * notesForIntegrator) shows the Riverfront Summer 5K's own real activity entries, newest first.
  */
 function StaffInterlude({ seed }: StaffInterludeProps) {
-  const hydrated = useHydrated();
-  const switchRole = useRoleSwitch();
+  const doors = useDoors();
   const fiveK = seed.find((c) => c.id === RIVERFRONT_5K_ID);
   const logLines = fiveK ? [...fiveK.activity].slice(-5).reverse() : [];
-
-  function handleOpenWorkspace(event: React.MouseEvent) {
-    if (!hydrated) return;
-    event.preventDefault();
-    switchRole("clerk");
-  }
 
   return (
     <section className="relative isolate overflow-hidden bg-night py-[var(--section-space)]">
@@ -81,7 +73,7 @@ function StaffInterlude({ seed }: StaffInterludeProps) {
             ))}
           </ul>
           <Button asChild variant="dark" size="lg" className="w-fit">
-            <Link href={routes.city.queue()} onClick={handleOpenWorkspace}>
+            <Link href={routes.city.queue()} onClick={doors.cityStaff}>
               Open the staff workspace
             </Link>
           </Button>

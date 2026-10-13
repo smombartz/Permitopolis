@@ -2,6 +2,7 @@
 
 import { ChevronLeftIcon, ChevronRightIcon } from "lucide-react";
 import { MonthGrid, WeekGrid, type CalendarItem } from "@/components/calendar";
+import { TierLegend } from "@/components/domain";
 import { monthLabel } from "@/components/calendar/utils";
 import { Button } from "@/components/ui/button";
 import { SegmentedControl } from "@/components/ui/segmented-control";
@@ -9,7 +10,7 @@ import { StickyAside } from "@/components/ui/sticky-aside";
 import { fmtDateShort } from "@/lib/format";
 import type { Dept, EventCase, ISODate } from "@/lib/types";
 import { monthAnchorOf, shiftMonth, shiftWeek, weekStartOf } from "@/lib/view/active";
-import { CalendarLegend, RoleOverlaySidePanel } from "./RoleOverlay";
+import { RoleOverlaySidePanel } from "./RoleOverlay";
 
 export type CalendarSubView = "month" | "week";
 
@@ -69,7 +70,7 @@ export function ActiveCalendarView({ items, cases, today, role, date, onDateChan
             ]}
           />
         </div>
-        <CalendarLegend />
+        <TierLegend aria-label="Calendar legend: tiers" />
         {subView === "month" ? (
           <MonthGrid items={items} today={today} month={monthAnchor} onSelectItem={onSelectItem} onSelectDay={onDateChange} />
         ) : (

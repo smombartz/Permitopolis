@@ -4,7 +4,7 @@ import * as React from "react"
 import { Field } from "@/components/ui/field"
 import { Input } from "@/components/ui/input"
 import { InlineAlert } from "@/components/ui/inline-alert"
-import { checkScheduleMeeting, meetingCardFor } from "@/lib/state/checks"
+import { checkScheduleMeeting, meetingCardFor } from "@/lib/state"
 import { PanelActions, PanelBody, PanelHeader, useCaseContext, useCaseDispatch } from "../panelKit"
 import type { ActionPanelProps } from "../types"
 

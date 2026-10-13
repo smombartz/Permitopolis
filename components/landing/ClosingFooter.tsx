@@ -5,23 +5,13 @@ import { ArrowRightIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Panel } from "@/components/ui/panel";
 import { routes } from "@/lib/routes";
-import { useDemo, useHydrated } from "@/lib/state";
-import { usePersonaSwitch } from "@/components/shell";
+import { useDoors } from "./hooks";
 import { CITY_STAFF_BY_DEPT } from "@/lib/data/people";
 
 /** Closing card and footer (plan 7, row 10). */
 function ClosingFooter() {
-  const hydrated = useHydrated();
-  const switchPersona = usePersonaSwitch();
-  const personaId = useDemo((s) => s.personaId);
+  const doors = useDoors();
   const clerk = CITY_STAFF_BY_DEPT.clerk;
-
-  function handlePlanAnEvent(event: React.MouseEvent) {
-    if (!hydrated) return;
-    event.preventDefault();
-    useDemo.getState().setRole("applicant");
-    switchPersona(personaId);
-  }
 
   return (
     <>
@@ -38,7 +28,7 @@ function ClosingFooter() {
             you.
           </p>
           <Button asChild size="lg">
-            <Link href={routes.apply()} onClick={handlePlanAnEvent}>
+            <Link href={routes.apply()} onClick={doors.planAnEvent}>
               Plan an event
               <ArrowRightIcon aria-hidden="true" />
             </Link>

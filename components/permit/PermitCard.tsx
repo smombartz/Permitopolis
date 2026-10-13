@@ -1,3 +1,7 @@
+"use client";
+
+import * as React from "react";
+import Link from "next/link";
 import { QRCodeSVG } from "qrcode.react";
 import { SessionList } from "@/components/permit/SessionList";
 import { CaseId, ConditionList, TierBadge } from "@/components/domain";
@@ -12,6 +16,20 @@ import { routes } from "@/lib/routes";
 import type { EventCase, ISODate } from "@/lib/types";
 import { sessionRows } from "@/lib/view/permit";
 
+const noSubscription = () => () => {};
+
+/**
+ * The site's own origin, so the QR code holds a URL a phone can open and not only a path. Empty
+ * on the server and on the first client render, then the browser's.
+ */
+function useOrigin(): string {
+  return React.useSyncExternalStore(
+    noSubscription,
+    () => window.location.origin,
+    () => "",
+  );
+}
+
 /**
  * The permit itself: mobile-first (applicants carry it on a phone), and what prints through
  * `PermitPrintStyles`'s visibility pattern when `id="permit-print-area"` is targeted.
@@ -22,6 +40,8 @@ function PermitCard({ c, today, cfg }: { c: EventCase; today: ISODate; cfg: Rule
   const refund = cancellationRefund(c, today, cfg);
   const rows = sessionRows(c);
   const isSeries = !!c.schedule?.recurrence;
+  const verifyPath = routes.verify(c.id);
+  const origin = useOrigin();
 
   return (
     <div
@@ -45,10 +65,17 @@ function PermitCard({ c, today, cfg }: { c: EventCase; today: ISODate; cfg: Rule
       <Separator />
 
       <div className="flex flex-col items-center gap-3 sm:flex-row sm:justify-between">
-        <QRCodeSVG value={routes.verify(c.id)} size={148} />
+        <QRCodeSVG value={`${origin}${verifyPath}`} size={148} />
         <div className="flex flex-col items-center gap-1 text-center sm:items-end sm:text-right">
           <p className="text-sm font-semibold text-fg">Scan to verify this permit</p>
-          <p className="font-mono text-xs text-fg-secondary">{routes.verify(c.id)}</p>
+          <p className="font-mono text-xs text-fg-secondary">{verifyPath}</p>
+          {/* What the scan opens, for whoever is holding the permit rather than scanning it. */}
+          <Link
+            href={verifyPath}
+            className="no-print rounded-control text-sm font-medium text-fg-accent underline-offset-4 outline-none hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring"
+          >
+            Open the verification page
+          </Link>
         </div>
       </div>
 

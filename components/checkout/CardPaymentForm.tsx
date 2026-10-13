@@ -5,10 +5,12 @@ import { Button } from "@/components/ui/button";
 import { Field } from "@/components/ui/field";
 import { InlineAlert } from "@/components/ui/inline-alert";
 import { Input } from "@/components/ui/input";
+import { PERSONA_BY_ID } from "@/lib/data/people";
+import { useDemo } from "@/lib/state";
 import { payButtonLabel } from "@/lib/view/checkout";
 
 /** A fictional card: no real payment is ever made (PRD, "simulated forms that always succeed"). */
-const TEST_CARD = { number: "4242 4242 4242 4242", name: "Maya Chen", expiry: "12/29", cvc: "123" };
+const TEST_CARD = { number: "4242 4242 4242 4242", expiry: "12/29", cvc: "123" };
 
 interface CardPaymentFormProps {
   amount: number;
@@ -26,7 +28,9 @@ interface CardPaymentFormProps {
  * can still refuse, and its reason is shown).
  */
 function CardPaymentForm({ amount, covers, disabled = false, disabledReason, onPay }: CardPaymentFormProps) {
-  const [card, setCard] = React.useState(TEST_CARD);
+  // Prefilled for whoever is paying: the persona's own contact, not one name for every organizer.
+  const personaId = useDemo((s) => s.personaId);
+  const [card, setCard] = React.useState(() => ({ ...TEST_CARD, name: PERSONA_BY_ID[personaId]?.contactName || "Test Cardholder" }));
   const [pending, setPending] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
 

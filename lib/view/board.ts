@@ -17,6 +17,7 @@ import {
 } from "@/lib/state";
 import type { BoardColumn } from "@/lib/state/types";
 import { PARTY_LABEL, type EventCase, type ISODate, type Occurrence, type Party, type Task, type TaskPhase } from "@/lib/types";
+import { canPaySession } from "@/lib/view/checkout";
 
 /* ---------------------------------------------------------------------- */
 /* My events                                                               */
@@ -56,8 +57,23 @@ export function nextActionFor(c: EventCase, today: ISODate): { text: string; due
   return { text: "Nothing for you to do right now.", due: null };
 }
 
+/**
+ * True while a Draft is still only wizard answers: no plan has been confirmed, so it has no
+ * cards and no board. An Instant draft stays this way until it is booked; a Reviewed or Special
+ * one gets its board at the wizard's last step and stays a Draft until it is submitted.
+ */
+export function isUnplannedDraft(c: EventCase): boolean {
+  return c.state === "draft" && c.tasks.length === 0;
+}
+
+/** Where an event opens from My events: the wizard while it is only answers, its board after. */
 function hrefFor(c: EventCase): string {
-  return c.state === "draft" ? routes.apply({ caseId: c.id }) : routes.event(c.id);
+  return isUnplannedDraft(c) ? routes.apply({ caseId: c.id }) : routes.event(c.id);
+}
+
+/** The permit page, while the event has a live permit; null before one and after it ends. */
+export function permitHrefFor(c: EventCase): string | null {
+  return hasActivePermit(c) ? routes.permit(c.id) : null;
 }
 
 /** This persona's events: active ones first (what needs the applicant first, then by event date), then Past. */
@@ -68,7 +84,7 @@ export function myEvents(cases: EventCase[], personaId: string, today: ISODate):
     return {
       case: c,
       href: hrefFor(c),
-      permitHref: hasActivePermit(c) ? routes.permit(c.id) : null,
+      permitHref: permitHrefFor(c),
       nextActionText: text,
       nextActionDue: due,
       needsApplicant: whoIsUp(c, today).includes("applicant"),
@@ -249,22 +265,26 @@ export function dateHoldFootnote(c: EventCase): string | null {
 
 /**
  * Sign-off and payment cards (and an unlocked "Carry your permit") do not open a card
- * detail sheet: their button goes straight to the quote or the permit page. A series'
- * "Pay fees and deposit" is the exception: it opens the session schedule instead (see
- * `BoardScreen`), so it is left out here.
+ * detail sheet: their button goes straight to the quote or the permit page. "Pay fees and
+ * deposit" is the quote's own payment while it is open, for a series too: the quote asks for
+ * the first session, and the checkout page is the one place it is paid.
  */
 export function directLinkHref(c: EventCase, task: Task): string | null {
   if (task.status !== "todo") return null;
   if (task.catalogId === "accept_and_sign") return routes.quote(c.id);
-  if (task.catalogId === "pay_fees" && !c.schedule?.recurrence) return routes.quote(c.id);
+  if (task.catalogId === "pay_fees") return routes.quote(c.id);
   if (task.catalogId === "final_bill_or_refund") return routes.quote(c.id, { pay: "final" });
   if (task.catalogId === "carry_permit") return routes.permit(c.id);
   return null;
 }
 
-/** True for a series' own "Pay fees and deposit" card: it opens the session schedule sheet. */
+/**
+ * True for a series' "Pay fees and deposit" card once the booking or the quote is paid: from
+ * then on it opens the session schedule, where the later sessions are paid one by one. While
+ * the card is locked it opens as any locked card does, with what unlocks it.
+ */
 export function opensSessionSchedule(c: EventCase, task: Task): boolean {
-  return task.catalogId === "pay_fees" && Boolean(c.schedule?.recurrence);
+  return task.catalogId === "pay_fees" && task.status === "done" && Boolean(c.schedule?.recurrence);
 }
 
 export function unlockHintFor(catalogId: string): string | undefined {
@@ -279,13 +299,22 @@ export interface SessionRow {
   date: ISODate;
   billing: Occurrence["billing"];
   amount: number;
+  /** The checkout page for this session, when it can be paid there now; null otherwise. */
+  payHref: string | null;
 }
 
 /** Every session of a series, with its own per-session amount, in date order. */
 export function seriesSessions(c: EventCase, cfg: RulesConfig): SessionRow[] {
   if (!c.schedule?.recurrence) return [];
   const perSession = estimateFees(c, classify(c, cfg), cfg).perSession ?? 0;
-  return [...c.schedule.occurrences].sort((a, b) => a.date.localeCompare(b.date)).map((o) => ({ date: o.date, billing: o.billing, amount: perSession }));
+  return [...c.schedule.occurrences]
+    .sort((a, b) => a.date.localeCompare(b.date))
+    .map((o) => ({
+      date: o.date,
+      billing: o.billing,
+      amount: perSession,
+      payHref: canPaySession(c, o.date) ? routes.quote(c.id, { pay: "session", date: o.date }) : null,
+    }));
 }
 
 /* ---------------------------------------------------------------------- */

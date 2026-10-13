@@ -19,6 +19,23 @@ interface PageHeaderProps extends Omit<React.ComponentProps<"header">, "title"> 
   backLabel?: React.ReactNode
 }
 
+interface BackLinkProps extends Omit<React.ComponentProps<typeof Link>, "children"> {
+  children?: React.ReactNode
+}
+
+/**
+ * The back link above a page's header. `PageHeader` renders it from `backHref`; a screen that
+ * opens with a `CaseHeader` instead puts this one above it, so every page goes back the same way.
+ */
+function BackLink({ className, children = "Back", ...props }: BackLinkProps) {
+  return (
+    <Link data-slot="back-link" className={cn(BACK_LINK_CLASS, className)} {...props}>
+      <ArrowLeftIcon className="size-4" aria-hidden="true" />
+      {children}
+    </Link>
+  )
+}
+
 /** The top of a page: an optional back link, an eyebrow, the title and description, and an actions slot. */
 function PageHeader({
   eyebrow,
@@ -36,10 +53,7 @@ function PageHeader({
     <header data-slot="page-header" className={cn("flex flex-col gap-3", className)} {...props}>
       {showBack ? (
         backHref ? (
-          <Link href={backHref} className={BACK_LINK_CLASS}>
-            <ArrowLeftIcon className="size-4" aria-hidden="true" />
-            {backLabel}
-          </Link>
+          <BackLink href={backHref}>{backLabel}</BackLink>
         ) : (
           <button type="button" onClick={onBack} className={BACK_LINK_CLASS}>
             <ArrowLeftIcon className="size-4" aria-hidden="true" />
@@ -59,4 +73,4 @@ function PageHeader({
   )
 }
 
-export { PageHeader }
+export { BackLink, PageHeader }

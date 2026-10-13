@@ -6,12 +6,14 @@ import {
   HERO_PREVIEW_DEFAULT,
   blockPartyNote,
   cancellationRows,
+  cityStaffDoor,
   comparisonRows,
   demoPathJump,
   faqItems,
   feeScheduleRows,
   heroPreviewAnswers,
   heroPreviewResult,
+  planAnEventPath,
   tierCards,
 } from "./landing";
 
@@ -173,6 +175,28 @@ describe("faqItems", () => {
     expect(answer).toContain("10 days");
     expect(answer).toContain("30 days");
     expect(answer).toContain("60 days");
+  });
+});
+
+describe("the two doors", () => {
+  const seed = buildSeed();
+
+  it("Plan an event opens a blank wizard for a new applicant", () => {
+    expect(planAnEventPath("new", seed)).toBe("/apply");
+  });
+
+  it("Plan an event reopens the persona's one draft where it was left", () => {
+    expect(planAnEventPath("sunrise-yoga-club", seed)).toBe("/apply?case=PMT-27-0142&step=when");
+  });
+
+  it("Plan an event is the wizard, not My events, for somebody who already has an event", () => {
+    expect(planAnEventPath("maya-chen", seed)).toBe("/apply");
+  });
+
+  it("City staff opens My queue as the City Clerk, or as the city role already current", () => {
+    expect(cityStaffDoor("applicant")).toEqual({ role: "clerk", href: "/city/queue" });
+    expect(cityStaffDoor("clerk")).toEqual({ role: "clerk", href: "/city/queue" });
+    expect(cityStaffDoor("hl")).toEqual({ role: "hl", href: "/city/queue" });
   });
 });
 

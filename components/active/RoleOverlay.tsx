@@ -1,5 +1,4 @@
-import { HardHatIcon, LandmarkIcon, ShieldCheckIcon, type LucideIcon } from "lucide-react";
-import { DueDate } from "@/components/domain";
+import { DEPT_ICON, DueDate } from "@/components/domain";
 import { Stat } from "@/components/ui/stat";
 import { plural } from "@/lib/format";
 import type { Dept, EventCase, ISODate } from "@/lib/types";
@@ -11,8 +10,6 @@ export const ROLE_OVERLAY_COLUMN_LABEL: Record<Dept, string> = {
   pws: "Work orders",
   hl: "Vendor permits",
 };
-
-const ROLE_ICON: Record<Dept, LucideIcon> = { clerk: LandmarkIcon, pws: HardHatIcon, hl: ShieldCheckIcon };
 
 function workOrderCellText(overlay: Extract<RoleOverlayData, { role: "pws" }>): string {
   if (overlay.workOrdersOpen === 0 && overlay.workOrdersDone === 0) return "No work orders yet";
@@ -49,7 +46,7 @@ export function RoleOverlayCell({ role, case: c, today }: { role: Dept; case: Ev
  */
 export function RoleOverlaySidePanel({ role, cases, today }: { role: Dept; cases: EventCase[]; today: ISODate }) {
   const overlay = roleOverlayTotal(role, cases);
-  const Icon = ROLE_ICON[role];
+  const Icon = DEPT_ICON[role];
 
   return (
     <div className="flex flex-col gap-4">
@@ -96,28 +93,5 @@ export function RoleOverlaySidePanel({ role, cases, today }: { role: Dept; cases
         </div>
       ) : null}
     </div>
-  );
-}
-
-const TIER_DOT: Record<"instant" | "reviewed" | "special", string> = {
-  instant: "bg-tier-instant",
-  reviewed: "bg-tier-reviewed",
-  special: "bg-tier-special",
-};
-
-const TIER_ORDER: Array<"instant" | "reviewed" | "special"> = ["instant", "reviewed", "special"];
-const TIER_TEXT: Record<"instant" | "reviewed" | "special", string> = { instant: "Instant", reviewed: "Reviewed", special: "Special event" };
-
-/** The tier legend MonthGrid/WeekGrid need beside them: color is never shown without its label. */
-export function CalendarLegend() {
-  return (
-    <ul className="flex flex-wrap items-center gap-x-4 gap-y-1" aria-label="Legend: tiers">
-      {TIER_ORDER.map((tier) => (
-        <li key={tier} className="flex items-center gap-1.5 text-xs text-fg-secondary">
-          <span aria-hidden className={`size-2 shrink-0 rounded-full ${TIER_DOT[tier]}`} />
-          {TIER_TEXT[tier]}
-        </li>
-      ))}
-    </ul>
   );
 }

@@ -4,7 +4,7 @@ import * as React from "react"
 import { Field } from "@/components/ui/field"
 import { Textarea } from "@/components/ui/textarea"
 import { InlineAlert } from "@/components/ui/inline-alert"
-import { checkCompleteCityTask } from "@/lib/state/checks"
+import { checkCompleteCityTask } from "@/lib/state"
 import { PanelActions, PanelBody, PanelHeader, useCaseContext, useCaseDispatch } from "../panelKit"
 import type { ActionPanelProps } from "../types"
 

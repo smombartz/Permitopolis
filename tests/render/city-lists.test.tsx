@@ -27,11 +27,11 @@ describe("My queue", () => {
     expect(screen.getAllByText(/Verify .*insurance/i).length).toBeGreaterThan(0);
   });
 
-  it("clicking a row goes to the case with ?task=", async () => {
+  it("clicking a row goes to the case with ?task=, and says which list it came from", async () => {
     const { user } = await renderScreen(<QueueScreen />, { role: "clerk", path: routes.city.queue() });
     const link = screen.getByRole("link", { name: /Downtown Art Walk/ });
     await user.click(link);
-    expect(lastPush()).toBe(routes.city.case(F1, { task: `${F1}:intake_check` }));
+    expect(lastPush()).toBe(routes.city.case(F1, { task: `${F1}:intake_check`, from: routes.city.queue() }));
   });
 
   it("an empty queue is a designed state", async () => {
@@ -91,7 +91,8 @@ describe("Cases pipeline", () => {
   it("rows and cards open the case", async () => {
     const { user } = await renderScreen(<CasesScreen />, { role: "clerk", path: routes.city.cases({ tier: "special" }) });
     await user.click(screen.getByText("Riverfront Summer 5K"));
-    expect(lastPush()).toBe(routes.city.case(S5));
+    // The case's back link returns to this list as it is, filter included.
+    expect(lastPush()).toBe(routes.city.case(S5, { from: routes.city.cases({ tier: "special" }) }));
   });
 });
 

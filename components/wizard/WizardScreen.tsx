@@ -7,8 +7,7 @@ import { PageHeader } from "@/components/ui/page-header";
 import { WizardStepper } from "@/components/ui/wizard-stepper";
 import { StickyAside } from "@/components/ui/sticky-aside";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
-import { CaseNotFound } from "@/components/shell";
-import { useIsNarrow } from "@/components/shell/useIsNarrow";
+import { CaseNotFound, useIsNarrow } from "@/components/shell";
 import { useDemo } from "@/lib/state";
 import { classify, requirements } from "@/lib/rules";
 import { routes } from "@/lib/routes";
@@ -142,7 +141,7 @@ function WizardScreen() {
     }
     const result = dispatch(draft.id, { type: "create_board" });
     if (!result.ok) {
-      setPrimaryError(result.reason ?? "That didn't work. Try again.");
+      setPrimaryError(result.reason ?? "That didn't go through.");
       return;
     }
     router.push(routes.event(draft.id));
@@ -174,6 +173,7 @@ function WizardScreen() {
           today={demoToday}
           lateFee={draft?.flags.lateFee ?? false}
           tasks={tasks}
+          hasBoard={(draft?.tasks.length ?? 0) > 0}
           personaName={persona?.name ?? "you"}
           onStepLink={goToStep}
           onPrimaryAction={handlePrimaryAction}

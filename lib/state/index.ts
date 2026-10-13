@@ -8,9 +8,31 @@ export * from "./types";
 export * from "./actions";
 
 export { availableActions } from "./availableActions";
-export { actorsFor } from "./checks";
+export {
+  actorsFor,
+  // The checks `transition()` runs, one per action a panel offers: a screen calls the same
+  // check to show the engine's own reason before the button is pressed.
+  cardUnderVerification,
+  checkAcceptComplete,
+  checkCompleteCityTask,
+  checkConfirmRouting,
+  checkIssuePermit,
+  checkLogCloseout,
+  checkReconcileClose,
+  checkRequestInfo,
+  checkReviewDecide,
+  checkScheduleMeeting,
+  checkSendQuote,
+  checkVerifyOrReject,
+  insideLeadTime,
+  lateFeeApplies,
+  meetingCardFor,
+  nextUnpaidSession,
+  type CheckResult,
+} from "./checks";
 export { advanceClock, isSessionDate, lastSessionDate, sessionDates } from "./clock";
-export { taskDueDate } from "./core";
+// What a quote asks for and what is still owed on it ("What a quote asks for" in the readme).
+export { dueAtQuote, quoteBalance, quotePaid, taskDueDate } from "./core";
 export { classifyDraft, newCase, syncDraft } from "./newCase";
 export { buildSeed } from "./seed";
 export {

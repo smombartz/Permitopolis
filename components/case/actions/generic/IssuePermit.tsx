@@ -2,7 +2,7 @@
 
 import * as React from "react"
 import { InlineAlert } from "@/components/ui/inline-alert"
-import { checkIssuePermit } from "@/lib/state/checks"
+import { checkIssuePermit } from "@/lib/state"
 import { PanelActions, PanelBody, PanelHeader, useCaseContext, useCaseDispatch } from "../panelKit"
 import type { ActionPanelProps } from "../types"
 

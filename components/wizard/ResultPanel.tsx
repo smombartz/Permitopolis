@@ -91,7 +91,7 @@ function ResultPanel({ panel, onApplyWhatIf, className }: ResultPanelProps) {
 
       {panel.components.length > 0 ? (
         <div className="flex flex-col gap-1.5">
-          <p className="text-xs font-bold tracking-[.1em] text-fg-label uppercase">One Permitopolis event permit. It covers:</p>
+          <p className="text-eyebrow font-bold tracking-[.12em] text-fg-label uppercase">One Permitopolis event permit. It covers:</p>
           <ul className="flex flex-col gap-1">
             {panel.components.map((component) => (
               <li key={component.id} className="text-sm text-fg-secondary">
@@ -104,7 +104,7 @@ function ResultPanel({ panel, onApplyWhatIf, className }: ResultPanelProps) {
 
       {panel.reviewers.length > 0 ? (
         <div className="flex flex-col gap-2">
-          <p className="text-xs font-bold tracking-[.1em] text-fg-label uppercase">Reviewers</p>
+          <p className="text-eyebrow font-bold tracking-[.12em] text-fg-label uppercase">Reviewers</p>
           {panel.reviewers.map((reviewer) => {
             const Icon = DEPT_ICON[reviewer.dept];
             return (
@@ -119,7 +119,7 @@ function ResultPanel({ panel, onApplyWhatIf, className }: ResultPanelProps) {
 
       {fees.lines.length > 0 ? (
         <div className="flex flex-col gap-2">
-          <p className="text-xs font-bold tracking-[.1em] text-fg-label uppercase">Fee estimate</p>
+          <p className="text-eyebrow font-bold tracking-[.12em] text-fg-label uppercase">Fee estimate</p>
           {isSeries ? (
             <p className="text-sm text-fg-secondary">
               {fmtMoney(fees.perSession ?? 0)} per session &middot; {plural(fees.sessions ?? 0, "session")} &middot; {fmtMoney(fees.total)} total

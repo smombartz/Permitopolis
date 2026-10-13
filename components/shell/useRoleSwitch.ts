@@ -10,7 +10,8 @@ import type { Party } from "@/lib/types";
  * Switches role the way the PRD describes: two city roles keep the URL; the Applicant and a
  * city role follow a case on screen (lib/view/shell.ts's `resolveRoleSwitch`); otherwise the
  * role's remembered page, then its home. Used by the top bar's switcher and by the
- * applicant/city mismatch panels, so every way of changing role lands the same place.
+ * applicant/city mismatch panels, so every way of changing role lands the same place. A page
+ * opened under the wrong role stays put when the switch is to a role it is built for.
  *
  * When the page does not change (two city roles), nothing is pushed: the URL stays exactly as
  * it is, query string and all, and the screen re-renders for the new role from the store.
@@ -27,6 +28,9 @@ export function useRoleSwitch(): (toRole: Party) => void {
         fromRole: state.role,
         toRole,
         pathname,
+        // Read at the click, not with `useSearchParams()`: the top bar renders outside a Suspense
+        // boundary, and only a wizard link opened under a city role needs it.
+        search: window.location.search,
         cases: state.cases,
         lastPathByRole: state.lastPathByRole,
       });

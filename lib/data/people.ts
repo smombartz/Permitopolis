@@ -299,6 +299,14 @@ export const PERSONAS: Persona[] = [
 
 export const PERSONA_BY_ID: Record<string, Persona> = Object.fromEntries(PERSONAS.map((p) => [p.id, p]));
 
+/**
+ * The name a case's applicant goes by, on every screen that names one: a list row, a case
+ * header, the "Next:" sentence. A persona missing from the data reads "The applicant".
+ */
+export function applicantNameOf(c: { applicantId: string }): string {
+  return PERSONA_BY_ID[c.applicantId]?.name ?? "The applicant";
+}
+
 /** The id of the blank persona: a new applicant with no case yet. */
 export const NEW_PERSONA_ID = "new";
 

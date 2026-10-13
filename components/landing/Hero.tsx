@@ -5,8 +5,7 @@ import { ArrowRightIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Eyebrow } from "@/components/ui/eyebrow";
 import { routes } from "@/lib/routes";
-import { useDemo, useHydrated } from "@/lib/state";
-import { useRoleSwitch, usePersonaSwitch } from "@/components/shell";
+import { useDoors } from "./hooks";
 import { HeroPreviewPanel } from "./HeroPreviewPanel";
 
 /** The hand-drawn indigo stroke under the headline's last word: one organic gesture. */
@@ -28,23 +27,7 @@ function HeroUnderline() {
  * under its last word, the lead paragraph, the two doors, and the live preview panel.
  */
 function Hero() {
-  const hydrated = useHydrated();
-  const switchRole = useRoleSwitch();
-  const switchPersona = usePersonaSwitch();
-  const personaId = useDemo((s) => s.personaId);
-
-  function handlePlanAnEvent(event: React.MouseEvent) {
-    if (!hydrated) return;
-    event.preventDefault();
-    useDemo.getState().setRole("applicant");
-    switchPersona(personaId);
-  }
-
-  function handleCityStaff(event: React.MouseEvent) {
-    if (!hydrated) return;
-    event.preventDefault();
-    switchRole("clerk");
-  }
+  const doors = useDoors();
 
   return (
     <section className="page-container grid grid-cols-1 items-center gap-16 pt-16 pb-10 lg:grid-cols-[0.9fr_1.1fr] lg:pt-24">
@@ -64,13 +47,13 @@ function Hero() {
         </p>
         <div className="flex flex-wrap items-center gap-3">
           <Button asChild size="lg">
-            <Link href={routes.apply()} onClick={handlePlanAnEvent}>
+            <Link href={routes.apply()} onClick={doors.planAnEvent}>
               Plan an event
               <ArrowRightIcon aria-hidden="true" />
             </Link>
           </Button>
           <Button asChild variant="secondary" size="lg">
-            <Link href={routes.city.queue()} onClick={handleCityStaff}>
+            <Link href={routes.city.queue()} onClick={doors.cityStaff}>
               City staff
             </Link>
           </Button>

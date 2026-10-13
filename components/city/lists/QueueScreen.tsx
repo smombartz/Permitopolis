@@ -10,12 +10,12 @@ import { CaseId, DueDate, EventTitle, ReviewClock, StateChip, TierBadge, Waiting
 import { KeyboardFooter } from "@/components/city/lists/KeyboardFooter";
 import { useRovingListNav } from "@/components/city/lists/useRovingListNav";
 import { reviewClock, taskDueDate, useDemo, type QueueItem } from "@/lib/state";
+import { applicantNameOf } from "@/lib/data/people";
 import { routes } from "@/lib/routes";
 import { plural } from "@/lib/format";
 import type { Dept, Party } from "@/lib/types";
 import {
   QUEUE_GROUP_LABEL,
-  applicantNameOf,
   emptyQueueMessage,
   orderedQueueGroups,
   queueBriefing,
@@ -37,7 +37,7 @@ function QueueRow({ item, role, today, reviewer }: { item: QueueItem; role: Dept
     <li>
       <Link
         data-row-nav=""
-        href={routes.city.case(c.id, { task: task.id })}
+        href={routes.city.case(c.id, { task: task.id, from: routes.city.queue() })}
         className="flex flex-col gap-2 rounded-panel border border-line-subtle bg-surface-1 p-3 outline-none transition-colors duration-[var(--dur-fast)] ease-frost hover:bg-surface-2 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring sm:flex-row sm:items-center sm:justify-between"
       >
         <div className="flex min-w-0 flex-1 items-center gap-3">
@@ -90,7 +90,7 @@ function QueueScreen() {
             if (items.length === 0) return null;
             return (
               <section key={group} className="flex flex-col gap-2">
-                <h2 className="flex items-center gap-2 text-sm font-bold text-fg-label uppercase tracking-[.08em]">
+                <h2 className="flex items-center gap-2 text-eyebrow font-bold tracking-[.12em] text-fg-label uppercase">
                   {QUEUE_GROUP_LABEL[group]}
                   <CountBadge count={items.length} variant={group === "overdue" ? "danger" : "neutral"} />
                 </h2>
@@ -112,7 +112,7 @@ function QueueScreen() {
             {others.map(({ case: c, parties }) => (
               <li key={c.id}>
                 <Link
-                  href={routes.city.case(c.id)}
+                  href={routes.city.case(c.id, { from: routes.city.queue() })}
                   className="flex flex-col gap-2 rounded-control border border-line-subtle bg-surface-2 p-3 outline-none transition-colors duration-[var(--dur-fast)] ease-frost hover:bg-surface-3 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring sm:flex-row sm:items-center sm:justify-between"
                 >
                   <div className="flex min-w-0 items-center gap-3">

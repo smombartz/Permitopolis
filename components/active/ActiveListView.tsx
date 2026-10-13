@@ -10,7 +10,7 @@ import { Switch } from "@/components/ui/switch";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Toolbar } from "@/components/ui/toolbar";
 import { fmtTimeRange, plural } from "@/lib/format";
-import { PERSONA_BY_ID } from "@/lib/data/people";
+import { applicantNameOf } from "@/lib/data/people";
 import { routes } from "@/lib/routes";
 import type { Dept, ISODate } from "@/lib/types";
 import { clerkOverlay, type ActiveListRow } from "@/lib/view/active";
@@ -25,10 +25,8 @@ interface ActiveListViewProps {
   includeHolds: boolean;
   expandSessions: boolean;
   onToggleExpand: (next: boolean) => void;
-}
-
-function applicantNameOf(applicantId: string): string {
-  return PERSONA_BY_ID[applicantId]?.name ?? "Unknown applicant";
+  /** This list's own URL: a case opened from a row comes back to it. */
+  from: string;
 }
 
 /**
@@ -36,7 +34,7 @@ function applicantNameOf(applicantId: string): string {
  * permits"). "Include held dates" is global, in the page header; this view's own toggle is
  * "Show every session", since only the list ever collapses a series.
  */
-export function ActiveListView({ rows, today, role, includeHolds, expandSessions, onToggleExpand }: ActiveListViewProps) {
+export function ActiveListView({ rows, today, role, includeHolds, expandSessions, onToggleExpand, from }: ActiveListViewProps) {
   return (
     <div className="flex flex-col gap-4">
       <Toolbar aria-label="Active permits list options">
@@ -71,10 +69,10 @@ export function ActiveListView({ rows, today, role, includeHolds, expandSessions
               <TableRow key={row.key}>
                 <TableCell>
                   <Link
-                    href={routes.city.case(row.case.id)}
+                    href={routes.city.case(row.case.id, { from })}
                     className="outline-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring"
                   >
-                    <EventTitle name={row.case.name} applicantName={applicantNameOf(row.case.applicantId)} />
+                    <EventTitle name={row.case.name} applicantName={applicantNameOf(row.case)} />
                   </Link>
                 </TableCell>
                 <TableCell>
@@ -95,7 +93,7 @@ export function ActiveListView({ rows, today, role, includeHolds, expandSessions
                 </TableCell>
                 <TableCell>
                   <Button asChild variant="ghost" size="icon-sm" aria-label={`Open ${row.case.name}`}>
-                    <Link href={routes.city.case(row.case.id)}>
+                    <Link href={routes.city.case(row.case.id, { from })}>
                       <ChevronRightIcon />
                     </Link>
                   </Button>

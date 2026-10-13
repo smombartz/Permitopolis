@@ -47,6 +47,8 @@ export interface RoleSwitchArgs {
   toRole: Party;
   /** Where the presenter is now, as `usePathname()` gives it (no query string). */
   pathname: string;
+  /** The page's query string, with or without its "?". Only read to find the wizard's draft. */
+  search?: string;
   cases: EventCase[];
   /** Each role's last page in its own area, query string included. */
   lastPathByRole: Partial<Record<Party, string>>;
@@ -68,11 +70,22 @@ export interface RoleSwitchResult {
  * or booked. Off a case page (or when the case does not exist), the switch goes to the role's
  * last remembered page, query string included, then its home.
  *
+ * A page opened under the wrong role (a typed-in or shared link: the Applicant on a city case,
+ * a city role on a quote) shows its shell's "built for" panel. Switching from there to a role
+ * the page is built for stays on the page, so the link opens what it was sent to open.
+ *
  * Landing on the Applicant also sets the persona to the applicant of the case the landing
  * page is about, so the board never shows one organizer's event under another's name.
  */
-export function resolveRoleSwitch({ fromRole, toRole, pathname, cases, lastPathByRole }: RoleSwitchArgs): RoleSwitchResult {
+export function resolveRoleSwitch({ fromRole, toRole, pathname, search = "", cases, lastPathByRole }: RoleSwitchArgs): RoleSwitchResult {
   if (fromRole === toRole) return { path: pathname };
+  if (!pageIsFor(fromRole, pathname) && pageIsFor(toRole, pathname)) {
+    if (toRole !== "applicant") return { path: pathname };
+    const query = search.replace(/^\?/, "");
+    const aboutId = applicantCaseIdFromHref(query ? `${pathname}?${query}` : pathname);
+    const about = aboutId ? cases.find((c) => c.id === aboutId) : undefined;
+    return about ? { path: pathname, personaId: about.applicantId } : { path: pathname };
+  }
   if (fromRole !== "applicant" && toRole !== "applicant") {
     return cityPageIsFor(toRole, pathname) ? { path: pathname } : { path: rememberedCityPage(toRole, lastPathByRole) };
   }
@@ -161,6 +174,17 @@ export function cityToolOwner(href: string): Dept | null {
 export function cityPageIsFor(role: Party, href: string): boolean {
   const owner = cityToolOwner(href);
   return owner === null || owner === role;
+}
+
+/**
+ * Whether a page is in this role's own area: the wizard and the event pages for the Applicant;
+ * for a city role, a city page it shares or owns. The landing page, the demo guide and the
+ * public check are nobody's.
+ */
+export function pageIsFor(role: Party, href: string): boolean {
+  const path = href.split("?")[0];
+  if (role === "applicant") return path === routes.apply() || path === routes.events() || path.startsWith(`${routes.events()}/`);
+  return path.startsWith("/city/") && cityPageIsFor(role, path);
 }
 
 /** The city role's last page, when it is still one of its own; otherwise its queue. */

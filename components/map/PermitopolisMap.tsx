@@ -2,8 +2,9 @@
 
 import * as React from "react";
 import { cn } from "@/lib/utils";
-import { TIER_LABEL, type Tier } from "@/lib/types";
+import { TIER_LABEL } from "@/lib/types";
 import { TIER_ICON } from "@/components/domain/icons";
+import { TierLegend } from "@/components/domain/TierLegend";
 import { VIEWBOX } from "@/lib/data/mapGeometry";
 import { CityBackground } from "./CityBackground";
 import { lineMidpoint, occupiedIds, rectCenter, resolveLocationShapes } from "./geometry";
@@ -11,7 +12,6 @@ import type { MapHighlight } from "./types";
 
 const FOCUS_RING =
   "outline-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring";
-const TIERS: Tier[] = ["instant", "reviewed", "special"];
 
 export type { MapHighlight };
 
@@ -40,15 +40,15 @@ const TIER_FILL: Record<MapHighlight["tier"], string> = {
   reviewed: "fill-tier-reviewed-surface",
   special: "fill-tier-special-surface",
 };
-const TIER_STROKE: Record<MapHighlight["tier"], string> = {
-  instant: "stroke-tier-instant",
-  reviewed: "stroke-tier-reviewed",
-  special: "stroke-tier-special",
-};
 const TIER_DOT: Record<MapHighlight["tier"], string> = {
   instant: "bg-tier-instant",
   reviewed: "bg-tier-reviewed",
   special: "bg-tier-special",
+};
+const TIER_STROKE: Record<MapHighlight["tier"], string> = {
+  instant: "stroke-tier-instant",
+  reviewed: "stroke-tier-reviewed",
+  special: "stroke-tier-special",
 };
 
 /**
@@ -75,18 +75,7 @@ export function PermitopolisMap({ highlights, selectedId, onSelect, className }:
 
   return (
     <div className={cn("flex flex-col gap-3", className)}>
-      <ul className="flex flex-wrap items-center gap-x-4 gap-y-1" aria-label="Map legend: tiers">
-        {TIERS.map((tier) => {
-          const TierIcon = TIER_ICON[tier];
-          return (
-            <li key={tier} className="flex items-center gap-1.5 text-xs text-fg-secondary">
-              <span aria-hidden className={cn("size-2 shrink-0 rounded-full", TIER_DOT[tier])} />
-              <TierIcon aria-hidden className="size-3 shrink-0" />
-              {TIER_LABEL[tier]}
-            </li>
-          );
-        })}
-      </ul>
+      <TierLegend aria-label="Map legend: tiers" />
       <svg
         viewBox={`${VIEWBOX.x} ${VIEWBOX.y} ${VIEWBOX.width} ${VIEWBOX.height}`}
         role="img"

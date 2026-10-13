@@ -151,7 +151,7 @@ function StepWhen({ answers, onChange, onLateFee, panel, today }: StepWhenProps)
 
       {occurrences.length > 1 ? (
         <div className="flex flex-col gap-1.5">
-          <p className="text-xs font-bold tracking-[.1em] text-fg-label uppercase">{sessionCountLabel(schedule!)}</p>
+          <p className="text-eyebrow font-bold tracking-[.12em] text-fg-label uppercase">{sessionCountLabel(schedule!)}</p>
           <ul className="flex flex-col gap-1.5">
             {occurrences.map((occ) => (
               <li key={occ.date} className="flex items-center justify-between gap-2 rounded-control border border-line-subtle bg-surface-1 px-3 py-1.5">

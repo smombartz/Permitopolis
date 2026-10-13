@@ -67,7 +67,10 @@ export function ActiveScreen() {
   const setCalSub = React.useCallback((next: CalendarSubView) => setParams({ cal: next === "month" ? null : next }), [setParams]);
   const setIncludeHolds = React.useCallback((next: boolean) => setParams({ holds: next ? "1" : null }), [setParams]);
   const setExpandSessions = React.useCallback((next: boolean) => setParams({ sessions: next ? "1" : null }), [setParams]);
-  const openCase = React.useCallback((caseId: string) => router.push(routes.city.case(caseId)), [router]);
+  // A case opened from here comes back to this view, date and toggles.
+  const query = searchParams.toString();
+  const here = query ? `${pathname}?${query}` : pathname;
+  const openCase = React.useCallback((caseId: string) => router.push(routes.city.case(caseId, { from: here })), [router, here]);
 
   const listRows = React.useMemo(
     () => activeListRows(cases, today, { includeHolds, expandSessions }),
@@ -113,6 +116,7 @@ export function ActiveScreen() {
             includeHolds={includeHolds}
             expandSessions={expandSessions}
             onToggleExpand={setExpandSessions}
+            from={here}
           />
         </TabsContent>
 
@@ -144,7 +148,7 @@ export function ActiveScreen() {
         </TabsContent>
 
         <TabsContent value="closeout" className="pt-4">
-          <ActiveCloseoutView rows={closeout} />
+          <ActiveCloseoutView rows={closeout} from={here} />
         </TabsContent>
       </Tabs>
     </div>

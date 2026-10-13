@@ -3,7 +3,7 @@
 import * as React from "react"
 import { InlineAlert } from "@/components/ui/inline-alert"
 import { ConditionList, FeeTable } from "@/components/domain"
-import { checkSendQuote } from "@/lib/state/checks"
+import { checkSendQuote } from "@/lib/state"
 import { addDaysISO } from "@/lib/dates"
 import { fmtDate } from "@/lib/format"
 import { PanelActions, PanelBody, PanelHeader, useCaseContext, useCaseDispatch } from "../panelKit"

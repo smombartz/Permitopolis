@@ -7,7 +7,7 @@ import { CARD_BY_ID, type CardSpec, type CatalogId } from "@/lib/rules/catalog";
 import { availability, occupiedWindow, occurrences } from "@/lib/rules";
 import type { RulesConfig, RulesCtx } from "@/lib/rules/types";
 import { daysBetween } from "@/lib/dates";
-import { PERSONA_BY_ID } from "@/lib/data/people";
+import { applicantNameOf } from "@/lib/data/people";
 import type { CasesFilters, CasesView } from "@/lib/routes";
 import {
   availableActions,
@@ -26,7 +26,7 @@ import {
   type QueueItem,
   type WaitingOnOthersItem,
 } from "@/lib/state";
-import { PARTY_LABEL, STATE_LABEL, TIER_LABEL, type CaseState, type Dept, type EventCase, type ISODate, type Party, type Tier } from "@/lib/types";
+import { ENDING_LABEL, PARTY_LABEL, STATE_LABEL, TIER_LABEL, type CaseState, type Dept, type EventCase, type ISODate, type Party, type Tier } from "@/lib/types";
 
 /* ------------------------------------------------------------------------ */
 /* My queue                                                                  */
@@ -186,11 +186,6 @@ export function casesQueryString(filters: CasesListFilters, role: Party): string
   return params.toString();
 }
 
-/** `PERSONA_BY_ID[c.applicantId].name`, falling back to the id for a persona not in the data. */
-export function applicantNameOf(c: EventCase): string {
-  return PERSONA_BY_ID[c.applicantId]?.name ?? c.applicantId;
-}
-
 function matchesSearch(c: EventCase, q: string): boolean {
   const needle = q.trim().toLowerCase();
   if (!needle) return true;
@@ -202,7 +197,10 @@ export function filteredCases(cases: EventCase[], role: Party, filters: CasesLis
   return cases.filter((c) => {
     if (!isVisibleToCity(c)) return false;
     const endedOrClosed = c.ending !== null || c.state === "closed";
-    if (!filters.closedAndEnded && endedOrClosed) return false;
+    // Asking for Closed, or for the endings, is asking to see them: a link from elsewhere
+    // (`routes.city.cases({ state: "closed" })`) needs no second switch.
+    const askedFor = filters.state === "closed" || filters.state === "off_path";
+    if (!filters.closedAndEnded && !askedFor && endedOrClosed) return false;
     if (filters.involvesMe && !involves(c, role)) return false;
     if (filters.tier && c.tier !== filters.tier) return false;
     if (filters.state) {
@@ -233,7 +231,7 @@ export interface FilterChipView {
 export function activeFilterChips(filters: CasesListFilters): FilterChipView[] {
   const chips: FilterChipView[] = [];
   if (filters.tier) chips.push({ key: "tier", label: TIER_LABEL[filters.tier] });
-  if (filters.state) chips.push({ key: "state", label: filters.state === "off_path" ? "Closed or ended" : STATE_LABEL[filters.state] });
+  if (filters.state) chips.push({ key: "state", label: filters.state === "off_path" ? "Ended" : STATE_LABEL[filters.state] });
   if (filters.waiting) chips.push({ key: "waiting", label: `Waiting on ${filters.waiting === "me" ? "me" : PARTY_LABEL[filters.waiting]}` });
   if (filters.from || filters.to) chips.push({ key: "dates", label: `Event date ${filters.from ?? "any"} – ${filters.to ?? "any"}` });
   if (filters.q) chips.push({ key: "q", label: `"${filters.q}"` });
@@ -244,9 +242,18 @@ export function activeFilterChips(filters: CasesListFilters): FilterChipView[] {
 /* Cases pipeline: board                                                    */
 /* ------------------------------------------------------------------------ */
 
+/**
+ * The board's columns for the cases it is given: the seven pipeline states, and Closed after
+ * them once a closed case is among those shown (the "Closed and ended" toggle, or the Closed
+ * state filter). An ended case sits in the state it ended in, so it needs no column of its own.
+ */
+export function pipelineBoardStates(cases: EventCase[]): CaseState[] {
+  return cases.some((c) => c.state === "closed") ? [...PIPELINE_BOARD_STATES, "closed"] : PIPELINE_BOARD_STATES;
+}
+
 /** One column per state, each already in event-date order. Columns with no case stay, empty. */
 export function pipelineBoardColumns(cases: EventCase[], today: ISODate): Record<CaseState, EventCase[]> {
-  const columns = Object.fromEntries(PIPELINE_BOARD_STATES.map((s) => [s, [] as EventCase[]])) as Record<CaseState, EventCase[]>;
+  const columns = Object.fromEntries(pipelineBoardStates(cases).map((s) => [s, [] as EventCase[]])) as Record<CaseState, EventCase[]>;
   const sorted = [...cases].sort((a, b) => (eventDate(a, today) ?? "9999-12-31").localeCompare(eventDate(b, today) ?? "9999-12-31"));
   for (const c of sorted) {
     if (c.state in columns) columns[c.state as CaseState].push(c);
@@ -293,7 +300,7 @@ export function pipelineTableRow(c: EventCase, today: ISODate, cfg: RulesConfig)
   return {
     case: c,
     waitingOn: upNow.map((p) => ({ party: p.party, days: p.daysHolding })),
-    nextAction: c.ending ? `Ended: ${c.ending.replace("_", " ")}` : firstTask ? firstTask.title : "Nothing actionable",
+    nextAction: c.ending ? ENDING_LABEL[c.ending] : firstTask ? firstTask.title : "Nothing actionable",
     due,
     daysWaiting: Math.max(0, ...upNow.map((p) => p.daysHolding), 0),
     deptStatus: depts.map((dept) => ({ dept, status: deptStatusOf(c, dept) })),

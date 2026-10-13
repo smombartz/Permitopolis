@@ -4,7 +4,7 @@ import { useRouter } from "next/navigation"
 import { StackedTaskCard, TaskCard } from "@/components/domain/TaskCard"
 import { CountBadge } from "@/components/ui/count-badge"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { useIsNarrow } from "@/components/shell/useIsNarrow"
+import { useIsNarrow } from "@/components/shell"
 import type { BoardColumn } from "@/lib/state/types"
 import type { EventCase, ISODate, Task } from "@/lib/types"
 import {

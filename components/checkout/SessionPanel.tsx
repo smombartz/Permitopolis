@@ -1,5 +1,7 @@
 "use client";
 
+import { useRouter } from "next/navigation";
+import { toast } from "sonner";
 import { CardPaymentForm } from "@/components/checkout/CardPaymentForm";
 import { PlanSummaryCard } from "@/components/checkout/PlanSummaryCard";
 import { PageHeader } from "@/components/ui/page-header";
@@ -10,15 +12,21 @@ import { useDemo } from "@/lib/state";
 import type { EventCase, ISODate } from "@/lib/types";
 import { planSummary, sessionAmount } from "@/lib/view/checkout";
 
-/** SESSION mode: pay one due session of a permitted series. */
+/** SESSION mode: pay one due session of a permitted series, then back to the board it came from. */
 function SessionPanel({ c, occurrenceDate }: { c: EventCase; occurrenceDate: ISODate }) {
+  const router = useRouter();
   const dispatch = useDemo((s) => s.dispatch);
   const cfg = useDemo((s) => s.cfg);
   const plan = planSummary(c);
   const amount = sessionAmount(c, cfg);
 
   function handlePay() {
-    return dispatch(c.id, { type: "pay", amount, method: "card", kind: "session", occurrenceDate });
+    const result = dispatch(c.id, { type: "pay", amount, method: "card", kind: "session", occurrenceDate });
+    if (result.ok) {
+      toast.success("Paid.");
+      router.push(routes.event(c.id));
+    }
+    return result;
   }
 
   return (

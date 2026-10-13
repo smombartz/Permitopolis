@@ -6,12 +6,12 @@
  */
 import { classify } from "@/lib/rules";
 import type { PermitComponent, RulesConfig } from "@/lib/rules/types";
-import { cardUnderVerification, meetingCardFor } from "@/lib/state/checks";
-import { reviewClock } from "@/lib/state/selectors";
+import { cardUnderVerification, meetingCardFor, reviewClock } from "@/lib/state";
 import type { ActionAvailability, ReviewClockView } from "@/lib/state/types";
-import type { ActionType } from "@/lib/state/actions";
+import { ACTION_TYPES, type ActionType } from "@/lib/state/actions";
 import type { CaseTab } from "@/lib/routes";
 import { routes } from "@/lib/routes";
+import { cityPageIsFor } from "@/lib/view/shell";
 import { fmtDate, fmtNumber, fmtTime, fmtTimeRange, plural } from "@/lib/format";
 import {
   DEPTS,
@@ -46,9 +46,32 @@ export function isCaseTab(value: string | null): value is CaseTab {
   return value !== null && (CASE_TABS as string[]).includes(value);
 }
 
-/** The list the user came from, when the back link carries it; otherwise the cases pipeline. */
-export function backTarget(fromParam: string | null): string {
-  return fromParam && fromParam.startsWith("/") ? fromParam : routes.city.cases();
+/** The lists a case is opened from, and what its back link calls each of them. */
+const BACK_LABEL: [path: string, label: string][] = [
+  [routes.city.queue(), "Back to My queue"],
+  [routes.city.cases(), "Back to cases"],
+  [routes.city.active(), "Back to Active permits"],
+  [routes.city.intake(), "Back to Intake"],
+];
+
+export interface CaseBackLink {
+  href: string;
+  label: string;
+}
+
+/**
+ * Where a case's back link goes: the list it was opened from (`?from=`, a city path with its
+ * own query string, so a filtered pipeline comes back filtered), or the cases pipeline. A list
+ * this role does not have (the Clerk's Intake, after a switch to another department) and
+ * anything that is not one of the four lists fall back to the pipeline too.
+ */
+export function caseBackLink(fromParam: string | null, role: Party): CaseBackLink {
+  const fallback: CaseBackLink = { href: routes.city.cases(), label: "Back to cases" };
+  if (!fromParam) return fallback;
+  const path = fromParam.split("?")[0];
+  const known = BACK_LABEL.find(([listPath]) => listPath === path);
+  if (!known || !cityPageIsFor(role, path)) return fallback;
+  return { href: fromParam, label: known[1] };
 }
 
 /* ---------- header ---------- */
@@ -257,6 +280,8 @@ function cityTaskAction(c: EventCase, task: Task): { action: ActionType; arg?: s
   }
   if (id === "consolidate") return { action: task.payload.denied === true ? "deny" : "send_quote" };
   if (id === "issue_permit") return { action: "issue_permit" };
+  // An Instant event's closeout exception (a damage report) is settled by reconciling it.
+  if (id === "instant_exception") return { action: "reconcile_close" };
   if (id.startsWith("work_order:")) return { action: "complete_city_task", arg: task.id };
   if (id === "cleanup_inspection" || id === "log_actual_hours") return { action: "log_closeout" };
   if (id === "reconcile") return { action: "reconcile_close" };
@@ -274,6 +299,19 @@ export function openKeyForTask(c: EventCase, task: Task, role: Party): string | 
   const mapped = cityTaskAction(c, task);
   if (!mapped) return null;
   return mapped.arg ? `${mapped.action}:${mapped.arg}` : mapped.action;
+}
+
+/**
+ * What `?task=` opens, as an open key. The param holds either a task's id, which is what a
+ * link from outside carries (a My queue row, an Intake row, a Who's up task): that opens the
+ * panel that moves the task on for this viewer. Or it holds an open key already, which is what
+ * this screen's own buttons write. Null when it names neither, so the sheet stays shut.
+ */
+export function resolveOpenKey(c: EventCase, param: string | null, role: Party): string | null {
+  if (!param) return null;
+  const task = c.tasks.find((t) => t.id === param);
+  if (task) return openKeyForTask(c, task, role);
+  return (ACTION_TYPES as string[]).includes(parseOpenKey(param).action) ? param : null;
 }
 
 /** True when the role's action panel has nothing enabled or disabled to show at all. */

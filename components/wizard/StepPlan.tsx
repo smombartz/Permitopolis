@@ -18,6 +18,8 @@ export interface StepPlanProps {
   today: ISODate;
   lateFee: boolean;
   tasks: Task[];
+  /** The draft already has its board (the applicant came back to change the plan). */
+  hasBoard: boolean;
   personaName: string;
   onStepLink: (step: WizardStep) => void;
   onPrimaryAction: () => void;
@@ -34,6 +36,7 @@ function StepPlan({
   today,
   lateFee,
   tasks,
+  hasBoard,
   personaName,
   onStepLink,
   onPrimaryAction,
@@ -49,7 +52,7 @@ function StepPlan({
   const isInstant = panel.tier === "instant";
   // A series pays its first session at booking (`dueNow`); a single event pays in full.
   const dueNow = panel.fees.dueNow ?? panel.fees.total;
-  const primaryLabel = isInstant ? `Book and pay ${fmtMoney(dueNow)}` : "Create my to-do board";
+  const primaryLabel = isInstant ? `Book and pay ${fmtMoney(dueNow)}` : hasBoard ? "Update my to-do board" : "Create my to-do board";
 
   return (
     <div className="flex flex-col gap-6">
@@ -75,7 +78,7 @@ function StepPlan({
 
       {panel.components.length > 0 ? (
         <div className="flex flex-col gap-1.5">
-          <p className="text-xs font-bold tracking-[.1em] text-fg-label uppercase">One Permitopolis event permit. It covers:</p>
+          <p className="text-eyebrow font-bold tracking-[.12em] text-fg-label uppercase">One Permitopolis event permit. It covers:</p>
           <ul className="flex flex-col gap-1">
             {panel.components.map((component) => (
               <li key={component.id} className="text-sm text-fg-secondary">
@@ -88,7 +91,7 @@ function StepPlan({
 
       {panel.reviewers.length > 0 ? (
         <div className="flex flex-col gap-2">
-          <p className="text-xs font-bold tracking-[.1em] text-fg-label uppercase">Reviewing departments</p>
+          <p className="text-eyebrow font-bold tracking-[.12em] text-fg-label uppercase">Reviewing departments</p>
           {panel.reviewers.map((reviewer) => {
             const Icon = DEPT_ICON[reviewer.dept];
             return (
@@ -103,14 +106,14 @@ function StepPlan({
 
       {timeline.length > 0 ? (
         <div className="flex flex-col gap-1.5">
-          <p className="text-xs font-bold tracking-[.1em] text-fg-label uppercase">Timeline</p>
+          <p className="text-eyebrow font-bold tracking-[.12em] text-fg-label uppercase">Timeline</p>
           <KeyValueList columns={2} items={timeline.map((step) => ({ label: step.label, value: fmtDate(step.date) }))} />
         </div>
       ) : null}
 
       {phaseGroups.length > 0 ? (
         <div className="flex flex-col gap-3">
-          <p className="text-xs font-bold tracking-[.1em] text-fg-label uppercase">Documents and actions to come</p>
+          <p className="text-eyebrow font-bold tracking-[.12em] text-fg-label uppercase">Documents and actions to come</p>
           {phaseGroups.map((group) => (
             <div key={group.phase} className="flex flex-col gap-1">
               <p className="text-xs font-semibold text-fg-label">{group.label}</p>
@@ -127,7 +130,7 @@ function StepPlan({
       ) : null}
 
       <div className="flex flex-col gap-2">
-        <p className="text-xs font-bold tracking-[.1em] text-fg-label uppercase">Fee estimate</p>
+        <p className="text-eyebrow font-bold tracking-[.12em] text-fg-label uppercase">Fee estimate</p>
         <FeeTable lines={panel.fees.lines} />
       </div>
 

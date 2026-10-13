@@ -9,8 +9,9 @@ import { SignatureForm } from "@/components/checkout/SignatureForm";
 import { CaseHeader, ConditionList, FeeTable } from "@/components/domain";
 import { Button } from "@/components/ui/button";
 import { InlineAlert } from "@/components/ui/inline-alert";
+import { BackLink } from "@/components/ui/page-header";
 import { Section } from "@/components/ui/section";
-import { PERSONA_BY_ID } from "@/lib/data/people";
+import { applicantNameOf } from "@/lib/data/people";
 import { fmtDate, fmtMoney, plural } from "@/lib/format";
 import { routes } from "@/lib/routes";
 import { eventDate, useDemo } from "@/lib/state";
@@ -34,7 +35,7 @@ function QuotePanel({ c, today }: { c: EventCase; today: string }) {
   );
 
   const plan = planSummary(c);
-  const applicantName = PERSONA_BY_ID[c.applicantId]?.name ?? "Applicant";
+  const applicantName = applicantNameOf(c);
   const paid = isQuotePaid(c, cfg);
   const owed = quoteAmountOwed(c, cfg);
   const dueNow = quoteDueNow(c, cfg);
@@ -60,6 +61,7 @@ function QuotePanel({ c, today }: { c: EventCase; today: string }) {
 
   return (
     <div className="flex flex-col gap-6">
+      <BackLink href={routes.event(c.id)}>Back to your board</BackLink>
       <CaseHeader
         name={c.name}
         tier={c.tier}

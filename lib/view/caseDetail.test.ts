@@ -1,11 +1,11 @@
 import { describe, expect, it } from "vitest";
 import { DEFAULT_CONFIG, DEFAULT_DEMO_TODAY } from "@/lib/rules/config";
-import { buildSeed } from "@/lib/state";
+import { buildSeed, queueFor } from "@/lib/state";
 import { makeCase, makeTask } from "@/lib/state/testSupport";
 import {
   activityActors,
-  backTarget,
   buildOverview,
+  caseBackLink,
   CASE_TABS,
   documentGroups,
   filterActivity,
@@ -15,6 +15,7 @@ import {
   openKeyForAction,
   openKeyForTask,
   parseOpenKey,
+  resolveOpenKey,
   reviewSummaries,
   seriesSummary,
 } from "./caseDetail";
@@ -38,14 +39,33 @@ describe("tabs", () => {
   });
 });
 
-describe("backTarget", () => {
-  it("uses the remembered list when one is given", () => {
-    expect(backTarget("/city/queue")).toBe("/city/queue");
+describe("caseBackLink", () => {
+  it("returns to the list the case was opened from, and names it", () => {
+    expect(caseBackLink("/city/queue", "pws")).toEqual({ href: "/city/queue", label: "Back to My queue" });
+    expect(caseBackLink("/city/active?view=calendar&date=2027-06-07", "hl")).toEqual({
+      href: "/city/active?view=calendar&date=2027-06-07",
+      label: "Back to Active permits",
+    });
+    expect(caseBackLink("/city/intake?tab=reviewed", "clerk")).toEqual({ href: "/city/intake?tab=reviewed", label: "Back to Intake" });
   });
 
-  it("falls back to the cases pipeline otherwise", () => {
-    expect(backTarget(null)).toBe("/city/cases");
-    expect(backTarget("not-a-path")).toBe("/city/cases");
+  it("keeps a filtered pipeline's filters", () => {
+    expect(caseBackLink("/city/cases?view=table&tier=special&sort=due", "clerk")).toEqual({
+      href: "/city/cases?view=table&tier=special&sort=due",
+      label: "Back to cases",
+    });
+  });
+
+  it("falls back to the cases pipeline with no list, or one that is not a city list", () => {
+    const pipeline = { href: "/city/cases", label: "Back to cases" };
+    expect(caseBackLink(null, "clerk")).toEqual(pipeline);
+    expect(caseBackLink("not-a-path", "clerk")).toEqual(pipeline);
+    expect(caseBackLink("//elsewhere.example/city/queue", "clerk")).toEqual(pipeline);
+    expect(caseBackLink("/events", "clerk")).toEqual(pipeline);
+  });
+
+  it("does not send another department back to the Clerk's Intake", () => {
+    expect(caseBackLink("/city/intake", "pws")).toEqual({ href: "/city/cases", label: "Back to cases" });
   });
 });
 
@@ -262,6 +282,42 @@ describe("openKeyForTask: which panel an action maps to", () => {
 
     const pwsReview = S5.tasks.find((t) => t.catalogId === "review:pws")!;
     expect(openKeyForTask(S5, pwsReview, "hl")).toBe("remind:pws");
+  });
+});
+
+describe("resolveOpenKey: what ?task= opens", () => {
+  it("takes a task's id, as a link from a list or from Who's up carries it", () => {
+    expect(resolveOpenKey(S5, "PMT-27-0097:verify:insurance_certificate", "hl")).toBe("verify_document:PMT-27-0097:insurance_certificate");
+    expect(resolveOpenKey(S4, "PMT-27-0126:intake_check", "clerk")).toBe("accept_complete");
+  });
+
+  it("takes one of the screen's own open keys as it is", () => {
+    expect(resolveOpenKey(S5, "issue_permit", "clerk")).toBe("issue_permit");
+    expect(resolveOpenKey(S3, "verify_document:PMT-27-0118:vendor_health_permit:1", "hl")).toBe("verify_document:PMT-27-0118:vendor_health_permit:1");
+  });
+
+  it("opens a reminder when the task belongs to somebody else", () => {
+    expect(resolveOpenKey(S5, "PMT-27-0097:verify:insurance_certificate", "clerk")).toBe("remind:hl");
+  });
+
+  it("opens nothing for a param that is neither", () => {
+    expect(resolveOpenKey(S5, null, "clerk")).toBeNull();
+    expect(resolveOpenKey(S5, "", "clerk")).toBeNull();
+    expect(resolveOpenKey(S5, "PMT-27-0097:no_such_task", "clerk")).toBeNull();
+    expect(resolveOpenKey(S5, "not_an_action", "clerk")).toBeNull();
+  });
+
+  it("every row of every role's opening queue opens a panel", () => {
+    for (const role of ["clerk", "pws", "hl"] as const) {
+      for (const row of queueFor(cases, role, TODAY)) {
+        expect(resolveOpenKey(row.case, row.task.id, role), `${role}: ${row.task.id}`).not.toBeNull();
+      }
+    }
+  });
+
+  it("the Clerk's Instant exception opens Reconcile and close", () => {
+    const picnic = cases.find((c) => c.id === "PMT-27-0017")!; // Brightline Logistics company picnic
+    expect(resolveOpenKey(picnic, "PMT-27-0017:instant_exception", "clerk")).toBe("reconcile_close");
   });
 });
 

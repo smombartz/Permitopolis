@@ -40,7 +40,7 @@ function VerifyScreen() {
         ) : (
           <CircleXIcon className="size-20" aria-hidden="true" />
         )}
-        <p className="text-display font-extrabold">{result.valid ? "Valid" : "Not valid"}</p>
+        <h1 className="text-display font-extrabold">{result.valid ? "Valid" : "Not valid"}</h1>
         {result.reason ? <p className="text-lg font-medium text-fg-secondary">{result.reason}</p> : null}
       </div>
 

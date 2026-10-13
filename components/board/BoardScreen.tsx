@@ -2,7 +2,7 @@
 
 import Link from "next/link"
 import { useParams, usePathname, useRouter, useSearchParams } from "next/navigation"
-import { CalendarPlusIcon, LayoutGridIcon, Rows3Icon } from "lucide-react"
+import { CalendarPlusIcon, LayoutGridIcon, Rows3Icon, TicketIcon } from "lucide-react"
 import { BoardColumns, EntryList } from "@/components/board/BoardColumns"
 import { BoardMenu } from "@/components/board/BoardMenu"
 import { CardSheetContent } from "@/components/board/CardSheet"
@@ -11,12 +11,13 @@ import { VendorStackSheet } from "@/components/board/VendorStackSheet"
 import { CaseHeader } from "@/components/domain/CaseHeader"
 import { EndingBanner } from "@/components/domain/EndingBanner"
 import { PartyChip } from "@/components/domain/PartyChip"
-import { CaseNotFound } from "@/components/shell/CaseNotFound"
+import { CaseNotFound } from "@/components/shell"
 import { Button } from "@/components/ui/button"
 import { EmptyState } from "@/components/ui/empty-state"
+import { BackLink, PageHeader } from "@/components/ui/page-header"
 import { SegmentedControl } from "@/components/ui/segmented-control"
 import { Sheet } from "@/components/ui/sheet"
-import { PERSONA_BY_ID } from "@/lib/data/people"
+import { applicantNameOf } from "@/lib/data/people"
 import { routes } from "@/lib/routes"
 import { eventDate, useDemo } from "@/lib/state"
 import type { BoardColumn } from "@/lib/state/types"
@@ -24,6 +25,8 @@ import { PARTY_LABEL, type EventCase } from "@/lib/types"
 import {
   boardColumnsGrouped,
   dateHoldFootnote,
+  isUnplannedDraft,
+  permitHrefFor,
   reviewerRows,
   waitingOnChipItems,
   type StackedCards,
@@ -42,7 +45,7 @@ function StatusStrip({ c }: { c: EventCase }) {
     <div className="flex flex-col gap-3 rounded-panel border border-line-subtle bg-surface-2 p-4">
       <div className="flex flex-wrap items-center justify-between gap-x-6 gap-y-2">
         <div className="flex flex-wrap items-center gap-1.5">
-          <span className="text-xs font-bold tracking-[.1em] text-fg-label uppercase">Waiting on</span>
+          <span className="text-eyebrow font-bold tracking-[.12em] text-fg-label uppercase">Waiting on</span>
           {waitingChips.length === 0 ? (
             <span className="text-sm text-fg-secondary">Nobody right now</span>
           ) : (
@@ -66,12 +69,7 @@ function StatusStrip({ c }: { c: EventCase }) {
 function DraftNotPlannedYet({ c }: { c: EventCase }) {
   return (
     <div className="flex flex-col gap-6">
-      <div className="flex items-center justify-between gap-3">
-        <h1 className="text-h4 font-bold text-fg">{c.name || "Untitled event"}</h1>
-        <Button asChild variant="secondary">
-          <Link href={routes.events()}>Back to My events</Link>
-        </Button>
-      </div>
+      <PageHeader eyebrow="Draft" title={c.name || "Untitled event"} backHref={routes.events()} backLabel="Back to My events" />
       <EmptyState
         icon={CalendarPlusIcon}
         title="This event is still being planned"
@@ -117,11 +115,11 @@ function BoardScreen() {
     return <CaseNotFound id={id} backHref={routes.events()} backLabel="Back to My events" />
   }
 
-  if (c.state === "draft" && c.tasks.length === 0) {
+  if (isUnplannedDraft(c)) {
     return <DraftNotPlannedYet c={c} />
   }
 
-  const applicantName = PERSONA_BY_ID[c.applicantId]?.name ?? "The applicant"
+  const applicantName = applicantNameOf(c)
   const grouped = boardColumnsGrouped(c)
   const stack: StackedCards | undefined = cardParam?.startsWith("stack:")
     ? Object.values(grouped)
@@ -136,23 +134,35 @@ function BoardScreen() {
     router.replace(withParams({ card: null }))
   }
 
+  const permitHref = permitHrefFor(c)
+
   return (
     <div className="flex flex-col gap-6">
-      <div className="flex items-start justify-between gap-3">
-        <CaseHeader
-          className="flex-1"
-          name={c.name || "Untitled event"}
-          tier={c.tier}
-          caseId={c.id}
-          applicantName={applicantName}
-          eventDate={eventDate(c, today)}
-          today={today}
-          state={c.state}
-          ending={c.ending}
-          hold={c.dateHold}
-        />
-        <BoardMenu c={c} />
-      </div>
+      <BackLink href={routes.events()}>Back to My events</BackLink>
+      <CaseHeader
+        name={c.name || "Untitled event"}
+        tier={c.tier}
+        caseId={c.id}
+        applicantName={applicantName}
+        eventDate={eventDate(c, today)}
+        today={today}
+        state={c.state}
+        ending={c.ending}
+        hold={c.dateHold}
+        actions={
+          <>
+            {permitHref ? (
+              <Button asChild variant="secondary">
+                <Link href={permitHref}>
+                  <TicketIcon data-icon="inline-start" />
+                  View permit
+                </Link>
+              </Button>
+            ) : null}
+            <BoardMenu c={c} />
+          </>
+        }
+      />
 
       {c.ending ? <EndingBanner ending={c.ending} reason={c.endingReason} /> : <StatusStrip c={c} />}
 

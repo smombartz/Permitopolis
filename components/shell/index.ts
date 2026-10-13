@@ -4,3 +4,4 @@ export { PlaceholderScreen } from "@/components/shell/PlaceholderScreen";
 export { CaseNotFound } from "@/components/shell/CaseNotFound";
 export { StoreHydrator } from "@/components/shell/StoreHydrator";
 export { usePersonaSwitch, useRoleSwitch } from "@/components/shell/useRoleSwitch";
+export { useIsNarrow } from "@/components/shell/useIsNarrow";

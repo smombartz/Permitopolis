@@ -1,9 +1,9 @@
 "use client"
 
 /**
- * The right-hand Sheet every action panel opens in. `openKey` is the URL's `?task=` value
- * (an action type, or `type:arg`); the registry resolves it to a panel component. Unknown or
- * unregistered keys close quietly instead of showing a broken sheet.
+ * The right-hand Sheet every action panel opens in. `openKey` is what the URL's `?task=`
+ * resolved to (`resolveOpenKey()`: an action type, or `type:arg`); the registry finds its
+ * panel. A key with no panel registered leaves the sheet shut instead of opening it empty.
  */
 import { Sheet, SheetContent } from "@/components/ui/sheet"
 import { parseOpenKey } from "@/lib/view/caseDetail"
@@ -18,9 +18,9 @@ interface ActionSheetProps {
 }
 
 function ActionSheet({ caseId, openKey, role, onOpenChange }: ActionSheetProps) {
-  const open = openKey !== null
   const parsed = openKey ? parseOpenKey(openKey) : null
   const Panel = parsed ? panelFor(parsed.action, role) : undefined
+  const open = Panel !== undefined
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>

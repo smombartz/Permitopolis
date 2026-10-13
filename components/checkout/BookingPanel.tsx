@@ -16,7 +16,10 @@ import { routes } from "@/lib/routes";
 import type { EventCase } from "@/lib/types";
 import { bookingEstimate, dueNowOf, planSummary } from "@/lib/view/checkout";
 
-/** BOOKING mode: an Instant Draft books and pays in one step. */
+/**
+ * BOOKING mode: an Instant Draft books and pays in one step. It arrives here from the wizard's
+ * last step with no board yet (the booking builds it), so the way back is the wizard.
+ */
 function BookingPanel({ c, ctx }: { c: EventCase; ctx: RulesCtx }) {
   const router = useRouter();
   const dispatch = useDemo((s) => s.dispatch);
@@ -26,6 +29,7 @@ function BookingPanel({ c, ctx }: { c: EventCase; ctx: RulesCtx }) {
   const blocked = !bookRow?.enabled;
   const estimate = bookingEstimate(c, ctx);
   const dueNow = dueNowOf(estimate);
+  const planHref = routes.apply({ caseId: c.id, step: "plan" });
 
   function handlePay() {
     const result = dispatch(c.id, { type: "book_and_pay", method: "card" });
@@ -42,8 +46,8 @@ function BookingPanel({ c, ctx }: { c: EventCase; ctx: RulesCtx }) {
         eyebrow="Book and pay"
         title={c.name}
         description="Instant events book and pay in one step."
-        backHref={routes.event(c.id)}
-        backLabel="Back to your board"
+        backHref={planHref}
+        backLabel="Back to your plan"
       />
       <Section title="Your plan">
         <PlanSummaryCard plan={plan} />
@@ -71,7 +75,7 @@ function BookingPanel({ c, ctx }: { c: EventCase; ctx: RulesCtx }) {
       )}
       {blocked ? (
         <Button asChild variant="secondary" className="self-start">
-          <Link href={routes.event(c.id)}>Back to your board</Link>
+          <Link href={planHref}>Back to your plan</Link>
         </Button>
       ) : null}
     </div>

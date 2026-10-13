@@ -1,20 +1,19 @@
 "use client"
 
 import * as React from "react"
-import Link from "next/link"
 import { useParams, useRouter, useSearchParams } from "next/navigation"
-import { ArrowLeftIcon, FileLockIcon } from "lucide-react"
+import { FileLockIcon } from "lucide-react"
 import { CaseHeader, EndingBanner } from "@/components/domain"
 import { Banner } from "@/components/ui/banner"
 import { EmptyState } from "@/components/ui/empty-state"
-import { PageHeader } from "@/components/ui/page-header"
+import { BackLink, PageHeader } from "@/components/ui/page-header"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { CaseNotFound } from "@/components/shell"
-import { PERSONA_BY_ID } from "@/lib/data/people"
+import { applicantNameOf } from "@/lib/data/people"
 import { routes } from "@/lib/routes"
 import { availableActions, eventDate, isVisibleToCity, nextMove, waitingOn, useDemo } from "@/lib/state"
-import { STATE_LABEL, type Dept, type Party } from "@/lib/types"
-import { CASE_TABS, CASE_TAB_LABEL, backTarget, headerReviewClock, isCaseTab } from "@/lib/view/caseDetail"
+import { ENDING_LABEL, STATE_LABEL, type Dept, type Party } from "@/lib/types"
+import { CASE_TABS, CASE_TAB_LABEL, caseBackLink, headerReviewClock, isCaseTab, resolveOpenKey } from "@/lib/view/caseDetail"
 import { ActionSheet } from "./ActionSheet"
 import { ActionsPanel } from "./ActionsPanel"
 import { ActivityTab } from "./tabs/ActivityTab"
@@ -50,7 +49,7 @@ function CaseDetailScreen() {
   const [announcement, setAnnouncement] = React.useState("")
   React.useEffect(() => {
     if (!c) return
-    const label = c.ending ? `Ended: ${c.ending.replace("_", " ")}` : STATE_LABEL[c.state]
+    const label = c.ending ? ENDING_LABEL[c.ending] : STATE_LABEL[c.state]
     if (announcementRef.current !== undefined && announcementRef.current !== label) setAnnouncement(`${c.name}: now ${label}.`)
     announcementRef.current = label
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -60,10 +59,12 @@ function CaseDetailScreen() {
     return <CaseNotFound id={id} backHref={routes.city.cases()} backLabel="Back to cases" />
   }
 
+  const back = caseBackLink(searchParams.get("from"), role)
+
   if (!isVisibleToCity(c)) {
     return (
       <div className="flex flex-col gap-6">
-        <PageHeader eyebrow="Case" title={id} backHref={backTarget(searchParams.get("from"))} backLabel="Back" />
+        <PageHeader eyebrow="Case" title={id} backHref={back.href} backLabel={back.label} />
         <EmptyState
           icon={FileLockIcon}
           title="This application is still a draft"
@@ -75,7 +76,9 @@ function CaseDetailScreen() {
 
   const tabParam = searchParams.get("tab")
   const tab = isCaseTab(tabParam) ? tabParam : "overview"
-  const taskParam = searchParams.get("task")
+  // `?task=` is a task's id when the link came from a list or from Who's up, and an open key
+  // when one of this screen's own buttons wrote it. Either way it resolves to one panel, or none.
+  const openKey = resolveOpenKey(c, searchParams.get("task"), role)
 
   function go(next: { tab?: string; task?: string | null }) {
     const nextParams = new URLSearchParams(searchParams.toString())
@@ -88,7 +91,7 @@ function CaseDetailScreen() {
     router.replace(query ? `${routes.city.case(id)}?${query}` : routes.city.case(id))
   }
 
-  const applicantName = PERSONA_BY_ID[c.applicantId]?.name ?? "The applicant"
+  const applicantName = applicantNameOf(c)
   const statuses = waitingOn(c, today)
   const sentence = nextMove(c, today, applicantName)
   const ctx = { today, cases, cfg }
@@ -97,13 +100,7 @@ function CaseDetailScreen() {
 
   return (
     <div className="flex flex-col gap-6">
-      <Link
-        href={backTarget(searchParams.get("from"))}
-        className="inline-flex w-fit items-center gap-1.5 rounded-control text-sm font-medium text-fg-secondary outline-none transition-colors duration-[var(--dur-fast)] ease-frost hover:text-fg focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring"
-      >
-        <ArrowLeftIcon className="size-4" aria-hidden="true" />
-        Back to cases
-      </Link>
+      <BackLink href={back.href}>{back.label}</BackLink>
       <CaseHeader
         name={c.name}
         tier={c.tier}
@@ -156,7 +153,7 @@ function CaseDetailScreen() {
         <ActionsPanel role={role} stateLabel={STATE_LABEL[c.state]} actions={actions} whoIsUpNote={sentence} onOpen={(key) => go({ task: key })} />
       </div>
 
-      <ActionSheet caseId={c.id} openKey={taskParam} role={role} onOpenChange={(open) => !open && go({ task: null })} />
+      <ActionSheet caseId={c.id} openKey={openKey} role={role} onOpenChange={(open) => !open && go({ task: null })} />
 
       <div aria-live="polite" role="status" className="sr-only">
         {announcement}

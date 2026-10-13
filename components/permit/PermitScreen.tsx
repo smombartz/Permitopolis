@@ -25,12 +25,12 @@ function PermitScreen() {
   const cfg = useDemo((s) => s.cfg);
 
   const c = cases.find((x) => x.id === id);
-  if (!c) return <CaseNotFound id={id} backHref={routes.events()} backLabel="Back to your events" />;
+  if (!c) return <CaseNotFound id={id} backHref={routes.events()} backLabel="Back to My events" />;
 
   const info = permitPageInfo(c);
 
   return (
-    <div className="flex flex-col gap-5">
+    <div className="flex flex-col gap-6">
       <PermitPrintStyles />
       <PageHeader
         eyebrow="Permit"

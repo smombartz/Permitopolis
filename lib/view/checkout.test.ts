@@ -6,6 +6,7 @@ import {
   afterQuotePaymentMessage,
   allAccepted,
   bookingEstimate,
+  canPaySession,
   checkoutDecision,
   dueNowOf,
   isQuotePaid,
@@ -101,6 +102,27 @@ describe("checkoutDecision", () => {
     const decision = checkoutDecision(s1, {});
     expect(decision.mode).toBe("not_ready");
     if (decision.mode === "not_ready") expect(decision.info.href).toBe(`/events/${s1.id}/permit`);
+  });
+});
+
+describe("canPaySession: what the board's session schedule may link to", () => {
+  const cases = buildSeed();
+
+  it("takes a session still owed on a permitted series, and no other", () => {
+    const taiChi = caseById(cases, "PMT-27-0034"); // Event day today
+    const byBilling = (billing: string) => taiChi.schedule!.occurrences.find((o) => o.billing === billing)!.date;
+    expect(canPaySession(taiChi, byBilling("due"))).toBe(true);
+    expect(canPaySession(taiChi, byBilling("upcoming"))).toBe(true);
+    expect(canPaySession(taiChi, byBilling("paid"))).toBe(false);
+    expect(canPaySession(taiChi, byBilling("skipped"))).toBe(false);
+    expect(canPaySession(taiChi, "2027-01-01")).toBe(false);
+  });
+
+  it("takes nothing before the series is permitted", () => {
+    const yoga = caseById(cases, "PMT-27-0142"); // a Draft
+    const market = caseById(cases, "PMT-27-0070"); // In review
+    expect(canPaySession(yoga, yoga.schedule!.occurrences[0].date)).toBe(false);
+    expect(canPaySession(market, market.schedule!.occurrences[0].date)).toBe(false);
   });
 });
 

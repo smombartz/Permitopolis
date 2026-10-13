@@ -55,8 +55,14 @@ export const routes = {
   city: {
     queue: () => "/city/queue",
     cases: (filters: CasesFilters = {}) => withQuery("/city/cases", { ...filters }),
-    case: (id: string, options: { task?: string; tab?: CaseTab } = {}) =>
-      withQuery(`/city/cases/${id}`, { task: options.task, tab: options.tab }),
+    /**
+     * A case. `task` opens a panel over it: a task's id (the panel that moves that task on, for
+     * whoever is looking), or an action key, `"request_info"` or `"verify_document:<card id>"`
+     * (`lib/view/caseDetail.ts`). `from` is the list the case was opened from, as a path with
+     * its query string; the case's back link returns there.
+     */
+    case: (id: string, options: { task?: string; tab?: CaseTab; from?: string } = {}) =>
+      withQuery(`/city/cases/${id}`, { task: options.task, tab: options.tab, from: options.from }),
     active: (options: { view?: ActiveView; date?: string } = {}) =>
       withQuery("/city/active", { view: options.view, date: options.date }),
     intake: (options: { tab?: Tier } = {}) => withQuery("/city/intake", { tab: options.tab }),

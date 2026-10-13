@@ -17,7 +17,10 @@ interface BoardMenuProps {
   c: EventCase
 }
 
-/** Withdraw (before a permit), Cancel (after) and Amend, from the board's menu. */
+/**
+ * The board's menu: change the plan, and Withdraw (before a permit) or Cancel (after). A Draft
+ * changes its plan in the wizard it came from; once submitted, a change is an amendment.
+ */
 function BoardMenu({ c }: BoardMenuProps) {
   const today = useDemo((s) => s.demoToday)
   const [withdrawOpen, setWithdrawOpen] = React.useState(false)
@@ -49,10 +52,17 @@ function BoardMenu({ c }: BoardMenuProps) {
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end">
           <DropdownMenuItem asChild>
-            <Link href={routes.amend(c.id)}>
-              <FilePenLineIcon data-icon="inline-start" />
-              Amend
-            </Link>
+            {c.state === "draft" ? (
+              <Link href={routes.apply({ caseId: c.id })}>
+                <FilePenLineIcon data-icon="inline-start" />
+                Edit your plan
+              </Link>
+            ) : (
+              <Link href={routes.amend(c.id)}>
+                <FilePenLineIcon data-icon="inline-start" />
+                Amend
+              </Link>
+            )}
           </DropdownMenuItem>
           {hasPermit ? (
             <DropdownMenuItem variant="destructive" onSelect={() => setCancelOpen(true)}>

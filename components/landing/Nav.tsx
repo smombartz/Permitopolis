@@ -11,9 +11,8 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { routes } from "@/lib/routes";
-import { useDemo, useHydrated } from "@/lib/state";
-import { useRoleSwitch, usePersonaSwitch } from "@/components/shell";
-import { useLandingNarrow } from "./hooks";
+import { useIsNarrow } from "@/components/shell";
+import { useDoors } from "./hooks";
 
 const ANCHOR_LINKS = [
   { href: "#how-it-works", label: "How it works" },
@@ -28,34 +27,12 @@ const ANCHOR_LINKS = [
  * one menu button, the same shape as the app's own `useIsNarrow` collapse.
  *
  * The doors are plain links until `useHydrated()` is true (readme: "enable a door or a jump
- * only once useHydrated() is true"); afterwards they also set the role (and, for "Plan an
- * event", the persona) through the shared hooks, so the destination opens for the right role.
+ * only once useHydrated() is true"); afterwards they also set the role first (`useDoors()`), so
+ * the destination opens for the right role.
  */
 function Nav() {
-  const narrow = useLandingNarrow();
-  const hydrated = useHydrated();
-  const switchRole = useRoleSwitch();
-  const switchPersona = usePersonaSwitch();
-  const personaId = useDemo((s) => s.personaId);
-
-  /**
-   * "Keep the current persona, or New applicant", then the wizard: setting the role directly
-   * (useRoleSwitch() would no-op when the role is already the Applicant, the common case) and
-   * handing off to usePersonaSwitch() for where that persona starts (routes.apply() for a new
-   * applicant or one whose only event is a draft).
-   */
-  function handlePlanAnEvent(event: React.MouseEvent) {
-    if (!hydrated) return;
-    event.preventDefault();
-    useDemo.getState().setRole("applicant");
-    switchPersona(personaId);
-  }
-
-  function handleCityStaff(event: React.MouseEvent) {
-    if (!hydrated) return;
-    event.preventDefault();
-    switchRole("clerk");
-  }
+  const narrow = useIsNarrow();
+  const doors = useDoors();
 
   return (
     <nav
@@ -85,12 +62,12 @@ function Nav() {
             ))}
             <DropdownMenuSeparator />
             <DropdownMenuItem asChild>
-              <Link href={routes.city.queue()} onClick={handleCityStaff}>
+              <Link href={routes.city.queue()} onClick={doors.cityStaff}>
                 City staff
               </Link>
             </DropdownMenuItem>
             <DropdownMenuItem asChild>
-              <Link href={routes.apply()} onClick={handlePlanAnEvent}>
+              <Link href={routes.apply()} onClick={doors.planAnEvent}>
                 Plan an event
               </Link>
             </DropdownMenuItem>
@@ -110,12 +87,12 @@ function Nav() {
             ))}
           </div>
           <Button asChild variant="secondary" size="sm">
-            <Link href={routes.city.queue()} onClick={handleCityStaff}>
+            <Link href={routes.city.queue()} onClick={doors.cityStaff}>
               City staff
             </Link>
           </Button>
           <Button asChild size="sm">
-            <Link href={routes.apply()} onClick={handlePlanAnEvent}>
+            <Link href={routes.apply()} onClick={doors.planAnEvent}>
               Plan an event
             </Link>
           </Button>

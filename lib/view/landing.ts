@@ -9,7 +9,7 @@
  */
 import { getSpace } from "@/lib/data/inventory";
 import { getSegment, milesOf } from "@/lib/data/streets";
-import { PERSONA_BY_ID } from "@/lib/data/people";
+import { applicantNameOf } from "@/lib/data/people";
 import { SCENARIO_JUMPS, type DemoPath } from "@/lib/data/demoScript";
 import { fmtMoney, fmtNumber } from "@/lib/format";
 import { classify, DEFAULT_CONFIG, estimateFees, whatIf } from "@/lib/rules";
@@ -139,7 +139,7 @@ export function tierCards(seed: EventCase[], cfg: RulesConfig = DEFAULT_CONFIG):
       leadTimeDays: cls.leadTimeDays,
       reviewerText,
       typicalFee: caseTotals(c).total,
-      example: { caseId: c.id, title: c.name, applicantName: PERSONA_BY_ID[c.applicantId]?.name ?? c.applicantId },
+      example: { caseId: c.id, title: c.name, applicantName: applicantNameOf(c) },
     };
   });
 }
@@ -325,6 +325,34 @@ export function faqItems(cfg: RulesConfig = DEFAULT_CONFIG): FaqItem[] {
       answer: "A block party closes a residential street in front of people's homes, so every household on that block signs off before intake continues — it's their street for the day too.",
     },
   ];
+}
+
+/* ------------------------------------------------------------------------ */
+/* The two doors                                                            */
+/* ------------------------------------------------------------------------ */
+
+/**
+ * Where "Plan an event" lands: always the wizard. It reopens the persona's one draft where
+ * they left it (S2, or a new applicant who has already started); anyone else, somebody with
+ * events of their own included, gets a blank one, since they are starting another event.
+ */
+export function planAnEventPath(personaId: string, cases: EventCase[]): string {
+  const path = pathForPersona(personaId, cases);
+  return path === routes.events() ? routes.apply() : path;
+}
+
+export interface CityStaffDoor {
+  role: Exclude<Party, "applicant">;
+  href: string;
+}
+
+/**
+ * Where "City staff" lands, and as whom: My queue, as the city role already current, or as the
+ * City Clerk when the Applicant is. (A role switch alone would not do: from one city role to
+ * another it keeps the page, and this page is the landing page.)
+ */
+export function cityStaffDoor(role: Party): CityStaffDoor {
+  return { role: role === "applicant" ? "clerk" : role, href: routes.city.queue() };
 }
 
 /* ------------------------------------------------------------------------ */

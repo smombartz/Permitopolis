@@ -95,9 +95,16 @@ describe("waiting on others and the empty state", () => {
 });
 
 describe("pipeline board columns", () => {
-  it("has exactly the seven states the brief lists, Draft and Closed excluded", () => {
-    const columns = pipelineBoardColumns(seed(), TODAY);
+  it("has exactly the seven states the brief lists for the open pipeline, Draft and Closed excluded", () => {
+    const open = seed().filter((c) => c.state !== "closed");
+    const columns = pipelineBoardColumns(open, TODAY);
     expect(Object.keys(columns)).toEqual(["submitted", "in_review", "needs_info", "quote_sent", "permitted", "event_day", "closeout"]);
+  });
+
+  it("adds a Closed column, last, once closed cases are among those shown", () => {
+    const columns = pipelineBoardColumns(seed(), TODAY);
+    expect(Object.keys(columns).at(-1)).toBe("closed");
+    expect(columns.closed).toHaveLength(3);
   });
 
   it("every case lands in the column matching its own state, soonest event date first", () => {
@@ -221,6 +228,21 @@ describe("filteredCases: every filter alone and combined", () => {
   it("the closed-and-ended toggle brings a Denied case back", () => {
     const withToggle = filteredCases(seed(), "clerk", { ...BASE, closedAndEnded: true }, TODAY);
     expect(withToggle.some((c) => c.ending === "denied")).toBe(true);
+  });
+
+  it("choosing Closed, or the endings, shows them without the toggle", () => {
+    const closed = filteredCases(seed(), "clerk", { ...BASE, state: "closed" }, TODAY);
+    expect(closed).toHaveLength(3);
+    expect(closed.every((c) => c.state === "closed" && c.ending === null)).toBe(true);
+
+    const ended = filteredCases(seed(), "clerk", { ...BASE, state: "off_path" }, TODAY);
+    expect(ended.map((c) => c.ending).sort()).toEqual(["cancelled", "denied", "hold_expired", "withdrawn"]);
+  });
+
+  it("a state that is still open leaves an ended case in that state out", () => {
+    // B24's hold expired in Quote sent: it is an ending, not a quote somebody can still pay.
+    const result = filteredCases(seed(), "clerk", { ...BASE, state: "quote_sent" }, TODAY);
+    expect(result.every((c) => c.ending === null)).toBe(true);
   });
 
   it("tier narrows to that tier alone", () => {

@@ -11,13 +11,7 @@ import { format } from "date-fns";
 import { toDate } from "@/lib/dates";
 import { fmtDate, fmtMoney, fmtTimeRange, plural } from "@/lib/format";
 import { classify, estimateFees, type FeeEstimate, type RulesConfig, type RulesCtx } from "@/lib/rules";
-import { hasActivePermit } from "@/lib/state";
-// dueAtQuote, quoteBalance and quotePaid are not re-exported from lib/state's public barrel
-// (see notesForIntegrator / contractChangeRequests): imported directly from the implementation
-// file the readme points to ("What a quote asks for", lib/state/core.ts).
-import { dueAtQuote, quoteBalance, quotePaid } from "@/lib/state/core";
-// lateFeeApplies is exported from checks.ts but, like the above, not re-exported by the barrel.
-import { lateFeeApplies } from "@/lib/state/checks";
+import { caseTotals, dueAtQuote, hasActivePermit, lateFeeApplies, quoteBalance, quotePaid } from "@/lib/state";
 import { ENDING_LABEL, type Condition, type EventCase, type ISODate } from "@/lib/types";
 import { routes } from "@/lib/routes";
 
@@ -128,14 +122,17 @@ export function checkoutDecision(c: EventCase, search: CheckoutSearch): Checkout
   return { mode: "not_ready", info: generalNotReadyInfo(c) };
 }
 
-/** Whether a closed or closeout case still owes a final bill (`caseTotals().due`, inlined to avoid a selector round trip). */
+/**
+ * Whether the checkout takes a payment for this session: the rule the board's session schedule
+ * reads before it offers "Pay this session", so its link never lands on "nothing to pay".
+ */
+export function canPaySession(c: EventCase, date: ISODate): boolean {
+  return checkoutDecision(c, { pay: "session", date }).mode === "session";
+}
+
+/** Whether a closed or closeout case still owes a final bill. */
 function caseHasFinalBillDue(c: EventCase): boolean {
-  const fees = c.feeLines.filter((l) => l.kind === "fee" || l.kind === "late_fee").reduce((s, l) => s + (l.actual ?? l.estimate), 0);
-  const settled = c.closeout.balance !== null;
-  const deposit = settled ? 0 : c.feeLines.filter((l) => l.kind === "deposit").reduce((s, l) => s + (l.actual ?? l.estimate), 0);
-  const total = fees + deposit;
-  const paid = c.payments.reduce((s, p) => s + p.amount, 0);
-  return Math.round((total - paid) * 100) / 100 > 0;
+  return caseTotals(c).due > 0;
 }
 
 export interface PlanSummary {

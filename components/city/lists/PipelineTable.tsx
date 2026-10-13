@@ -4,14 +4,13 @@ import * as React from "react";
 import { useRouter } from "next/navigation";
 import { ArrowDownIcon, ArrowUpIcon } from "lucide-react";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { CaseId, DeptStatusDots, DueDate, EventTitle, LeadTimeRisk, StateChip, TierBadge, WaitingOnChips } from "@/components/domain";
+import { CaseId, DateText, DeptStatusDots, DueDate, EventTitle, LeadTimeRisk, StateChip, TierBadge, WaitingOnChips } from "@/components/domain";
 import { useRovingListNav } from "@/components/city/lists/useRovingListNav";
 import { routes } from "@/lib/routes";
-import { fmtDateShort } from "@/lib/format";
 import { eventDate } from "@/lib/state";
 import type { ISODate } from "@/lib/types";
 import type { PipelineTableRow, SortDir, SortField } from "@/lib/view/cityLists";
-import { applicantNameOf } from "@/lib/view/cityLists";
+import { applicantNameOf } from "@/lib/data/people";
 
 const COLUMNS: { field: SortField | null; label: string }[] = [
   { field: null, label: "ID" },
@@ -32,16 +31,18 @@ interface PipelineTableProps {
   sort: SortField;
   dir: SortDir;
   onSort: (field: SortField) => void;
+  /** This list's own URL: a case opened from a row comes back to it. */
+  from: string;
 }
 
 /** The pipeline's Table view: sortable, sticky header, mono ids/dates, long names truncated. */
-function PipelineTable({ rows, today, sort, dir, onSort }: PipelineTableProps) {
+function PipelineTable({ rows, today, sort, dir, onSort, from }: PipelineTableProps) {
   const router = useRouter();
   const containerRef = React.useRef<HTMLDivElement>(null);
   useRovingListNav(containerRef, "[data-row-nav]");
 
   function open(id: string) {
-    router.push(routes.city.case(id));
+    router.push(routes.city.case(id, { from }));
   }
 
   return (
@@ -96,7 +97,7 @@ function PipelineTable({ rows, today, sort, dir, onSort }: PipelineTableProps) {
               <TableCell>
                 <TierBadge tier={c.tier} />
               </TableCell>
-              <TableCell numeric>{date ? fmtDateShort(date) : "No date yet"}</TableCell>
+              <TableCell numeric>{date ? <DateText date={date} short /> : "No date yet"}</TableCell>
               <TableCell>
                 <StateChip state={c.state} ending={c.ending} />
               </TableCell>

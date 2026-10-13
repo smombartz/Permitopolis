@@ -1,9 +1,8 @@
 import { Panel } from "@/components/ui/panel";
-import { Chip } from "@/components/ui/chip";
-import { TaskCard } from "@/components/domain";
+import { TaskCard, TierBadge } from "@/components/domain";
 import { boardColumns } from "@/lib/state";
 import { DEFAULT_DEMO_TODAY } from "@/lib/rules";
-import { TIER_LABEL, type EventCase } from "@/lib/types";
+import type { EventCase } from "@/lib/types";
 import { SectionHeading } from "./SectionHeading";
 
 const JAZZ_IN_THE_PLAZA_ID = "PMT-27-0118";
@@ -41,7 +40,7 @@ function TodoBoard({ seed }: TodoBoardProps) {
       <Panel variant="frosted" className="flex w-full max-w-[520px] flex-col gap-4 p-5">
         <div className="flex items-center justify-between gap-2">
           <h3 className="text-sm font-bold text-fg">{jazz.name}</h3>
-          <Chip variant="neutral">{TIER_LABEL[jazz.tier]}</Chip>
+          <TierBadge tier={jazz.tier} />
         </div>
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2" aria-hidden="true">
           {doNow ? <TaskCard task={doNow} today={DEFAULT_DEMO_TODAY} /> : null}

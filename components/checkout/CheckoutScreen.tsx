@@ -34,7 +34,7 @@ function CheckoutScreen() {
   const cfg = useDemo((s) => s.cfg);
 
   const c = cases.find((x) => x.id === id);
-  if (!c) return <CaseNotFound id={id} backHref={routes.events()} backLabel="Back to your events" />;
+  if (!c) return <CaseNotFound id={id} backHref={routes.events()} backLabel="Back to My events" />;
 
   const ctx: RulesCtx = { today, cases, cfg };
   const decision = checkoutDecision(c, {

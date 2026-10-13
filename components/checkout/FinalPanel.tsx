@@ -1,5 +1,7 @@
 "use client";
 
+import { useRouter } from "next/navigation";
+import { toast } from "sonner";
 import { CardPaymentForm } from "@/components/checkout/CardPaymentForm";
 import { FeeTable } from "@/components/domain";
 import { PageHeader } from "@/components/ui/page-header";
@@ -8,13 +10,19 @@ import { routes } from "@/lib/routes";
 import { caseTotals, useDemo } from "@/lib/state";
 import type { EventCase } from "@/lib/types";
 
-/** FINAL mode: pay the final bill after closeout, estimated against actual. */
+/** FINAL mode: pay the final bill after closeout, estimated against actual, then back to the board. */
 function FinalPanel({ c }: { c: EventCase }) {
+  const router = useRouter();
   const dispatch = useDemo((s) => s.dispatch);
   const due = caseTotals(c).due;
 
   function handlePay() {
-    return dispatch(c.id, { type: "pay", amount: due, method: "card", kind: "final_invoice" });
+    const result = dispatch(c.id, { type: "pay", amount: due, method: "card", kind: "final_invoice" });
+    if (result.ok) {
+      toast.success("Paid.");
+      router.push(routes.event(c.id));
+    }
+    return result;
   }
 
   return (
