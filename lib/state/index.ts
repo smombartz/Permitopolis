@@ -1,5 +1,6 @@
 /**
- * Public surface of the state machine: every function of StateApi, plus the store.
+ * Public surface of the state machine: every function of StateApi, the store, the seed, and
+ * the selectors screens share.
  */
 import type { StateApi } from "./types";
 
@@ -7,27 +8,36 @@ export * from "./types";
 export * from "./actions";
 
 export { availableActions } from "./availableActions";
+export { actorsFor } from "./checks";
 export { advanceClock, isSessionDate, lastSessionDate, sessionDates } from "./clock";
 export { taskDueDate } from "./core";
 export { classifyDraft, newCase, syncDraft } from "./newCase";
+export { buildSeed } from "./seed";
 export {
+  activePermits,
   applicantCases,
   boardColumn,
+  boardColumns,
   caseTotals,
   daysUntilEvent,
   eventDate,
+  hasActivePermit,
+  holdsDateAtQuote,
   involves,
   isOpen,
   isVisibleToCity,
   leadTimeRisk,
   nextCaseId,
+  permitSessions,
   queueFor,
   reviewClock,
   waitingOnOthers,
+  whoIsUp,
+  type PermitSession,
 } from "./selectors";
 export { demoToday, resetDemoStoreForTests, useDemo, useHydrated } from "./store";
 export { transition } from "./transition";
-export { isStalled, nextMove, waitingOn } from "./waitingOn";
+export { involvement, isStalled, nextMove, waitingOn, type Involvement } from "./waitingOn";
 
 import { availableActions } from "./availableActions";
 import { advanceClock } from "./clock";

@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { PARTIES } from "@/lib/types";
+import { involves } from "./selectors";
 import { makeCase, makeTask } from "./testSupport";
 import { isStalled, nextMove, waitingOn } from "./waitingOn";
 
@@ -52,6 +53,72 @@ describe("waitingOn", () => {
     const c = makeCase({ state: "submitted", ending: "withdrawn" });
     const rows = waitingOn(c, "2027-05-03");
     expect(rows.every((r) => r.status === "done_for_now" || r.status === "not_involved")).toBe(true);
+  });
+});
+
+describe("openTasks: oldest due first", () => {
+  const card = (suffix: string, dueDate: string | null, extra: Partial<Parameters<typeof makeTask>[0]> = {}) =>
+    makeTask({ id: `PMT-27-0001:${suffix}`, catalogId: suffix, title: suffix, dueDate, ...extra });
+
+  it("sorts by due date, whatever order the cards were created in, with undated cards last", () => {
+    const c = makeCase({ state: "in_review", tasks: [card("later", "2027-06-04"), card("undated", null), card("sooner", "2027-05-10"), card("overdue", "2027-04-29")] });
+    const applicant = waitingOn(c, "2027-05-03").find((r) => r.party === "applicant")!;
+    expect(applicant.openTasks.map((t) => t.catalogId)).toEqual(["overdue", "sooner", "later", "undated"]);
+    expect(applicant.oldestDue).toBe("2027-04-29");
+    // The row's one line, and the "Next:" sentence, name the task that is due first.
+    expect(applicant.note).toBe("Up: overdue");
+  });
+
+  it("an open request's own date is the card's date for as long as it is open", () => {
+    const request = { from: "hl" as const, message: "Please upload it.", at: "2027-04-30T09:05", dueDate: "2027-05-05", resolved: false };
+    const c = makeCase({ state: "needs_info", tasks: [card("sooner", "2027-05-10"), card("asked_for", "2027-06-04", { request })] });
+    expect(waitingOn(c, "2027-05-03").find((r) => r.party === "applicant")?.openTasks.map((t) => t.catalogId)).toEqual(["asked_for", "sooner"]);
+  });
+
+  it("cards due the same day keep the order they were created in", () => {
+    const c = makeCase({ state: "quote_sent", tasks: [card("accept_and_sign", "2027-05-14"), card("pay_fees", "2027-05-14")] });
+    expect(waitingOn(c, "2027-05-03").find((r) => r.party === "applicant")?.openTasks.map((t) => t.catalogId)).toEqual(["accept_and_sign", "pay_fees"]);
+  });
+});
+
+describe("a department named on cards before the case is routed", () => {
+  const insurance = makeTask({ id: "PMT-27-0001:insurance_certificate", catalogId: "insurance_certificate", reviewer: "hl", status: "submitted" });
+  const sound = makeTask({ id: "PMT-27-0001:sound_details", catalogId: "sound_details", reviewer: "pws", status: "submitted" });
+  const intake = makeTask({ id: "PMT-27-0001:intake_check", catalogId: "intake_check", owner: "clerk", kind: "review" });
+  const row = (c: ReturnType<typeof makeCase>, party: "pws" | "hl") => waitingOn(c, "2027-05-03").find((r) => r.party === party)!;
+
+  it("is Waiting, not Done for now: it has not started", () => {
+    const c = makeCase({ state: "submitted", tasks: [insurance, sound, intake] });
+    for (const party of ["pws", "hl"] as const) {
+      expect(row(c, party)).toMatchObject({ status: "waiting", note: "Starts when the City Clerk routes the case", openTasks: [], daysHolding: 0 });
+    }
+    expect(involves(c, "pws")).toBe(true);
+  });
+
+  it("the same while the Clerk waits on an answer at intake", () => {
+    const c = makeCase({ state: "needs_info", tasks: [insurance, { ...intake, status: "locked", payload: { awaitingAnswer: true } }] });
+    expect(row(c, "hl")).toMatchObject({ status: "waiting", note: "Starts when the City Clerk routes the case" });
+  });
+
+  it("the next-move sentence stops at the Clerk: nobody can say yet what the departments will do", () => {
+    const c = makeCase({ state: "submitted", tasks: [insurance, sound, intake] });
+    expect(nextMove(c, "2027-05-03")).toBe("Next: City Clerk checks the application is complete.");
+  });
+
+  it("is not involved at all while the case is a Draft: Drafts are the applicant's alone", () => {
+    const draft = makeCase({ state: "draft", tasks: [{ ...insurance, status: "todo" }, { ...sound, status: "todo" }] });
+    expect(row(draft, "hl").status).toBe("not_involved");
+    expect(row(draft, "pws").status).toBe("not_involved");
+    expect(involves(draft, "hl")).toBe(false);
+  });
+
+  it("is not involved once the Clerk has routed the case without it", () => {
+    const hlReview = { dept: "hl" as const, sections: ["Certificate of insurance"], status: "pending" as const, dueDate: "2027-05-17", decidedOn: null, clock: { startedOn: "2027-05-03", pausedSince: null, pausedDays: 0, allowedDays: 14 }, internalNote: "", messageToApplicant: "" };
+    const hlTask = makeTask({ id: "PMT-27-0001:review:hl", catalogId: "review:hl", owner: "hl", kind: "review" });
+    const c = makeCase({ state: "in_review", reviews: [hlReview], tasks: [insurance, sound, hlTask] });
+    expect(row(c, "hl").status).toBe("up_now");
+    expect(row(c, "pws")).toMatchObject({ status: "not_involved", note: "Not involved in this case" });
+    expect(involves(c, "pws")).toBe(false);
   });
 });
 

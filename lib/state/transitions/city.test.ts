@@ -172,6 +172,18 @@ describe("review_decide", () => {
     const result = transition(c, { type: "review_decide", decision: "approve", conditions: [], feeLines: [] }, "pws", makeCtx());
     expect(result.ok).toBe(false);
   });
+
+  it("prices a reviewer's fee lines to the cent", () => {
+    const review = { dept: "pws" as const, sections: ["Route"], status: "pending" as const, dueDate: "2027-05-17", decidedOn: null, clock: { startedOn: "2027-04-19", pausedSince: null, pausedDays: 0, allowedDays: 21 }, internalNote: "", messageToApplicant: "" };
+    const c = makeCase({ state: "in_review", reviews: [review] });
+    const feeLines = [
+      { dept: "pws" as const, label: "Route closure", qty: 3.1, unit: "mile", unitPrice: 400 },
+      { dept: "pws" as const, label: "Police", qty: 1.1, unit: "officer-hour", unitPrice: 85 },
+    ];
+    const result = transition(c, { type: "review_decide", decision: "approve", conditions: [], feeLines }, "pws", makeCtx());
+    // 3.1 * 400 is 1240.0000000000002 and 1.1 * 85 is 93.50000000000001 in floating point.
+    expect(result.ok && result.case.feeLines.map((line) => line.estimate)).toEqual([1240, 93.5]);
+  });
 });
 
 describe("schedule_meeting and complete_city_task", () => {
@@ -220,6 +232,21 @@ describe("log_closeout (S6)", () => {
     expect(result.case.tasks.find((t) => t.catalogId === "cleanup_inspection")?.status).toBe("done");
     expect(result.case.tasks.find((t) => t.catalogId === "log_actual_hours")?.status).toBe("done");
     expect(result.case.tasks.find((t) => t.catalogId === "reconcile")?.status).toBe("todo");
+  });
+
+  it("prices actuals and extra lines to the cent", () => {
+    const c = makeCase({
+      id: "PMT-27-0200",
+      state: "closeout",
+      feeLines: [{ id: "f1", dept: "clerk", label: "Route closure", qty: 3, unit: "mile", unitPrice: 400, estimate: 1200, actual: null, kind: "fee" }],
+    });
+    const result = transition(
+      c,
+      { type: "log_closeout", cleanup: "pass", actuals: [{ feeLineId: "f1", qty: 3.1 }], extraLines: [{ dept: "pws", label: "Overtime police", qty: 1.1, unit: "officer-hour", unitPrice: 85 }] },
+      "pws",
+      makeCtx(),
+    );
+    expect(result.ok && result.case.feeLines.map((line) => line.actual)).toEqual([1240, 93.5]);
   });
 
   it("fails when there is nothing to close out yet", () => {

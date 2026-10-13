@@ -92,6 +92,59 @@ describe("pay", () => {
     });
   });
 
+  describe("money is compared to the cent", () => {
+    // 62.1 + 62.2 + 62.3 is 186.60000000000002 in floating point: a cent-exact payment of
+    // $186.60 used to fall short of it, so the permit stayed locked and the hold could expire.
+    const lines = [62.1, 62.2, 62.3].map((amount, i) => ({ id: `f${i}`, dept: "clerk" as const, label: `Line ${i}`, qty: 1, unit: "flat", unitPrice: amount, estimate: amount, actual: null, kind: "fee" as const }));
+    const quoted = () =>
+      makeCase({
+        state: "quote_sent",
+        flags: { sentToCommission: false, lateFee: false, signed: true, acceptedComplete: true, amendmentPending: false },
+        dateHold: { status: "held", placedOn: "2027-04-19", expiresOn: "2027-05-17" },
+        feeLines: lines,
+        tasks: [
+          makeTask({ id: "PMT-27-0001:pay_fees", catalogId: "pay_fees", kind: "payment", payload: { amount: 186.6 } }),
+          makeTask({ id: "PMT-27-0001:issue_permit", catalogId: "issue_permit", owner: "clerk", kind: "action", status: "locked" }),
+        ],
+      });
+
+    it("paying $186.60 against three lines that add up to it is paid in full", () => {
+      const result = transition(quoted(), { type: "pay", amount: 186.6, method: "card", kind: "quote" }, "applicant", makeCtx());
+      expect(result.ok).toBe(true);
+      if (!result.ok) return;
+      expect(result.case.tasks.find((t) => t.catalogId === "pay_fees")).toMatchObject({ status: "done", payload: { amount: 186.6 } });
+      expect(result.case.tasks.find((t) => t.catalogId === "issue_permit")?.status).toBe("todo");
+    });
+
+    it("so is paying it in two parts", () => {
+      const part = transition(quoted(), { type: "pay", amount: 62.1, method: "in_person", kind: "quote" }, "clerk", makeCtx());
+      expect(part.ok && part.case.tasks.find((t) => t.catalogId === "pay_fees")?.payload.amount).toBe(124.5);
+      const rest = part.ok ? transition(part.case, { type: "pay", amount: 124.5, method: "card", kind: "quote" }, "applicant", makeCtx()) : part;
+      expect(rest.ok && rest.case.tasks.find((t) => t.catalogId === "issue_permit")?.status).toBe("todo");
+    });
+  });
+
+  describe("the hold's expiry is the deadline for paying the quote", () => {
+    const line = { id: "f1", dept: "clerk" as const, label: "Fees and deposit", qty: 1, unit: "flat", unitPrice: 400, estimate: 400, actual: null, kind: "fee" as const };
+    const quoted = () =>
+      makeCase({
+        state: "quote_sent",
+        dateHold: { status: "held", placedOn: "2027-03-27", expiresOn: "2027-04-24" },
+        feeLines: [line],
+        tasks: [makeTask({ id: "PMT-27-0001:pay_fees", catalogId: "pay_fees", kind: "payment", payload: { amount: 400 } })],
+      });
+
+    it("once the quote is paid in full the date is simply held: no 'held until' a date that no longer applies", () => {
+      const result = transition(quoted(), { type: "pay", amount: 400, method: "card", kind: "quote" }, "applicant", makeCtx());
+      expect(result.ok && result.case.dateHold).toEqual({ status: "held", placedOn: "2027-03-27", expiresOn: null });
+    });
+
+    it("a part payment leaves the deadline in place", () => {
+      const result = transition(quoted(), { type: "pay", amount: 100, method: "card", kind: "quote" }, "applicant", makeCtx());
+      expect(result.ok && result.case.dateHold.expiresOn).toBe("2027-04-24");
+    });
+  });
+
   it("refuses an amount of zero or less", () => {
     const c = makeCase({ state: "quote_sent" });
     for (const amount of [0, -50]) {

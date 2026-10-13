@@ -8,10 +8,12 @@ import { daysBetween } from "@/lib/dates";
 import { fmtDate, plural } from "@/lib/format";
 import { availability as availabilityRule, occupiedWindow, occurrences } from "@/lib/rules";
 import { CARD_BY_ID, type CardSpec } from "@/lib/rules/catalog";
-import { PARTY_LABEL, type Availability, type Dept } from "@/lib/types";
-import type { EventCase } from "@/lib/types";
+import { tier as higherTier } from "@/lib/rules/shared";
+import { PARTY_LABEL, type Actor, type Availability, type Dept } from "@/lib/types";
+import type { EventCase, Task } from "@/lib/types";
 import type { RulesCtx } from "@/lib/rules/types";
-import { findTask, preSubmitCardsIn, quotePaid, reviewFor, signoffsLeft, taskId } from "./core";
+import type { ActionType, RoutedReviewer } from "./actions";
+import { findTask, idSuffix, preSubmitCardsIn, quotePaid, reviewFor, signoffsLeft, taskId } from "./core";
 
 function unlockHintFor(catalogId: string): string | undefined {
   return (CARD_BY_ID as Record<string, CardSpec>)[catalogId]?.unlockHint;
@@ -23,6 +25,108 @@ export const OK: CheckResult = { ok: true };
 
 export function fail(reason: string): CheckResult {
   return { ok: false, reason };
+}
+
+/* ---------- who may raise each action ---------- */
+
+const CITY: Actor[] = ["clerk", "pws", "hl"];
+
+/**
+ * The parties that may raise each action (plan 5.4). transition() checks this before anything
+ * else, so a screen that dispatches as the wrong role gets a reason instead of a changed case.
+ * "Simulate a sign-off" is a demo button on the block captain's own card, so the applicant may
+ * press it for a neighbor.
+ */
+const ACTION_ACTORS: Record<ActionType, Actor[]> = {
+  create_board: ["applicant"],
+  book_and_pay: ["applicant"],
+  complete_task: ["applicant"],
+  simulate_signoff: ["neighbor", "applicant"],
+  submit: ["applicant"],
+  respond_to_request: ["applicant"],
+  accept_and_sign: ["applicant"],
+  pay: ["applicant", "clerk"],
+  withdraw: ["applicant"],
+  cancel: ["applicant"],
+  submit_feedback: ["applicant"],
+  book_again: ["applicant"],
+  amend: ["applicant"],
+  accept_complete: ["clerk"],
+  confirm_routing: ["clerk"],
+  send_to_commission: ["clerk"],
+  send_quote: ["clerk"],
+  deny: ["clerk"],
+  issue_permit: ["clerk"],
+  reconcile_close: ["clerk"],
+  request_info: CITY,
+  verify_document: CITY,
+  reject_document: CITY,
+  review_decide: CITY,
+  schedule_meeting: ["clerk", "pws"],
+  complete_city_task: CITY,
+  log_closeout: ["pws"],
+  add_note: CITY,
+  remind: CITY,
+  tick: ["system"],
+};
+
+/** Reads after "can": "Only the City Clerk can issue the permit." */
+const ACTION_PHRASE: Record<ActionType, string> = {
+  create_board: "confirm the plan",
+  book_and_pay: "book and pay",
+  complete_task: "complete a card",
+  simulate_signoff: "add a neighbor sign-off",
+  submit: "submit the application",
+  respond_to_request: "respond to a request",
+  accept_and_sign: "accept the conditions and sign",
+  pay: "record a payment",
+  withdraw: "withdraw the application",
+  cancel: "cancel the event",
+  submit_feedback: "send feedback",
+  book_again: "book again",
+  amend: "amend the application",
+  accept_complete: "accept an application as complete",
+  confirm_routing: "confirm the reviewers",
+  send_to_commission: "send a case to commission",
+  send_quote: "send the quote",
+  deny: "deny an application",
+  issue_permit: "issue the permit",
+  reconcile_close: "reconcile and close",
+  request_info: "request information",
+  verify_document: "verify a document",
+  reject_document: "send a document back",
+  review_decide: "decide a review",
+  schedule_meeting: "schedule a meeting",
+  complete_city_task: "complete a city task",
+  log_closeout: "log the closeout",
+  add_note: "add a note",
+  remind: "send a reminder",
+  tick: "advance the clock",
+};
+
+const ACTOR_NAME: Record<Actor, string> = {
+  applicant: "the applicant",
+  clerk: "the City Clerk",
+  pws: PARTY_LABEL.pws,
+  hl: PARTY_LABEL.hl,
+  neighbor: "a neighbor",
+  system: "the system",
+};
+
+function whoPhrase(actors: Actor[]): string {
+  if (CITY.every((dept) => actors.includes(dept))) return "city staff";
+  return actors.map((actor) => ACTOR_NAME[actor]).join(" or ");
+}
+
+/** The parties that may raise this action, e.g. ['applicant', 'clerk'] for `pay`. */
+export function actorsFor(type: ActionType): Actor[] {
+  return ACTION_ACTORS[type];
+}
+
+export function checkActor(type: ActionType, actor: Actor): CheckResult {
+  const allowed = ACTION_ACTORS[type];
+  if (allowed.includes(actor)) return OK;
+  return fail(`Only ${whoPhrase(allowed)} can ${ACTION_PHRASE[type]}.`);
 }
 
 export function requireOpen(c: EventCase): CheckResult {
@@ -122,12 +226,22 @@ export function checkAcceptComplete(c: EventCase, ctx: RulesCtx): CheckResult {
   return OK;
 }
 
-export function checkConfirmRouting(c: EventCase): CheckResult {
+/**
+ * `reviewers` is the list the Clerk confirms; availableActions() leaves it out, since the
+ * panel has not been filled in yet. Routing nobody would move the case to In review with no
+ * review to wait for, and routing a department twice would give it two reviews of one case.
+ */
+export function checkConfirmRouting(c: EventCase, reviewers?: RoutedReviewer[]): CheckResult {
   const state = requireState(c, "submitted");
   if (!state.ok) return state;
   if (!c.flags.acceptedComplete) return fail("Accept the application as complete first.");
   const task = findTask(c, taskId(c.id, "confirm_routing"));
   if (!task || task.status === "done") return fail("Routing is already confirmed.");
+  if (reviewers) {
+    if (reviewers.length === 0) return fail("Choose at least one reviewer.");
+    const twice = reviewers.find((r, i) => reviewers.findIndex((other) => other.dept === r.dept) !== i);
+    if (twice) return fail(`${PARTY_LABEL[twice.dept]} is on the list twice; route each department once.`);
+  }
   return OK;
 }
 
@@ -158,12 +272,20 @@ export function checkRespondToRequest(c: EventCase, taskIdArg: string): CheckRes
   return OK;
 }
 
-export function checkVerifyOrReject(c: EventCase, taskIdArg: string): CheckResult {
+/**
+ * A submitted card is accepted or sent back by the department that checks it. The department
+ * that asked for it in a request can accept its own answer too (the Clerk at intake asks about
+ * cards another department reviews later).
+ */
+export function checkVerifyOrReject(c: EventCase, taskIdArg: string, actor: Actor): CheckResult {
   const open = requireOpen(c);
   if (!open.ok) return open;
   const task = findTask(c, taskIdArg);
-  if (!task) return fail("Card not found.");
+  if (!task || task.owner !== "applicant") return fail("Card not found.");
   if (task.status !== "submitted") return fail("This card isn't submitted.");
+  if (actor !== task.reviewer && actor !== task.request?.from) {
+    return fail(task.reviewer ? `${PARTY_LABEL[task.reviewer]} checks this card.` : "Nobody has to check this card.");
+  }
   return OK;
 }
 
@@ -258,27 +380,109 @@ export function checkAmend(c: EventCase, today: string, eventDate: string | null
   return OK;
 }
 
+/**
+ * An amendment needs the tier's notice again when it raises the tier or moves the date. One
+ * that does neither (five more guests, a new description) changes nothing the lead time
+ * protects, so it is not refused for being made close to the day.
+ */
+export function amendmentNeedsNotice(before: EventCase, amended: EventCase): boolean {
+  const tierRose = before.tier !== amended.tier && higherTier(before.tier, amended.tier) === amended.tier;
+  return tierRose || before.schedule?.date !== amended.schedule?.date;
+}
+
+/**
+ * The date gate, run again on the amended plan (PRD, Amend): the place must still be free for
+ * every session, and an amendment that needs notice must meet the new tier's lead time or
+ * carry the late fee. `amended` is the case with its new answers, tier and `flags.lateFee`.
+ */
+export function checkAmendedDate(before: EventCase, amended: EventCase, ctx: RulesCtx): CheckResult {
+  const conflict = slotConflict(amended, ctx, true);
+  if (conflict) return fail(conflictReason(amended, conflict, "This date is not available."));
+  return amendmentNeedsNotice(before, amended) ? checkLeadTime(amended, ctx) : OK;
+}
+
 export function checkSendToCommission(c: EventCase): CheckResult {
   return requireState(c, "in_review", "needs_info");
 }
 
-export function checkScheduleMeeting(c: EventCase, taskIdArg: string): CheckResult {
+/**
+ * The meeting card a schedule_meeting acts on. The Clerk's own "Schedule the pre-application
+ * meeting" task stands for the applicant's meeting card: My queue opens the Clerk's task, and
+ * the date belongs on the card the applicant sees.
+ */
+export function meetingCardFor(c: EventCase, taskIdArg: string): Task | undefined {
+  const task = findTask(c, taskIdArg);
+  if (task?.catalogId === "schedule_pre_application_meeting") return findTask(c, taskId(c.id, "pre_application_meeting"));
+  return task;
+}
+
+/** A meeting is scheduled and closed by the department that holds it, or by the Clerk, who owns every case. */
+function meetingHosts(task: Task): Actor[] {
+  return task.reviewer && task.reviewer !== "clerk" ? [task.reviewer, "clerk"] : ["clerk"];
+}
+
+export function checkScheduleMeeting(c: EventCase, taskIdArg: string, actor: Actor): CheckResult {
   const open = requireOpen(c);
   if (!open.ok) return open;
-  const task = findTask(c, taskIdArg);
+  const task = meetingCardFor(c, taskIdArg);
   if (!task) return fail("Card not found.");
   if (task.kind !== "meeting") return fail("That card isn't a meeting.");
+  const hosts = meetingHosts(task);
+  if (!hosts.includes(actor)) return fail(`Only ${whoPhrase(hosts)} can schedule this meeting.`);
+  if (task.status === "done") return fail("That meeting has already been held.");
   return OK;
 }
 
-export function checkCompleteCityTask(c: EventCase, taskIdArg: string): CheckResult {
+/**
+ * City tasks that are finished by an action of their own. Marking one done by hand would skip
+ * what that action does (the hold, the reviews, the permit), so complete_city_task refuses and
+ * says which action to take.
+ */
+function ownActionFor(catalogId: string): string | undefined {
+  if (catalogId.startsWith("review:")) return "Decide the review";
+  const actions: Record<string, string> = {
+    intake_check: "Accept the application as complete",
+    confirm_routing: "Confirm the reviewers",
+    schedule_pre_application_meeting: "Schedule the meeting",
+    consolidate: "Send the quote, or deny the application,",
+    issue_permit: "Issue the permit",
+    reconcile: "Reconcile and close",
+    instant_exception: "Reconcile and close",
+    cleanup_inspection: "Log the closeout",
+    log_actual_hours: "Log the closeout",
+  };
+  return actions[catalogId];
+}
+
+/**
+ * complete_city_task closes a work order, a meeting that was held, or a re-review with no
+ * change. Nothing else: an applicant's card is the applicant's to finish, a department's task
+ * is its own, and a task with its own action is finished by that action.
+ */
+export function checkCompleteCityTask(c: EventCase, taskIdArg: string, actor: Actor): CheckResult {
   const open = requireOpen(c);
   if (!open.ok) return open;
   const task = findTask(c, taskIdArg);
   if (!task) return fail("Card not found.");
+  if (task.owner === "applicant") {
+    if (task.kind !== "meeting") return fail("That card is the applicant's to finish.");
+    const hosts = meetingHosts(task);
+    if (!hosts.includes(actor)) return fail(`Only ${whoPhrase(hosts)} can close this meeting.`);
+  } else {
+    if (task.owner !== actor) return fail(`That task belongs to ${PARTY_LABEL[task.owner]}.`);
+    const ownAction = ownActionFor(task.catalogId);
+    if (ownAction) return fail(`${ownAction} to finish this task.`);
+  }
   if (task.status === "locked") return fail("That card is locked.");
   if (task.status === "done") return fail("Already done.");
   return OK;
+}
+
+/** The applicant card a `verify:<card suffix>` task checks, while it still waits for that check. */
+export function cardUnderVerification(c: EventCase, verifyTask: Task): Task | undefined {
+  if (!verifyTask.catalogId.startsWith("verify:")) return undefined;
+  const card = findTask(c, taskId(c.id, idSuffix(c, verifyTask.id).slice("verify:".length)));
+  return card?.status === "submitted" ? card : undefined;
 }
 
 export function checkCompleteTask(c: EventCase, taskIdArg: string): CheckResult {

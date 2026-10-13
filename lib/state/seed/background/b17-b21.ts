@@ -3,9 +3,46 @@
  * All log_closeout calls pass `actuals: []` and use `extraLines` only, since a seed script
  * cannot know the real fee-line ids that estimateFees() will assign at replay time.
  */
-import type { EventAnswers } from "@/lib/types";
-import type { SeedScript } from "../../types";
+import type { EventAnswers, ISODate } from "@/lib/types";
+import type { SeedScript, SeedStep } from "../../types";
 import { addOns, inventoryLocation, sampleFile, singleSchedule, step, taskId } from "../helpers";
+
+/**
+ * What a Special event has behind it by the time it is permitted: the pre-application meeting
+ * scheduled and held by the Clerk, and the community notice posted and accepted. Without these
+ * a case that is long past its permit would still show pre-permit cards as open.
+ */
+function beforeThePermit(
+  caseId: string,
+  d: { scheduledOn: ISODate; noticeOn: ISODate; noticeAcceptedOn: ISODate; meetingOn: ISODate; noticeFile: string },
+): SeedStep[] {
+  return [
+    step(`${d.scheduledOn}T10:00`, "clerk", { type: "schedule_meeting", taskId: taskId(caseId, "pre_application_meeting"), date: d.meetingOn }),
+    step(`${d.noticeOn}T09:00`, "applicant", {
+      type: "complete_task",
+      taskId: taskId(caseId, "community_notification"),
+      files: [sampleFile(d.noticeFile, { type: "image/jpeg", size: 990_000 })],
+    }),
+    step(`${d.noticeAcceptedOn}T09:00`, "clerk", { type: "verify_document", taskId: taskId(caseId, "community_notification") }),
+    step(`${d.meetingOn}T14:00`, "clerk", { type: "complete_city_task", taskId: taskId(caseId, "pre_application_meeting") }),
+  ];
+}
+
+/**
+ * What a Special event has behind it once its day has come: the coordination meeting and the
+ * walkthrough scheduled and held, and its work orders done. These two close a street and ask
+ * for no city services, so their work orders are the barricades and the closure itself.
+ */
+function beforeTheEvent(caseId: string, d: { scheduledOn: ISODate; coordinationOn: ISODate; walkthroughOn: ISODate; workOrdersOn: ISODate }): SeedStep[] {
+  return [
+    step(`${d.scheduledOn}T09:00`, "clerk", { type: "schedule_meeting", taskId: taskId(caseId, "coordination_meeting"), date: d.coordinationOn }),
+    step(`${d.scheduledOn}T09:05`, "pws", { type: "schedule_meeting", taskId: taskId(caseId, "site_walkthrough"), date: d.walkthroughOn }),
+    step(`${d.coordinationOn}T11:00`, "clerk", { type: "complete_city_task", taskId: taskId(caseId, "coordination_meeting") }),
+    step(`${d.walkthroughOn}T10:00`, "pws", { type: "complete_city_task", taskId: taskId(caseId, "site_walkthrough") }),
+    step(`${d.workOrdersOn}T08:00`, "pws", { type: "complete_city_task", taskId: taskId(caseId, "work_order:barricades") }),
+    step(`${d.workOrdersOn}T08:30`, "pws", { type: "complete_city_task", taskId: taskId(caseId, "work_order:closure") }),
+  ];
+}
 
 /** B17 · Permitopolis University Greek Council: Closeout, hours logged, waiting on the Clerk. */
 const CASE17 = "PMT-27-0036";
@@ -132,6 +169,7 @@ export const B18: SeedScript = {
         { dept: "hl", sections: ["Certificate of insurance", "Accessibility plan"], dueDate: "2027-02-28" },
       ],
     }),
+    ...beforeThePermit(CASE18, { scheduledOn: "2027-02-09", noticeOn: "2027-02-10", noticeAcceptedOn: "2027-02-11", meetingOn: "2027-02-12", noticeFile: "poker-run-posted-notice.jpg" }),
     step("2027-02-15T09:00", "pws", { type: "review_decide", decision: "approve", conditions: [], feeLines: [] }),
     step("2027-02-15T09:05", "hl", { type: "review_decide", decision: "approve", conditions: [], feeLines: [] }),
     step("2027-02-17T09:00", "clerk", { type: "send_quote", conditions: [], feeLines: [] }),
@@ -139,6 +177,7 @@ export const B18: SeedScript = {
     // One block closed $150, application $250, deposit $1,000.
     step("2027-02-18T09:05", "applicant", { type: "pay", amount: 1400, method: "card", kind: "quote" }),
     step("2027-02-19T09:00", "clerk", { type: "issue_permit" }),
+    ...beforeTheEvent(CASE18, { scheduledOn: "2027-02-22", coordinationOn: "2027-03-19", walkthroughOn: "2027-04-02", workOrdersOn: "2027-04-08" }),
     step("2027-04-11T09:00", "pws", {
       type: "log_closeout",
       cleanup: "issues",
@@ -218,6 +257,7 @@ export const B19: SeedScript = {
         { dept: "hl", sections: ["Certificate of insurance", "Accessibility plan"], dueDate: "2027-01-21" },
       ],
     }),
+    ...beforeThePermit(CASE19, { scheduledOn: "2027-01-11", noticeOn: "2027-01-12", noticeAcceptedOn: "2027-01-13", meetingOn: "2027-01-14", noticeFile: "downtown-dash-posted-notice.jpg" }),
     step("2027-01-15T09:00", "pws", { type: "review_decide", decision: "approve", conditions: [], feeLines: [] }),
     step("2027-01-15T09:05", "hl", { type: "review_decide", decision: "approve", conditions: [], feeLines: [] }),
     step("2027-01-17T09:00", "clerk", { type: "send_quote", conditions: [], feeLines: [] }),
@@ -225,6 +265,7 @@ export const B19: SeedScript = {
     // Route 0.2 miles $80, application $250, deposit $1,000.
     step("2027-01-18T09:05", "applicant", { type: "pay", amount: 1330, method: "card", kind: "quote" }),
     step("2027-01-19T09:00", "clerk", { type: "issue_permit" }),
+    ...beforeTheEvent(CASE19, { scheduledOn: "2027-01-21", coordinationOn: "2027-02-12", walkthroughOn: "2027-02-26", workOrdersOn: "2027-03-03" }),
     step("2027-03-06T09:00", "pws", {
       type: "log_closeout",
       cleanup: "pass",

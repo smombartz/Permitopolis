@@ -98,10 +98,18 @@ describe("useDemo", () => {
 
   it("dispatch runs the action through transition() and stores the result", () => {
     const id = useDemo.getState().createDraft("maya");
-    const result = useDemo.getState().dispatch(id, { type: "add_note", text: "Called to confirm." }, "applicant");
+    const result = useDemo.getState().dispatch(id, { type: "add_note", text: "Called to confirm." }, "clerk");
     expect(result.ok).toBe(true);
     const draft = useDemo.getState().cases.find((c) => c.id === id);
     expect(draft?.activity.map((a) => a.text)).toEqual(["Started a draft.", "Called to confirm."]);
+  });
+
+  it("dispatch acts as the current role unless told otherwise, and reports why an action was refused", () => {
+    const id = useDemo.getState().createDraft("maya");
+    // The store starts in the Applicant role, and a note is for city staff.
+    expect(useDemo.getState().dispatch(id, { type: "add_note", text: "Hello" })).toEqual({ ok: false, reason: "Only city staff can add a note." });
+    useDemo.getState().setRole("clerk");
+    expect(useDemo.getState().dispatch(id, { type: "add_note", text: "Hello" }).ok).toBe(true);
   });
 
   it("setRole, setPersona and toggleHints update the store", () => {

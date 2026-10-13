@@ -7,11 +7,13 @@ import { fmtMoney } from "@/lib/format";
 import { cancellationRefund, classify, dueDate, estimateFees, requirements } from "@/lib/rules";
 import { CARD_BY_ID, type CardSpec } from "@/lib/rules/catalog";
 import type { FeeEstimate, RulesCtx } from "@/lib/rules/types";
-import type { Actor, DateHold, EventCase, Task } from "@/lib/types";
+import type { Actor, DateHold, EventAnswers, EventCase, Task } from "@/lib/types";
 import type { Action } from "../actions";
 import {
+  amendmentNeedsNotice,
   checkAcceptAndSign,
   checkAmend,
+  checkAmendedDate,
   checkBookAndPay,
   checkBookAgain,
   checkCancel,
@@ -400,24 +402,57 @@ export function bookAgain(c: EventCase, _action: Extract_<"book_again">, actor: 
   return { ok: true, case: next, spawned: [syncDraft(spawned, ctx)] };
 }
 
+/** Only what the wizard collects. An amendment changes the answers, never the record's history. */
+function answersOf(a: EventAnswers): EventAnswers {
+  return { eventType: a.eventType, name: a.name, description: a.description, location: a.location, schedule: a.schedule, attendance: a.attendance, addOns: a.addOns };
+}
+
+/**
+ * The fee lines of an amended plan: the new plan's own lines, plus every line somebody added
+ * to the old one (a reviewer's fire watch, a late fee already charged). The old plan's own
+ * lines are the ones its answers price, and those are replaced.
+ */
+function amendedFeeLines(before: EventCase, fresh: FeeEstimate, ctx: RulesCtx): EventCase["feeLines"] {
+  const priced = new Set(estimateFees(before, classify(before, ctx.cfg), ctx.cfg).lines.map((line) => line.label));
+  const chargesLateFee = fresh.lines.some((line) => line.kind === "late_fee");
+  const added = before.feeLines.filter((line) => (line.kind === "late_fee" ? !chargesLateFee : !priced.has(line.label)));
+  return [...fresh.lines, ...added].map((line, i) => ({ ...line, id: taskId(before.id, "fee", i + 1) }));
+}
+
+/**
+ * P1. The same record takes new answers: it is classified again, the date gate runs again, and
+ * the cards the new plan adds join the board tagged 'amendment'. State, permit and date hold
+ * are not touched, so a permit stays valid for the original plan while the amendment is
+ * pending (`flags.amendmentPending`). What happens to a pending amendment next (its review and
+ * its quote) belongs to workstream 5A.
+ */
 export function amend(c: EventCase, action: Extract_<"amend">, actor: Actor, ctx: RulesCtx): TransitionResult {
   const ed = eventDate(c, ctx.today);
   const check = checkAmend(c, ctx.today, ed);
   if (!check.ok) return check;
-  const nextAnswers = action.answers;
-  const withAnswers = { ...c, ...nextAnswers };
+
+  // Sessions first, as for a Draft: the new schedule's sessions come from the rules engine.
+  const withAnswers = withSessions({ ...c, ...answersOf(action.answers), flags: { ...c.flags, lateFee: !!action.lateFee } }, ctx);
   const cls = classify(withAnswers, ctx.cfg);
-  const freshTasks = requirements(withAnswers, cls, { caseId: c.id, today: ctx.today, cfg: ctx.cfg });
+  const amended: EventCase = { ...withAnswers, tier: cls.tier, triggers: cls.triggers };
+
+  const gate = checkAmendedDate(c, amended, ctx);
+  if (!gate.ok) return gate;
+
+  // The late fee is for notice the amendment needed and did not have, nothing else.
+  const lateFee = amendmentNeedsNotice(c, amended) && lateFeeApplies(amended, ctx);
+  const estimate = estimateFees(amended, cls, ctx.cfg, { caseId: c.id, lateFee });
+  const freshTasks = requirements(amended, cls, { caseId: c.id, today: ctx.today, cfg: ctx.cfg });
   const newCards = freshTasks.filter((t) => !c.tasks.some((existing) => existing.id === t.id)).map((t) => ({ ...t, tags: ["amendment" as const] }));
+
   let next: EventCase = {
-    ...c,
-    ...nextAnswers,
-    tier: cls.tier,
-    triggers: cls.triggers,
+    ...amended,
     tasks: [...c.tasks, ...newCards],
-    flags: { ...c.flags, amendmentPending: true, lateFee: !!action.lateFee },
+    feeLines: amendedFeeLines(c, estimate, ctx),
+    flags: { ...amended.flags, amendmentPending: true },
   };
-  next = appendActivity(next, actor, "Amended the application.", ctx);
+  const lateFeeLine = estimate.lines.find((line) => line.kind === "late_fee");
+  next = appendActivity(next, actor, `Amended the plan: ${cls.summary}.${lateFeeLine ? ` Late fee: ${fmtMoney(lateFeeLine.estimate)}.` : ""}`, ctx);
   return { ok: true, case: next };
 }
 
