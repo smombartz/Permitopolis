@@ -24,6 +24,7 @@ export { DeptStatusDots, type DeptStatusEntry } from "@/components/domain/DeptSt
 export { CaseHeader } from "@/components/domain/CaseHeader";
 export { ActivityTimeline } from "@/components/domain/ActivityTimeline";
 export { FeeTable, groupFeeLinesByDept, sumFeeLines } from "@/components/domain/FeeTable";
+export { FormAnswers } from "@/components/domain/FormAnswers";
 export { ConditionList, groupConditionsByDept } from "@/components/domain/ConditionList";
 export { WhoIsUp } from "@/components/domain/WhoIsUp";
 export { TaskCard, StackedTaskCard } from "@/components/domain/TaskCard";

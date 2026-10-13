@@ -2,6 +2,7 @@
  * Pure view-models for My events (/events) and the applicant board (/events/[id]).
  * Nothing here reads the store or dispatches; screens pass in cases, today and cfg.
  */
+import { fmtDate, fmtMoney } from "@/lib/format";
 import { classify, estimateFees } from "@/lib/rules";
 import { CARD_BY_ID, type CatalogId } from "@/lib/rules/catalog";
 import type { RulesConfig } from "@/lib/rules/types";
@@ -289,6 +290,46 @@ export function directLinkHref(c: EventCase, task: Task): string | null {
  */
 export function opensSessionSchedule(c: EventCase, task: Task): boolean {
   return task.catalogId === "pay_fees" && task.status === "done" && Boolean(c.schedule?.recurrence);
+}
+
+export interface CardRecord {
+  /** What happened, one line each: "$6,530 paid by card on Mon, May 3, 2027". */
+  lines: string[];
+  /** Where the card's result can be seen: the quote while it is open, the permit after. */
+  link: { href: string; label: string } | null;
+}
+
+/**
+ * What the sheet of a finished payment, sign-off or permit card shows: the amount and date paid,
+ * the signature and when it was given, and a link to the page that holds the result. These cards
+ * have no form or file of their own, so without this the sheet repeats the card's one sentence
+ * and nothing else. Empty for any other card.
+ */
+export function cardRecord(c: EventCase, task: Task): CardRecord {
+  const doneAt = [...task.history].reverse().find((h) => h.status === "done")?.at ?? null;
+  const permit = c.permit ? { href: routes.permit(c.id), label: "View permit" } : null;
+  const quote = c.state === "quote_sent" ? { href: routes.quote(c.id), label: "View the quote" } : null;
+  const paidLine = (p: EventCase["payments"][number]) =>
+    p.amount < 0
+      ? `${fmtMoney(-p.amount)} refunded on ${fmtDate(p.at)}`
+      : `${fmtMoney(p.amount)} paid ${p.method === "card" ? "by card" : "in person"} on ${fmtDate(p.at)}`;
+
+  switch (task.catalogId) {
+    case "pay_fees":
+      return { lines: c.payments.filter((p) => p.kind === "booking" || p.kind === "quote").map(paidLine), link: permit ?? quote };
+    case "final_bill_or_refund":
+      return { lines: c.payments.filter((p) => p.kind === "final_invoice" || p.kind === "refund").map(paidLine), link: permit };
+    case "accept_and_sign": {
+      if (task.status !== "done") return { lines: [], link: quote };
+      const signature = typeof task.payload.signature === "string" ? task.payload.signature : null;
+      const when = doneAt ? ` on ${fmtDate(doneAt)}` : "";
+      return { lines: [signature ? `Signed by ${signature}${when}` : `Signed${when}`], link: permit ?? quote };
+    }
+    case "carry_permit":
+      return { lines: task.status === "done" && doneAt ? [`Carried on the day; finished on ${fmtDate(doneAt)}`] : [], link: permit };
+    default:
+      return { lines: [], link: null };
+  }
 }
 
 export function unlockHintFor(catalogId: string): string | undefined {

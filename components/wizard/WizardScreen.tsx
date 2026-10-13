@@ -13,7 +13,8 @@ import { classify, requirements } from "@/lib/rules";
 import { routes } from "@/lib/routes";
 import { PERSONA_BY_ID } from "@/lib/data/people";
 import { TierBadge } from "@/components/domain";
-import { EMPTY_ADDONS, type EventAnswers, type TriggerId, type WizardStep } from "@/lib/types";
+import { cn } from "@/lib/utils";
+import { EMPTY_ADDONS, type EventAnswers, type ISODate, type TriggerId, type WizardStep } from "@/lib/types";
 import {
   WIZARD_STEPS,
   WIZARD_STEP_LABEL,
@@ -22,6 +23,7 @@ import {
   previousWizardStep,
   removeAddOnForTrigger,
   resolveWizardStep,
+  scheduleOnDate,
   wizardStepIndex,
 } from "@/lib/view/wizard";
 import { ResultPanel } from "./ResultPanel";
@@ -54,6 +56,7 @@ function WizardScreen() {
   const createDraft = useDemo((s) => s.createDraft);
   const updateDraft = useDemo((s) => s.updateDraft);
   const narrow = useIsNarrow("(max-width: 1023px)");
+  const phone = useIsNarrow("(max-width: 639px)");
 
   const [pendingAnswers, setPendingAnswers] = React.useState<EventAnswers>(blankAnswers);
   const [accountCreated, setAccountCreated] = React.useState(false);
@@ -62,12 +65,46 @@ function WizardScreen() {
   const [sheetOpen, setSheetOpen] = React.useState(false);
   const savedTimeout = React.useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const draft = React.useMemo(() => (caseIdParam ? cases.find((c) => c.id === caseIdParam) : undefined), [cases, caseIdParam]);
+  // The draft this visit created, kept until the URL carries its id. createDraft() is immediate
+  // but router.replace() is a transition, so for a moment the URL still says "no case": without
+  // this, every change made in that moment would start another draft ("J", "Ja", ...). The ref
+  // is for the handlers (two changes inside one event), the state for what is drawn.
+  const [createdId, setCreatedId] = React.useState<string | null>(null);
+  const createdRef = React.useRef<string | null>(null);
+  // The URL has caught up and is the only source again: a later visit to a blank /apply starts fresh.
+  if (caseIdParam && createdId) setCreatedId(null);
+  React.useEffect(() => {
+    if (caseIdParam) createdRef.current = null;
+  }, [caseIdParam]);
+
+  const draftId = caseIdParam ?? createdId;
+  const draft = React.useMemo(() => (draftId ? cases.find((c) => c.id === draftId) : undefined), [cases, draftId]);
   const unknownCase = Boolean(caseIdParam) && !draft;
   const notADraft = Boolean(draft) && draft!.state !== "draft";
-  // With no case at all the wizard always starts at step 1 (What are you planning?); once a
-  // draft exists it opens at its saved step unless the URL names one.
-  const step: WizardStep = draft ? resolveWizardStep(stepParam, draft.wizardStep) : "what";
+  // The URL's step wins, with or without a draft: Next and the stepper only rewrite the URL, so
+  // a blank wizard has to follow it too. Failing that, a draft opens at its saved step and a
+  // blank wizard at step 1 (What are you planning?).
+  const step: WizardStep = resolveWizardStep(stepParam, draft?.wizardStep ?? "what");
+
+  const answers: EventAnswers = draft ?? pendingAnswers;
+  const ctx = { today: demoToday, cases, cfg };
+  const panel = buildResultPanel(answers, ctx, { lateFee: draft?.flags.lateFee, ignoreCaseId: draft?.id });
+
+  // A tier change is announced and ringed from here, not from ResultPanel: below 1024px the
+  // panel is only mounted while its sheet is open, and the change is usually caused by a field
+  // on the step itself.
+  const previousTier = React.useRef(panel.tier);
+  const [tierHighlight, setTierHighlight] = React.useState(false);
+  const [tierAnnouncement, setTierAnnouncement] = React.useState("");
+  React.useEffect(() => {
+    if (previousTier.current !== panel.tier) {
+      previousTier.current = panel.tier;
+      setTierHighlight(true);
+      setTierAnnouncement(panel.summary);
+      const timeout = setTimeout(() => setTierHighlight(false), 900);
+      return () => clearTimeout(timeout);
+    }
+  }, [panel.tier, panel.summary]);
 
   // A case that is no longer a Draft (S2's jump after it has been booked, say) belongs on its
   // board, not in the wizard.
@@ -92,9 +129,6 @@ function WizardScreen() {
   }
   if (notADraft) return null;
 
-  const answers: EventAnswers = draft ?? pendingAnswers;
-  const ctx = { today: demoToday, cases, cfg };
-  const panel = buildResultPanel(answers, ctx, { lateFee: draft?.flags.lateFee, ignoreCaseId: draft?.id });
   const persona = PERSONA_BY_ID[personaId];
   const tasks = draft ? requirements(draft, classify(draft, cfg), { caseId: draft.id, today: demoToday, cfg }) : [];
 
@@ -106,12 +140,15 @@ function WizardScreen() {
 
   /** Every field change autosaves. The Draft is created on the applicant's first entry. */
   function ensureDraft(patch: Partial<EventAnswers>): void {
-    if (draft) {
-      updateDraft(draft.id, patch);
+    const existingId = draft?.id ?? createdRef.current;
+    if (existingId) {
+      updateDraft(existingId, patch);
     } else {
       const merged = { ...pendingAnswers, ...patch };
       setPendingAnswers(merged);
       const id = createDraft(personaId, merged);
+      createdRef.current = id;
+      setCreatedId(id);
       router.replace(routes.apply({ caseId: id, step }));
     }
     flashSaved();
@@ -126,9 +163,14 @@ function WizardScreen() {
     ensureDraft({ addOns: removeAddOnForTrigger(answers.addOns, triggerId) });
   }
 
-  function handleLateFee(): void {
+  /** The date gate's "Use <date>" fix, from step 5 (step 3 moves the date itself). */
+  function moveToDate(date: ISODate): void {
+    ensureDraft({ schedule: scheduleOnDate(answers.schedule, date, answers.eventType) });
+  }
+
+  function setLateFee(on: boolean): void {
     if (!draft) return;
-    updateDraft(draft.id, { lateFee: true });
+    updateDraft(draft.id, { lateFee: on });
     flashSaved();
   }
 
@@ -159,7 +201,9 @@ function WizardScreen() {
       stepContent = <StepWhere answers={answers} onChange={ensureDraft} ctx={ctx} ignoreCaseId={draft?.id} />;
       break;
     case "when":
-      stepContent = <StepWhen answers={answers} onChange={ensureDraft} onLateFee={handleLateFee} panel={panel} today={demoToday} />;
+      stepContent = (
+        <StepWhen answers={answers} onChange={ensureDraft} onLateFee={setLateFee} lateFee={draft?.flags.lateFee ?? false} panel={panel} today={demoToday} />
+      );
       break;
     case "size":
       stepContent = <StepSize answers={answers} onChange={ensureDraft} cfg={cfg} />;
@@ -176,6 +220,10 @@ function WizardScreen() {
           hasBoard={(draft?.tasks.length ?? 0) > 0}
           personaName={persona?.name ?? "you"}
           onStepLink={goToStep}
+          onNewDate={moveToDate}
+          onDropAddOn={applyWhatIf}
+          onLateFee={setLateFee}
+          compactFees={phone}
           onPrimaryAction={handlePrimaryAction}
           primaryError={primaryError}
           accountCreated={accountCreated}
@@ -187,6 +235,9 @@ function WizardScreen() {
 
   return (
     <div className={narrow ? "flex flex-col gap-6 pb-20" : "flex flex-col gap-6"}>
+      <span data-slot="wizard-tier-announcement" className="sr-only" role="status" aria-live="polite">
+        {tierAnnouncement}
+      </span>
       <PageHeader
         eyebrow="Apply for a permit"
         title={answers.name || "New event"}
@@ -226,7 +277,7 @@ function WizardScreen() {
 
         {!narrow ? (
           <StickyAside>
-            <ResultPanel panel={panel} onApplyWhatIf={applyWhatIf} />
+            <ResultPanel panel={panel} onApplyWhatIf={applyWhatIf} highlight={tierHighlight} />
           </StickyAside>
         ) : null}
       </div>
@@ -239,7 +290,13 @@ function WizardScreen() {
             className="fixed inset-x-0 bottom-0 z-40 flex items-center justify-between gap-3 border-t border-line-magnetic bg-glass-tinted px-4 py-3 text-left shadow-hud backdrop-blur-hud outline-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring"
           >
             <span className="flex min-w-0 items-center gap-2">
-              <TierBadge tier={panel.tier} />
+              <span
+                data-slot="wizard-bar-tier"
+                data-highlight={tierHighlight ? "true" : undefined}
+                className={cn("inline-flex shrink-0 rounded-full transition-shadow duration-300", tierHighlight && "shadow-[0_0_0_4px_var(--pill)]")}
+              >
+                <TierBadge tier={panel.tier} />
+              </span>
               <span className="min-w-0 truncate text-sm text-fg-secondary">{panel.summary}</span>
             </span>
             <span className="shrink-0 text-xs font-semibold text-fg-accent">Details</span>
@@ -250,7 +307,7 @@ function WizardScreen() {
                 <SheetTitle>Your plan</SheetTitle>
               </SheetHeader>
               <div className="flex-1 overflow-y-auto px-5 pb-5">
-                <ResultPanel panel={panel} onApplyWhatIf={applyWhatIf} />
+                <ResultPanel panel={panel} onApplyWhatIf={applyWhatIf} highlight={tierHighlight} />
               </div>
             </SheetContent>
           </Sheet>

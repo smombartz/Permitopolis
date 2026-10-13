@@ -34,6 +34,20 @@ describe("LandingScreen (/)", () => {
     expect(within(hero).getByText("Special event")).toBeInTheDocument();
   });
 
+  it("the primary nav and the footer are page landmarks beside <main>, not inside it", async () => {
+    await renderScreen(<LandingScreen />, { path: "/" });
+
+    const main = screen.getByRole("main");
+    const nav = screen.getAllByRole("navigation")[0];
+    const footer = screen.getByRole("contentinfo");
+    expect(main.contains(nav)).toBe(false);
+    expect(main.contains(footer)).toBe(false);
+    // In reading order: nav, main, footer.
+    expect(nav.compareDocumentPosition(main) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(main.compareDocumentPosition(footer) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(within(footer).getByRole("link", { name: /Open the demo guide/ })).toBeInTheDocument();
+  });
+
   it("the fee schedule panel shows $25 per hour for a shelter", async () => {
     await renderScreen(<LandingScreen />, { path: "/" });
     expect(screen.getByText("$25 per hour")).toBeInTheDocument();

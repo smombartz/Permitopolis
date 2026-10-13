@@ -1,11 +1,11 @@
 "use client"
 
 import * as React from "react"
+import { FormAnswers } from "@/components/domain"
 import { InlineAlert } from "@/components/ui/inline-alert"
 import { fmtFileSize } from "@/lib/format"
 import { checkVerifyOrReject } from "@/lib/state"
 import type { Task } from "@/lib/types"
-import { FormAnswers } from "../../FormAnswers"
 import { PanelActions, PanelBody, PanelHeader, useCaseContext, useCaseDispatch } from "../panelKit"
 import type { ActionPanelProps } from "../types"
 

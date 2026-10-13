@@ -6,10 +6,11 @@ import { Chip, ChipDot } from "@/components/ui/chip";
 import { InlineAlert } from "@/components/ui/inline-alert";
 import { KeyValueList } from "@/components/ui/key-value";
 import { FeeTable, TierBadge, DEPT_ICON } from "@/components/domain";
+import { DateGateBanner } from "@/components/wizard/DateGateBanner";
 import { fmtDate, fmtMoney } from "@/lib/format";
 import { classify, planTimeline, type RulesConfig } from "@/lib/rules";
 import { groupTasksByPhase, missingFields, primaryButtonReady, type ResultPanel } from "@/lib/view/wizard";
-import type { EventAnswers, ISODate, Task, WizardStep } from "@/lib/types";
+import type { EventAnswers, ISODate, Task, TriggerId, WizardStep } from "@/lib/types";
 
 export interface StepPlanProps {
   answers: EventAnswers;
@@ -22,6 +23,12 @@ export interface StepPlanProps {
   hasBoard: boolean;
   personaName: string;
   onStepLink: (step: WizardStep) => void;
+  /** The date gate's three fixes, the same ones step 3 offers. */
+  onNewDate: (date: ISODate) => void;
+  onDropAddOn: (id: TriggerId) => void;
+  onLateFee: (on: boolean) => void;
+  /** Two columns for the fee estimate, on a narrow screen. */
+  compactFees?: boolean;
   onPrimaryAction: () => void;
   primaryError: string | null;
   accountCreated: boolean;
@@ -39,6 +46,10 @@ function StepPlan({
   hasBoard,
   personaName,
   onStepLink,
+  onNewDate,
+  onDropAddOn,
+  onLateFee,
+  compactFees = false,
   onPrimaryAction,
   primaryError,
   accountCreated,
@@ -131,7 +142,7 @@ function StepPlan({
 
       <div className="flex flex-col gap-2">
         <p className="text-eyebrow font-bold tracking-[.12em] text-fg-label uppercase">Fee estimate</p>
-        <FeeTable lines={panel.fees.lines} />
+        <FeeTable lines={panel.fees.lines} compact={compactFees} />
       </div>
 
       <div className="flex flex-col gap-2 rounded-panel border border-line-subtle bg-surface-1 p-4">
@@ -159,16 +170,21 @@ function StepPlan({
         </InlineAlert>
       ) : null}
 
+      {/* The gate is usually tripped on step 4, so its fixes are here too, not only on step 3. */}
+      <DateGateBanner
+        gate={panel.dateGate}
+        leadTimeDays={panel.leadTimeDays}
+        lateFee={lateFee}
+        onNewDate={onNewDate}
+        onDropAddOn={onDropAddOn}
+        onLateFee={onLateFee}
+      />
+
       {primaryError ? <InlineAlert variant="danger">{primaryError}</InlineAlert> : null}
 
       <Button type="button" size="lg" disabled={!ready} onClick={onPrimaryAction}>
         {primaryLabel}
       </Button>
-      {!ready && missing.length === 0 ? (
-        <p className="text-xs text-fg-secondary">
-          {!panel.dateGate.leadTimeOk ? "This date doesn't meet the lead time yet." : "That date isn't available yet."}
-        </p>
-      ) : null}
     </div>
   );
 }

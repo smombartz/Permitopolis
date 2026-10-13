@@ -82,7 +82,32 @@ export function navigate(href: string): void {
   notifyNav();
 }
 
+/**
+ * In the app a `router.push()` or `router.replace()` is a transition: the call returns at once
+ * and `useSearchParams()` catches up later (after an RSC round trip under `next dev`). The mock
+ * moves the location synchronously, which hides every bug that lives in that gap. Between
+ * `holdNavigation()` and `releaseNavigation()` a push or replace is recorded but the location
+ * stays where it is; releasing lands on the last one, as the real router would.
+ */
+let heldNavigation: string[] | null = null;
+
+export function holdNavigation(): void {
+  heldNavigation = [];
+}
+
+export function releaseNavigation(): void {
+  const last = heldNavigation?.at(-1);
+  heldNavigation = null;
+  if (last !== undefined) navigate(last);
+}
+
+function go(href: string): void {
+  if (heldNavigation) heldNavigation.push(href);
+  else navigate(href);
+}
+
 export function resetNavState(): void {
+  heldNavigation = null;
   Object.assign(navState, DEFAULT_NAV_STATE, { params: {}, search: new URLSearchParams(), pushCalls: [], replaceCalls: [] });
   for (const fn of [router.back, router.forward, router.refresh, router.prefetch]) fn.mockClear();
   notifyNav();
@@ -99,11 +124,11 @@ const readSearch = () => navState.search;
 const router = {
   push: (href: string) => {
     navState.pushCalls.push(href);
-    navigate(href);
+    go(href);
   },
   replace: (href: string) => {
     navState.replaceCalls.push(href);
-    navigate(href);
+    go(href);
   },
   back: vi.fn(),
   forward: vi.fn(),

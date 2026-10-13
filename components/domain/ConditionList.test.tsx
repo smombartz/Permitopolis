@@ -36,4 +36,22 @@ describe("ConditionList", () => {
     await user.click(checkboxes[0]);
     expect(onToggleAccept).toHaveBeenCalledWith("c1");
   });
+
+  it("each accept checkbox has a visible \"I accept\" label that toggles it, and its name carries the condition", async () => {
+    const user = userEvent.setup();
+    const onToggleAccept = vi.fn();
+    render(<ConditionList conditions={CONDITIONS} editable onToggleAccept={onToggleAccept} />);
+
+    const labels = screen.getAllByText("I accept");
+    expect(labels).toHaveLength(3);
+    expect(screen.getByRole("checkbox", { name: "I accept: Vendor list confirmed 48 hours ahead." })).toBeInTheDocument();
+
+    await user.click(labels[2]);
+    expect(onToggleAccept).toHaveBeenCalledWith("c3");
+  });
+
+  it("read-only mode has no \"I accept\" label", () => {
+    render(<ConditionList conditions={CONDITIONS} />);
+    expect(screen.queryByText("I accept")).not.toBeInTheDocument();
+  });
 });

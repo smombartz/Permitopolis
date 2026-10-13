@@ -15,6 +15,7 @@ export {
   cardUnderVerification,
   checkAcceptComplete,
   checkCompleteCityTask,
+  checkCompleteTask,
   checkConfirmRouting,
   checkIssuePermit,
   checkLogCloseout,

@@ -16,7 +16,9 @@ interface WizardStepperProps extends React.ComponentProps<"ol"> {
 
 /**
  * The wizard's 1-to-5 stepper. Done steps are clickable to go back and edit; labels
- * collapse to numbered markers alone below the `sm` breakpoint ("compact on mobile").
+ * collapse to numbered markers alone below the `sm` breakpoint ("compact on mobile"). The label
+ * is only hidden from sight there (`sr-only`, never `display: none`): the marker is decorative,
+ * so the label and "Step N" are each step's whole accessible name.
  */
 function WizardStepper({ steps, current, onStepSelect, className, ...props }: WizardStepperProps) {
   return (
@@ -53,7 +55,8 @@ function WizardStepper({ steps, current, onStepSelect, className, ...props }: Wi
                 className="flex items-center gap-1.5 rounded-control outline-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring"
               >
                 {marker}
-                <span className="hidden text-xs font-medium whitespace-nowrap text-fg-secondary sm:inline">
+                <span className="sr-only">Step {index + 1}: </span>
+                <span className="sr-only text-xs font-medium whitespace-nowrap text-fg-secondary sm:not-sr-only">
                   {step.label}
                 </span>
                 <span className="sr-only">, done, edit</span>
@@ -61,9 +64,10 @@ function WizardStepper({ steps, current, onStepSelect, className, ...props }: Wi
             ) : (
               <span className="flex items-center gap-1.5" aria-current={isCurrent ? "step" : undefined}>
                 {marker}
+                <span className="sr-only">Step {index + 1}: </span>
                 <span
                   className={cn(
-                    "hidden text-xs font-medium whitespace-nowrap sm:inline",
+                    "sr-only text-xs font-medium whitespace-nowrap sm:not-sr-only",
                     isCurrent ? "font-bold text-fg" : "text-fg-secondary"
                   )}
                 >

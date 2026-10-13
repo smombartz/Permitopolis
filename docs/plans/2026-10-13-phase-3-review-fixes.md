@@ -24,22 +24,22 @@ again.
 
 ### Medium, applicant side
 
-- [ ] A1 Board card sheet: a finished document offers "Replace this file" only after a new file is
+- [x] A1 Board card sheet: a finished document offers "Replace this file" only after a new file is
       chosen, and only where the engine takes it
-- [ ] A2 Board card sheet: a form card that is with the city or accepted is read-only
-- [ ] A3 Wizard step 3: the lead-time banner says "N days away, needs M days' notice"
-- [ ] A4 Wizard: Next on a blank wizard creates the draft and moves on
-- [ ] A5 Wizard: one draft per visit, whatever the URL has caught up with
-- [ ] A6 Wizard step 4: vendor names can be typed (raw text kept locally)
-- [ ] A7 Wizard step 3: a date change rebuilds the recurrence's weekday and end
-- [ ] A8 Wizard step 5: the lead-time gate and its three fixes are on the plan step too
-- [ ] A9 Sheets are bottom sheets below 640px (side rules scoped to `sm` and up)
-- [ ] A10 Board column tabs fit 375px (two rows of two)
-- [ ] A11 `CaseHeader` takes `compactStepper`; the board and the quote set it when narrow
-- [ ] A12 `FeeTable` takes `compact` (two columns); the wizard panel and narrow screens use it
-- [ ] A13 Wizard: tier change is announced and highlighted from `WizardScreen`, on a phone too
-- [ ] A14 Checkout: the paid state stays on screen until the next page arrives
-- [ ] A15 State stepper reserves room for the Needs info pill
+- [x] A2 Board card sheet: a form card that is with the city or accepted is read-only
+- [x] A3 Wizard step 3: the lead-time banner says "N days away, needs M days' notice"
+- [x] A4 Wizard: Next on a blank wizard creates the draft and moves on
+- [x] A5 Wizard: one draft per visit, whatever the URL has caught up with
+- [x] A6 Wizard step 4: vendor names can be typed (raw text kept locally)
+- [x] A7 Wizard step 3: a date change rebuilds the recurrence's weekday and end
+- [x] A8 Wizard step 5: the lead-time gate and its three fixes are on the plan step too
+- [x] A9 Sheets are bottom sheets below 640px (side rules scoped to `sm` and up)
+- [x] A10 Board column tabs fit 375px (two rows of two)
+- [x] A11 `CaseHeader` takes `compactStepper`; the board and the quote set it when narrow
+- [x] A12 `FeeTable` takes `compact` (two columns); the wizard panel and narrow screens use it
+- [x] A13 Wizard: tier change is announced and highlighted from `WizardScreen`, on a phone too
+- [x] A14 Checkout: the paid state stays on screen until the next page arrives
+- [x] A15 State stepper reserves room for the Needs info pill
 
 ### Medium, city side
 
@@ -54,13 +54,13 @@ again.
 
 ### Low (each a few lines)
 
-- [ ] L1 Late fee chosen: the banner confirms it and offers Undo
-- [ ] L2 Permit: the whole cancellation schedule, today's band marked, deposit named, hidden when
+- [x] L1 Late fee chosen: the banner confirms it and offers Undo
+- [x] L2 Permit: the whole cancellation schedule, today's band marked, deposit named, hidden when
       cancelling is no longer possible
-- [ ] L3 Finished payment and sign-off cards show the amount, date or signature and a link
-- [ ] L4 Wizard stepper labels stay available to assistive tech below `sm`
-- [ ] L5 Vendor rows carry a status word; the quote's condition checkbox has a visible "I accept"
-- [ ] L6 Demo guide table wraps; landing page landmarks
+- [x] L3 Finished payment and sign-off cards show the amount, date or signature and a link
+- [x] L4 Wizard stepper labels stay available to assistive tech below `sm`
+- [x] L5 Vendor rows carry a status word; the quote's condition checkbox has a visible "I accept"
+- [x] L6 Demo guide table wraps; landing page landmarks
 - [ ] L7 In-person payment on a paid quote is disabled with a reason
 - [ ] L8 j/k and arrow navigation leaves modified keys, handled events and widgets alone
 - [ ] L9 My queue shows the review clock on review tasks only

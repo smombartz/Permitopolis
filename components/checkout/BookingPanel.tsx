@@ -6,6 +6,7 @@ import { toast } from "sonner";
 import { CardPaymentForm } from "@/components/checkout/CardPaymentForm";
 import { PlanSummaryCard } from "@/components/checkout/PlanSummaryCard";
 import { FeeTable } from "@/components/domain";
+import { useIsNarrow } from "@/components/shell";
 import { Button } from "@/components/ui/button";
 import { InlineAlert } from "@/components/ui/inline-alert";
 import { PageHeader } from "@/components/ui/page-header";
@@ -20,8 +21,9 @@ import { bookingEstimate, dueNowOf, planSummary } from "@/lib/view/checkout";
  * BOOKING mode: an Instant Draft books and pays in one step. It arrives here from the wizard's
  * last step with no board yet (the booking builds it), so the way back is the wizard.
  */
-function BookingPanel({ c, ctx }: { c: EventCase; ctx: RulesCtx }) {
+function BookingPanel({ c, ctx, onPaid }: { c: EventCase; ctx: RulesCtx; /** Keeps the paid state on screen until the permit page arrives. */ onPaid?: () => void }) {
   const router = useRouter();
+  const phone = useIsNarrow("(max-width: 639px)");
   const dispatch = useDemo((s) => s.dispatch);
   const plan = planSummary(c);
   const actions = availableActions(c, "applicant", ctx);
@@ -35,6 +37,7 @@ function BookingPanel({ c, ctx }: { c: EventCase; ctx: RulesCtx }) {
     const result = dispatch(c.id, { type: "book_and_pay", method: "card" });
     if (result.ok) {
       toast.success("Booked and paid.");
+      onPaid?.();
       router.push(routes.permit(c.id));
     }
     return result;
@@ -62,7 +65,7 @@ function BookingPanel({ c, ctx }: { c: EventCase; ctx: RulesCtx }) {
       ) : (
         <>
           <Section title="Fees">
-            <FeeTable lines={estimate.lines} />
+            <FeeTable lines={estimate.lines} compact={phone} />
           </Section>
           <Section title="Pay">
             <CardPaymentForm

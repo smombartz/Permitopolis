@@ -4,12 +4,11 @@ import { Button } from "@/components/ui/button"
 import { Section } from "@/components/ui/section"
 import { EmptyState } from "@/components/ui/empty-state"
 import { Badge } from "@/components/ui/badge"
-import { TaskKindLabel } from "@/components/domain"
+import { FormAnswers, TaskKindLabel } from "@/components/domain"
 import { FileQuestionIcon } from "lucide-react"
 import { fmtFileSize, plural } from "@/lib/format"
 import { PARTY_LABEL, type EventCase, type Party, type Task, type TaskStatus } from "@/lib/types"
 import { documentGroups } from "@/lib/view/caseDetail"
-import { FormAnswers } from "../FormAnswers"
 
 const STATUS_BADGE: Record<TaskStatus, { variant: "secondary" | "default" | "warning" | "success"; text: string }> = {
   locked: { variant: "secondary", text: "Locked" },

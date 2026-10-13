@@ -196,8 +196,9 @@ function DemoGuideScreen() {
                 {SCENARIO_JUMPS.map((jump) => (
                   <TableRow key={jump.id}>
                     <TableCell className="font-medium text-fg">{jump.label}</TableCell>
-                    <TableCell className="text-fg-secondary">{jump.state}</TableCell>
-                    <TableCell>
+                    {/* The longest of these is about 115 characters: it wraps, so Jump stays in view. */}
+                    <TableCell className="py-2 whitespace-normal text-fg-secondary">{jump.state}</TableCell>
+                    <TableCell className="w-px">
                       <Button type="button" variant="ghost" size="sm" onClick={() => startScenario(jump.caseId)}>
                         Jump
                       </Button>

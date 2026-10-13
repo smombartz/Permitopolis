@@ -12,7 +12,7 @@ import { CaseHeader } from "@/components/domain/CaseHeader"
 import { EndingBanner } from "@/components/domain/EndingBanner"
 import { PartyChip } from "@/components/domain/PartyChip"
 import { ReviewStatusDot } from "@/components/domain/ReviewStatusDot"
-import { CaseNotFound } from "@/components/shell"
+import { CaseNotFound, useIsNarrow } from "@/components/shell"
 import { Button } from "@/components/ui/button"
 import { EmptyState } from "@/components/ui/empty-state"
 import { BackLink, PageHeader } from "@/components/ui/page-header"
@@ -92,6 +92,8 @@ function BoardScreen() {
 
   const cases = useDemo((s) => s.cases)
   const today = useDemo((s) => s.demoToday)
+  // Below 768px the header's stepper is markers and the one current label (see CaseHeader).
+  const narrow = useIsNarrow()
   const c = cases.find((candidate) => candidate.id === id)
 
   const grouping: Grouping = searchParams.get("group") === "phase" ? "phase" : "columns"
@@ -147,6 +149,7 @@ function BoardScreen() {
         state={c.state}
         ending={c.ending}
         hold={c.dateHold}
+        compactStepper={narrow}
         actions={
           <>
             {permitHref ? (

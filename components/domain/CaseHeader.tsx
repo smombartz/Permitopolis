@@ -33,6 +33,11 @@ interface CaseHeaderProps extends React.ComponentProps<"div"> {
   reviewClock?: CaseHeaderReviewClock | null
   /** The role's primary actions, right-aligned next to the title. */
   actions?: React.ReactNode
+  /**
+   * Markers and the one current label instead of eight labels in a row, which need about 385px
+   * and cannot wrap. Set it on a narrow screen (`useIsNarrow()`).
+   */
+  compactStepper?: boolean
 }
 
 /** The header strip from both wireframes: event, tier, case id, applicant, stepper, hold and clock. */
@@ -48,6 +53,7 @@ function CaseHeader({
   hold,
   reviewClock,
   actions,
+  compactStepper = false,
   className,
   ...props
 }: CaseHeaderProps) {
@@ -77,7 +83,7 @@ function CaseHeader({
         </div>
         {actions ? <div className="flex shrink-0 flex-wrap items-center gap-2">{actions}</div> : null}
       </div>
-      <StateStepper state={state} ending={ending} />
+      <StateStepper state={state} ending={ending} compact={compactStepper} />
       <div className="flex flex-wrap items-center gap-x-5 gap-y-2 border-t border-line-subtle pt-3">
         <HoldStatus hold={hold} />
         {reviewClock ? (

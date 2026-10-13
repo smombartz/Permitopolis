@@ -3,6 +3,7 @@
  * `useDemo` selectors and the pure functions in `@/lib/rules`, and calls these to turn that
  * into what steps 1 to 5 show. Tested against the real seed in wizard.test.ts.
  */
+import { addDaysISO, weekdayOf } from "@/lib/dates";
 import { fmtMoney, plural } from "@/lib/format";
 import { getSpace } from "@/lib/data/inventory";
 import {
@@ -26,6 +27,7 @@ import {
   type CityServices,
   type EventAnswers,
   type EventType,
+  type ISODate,
   type Location,
   type Schedule,
   type Task,
@@ -245,6 +247,45 @@ export function addOnEffectText(key: AddOnKey, cfg: RulesConfig): string {
 
 /* ---------- step 3: sessions and the weekday ---------- */
 
+/** How far a series runs when Repeat is first switched on: about 12 weekly sessions. */
+export const DEFAULT_SESSIONS_OUT = 7 * 11;
+
+export function blankSchedule(date: ISODate): Schedule {
+  return { date, start: "09:00", end: "17:00", occurrences: [] };
+}
+
+/** The recurrence a series starts with on `date`: weekly, on that weekday. */
+export function defaultRecurrence(date: ISODate): NonNullable<Schedule["recurrence"]> {
+  return { frequency: "weekly", weekday: weekdayOf(date), until: addDaysISO(date, DEFAULT_SESSIONS_OUT) };
+}
+
+/**
+ * The schedule moved to `date` (step 3's date field, a next-open-date button, the date gate's
+ * "Use ..." fix). A series follows its first date: it repeats on that date's weekday, and an end
+ * date the move has left behind is put back the default distance out. Availability and every
+ * booked series go by `recurrence.weekday`, so a stale one would stop the series holding its
+ * slot. A class or club meetup repeats from its first date on.
+ */
+export function scheduleOnDate(schedule: Schedule | null, date: ISODate, eventType: EventType | null): Schedule {
+  const base = schedule ?? blankSchedule(date);
+  let recurrence = base.recurrence;
+  if (recurrence) {
+    recurrence = { ...recurrence, weekday: weekdayOf(date), until: recurrence.until < date ? addDaysISO(date, DEFAULT_SESSIONS_OUT) : recurrence.until };
+  } else if (!schedule && repeatsByDefault(eventType)) {
+    recurrence = defaultRecurrence(date);
+  }
+  return { ...base, date, recurrence, occurrences: [] };
+}
+
+/**
+ * The lead-time gate in the PRD's words: "19 days left, 30 needed." `daysUntil` is the days from
+ * today to the event, not the shortfall.
+ */
+export function leadTimeGapText(daysUntil: number, leadTimeDays: number): string {
+  if (daysUntil < 0) return `That date has passed. This event needs ${plural(leadTimeDays, "day")} of notice.`;
+  return `${plural(daysUntil, "day")} left, ${leadTimeDays} needed. This event needs ${plural(leadTimeDays - daysUntil, "more day")} of notice than it has.`;
+}
+
 const WEEKDAY_NAMES = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
 
 export function weekdayName(weekday: number): string {
@@ -283,6 +324,14 @@ export function missingFields(answers: EventAnswers): MissingField[] {
  * blacked-out date) and the applicant chose to pay the late fee: `book_and_pay` and `submit`
  * let a late date through exactly this way (see the readme, "How the engine behaves").
  */
+/**
+ * The applicant chose the late fee and it is what lets this date stand: the lead time is the
+ * only thing wrong, and the event is far enough out for the fee to be offered at all.
+ */
+export function lateFeeCarriesDate(gate: DateGate, lateFee: boolean): boolean {
+  return lateFee && !gate.ok && gate.fixes.includes("late_fee");
+}
+
 export function dateGateSatisfied(gate: DateGate, lateFee: boolean): boolean {
   if (gate.ok) return true;
   if (!lateFee) return false;

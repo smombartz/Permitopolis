@@ -31,3 +31,20 @@ describe("StateStepper (Phase 1 review fix: compact dots are never unlabeled)", 
     expect(list).toHaveTextContent("Closed");
   });
 });
+
+describe("StateStepper (Phase 3 review fix: the Needs info pill has its own room)", () => {
+  it("reserves the pill's height above the row, so it never covers what is above the stepper", () => {
+    render(<StateStepper state="needs_info" />);
+    expect(screen.getByRole("list", { name: "Case progress" }).className).toContain("pt-7");
+  });
+
+  it("reserves nothing when there is no pill: another state, an ending, or compact", () => {
+    const { rerender } = render(<StateStepper state="in_review" />);
+    const row = () => screen.getByRole("list", { name: "Case progress" });
+    expect(row().className).not.toContain("pt-7");
+    rerender(<StateStepper state="needs_info" ending="withdrawn" />);
+    expect(row().className).not.toContain("pt-7");
+    rerender(<StateStepper state="needs_info" compact />);
+    expect(row().className).not.toContain("pt-7");
+  });
+});

@@ -28,6 +28,8 @@
  * it. So a screen that keeps a step, a tab or a filter in the URL can be clicked through.
  * `lastPush()` / `lastReplace()` read the most recent `router.push()` / `router.replace()`;
  * `navigate(href)` moves the location from the test itself, as the browser's Back would.
+ * The real router is not synchronous: `holdNavigation()` and `releaseNavigation()` open the gap
+ * between a push and the URL catching up, for a screen that has to behave inside it.
  *
  * `demoToday` sets the date as it is. To move the seed forward the way the Demo menu does
  * (hold expiry, Event day, Closeout), call `useDemo.getState().setDemoToday(date)` inside
@@ -49,7 +51,7 @@ import { STORAGE_KEY } from "@/lib/rules";
 import { hydrateDemoStore, resetDemoStoreForTests, useDemo, type DemoState } from "@/lib/state";
 import { seedFingerprint } from "@/lib/state/seed";
 import type { EventCase, ISODate, Party } from "@/lib/types";
-import { navState, navigate, paramsFromPath, resetNavState } from "./setup";
+import { holdNavigation, navState, navigate, paramsFromPath, releaseNavigation, resetNavState } from "./setup";
 
 export interface RenderScreenOptions {
   /** A Demo menu scenario jump: the role, the persona and the page it opens. */
@@ -127,6 +129,13 @@ export async function flushHydration(): Promise<void> {
 }
 
 export { navigate };
+
+/**
+ * `holdNavigation()` makes `router.push()` and `router.replace()` lag the way a real transition
+ * does: the call is recorded (`lastPush()`, `lastReplace()`) but the location does not move
+ * until `releaseNavigation()`, inside `act()`. For a screen that must behave between the two.
+ */
+export { holdNavigation, releaseNavigation };
 
 export function lastPush(): string | undefined {
   return navState.pushCalls.at(-1);

@@ -53,6 +53,34 @@ function ToggleRow({
   );
 }
 
+function parseVendorNames(text: string): string[] {
+  return text
+    .split(",")
+    .map((name) => name.trim())
+    .filter(Boolean);
+}
+
+/**
+ * The vendor names, typed as one comma-separated line. The text as typed is kept here: the
+ * draft stores the parsed list, and drawing the field from that list would drop every space
+ * and comma the moment it was typed ("Rolling Dumpling Co." could not be written at all).
+ */
+function VendorNamesField({ names, onChange }: { names: string[]; onChange: (names: string[]) => void }) {
+  const [text, setText] = React.useState(() => names.join(", "));
+  return (
+    <Field label="Vendor names" hint="Optional, separated by commas.">
+      <Input
+        value={text}
+        placeholder="Rolling Dumpling Co., Bao Bus"
+        onChange={(event) => {
+          setText(event.target.value);
+          onChange(parseVendorNames(event.target.value));
+        }}
+      />
+    </Field>
+  );
+}
+
 /** Step 4: expected attendance and every add-on toggle, each with its one-line effect. */
 function StepSize({ answers, onChange, cfg }: StepSizeProps) {
   const addOns = answers.addOns;
@@ -125,23 +153,10 @@ function StepSize({ answers, onChange, cfg }: StepSizeProps) {
               onChange={(event) => patchAddOns({ foodVending: { ...addOns.foodVending!, vendors: Math.max(1, Number(event.target.value) || 1) } })}
             />
           </Field>
-          <Field label="Vendor names" hint="Optional, one per line.">
-            <Input
-              value={(addOns.foodVending?.vendorNames ?? []).join(", ")}
-              placeholder="Rolling Dumpling Co."
-              onChange={(event) =>
-                patchAddOns({
-                  foodVending: {
-                    ...addOns.foodVending!,
-                    vendorNames: event.target.value
-                      .split(",")
-                      .map((name) => name.trim())
-                      .filter(Boolean),
-                  },
-                })
-              }
-            />
-          </Field>
+          <VendorNamesField
+            names={addOns.foodVending?.vendorNames ?? []}
+            onChange={(vendorNames) => patchAddOns({ foodVending: { ...addOns.foodVending!, vendorNames } })}
+          />
         </ToggleRow>
 
         <ToggleRow

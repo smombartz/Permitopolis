@@ -11,7 +11,7 @@ import { TodoBoard } from "./TodoBoard";
 import { FeesPanels } from "./FeesPanels";
 import { StaffInterlude } from "./StaffInterlude";
 import { Faq } from "./Faq";
-import { ClosingFooter } from "./ClosingFooter";
+import { ClosingCard, SiteFooter } from "./ClosingFooter";
 
 /**
  * The public landing page at `/` (plan 7): a resident-facing Clerk's Office site, built on
@@ -26,8 +26,9 @@ function LandingScreen() {
 
   return (
     <div className="page-atmosphere min-h-dvh">
+      {/* The primary nav and the footer are landmarks of the page, so they sit beside <main>, not in it. */}
+      <Nav />
       <main>
-        <Nav />
         <Hero />
         <HowItWorks seed={seed} />
         <EventTiers seed={seed} />
@@ -36,8 +37,9 @@ function LandingScreen() {
         <FeesPanels />
         <StaffInterlude seed={seed} />
         <Faq />
-        <ClosingFooter />
+        <ClosingCard />
       </main>
+      <SiteFooter />
     </div>
   );
 }

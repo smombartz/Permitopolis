@@ -7,6 +7,7 @@ import { CardPaymentForm } from "@/components/checkout/CardPaymentForm";
 import { PlanSummaryCard } from "@/components/checkout/PlanSummaryCard";
 import { SignatureForm } from "@/components/checkout/SignatureForm";
 import { CaseHeader, ConditionList, FeeTable } from "@/components/domain";
+import { useIsNarrow } from "@/components/shell";
 import { Button } from "@/components/ui/button";
 import { InlineAlert } from "@/components/ui/inline-alert";
 import { BackLink } from "@/components/ui/page-header";
@@ -30,6 +31,9 @@ import {
 function QuotePanel({ c, today }: { c: EventCase; today: string }) {
   const dispatch = useDemo((s) => s.dispatch);
   const cfg = useDemo((s) => s.cfg);
+  // Eight stepper labels need about 385px and the fee table about 430px; a phone has 295.
+  const narrow = useIsNarrow();
+  const phone = useIsNarrow("(max-width: 639px)");
   const [acceptedIds, setAcceptedIds] = React.useState<string[]>(() =>
     c.conditions.filter((condition) => condition.acceptedByApplicant).map((condition) => condition.id),
   );
@@ -71,6 +75,7 @@ function QuotePanel({ c, today }: { c: EventCase; today: string }) {
         today={today}
         state={c.state}
         hold={c.dateHold}
+        compactStepper={narrow}
       />
       {c.dateHold.status === "held" && c.dateHold.expiresOn ? (
         <InlineAlert variant="warning">Pay by {fmtDate(c.dateHold.expiresOn)} to keep your date.</InlineAlert>
@@ -91,7 +96,7 @@ function QuotePanel({ c, today }: { c: EventCase; today: string }) {
         title="Fees"
         description={plan.isSeries ? "A series pays its first session now; the rest bill on schedule." : undefined}
       >
-        <FeeTable lines={c.feeLines} />
+        <FeeTable lines={c.feeLines} compact={phone} />
         {series && series.sessionsRemaining > 0 ? (
           <InlineAlert variant="info">
             The other {plural(series.sessionsRemaining, "session")} bill at {fmtMoney(series.perSession)} each, on schedule.

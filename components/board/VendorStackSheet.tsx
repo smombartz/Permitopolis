@@ -13,6 +13,15 @@ const STATUS_ICON: Record<Task["status"], typeof CheckIcon> = {
   done: CheckIcon,
 }
 
+/** The status in words, beside its icon: an icon and its color alone say nothing to many readers. */
+const STATUS_TEXT: Record<Task["status"], string> = {
+  locked: "Locked",
+  todo: "To do",
+  submitted: "With the city",
+  changes_requested: "Changes requested",
+  done: "Done",
+}
+
 interface VendorStackSheetProps {
   stack: StackedCards
   onSelectTask: (taskId: string) => void
@@ -39,11 +48,12 @@ function VendorStackSheet({ stack, onSelectTask }: VendorStackSheetProps) {
               onClick={() => onSelectTask(task.id)}
               className="flex items-center justify-between gap-2 rounded-control border border-line-subtle bg-surface-2 px-3 py-2.5 text-left text-sm outline-none transition-colors duration-[var(--dur-fast)] ease-frost hover:bg-surface-hover focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring"
             >
-              <span className="flex items-center gap-2">
+              <span className="flex min-w-0 items-center gap-2">
                 <Icon className={task.status === "done" ? "size-3.5 shrink-0 text-success-fg" : "size-3.5 shrink-0 text-fg-label"} aria-hidden="true" />
                 {task.title}
               </span>
-              <span className="flex items-center gap-2 text-xs text-fg-secondary">
+              <span className="flex shrink-0 items-center gap-2 text-xs text-fg-secondary">
+                <span className={task.status === "done" ? "font-medium text-success-fg" : "font-medium text-fg-secondary"}>{STATUS_TEXT[task.status]}</span>
                 {due ? <DateText date={due} short className="text-xs text-fg-secondary" /> : null}
                 <ChevronRightIcon className="size-3.5 shrink-0" aria-hidden="true" />
               </span>

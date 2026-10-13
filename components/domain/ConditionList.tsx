@@ -41,12 +41,15 @@ function ConditionList({ conditions, editable = false, acceptedIds, onToggleAcce
                   className="flex items-start gap-2.5 rounded-control border border-line-subtle bg-surface-2 px-3 py-2.5"
                 >
                   {editable ? (
-                    <Checkbox
-                      checked={accepted}
-                      onCheckedChange={() => onToggleAccept?.(condition.id)}
-                      className="mt-0.5"
-                      aria-label={`Accept: ${condition.text}`}
-                    />
+                    // The PRD's visible "I accept": the checkbox is named by it and by the condition.
+                    <label className="mt-0.5 flex shrink-0 cursor-pointer items-center gap-1.5 text-xs font-semibold text-fg">
+                      <Checkbox
+                        checked={accepted}
+                        onCheckedChange={() => onToggleAccept?.(condition.id)}
+                        aria-label={`I accept: ${condition.text}`}
+                      />
+                      I accept
+                    </label>
                   ) : (
                     <CheckIcon
                       className={cn("mt-0.5 size-4 shrink-0", accepted ? "text-success-fg" : "text-fg-label")}

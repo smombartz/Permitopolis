@@ -5,7 +5,24 @@
 **What Changed:**
 - The Phase 3 review returned 38 findings (2 high, 23 medium, 13 low). Plan: `docs/plans/2026-10-13-phase-3-review-fixes.md`
 - **High: the refund on the permit page and in the board's Cancel dialog is the one `cancel` pays.** Both printed `cancellationRefund()` off the fee lines, which for a series cover every session: after demo path 1 (S2 pays $20 for the first of 13 sessions) they read "$250" and the transition then refunded $20. `refundIfCancelled(c, today, cfg)` in `lib/state` is now the one figure (the schedule's share plus the deposit, capped at what was paid); `cancel()` uses it and both screens print it. The Cancel dialog reads the store's fee settings instead of the defaults
-- **High: a card's form is read back in words on the city's case detail.** The Documents tab and the Verify and Send back panels printed raw keys and `String(value)`: S3's vendor list read "vendors: [object Object]", S6's 25 times over. `formRows(task)` in `lib/view/caseDetail.ts` gives the label the applicant saw (a key nobody labelled reads as its own words), Yes or No, 12-hour times, and a list entry per line; `components/case/FormAnswers.tsx` prints it in both places. The field specs moved from `components/board/CardForms.tsx` to `lib/view/cardForms.ts` so both surfaces share them
+- **High: a card's form is read back in words on the city's case detail.** The Documents tab and the Verify and Send back panels printed raw keys and `String(value)`: S3's vendor list read "vendors: [object Object]", S6's 25 times over. `formRows(task)` (in `lib/view/cardForms.ts`, exported from `lib/view/caseDetail.ts`) gives the label the applicant saw (a key nobody labelled reads as its own words), Yes or No, 12-hour times, and a list entry per line; `components/domain/FormAnswers.tsx` prints it in both places. The field specs moved from `components/board/CardForms.tsx` to `lib/view/cardForms.ts` so both surfaces share them
+- **Applicant side, medium:**
+  - Board card sheet: an accepted document opened with Send already armed (the file list was seeded from the accepted file), and one click put S3's verified Certificate of insurance back in front of Health & Legal, which blocks demo path 3's last step. It now shows the accepted file read-only and offers "Replace this file", enabled only after a new file is chosen and only while `complete_task` would take it (not once the permit is issued)
+  - Board card sheet: a form card that is with the city or accepted showed its editable form and a Send that could only fail ("This card is already submitted."). It is read back with `FormAnswers` and a line saying who has it; this covers the vendor list and the city services request too
+  - Wizard step 3: the lead-time banner printed the days until the event as the shortfall ("needs 19 more days"). It reads "19 days left, 30 needed. This event needs 11 more days of notice than it has." (`leadTimeGapText()`)
+  - Wizard: on a blank wizard Next only rewrote the URL while the step was hard-wired to step 1, a dead click. The step is read from the URL with or without a draft, and no draft is started just for moving on
+  - Wizard: a change made before the URL carried the new draft's id started another draft ("J", "Ja", ...), because `router.replace()` is a transition. The id of the draft this visit created is kept until the URL has it
+  - Wizard step 4: vendor names could not be typed (the field was drawn from the parsed list, so a space or comma vanished as it was typed). The text as typed is kept locally; the hint says "separated by commas"
+  - Wizard step 3: moving a series to another weekday left `recurrence.weekday` (and a passed end date) stale: "Repeats every Sunday" over a list of Saturdays, and a booked series that no longer held its slot. `scheduleOnDate()` rebuilds both
+  - Wizard step 5: the date gate's three fixes were only on step 3, though the gate is usually tripped on step 4. `DateGateBanner` is on step 5 too, above the primary button
+  - Sheets below 640px: the side rules (`data-[side=right]:w-3/4`, specificity 0,2,0) beat the `max-sm:` bottom-sheet rules, so a card sheet on a phone was a 75% panel pinned top-left. The left, right and top rules are scoped to `sm` and up
+  - Board at 375px: the four column tabs overflowed the page (two rows of two now); the header's stepper drew eight nowrap labels in 295px (`CaseHeader` takes `compactStepper`, set by the board and the quote below 768px)
+  - `FeeTable` takes `compact`: two columns, with "qty unit × price" under the line. The wizard's 320px panel and the plan, booking, quote and final bill on a phone use it, so the amount per line is in view
+  - Wizard on a phone: the tier-change announcement and highlight lived in `ResultPanel`, which is not mounted while its sheet is shut. `WizardScreen` owns both and rings the bottom bar's badge
+  - Checkout: after paying, the screen read "Nothing to pay here" until the next page arrived. The paid state stays on screen for that visit ("Booked and paid", "Session paid", "Final bill paid")
+  - State stepper: the Needs info pill sat 28px above a row with 16px of room, over the header's meta line. The row reserves the room
+- **Applicant side, low:** the late fee, once chosen, is confirmed in the banner with "Remove the late fee"; the permit lists the whole cancellation schedule with today's band marked, names the deposit, and drops "If cancelled today" once cancelling is refused; a finished payment, sign-off or permit card shows what was paid or signed and when, with a link (`cardRecord()`); the wizard stepper's labels are `sr-only` below `sm` instead of `display: none`, with "Step N:"; vendor rows carry a status word; the quote's condition checkbox has a visible "I accept"; the demo guide's scenario table wraps; the landing page's nav and footer are landmarks beside `<main>`
+- **Render harness:** `holdNavigation()` and `releaseNavigation()` open the gap between a `router.push()` or `router.replace()` and the URL catching up, which the synchronous mock hid (the duplicate-draft, search-box and after-payment findings all live in it)
 
 **Why:**
 - A read-only review of the applicant side and the city side after the Phase 3 integration. Each finding was confirmed in the code and has a test that fails without its fix
@@ -14,8 +31,15 @@
 - `lib/state/selectors.ts`, `lib/state/index.ts`, `lib/state/transitions/applicant.ts` - `refundIfCancelled()`
 - `components/permit/PermitCard.tsx`, `components/board/BoardMenu.tsx` - print it
 - `lib/view/cardForms.ts` (new), `lib/view/caseDetail.ts` - `FORM_FIELDS`, `formRows()`
-- `components/case/FormAnswers.tsx` (new), `components/case/tabs/DocumentsTab.tsx`, `components/case/actions/generic/VerifyDocument.tsx`, `components/board/CardForms.tsx`, `components/board/CardSheet.tsx`
+- `components/domain/FormAnswers.tsx` (new), `components/case/tabs/DocumentsTab.tsx`, `components/case/actions/generic/VerifyDocument.tsx`, `components/board/CardForms.tsx`, `components/board/CardSheet.tsx`
 - `lib/view/permit.test.ts`, `lib/view/caseDetail.test.ts`, `tests/render/permit.test.tsx`, `tests/render/board.test.tsx`, `tests/render/case-detail.test.tsx`
+- `lib/view/wizard.ts` (`scheduleOnDate`, `leadTimeGapText`, `lateFeeCarriesDate`), `lib/view/board.ts` (`cardRecord`), and their tests
+- `components/wizard/{WizardScreen,StepWhen,StepPlan,StepSize,ResultPanel}.tsx`, `components/wizard/DateGateBanner.tsx` (new)
+- `components/board/{CardSheet,BoardColumns,BoardScreen,VendorStackSheet}.tsx`
+- `components/checkout/{CheckoutScreen,BookingPanel,SessionPanel,FinalPanel,QuotePanel}.tsx`
+- `components/domain/{FeeTable,CaseHeader,StateStepper,ConditionList,FormAnswers}.tsx`, `components/domain/index.ts`
+- `components/ui/{sheet,wizard-stepper}.tsx`, `components/landing/{LandingScreen,ClosingFooter,DemoGuideScreen}.tsx`
+- `tests/render/{setup.ts,harness.tsx}`, `tests/render/{wizard,board,checkout,landing,handoffs}.test.tsx`, `components/ui/{sheet,wizard-stepper}.test.tsx`, `components/domain/{FeeTable,StateStepper,ConditionList}.test.tsx`
 - `docs/plans/2026-10-13-phase-3-review-fixes.md` (new)
 
 ---

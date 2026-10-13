@@ -1,11 +1,12 @@
 import { cn } from "cn"
 import type { Task } from "@/lib/types"
-import { formRows } from "@/lib/view/caseDetail"
+import { formRows } from "@/lib/view/cardForms"
 
 /**
  * A card's form, read back: the labels the applicant saw, with a list (the vendors of a vendor
- * list) one entry per line. The Documents tab and the Verify and Send back panels both show it.
- * Renders nothing for a card with no form.
+ * list) one entry per line. The city's Documents tab and its Verify and Send back panels show
+ * it, and so does the applicant's own card once it is with the city or accepted. Renders
+ * nothing for a card with no form.
  */
 function FormAnswers({ task, size = "sm" }: { task: Pick<Task, "catalogId" | "payload">; size?: "xs" | "sm" }) {
   const rows = formRows(task)

@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 import { FeeTable, groupFeeLinesByDept, sumFeeLines } from "@/components/domain/FeeTable";
 import type { FeeLine } from "@/lib/types";
@@ -52,5 +52,30 @@ describe("FeeTable", () => {
   it("omits the Actual column by default", () => {
     render(<FeeTable lines={LINES} />);
     expect(screen.queryByText("Actual")).not.toBeInTheDocument();
+  });
+
+  it("compact: two columns, with the quantity and unit price under the line and the amount beside it", () => {
+    render(<FeeTable lines={LINES} compact />);
+    expect(screen.queryByText("Qty")).not.toBeInTheDocument();
+    expect(screen.queryByText("Unit price")).not.toBeInTheDocument();
+    for (const table of screen.getAllByRole("table")) {
+      expect(within(table).getAllByRole("columnheader").map((th) => th.textContent)).toEqual(["Line", "Estimate"]);
+    }
+
+    const row = screen.getByText("Barricades").closest("tr")!;
+    const [line, amount] = within(row).getAllByRole("cell");
+    expect(line).toHaveTextContent("4 each × $25");
+    // The line wraps instead of pushing the amount out of a 280px box.
+    expect(line.className).toContain("whitespace-normal");
+    expect(amount).toHaveTextContent("$100");
+    // The totals are unchanged.
+    expect(screen.getByText("$625")).toBeInTheDocument();
+  });
+
+  it("compact with actuals: the actual sits under the estimate", () => {
+    render(<FeeTable lines={LINES} compact showActual />);
+    const row = screen.getByText("Barricades").closest("tr")!;
+    expect(within(row).getAllByRole("cell")[1]).toHaveTextContent("$100Actual $125");
+    expect(screen.getAllByText("Not logged").length).toBe(2);
   });
 });

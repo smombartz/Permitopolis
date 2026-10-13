@@ -32,10 +32,71 @@ interface FeeTableProps extends React.ComponentProps<"div"> {
   lines: FeeLine[]
   /** Adds Actual and Difference columns, for closeout reconciliation. */
   showActual?: boolean
+  /**
+   * Two columns for a narrow box (the wizard's 320px panel, a phone): the line with its
+   * quantity and unit price beneath it, and the amount. The four-column table is about 430px at
+   * its narrowest, so there the amount per line would be scrolled out of view.
+   */
+  compact?: boolean
+}
+
+function LineLabel({ line }: { line: FeeLine }) {
+  return (
+    <>
+      {line.label}
+      {line.kind === "late_fee" ? (
+        <Badge variant="warning" className="ml-2">
+          Late fee
+        </Badge>
+      ) : null}
+    </>
+  )
+}
+
+/** One department's lines in two columns: the line (wrapping) over "qty unit × price", and the amount. */
+function CompactLines({ lines, showActual }: { lines: FeeLine[]; showActual: boolean }) {
+  return (
+    <Table data-layout="compact">
+      <TableHeader>
+        <TableRow>
+          <TableHead>Line</TableHead>
+          <TableHead className="text-right">Estimate</TableHead>
+        </TableRow>
+      </TableHeader>
+      <TableBody>
+        {lines.map((line) => (
+          <TableRow key={line.id}>
+            <TableCell className="h-auto py-2 whitespace-normal">
+              <span className="block text-fg">
+                <LineLabel line={line} />
+              </span>
+              <span className="block font-mono text-xs text-fg-label tabular-nums">
+                {line.qty} {line.unit} × <Money amount={line.unitPrice} className="text-xs" />
+              </span>
+            </TableCell>
+            <TableCell numeric className="h-auto py-2 text-right align-top">
+              <Money amount={line.estimate} />
+              {showActual ? (
+                <span className="block text-xs text-fg-label">
+                  {line.actual !== null ? (
+                    <>
+                      Actual <Money amount={line.actual} className="text-xs" />
+                    </>
+                  ) : (
+                    "Not logged"
+                  )}
+                </span>
+              ) : null}
+            </TableCell>
+          </TableRow>
+        ))}
+      </TableBody>
+    </Table>
+  )
 }
 
 /** Fee lines grouped by department, with a subtotal, the deposit and the total. */
-function FeeTable({ lines, showActual = false, className, ...props }: FeeTableProps) {
+function FeeTable({ lines, showActual = false, compact = false, className, ...props }: FeeTableProps) {
   const groups = groupFeeLinesByDept(lines)
   const feeLines = lines.filter((line) => line.kind !== "deposit")
   const depositLines = lines.filter((line) => line.kind === "deposit")
@@ -49,6 +110,9 @@ function FeeTable({ lines, showActual = false, className, ...props }: FeeTablePr
       {DEPTS.filter((dept) => (groups[dept]?.length ?? 0) > 0).map((dept) => (
         <div key={dept} className="flex flex-col gap-1.5">
           <p className="text-eyebrow font-bold tracking-[.12em] text-fg-label uppercase">{PARTY_LABEL[dept]}</p>
+          {compact ? (
+            <CompactLines lines={groups[dept] ?? []} showActual={showActual} />
+          ) : (
           <Table>
             <TableHeader>
               <TableRow>
@@ -70,12 +134,7 @@ function FeeTable({ lines, showActual = false, className, ...props }: FeeTablePr
                 return (
                   <TableRow key={line.id}>
                     <TableCell>
-                      {line.label}
-                      {line.kind === "late_fee" ? (
-                        <Badge variant="warning" className="ml-2">
-                          Late fee
-                        </Badge>
-                      ) : null}
+                      <LineLabel line={line} />
                     </TableCell>
                     <TableCell numeric className="text-right">
                       {line.qty} {line.unit}
@@ -101,6 +160,7 @@ function FeeTable({ lines, showActual = false, className, ...props }: FeeTablePr
               })}
             </TableBody>
           </Table>
+          )}
         </div>
       ))}
       <div className="flex flex-col gap-1.5 border-t border-line-subtle pt-3">

@@ -108,6 +108,102 @@ describe("the board (S6): after the event", () => {
   });
 });
 
+describe("the board's card sheet: a card the applicant no longer holds", () => {
+  const sheet = () => within(screen.getByRole("dialog"));
+
+  it("S3's accepted Certificate of insurance opens with nothing armed: one click cannot send a verified document back for checking", async () => {
+    const { user } = await renderScreen(<BoardScreen />, { role: "applicant", personaId: "downtown-arts-collective", path: routes.event(S3) });
+    const before = storedCase(S3);
+
+    await user.click(screen.getByRole("button", { name: /Certificate of insurance/ }));
+
+    expect(sheet().getByText("Accepted by Health & Legal.")).toBeInTheDocument();
+    expect(sheet().queryByRole("button", { name: "Send" })).not.toBeInTheDocument();
+    const replace = sheet().getByRole("button", { name: "Replace this file" });
+    expect(replace).toBeDisabled();
+    await user.click(replace);
+    expect(storedCase(S3)).toBe(before);
+
+    // Choosing a new file is what arms it; the engine then sends it to be checked again.
+    await user.click(sheet().getByRole("button", { name: "Use sample file" }));
+    await user.click(sheet().getByRole("button", { name: "Replace this file" }));
+    const card = storedCase(S3).tasks.find((t) => t.catalogId === "insurance_certificate")!;
+    expect(card.status).toBe("submitted");
+    expect(card.payload.files).toEqual([{ name: "sample-upload.pdf", size: 240_000, type: "application/pdf" }]);
+  });
+
+  it("once the permit is issued an accepted document cannot be replaced at all (S6)", async () => {
+    const { user } = await renderScreen(<BoardScreen />, { role: "applicant", personaId: "main-street-business-alliance", path: routes.event(S6) });
+
+    await user.click(screen.getByRole("button", { name: /Certificate of insurance/ }));
+
+    expect(sheet().getByText("Accepted by Health & Legal.")).toBeInTheDocument();
+    expect(sheet().queryByRole("button", { name: "Replace this file" })).not.toBeInTheDocument();
+    expect(sheet().queryByRole("button", { name: "Use sample file" })).not.toBeInTheDocument();
+  });
+
+  it("S4's City services request, with the city, is read back and has no Send", async () => {
+    const { user } = await renderScreen(<BoardScreen />, { role: "applicant", personaId: "maple-street-block-captain", path: routes.event(S4) });
+
+    await user.click(screen.getByRole("button", { name: /City services request/ }));
+
+    expect(sheet().getByText("With Public Works & Safety. You can't change it while they check it.")).toBeInTheDocument();
+    expect(sheet().queryByRole("button", { name: "Send" })).not.toBeInTheDocument();
+    expect(sheet().queryByRole("spinbutton")).not.toBeInTheDocument();
+    expect(sheet().getByText("Barricades").nextElementSibling).toHaveTextContent("4");
+    expect(sheet().getByText("Trash collection").nextElementSibling).toHaveTextContent("No");
+  });
+
+  it("S3's accepted Sound details and Vendor list are read back and have no Send", async () => {
+    const { user } = await renderScreen(<BoardScreen />, { role: "applicant", personaId: "downtown-arts-collective", path: routes.event(S3) });
+
+    await user.click(screen.getByRole("button", { name: /Sound details/ }));
+    expect(sheet().getByText("Accepted by Public Works & Safety.")).toBeInTheDocument();
+    expect(sheet().queryByRole("button", { name: "Send" })).not.toBeInTheDocument();
+    expect(sheet().queryByRole("textbox")).not.toBeInTheDocument();
+    expect(sheet().getByText("5 pm")).toBeInTheDocument();
+    await user.keyboard("{Escape}");
+
+    await user.click(screen.getByRole("button", { name: /Vendor list/ }));
+    expect(sheet().queryByRole("button", { name: "Send" })).not.toBeInTheDocument();
+    expect(sheet().queryByRole("button", { name: "Add a vendor" })).not.toBeInTheDocument();
+    expect(sheet().getByText("Rolling Dumpling Co. · Dumplings and noodle bowls")).toBeInTheDocument();
+  });
+
+  it("a finished payment card shows what was paid and when, and links to the permit (S6)", async () => {
+    const { user } = await renderScreen(<BoardScreen />, { role: "applicant", personaId: "main-street-business-alliance", path: routes.event(S6) });
+
+    await user.click(screen.getByRole("button", { name: /Pay fees and deposit/ }));
+
+    const paid = storedCase(S6).payments.filter((p) => p.kind === "quote");
+    expect(paid.length).toBeGreaterThan(0);
+    expect(sheet().getAllByText(/paid (by card|in person) on /)).toHaveLength(paid.length);
+    expect(sheet().getByRole("link", { name: "View permit" })).toHaveAttribute("href", routes.permit(S6));
+    // The card's one sentence is in the header once, not again in the body.
+    const why = storedCase(S6).tasks.find((t) => t.catalogId === "pay_fees")!.why;
+    expect(sheet().getAllByText(why)).toHaveLength(1);
+  });
+
+  it("a finished sign-off card shows who signed and when (S6)", async () => {
+    const { user } = await renderScreen(<BoardScreen />, { role: "applicant", personaId: "main-street-business-alliance", path: routes.event(S6) });
+
+    await user.click(screen.getByRole("button", { name: /Accept conditions and sign/ }));
+
+    expect(sheet().getByText(/^Signed by .+ on \w{3}, \w{3} \d+, 2027$/)).toBeInTheDocument();
+    expect(sheet().getByRole("link", { name: "View permit" })).toBeInTheDocument();
+  });
+
+  it("each vendor row of a stack says its status in words, not by icon alone (S6)", async () => {
+    const { user } = await renderScreen(<BoardScreen />, { role: "applicant", personaId: "main-street-business-alliance", path: routes.event(S6) });
+
+    await user.click(screen.getByRole("button", { name: /Health permit|Vendor health permits/ }));
+
+    const rows = sheet().getAllByRole("button", { name: /Health permit:/ });
+    expect(rows.length).toBe(25);
+    for (const row of rows) expect(row).toHaveTextContent("Done");
+  });
+});
+
 describe("the board's Cancel dialog", () => {
   it("S2 after Pay and book: today's refund is the $20 that was paid, and cancelling refunds exactly that", async () => {
     const { user } = await renderScreen(<BoardScreen />, { role: "applicant", personaId: "sunrise-yoga-club", path: routes.event(S2) });
@@ -182,6 +278,27 @@ describe("the board: below 768px", () => {
 
     expect(screen.getByRole("tab", { name: /Do now/ })).toBeInTheDocument();
     expect(screen.getByRole("tab", { name: /Done/ })).toBeInTheDocument();
+
+    // Four nowrap tabs with counts need about 450px: two rows of two fit a 335px container.
+    const tabList = screen.getByRole("tablist");
+    expect(tabList.className).toContain("grid-cols-2");
+    expect(tabList.className).not.toContain("h-11");
+    expect(within(tabList).getAllByRole("tab")).toHaveLength(4);
+  });
+
+  it("the header's stepper is markers and the one current label, not eight labels in a row", async () => {
+    vi.stubGlobal(
+      "matchMedia",
+      vi.fn((query: string) => ({ matches: true, media: query, onchange: null, addEventListener: vi.fn(), removeEventListener: vi.fn(), addListener: vi.fn(), removeListener: vi.fn(), dispatchEvent: vi.fn() })),
+    );
+
+    await renderScreen(<BoardScreen />, { role: "applicant", personaId: "downtown-arts-collective", path: routes.event(S3) });
+
+    const stepper = screen.getByRole("list", { name: "Case progress" });
+    expect(stepper).toHaveAttribute("data-compact", "true");
+    // No visible label per step: only the current one, under the markers.
+    expect(stepper.querySelectorAll('[aria-hidden="true"].whitespace-nowrap')).toHaveLength(0);
+    expect(stepper.parentElement).toHaveTextContent(/Needs info$/);
   });
 });
 

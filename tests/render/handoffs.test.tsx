@@ -755,7 +755,7 @@ describe("the demo paths that cross surfaces have a control for every step", () 
     expect(useDemo.getState().personaId).toBe("downtown-arts-collective");
     await user.click(screen.getByRole("button", { name: /Accept conditions and sign/ }));
     expect(here()).toBe(routes.quote(S3));
-    for (const box of screen.getAllByRole("checkbox", { name: /^Accept:/ })) await user.click(box);
+    for (const box of screen.getAllByRole("checkbox", { name: /^I accept:/ })) await user.click(box);
     await user.type(screen.getByLabelText(/Type your full legal name/), "Dana Whitfield");
     await user.click(screen.getByRole("checkbox", { name: /I have read and accept/ }));
     await user.click(screen.getByRole("button", { name: "Accept and sign" }));

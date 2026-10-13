@@ -1,10 +1,12 @@
 "use client"
 
 import * as React from "react"
+import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { toast } from "sonner"
 import { CheckIcon, DownloadIcon, LockIcon } from "lucide-react"
 import { ActivityTimeline } from "@/components/domain/ActivityTimeline"
+import { FormAnswers } from "@/components/domain/FormAnswers"
 import { PartyChip } from "@/components/domain/PartyChip"
 import { TaskKindLabel } from "@/components/domain/TaskKindLabel"
 import { MapThumbnail } from "@/components/map"
@@ -23,8 +25,8 @@ import {
 import { Textarea } from "@/components/ui/textarea"
 import { fmtDateShort } from "@/lib/format"
 import { routes } from "@/lib/routes"
-import { taskDueDate, useDemo, type Action } from "@/lib/state"
-import { unlockHintFor } from "@/lib/view/board"
+import { checkCompleteTask, taskDueDate, useDemo, type Action } from "@/lib/state"
+import { cardRecord, unlockHintFor } from "@/lib/view/board"
 import { FORM_FIELDS } from "@/lib/view/cardForms"
 import { PARTY_LABEL, type CityServices, type EventCase, type FileRef, type Task, type TaskHistoryEntry } from "@/lib/types"
 
@@ -106,10 +108,38 @@ function LockedBody({ task }: { task: Task }) {
   )
 }
 
-function DocumentBody({ task, dispatch, onClose }: BodyProps) {
-  const [files, setFiles] = React.useState<FileRef[]>(task.payload.files ?? [])
+function FileList({ files }: { files: FileRef[] }) {
+  return (
+    <ul className="flex flex-col gap-1 text-sm text-fg">
+      {files.map((f, i) => (
+        <li key={i} className="flex items-center gap-2">
+          <CheckIcon className="size-3.5 shrink-0 text-success-fg" aria-hidden="true" />
+          {f.name}
+        </li>
+      ))}
+    </ul>
+  )
+}
+
+/** Who has a card that the applicant can no longer change: "With Public Works & Safety." or "Accepted." */
+function heldByLine(task: Task): string {
+  if (task.status === "done") return task.reviewer ? `Accepted by ${PARTY_LABEL[task.reviewer]}.` : "Accepted."
+  return task.reviewer ? `With ${PARTY_LABEL[task.reviewer]}. You can't change it while they check it.` : "With the city."
+}
+
+function DocumentBody({ c, task, dispatch, onClose }: BodyProps) {
   const hint = DOCUMENT_HINT[task.catalogId]
-  const canResubmit = task.status === "todo" || task.status === "changes_requested" || task.status === "done"
+  const editable = task.status === "todo" || task.status === "changes_requested"
+  const accepted = task.status === "done"
+  // An accepted document can be replaced until the permit is issued (the engine sends it back
+  // to be checked again); after that complete_task refuses, so the control is not offered.
+  const canReplace = accepted && checkCompleteTask(c, task.id).ok
+  const sent = task.payload.files ?? []
+  // The files chosen in this sheet. A card that is with the city or accepted starts with none:
+  // seeded from what was already sent, an accepted card opened with Send armed, and one click
+  // put a verified document back in front of its reviewer.
+  const [files, setFiles] = React.useState<FileRef[]>(editable ? sent : [])
+  const canSend = editable || canReplace
 
   return (
     <div className="flex flex-col gap-4">
@@ -122,22 +152,23 @@ function DocumentBody({ task, dispatch, onClose }: BodyProps) {
       {task.payload.rejectedReason ? (
         <InlineAlert variant="warning">Sent back: {task.payload.rejectedReason}</InlineAlert>
       ) : null}
-      {canResubmit ? (
-        <FileDrop sample={SAMPLE_FILE} onFiles={(f) => setFiles(f)} hint="PDF, up to 10MB" />
+      {!editable ? (
+        <div className="flex flex-col gap-2">
+          <InlineAlert variant={accepted ? "success" : "info"}>{heldByLine(task)}</InlineAlert>
+          {sent.length > 0 ? <FileList files={sent} /> : null}
+        </div>
       ) : null}
-      {files.length > 0 ? (
-        <ul className="flex flex-col gap-1 text-sm text-fg">
-          {files.map((f, i) => (
-            <li key={i} className="flex items-center gap-2">
-              <CheckIcon className="size-3.5 shrink-0 text-success-fg" aria-hidden="true" />
-              {f.name}
-            </li>
-          ))}
-        </ul>
+      {canReplace ? (
+        <p className="text-sm text-fg-secondary">
+          Need to change it? Choose a new file. It goes back to {task.reviewer ? PARTY_LABEL[task.reviewer] : "the city"} to be checked again.
+        </p>
       ) : null}
-      {canResubmit ? (
+      {canSend ? <FileDrop sample={SAMPLE_FILE} onFiles={(f) => setFiles(f)} hint="PDF, up to 10MB" /> : null}
+      {canSend && files.length > 0 ? <FileList files={files} /> : null}
+      {canSend ? (
         <Button
           type="button"
+          variant={accepted ? "secondary" : "primary"}
           disabled={files.length === 0}
           onClick={() => {
             const ok = dispatch({ type: "complete_task", taskId: task.id, files })
@@ -145,7 +176,7 @@ function DocumentBody({ task, dispatch, onClose }: BodyProps) {
           }}
           className="self-start"
         >
-          Send
+          {accepted ? "Replace this file" : "Send"}
         </Button>
       ) : null}
       <ActivityTimeline items={historyToActivity(task.history)} collapsedCount={5} />
@@ -154,9 +185,30 @@ function DocumentBody({ task, dispatch, onClose }: BodyProps) {
 }
 
 function FormBody({ c, task, dispatch, onClose }: BodyProps) {
+  // Only a card the applicant still holds can be sent: complete_task refuses one that is with
+  // the city ("already submitted") or accepted ("already done"), so those are read back instead.
+  const editable = task.status === "todo" || task.status === "changes_requested"
+
   function submitForm(form: Record<string, unknown>) {
     const ok = dispatch({ type: "complete_task", taskId: task.id, form })
     if (ok) onClose()
+  }
+
+  const sitePlan =
+    task.catalogId === "site_plan" && c.location ? (
+      <MapThumbnail highlight={{ id: c.id, location: c.location, status: "pending", tier: c.tier, label: c.location.label }} />
+    ) : null
+
+  if (!editable) {
+    const hasAnswers = Object.keys(task.payload.form ?? {}).length > 0
+    return (
+      <div className="flex flex-col gap-4">
+        <InlineAlert variant={task.status === "done" ? "success" : "info"}>{heldByLine(task)}</InlineAlert>
+        {sitePlan}
+        {hasAnswers ? <FormAnswers task={task} /> : <p className="text-sm text-fg-secondary">This card had no extra fields.</p>}
+        <ActivityTimeline items={historyToActivity(task.history)} collapsedCount={5} />
+      </div>
+    )
   }
 
   if (task.catalogId === "vendor_list") {
@@ -180,14 +232,40 @@ function FormBody({ c, task, dispatch, onClose }: BodyProps) {
   const fields = FORM_FIELDS[task.catalogId as keyof typeof FORM_FIELDS]
   return (
     <div className="flex flex-col gap-4">
-      {task.catalogId === "site_plan" && c.location ? (
-        <MapThumbnail highlight={{ id: c.id, location: c.location, status: "pending", tier: c.tier, label: c.location.label }} />
-      ) : null}
+      {sitePlan}
       {fields ? (
         <SimpleCardForm fields={fields} initial={task.payload.form as Record<string, unknown> | undefined} onSubmit={submitForm} />
       ) : (
         <InlineAlert variant="info">This card has no extra fields; send it to mark it done.</InlineAlert>
       )}
+    </div>
+  )
+}
+
+/**
+ * A payment, sign-off or permit card: what was paid or signed and when, and the page that holds
+ * the result. The card's one sentence is already in the sheet's header.
+ */
+function RecordBody({ c, task }: BodyProps) {
+  const record = cardRecord(c, task)
+  return (
+    <div className="flex flex-col gap-4">
+      {record.lines.length > 0 ? (
+        <ul className="flex flex-col gap-1.5 text-sm text-fg">
+          {record.lines.map((line) => (
+            <li key={line} className="flex items-center gap-2">
+              <CheckIcon className="size-3.5 shrink-0 text-success-fg" aria-hidden="true" />
+              {line}
+            </li>
+          ))}
+        </ul>
+      ) : null}
+      {record.link ? (
+        <Button asChild variant="secondary" className="self-start">
+          <Link href={record.link.href}>{record.link.label}</Link>
+        </Button>
+      ) : null}
+      <ActivityTimeline items={historyToActivity(task.history)} collapsedCount={5} />
     </div>
   )
 }
@@ -202,16 +280,7 @@ function CityRequestBody({ task, dispatch, onClose }: BodyProps) {
         <span className="font-semibold text-fg">{PARTY_LABEL[task.request.from]} asks:</span> {task.request.message}
       </InlineAlert>
       <FileDrop sample={SAMPLE_FILE} onFiles={setFiles} hint="PDF, up to 10MB" />
-      {files.length > 0 ? (
-        <ul className="flex flex-col gap-1 text-sm text-fg">
-          {files.map((f, i) => (
-            <li key={i} className="flex items-center gap-2">
-              <CheckIcon className="size-3.5 shrink-0 text-success-fg" aria-hidden="true" />
-              {f.name}
-            </li>
-          ))}
-        </ul>
-      ) : null}
+      {files.length > 0 ? <FileList files={files} /> : null}
       <Textarea placeholder="A note back (optional)" value={message} onChange={(e) => setMessage(e.target.value)} />
       <Button
         type="button"
@@ -461,7 +530,7 @@ function CardSheetContent({ c, task, onClose }: CardSheetContentProps) {
   } else if (task.kind === "form") {
     body = <FormBody {...props} />
   } else {
-    body = <p className="text-sm text-fg-secondary">{task.why}</p>
+    body = <RecordBody {...props} />
   }
 
   return (

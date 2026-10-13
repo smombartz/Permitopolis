@@ -13,7 +13,7 @@ import type { EventCase, ISODate } from "@/lib/types";
 import { planSummary, sessionAmount } from "@/lib/view/checkout";
 
 /** SESSION mode: pay one due session of a permitted series, then back to the board it came from. */
-function SessionPanel({ c, occurrenceDate }: { c: EventCase; occurrenceDate: ISODate }) {
+function SessionPanel({ c, occurrenceDate, onPaid }: { c: EventCase; occurrenceDate: ISODate; /** Keeps the paid state on screen until the board arrives. */ onPaid?: () => void }) {
   const router = useRouter();
   const dispatch = useDemo((s) => s.dispatch);
   const cfg = useDemo((s) => s.cfg);
@@ -24,6 +24,7 @@ function SessionPanel({ c, occurrenceDate }: { c: EventCase; occurrenceDate: ISO
     const result = dispatch(c.id, { type: "pay", amount, method: "card", kind: "session", occurrenceDate });
     if (result.ok) {
       toast.success("Paid.");
+      onPaid?.();
       router.push(routes.event(c.id));
     }
     return result;

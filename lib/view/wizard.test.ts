@@ -10,6 +10,8 @@ import {
   dateGateSatisfied,
   groupTasksByPhase,
   isWizardStep,
+  lateFeeCarriesDate,
+  leadTimeGapText,
   missingFields,
   nextWizardStep,
   previousWizardStep,
@@ -17,6 +19,7 @@ import {
   removeAddOnForTrigger,
   repeatsByDefault,
   resolveWizardStep,
+  scheduleOnDate,
   sessionCountLabel,
   triggerDropLabel,
   weekdayName,
@@ -31,6 +34,11 @@ function caseById(id: string): EventCase {
   const found = seed.find((c) => c.id === id);
   if (!found) throw new Error(`no seeded case ${id}`);
   return found;
+}
+
+/** S2 as it stands once booked: a permitted series, which is what holds a slot. */
+function S2Booked(): EventCase {
+  return { ...caseById("PMT-27-0142"), state: "permitted", permit: { issuedOn: TODAY, signature: null } };
 }
 
 const S3 = caseById("PMT-27-0118"); // Jazz in the Plaza: Reviewed
@@ -250,5 +258,73 @@ describe("groupTasksByPhase", () => {
     const phases = groups.map((g) => g.phase);
     expect(phases).toEqual([...phases].sort((a, b) => phases.indexOf(a) - phases.indexOf(b)));
     expect(groups.flatMap((g) => g.tasks)).toHaveLength(tasks.length);
+  });
+});
+
+describe("leadTimeGapText", () => {
+  it("says how many days are left and how many are needed, in the PRD's words", () => {
+    expect(leadTimeGapText(19, 30)).toBe("19 days left, 30 needed. This event needs 11 more days of notice than it has.");
+    expect(leadTimeGapText(29, 30)).toBe("29 days left, 30 needed. This event needs 1 more day of notice than it has.");
+    expect(leadTimeGapText(1, 10)).toBe("1 day left, 10 needed. This event needs 9 more days of notice than it has.");
+  });
+
+  it("a Reviewed event 19 days out really is 19 days away with 30 needed", () => {
+    const answers: EventAnswers = { ...baseAnswers, addOns: { ...EMPTY_ADDONS, amplifiedSound: true }, schedule: { date: "2027-05-22", start: "11:00", end: "16:00", occurrences: [] } };
+    const panel = buildResultPanel(answers, ctx);
+    expect(panel.dateGate.daysUntil).toBe(19);
+    expect(panel.leadTimeDays).toBe(30);
+    expect(leadTimeGapText(panel.dateGate.daysUntil, panel.leadTimeDays)).toMatch(/^19 days left, 30 needed\./);
+  });
+
+  it("a date already gone says so", () => {
+    expect(leadTimeGapText(-2, 10)).toBe("That date has passed. This event needs 10 days of notice.");
+  });
+});
+
+describe("scheduleOnDate", () => {
+  const sundays = { date: "2027-06-06", start: "08:00", end: "09:00", recurrence: { frequency: "weekly" as const, weekday: 0, until: "2027-08-29" }, occurrences: [] };
+
+  it("a series moved to a Saturday repeats on Saturdays and keeps an end date that is still ahead", () => {
+    const moved = scheduleOnDate(sundays, "2027-06-12", "class_meetup");
+    expect(moved.date).toBe("2027-06-12");
+    expect(moved.recurrence).toEqual({ frequency: "weekly", weekday: 6, until: "2027-08-29" });
+    expect(weekdayName(moved.recurrence!.weekday)).toBe("Saturday");
+  });
+
+  it("a series moved past its end date gets a new end, the default distance out", () => {
+    const moved = scheduleOnDate(sundays, "2027-09-04", "class_meetup");
+    expect(moved.recurrence?.weekday).toBe(6);
+    expect(moved.recurrence?.until).toBe("2027-11-20");
+  });
+
+  it("a moved series still holds its slot for other applicants", () => {
+    const moved = { ...S2Booked(), schedule: scheduleOnDate(S2Booked().schedule, "2027-06-12", "class_meetup") };
+    const others: RulesCtx = { ...ctx, cases: [...seed.filter((c) => c.id !== moved.id), moved] };
+    const rival: EventAnswers = { ...baseAnswers, location: moved.location, schedule: { date: "2027-06-19", start: moved.schedule!.start, end: moved.schedule!.end, occurrences: [] } };
+    const gate = dateGate(rival, classify(rival, DEFAULT_CONFIG), others);
+    expect(gate.availability.status).toBe("booked");
+  });
+
+  it("a single event stays single; a class or club meetup repeats from its first date", () => {
+    expect(scheduleOnDate(null, "2027-06-19", "picnic_party").recurrence).toBeUndefined();
+    expect(scheduleOnDate(null, "2027-06-19", "class_meetup").recurrence).toEqual({ frequency: "weekly", weekday: 6, until: "2027-09-04" });
+    const single = { date: "2027-06-19", start: "11:00", end: "16:00", occurrences: [] };
+    expect(scheduleOnDate(single, "2027-06-26", "class_meetup").recurrence).toBeUndefined();
+  });
+});
+
+describe("lateFeeCarriesDate", () => {
+  const tooClose: EventAnswers = { ...baseAnswers, addOns: { ...EMPTY_ADDONS, amplifiedSound: true }, schedule: { date: "2027-05-22", start: "11:00", end: "16:00", occurrences: [] } };
+
+  it("is true only when the fee was chosen and the gate offers it", () => {
+    const gate = buildResultPanel(tooClose, ctx).dateGate;
+    expect(gate.fixes).toContain("late_fee");
+    expect(lateFeeCarriesDate(gate, false)).toBe(false);
+    expect(lateFeeCarriesDate(gate, true)).toBe(true);
+  });
+
+  it("is false once the date passes on its own", () => {
+    const later: EventAnswers = { ...tooClose, schedule: { ...tooClose.schedule!, date: "2027-06-19" } };
+    expect(lateFeeCarriesDate(buildResultPanel(later, ctx).dateGate, true)).toBe(false);
   });
 });

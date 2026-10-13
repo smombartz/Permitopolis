@@ -8,13 +8,11 @@ import { routes } from "@/lib/routes";
 import { useDoors } from "./hooks";
 import { CITY_STAFF_BY_DEPT } from "@/lib/data/people";
 
-/** Closing card and footer (plan 7, row 10). */
-function ClosingFooter() {
+/** The closing card (plan 7, row 10): the last section of the page's main content. */
+function ClosingCard() {
   const doors = useDoors();
-  const clerk = CITY_STAFF_BY_DEPT.clerk;
 
   return (
-    <>
       <section className="page-container py-[var(--section-space)]">
         <Panel
           variant="frosted"
@@ -35,7 +33,17 @@ function ClosingFooter() {
           </Button>
         </Panel>
       </section>
+  );
+}
 
+/**
+ * The site footer (plan 7, row 10). Rendered after `<main>`, not inside it: a `<footer>` inside
+ * `<main>` is not the page's contentinfo landmark.
+ */
+function SiteFooter() {
+  const clerk = CITY_STAFF_BY_DEPT.clerk;
+
+  return (
       <footer className="page-container flex flex-col gap-6 border-t border-line-subtle py-10 text-sm text-fg-secondary sm:flex-row sm:items-start sm:justify-between">
         <div className="flex flex-col gap-1">
           <p className="font-mono text-[11px] font-bold tracking-[.12em] text-fg-label uppercase">City Clerk&rsquo;s Office</p>
@@ -52,8 +60,7 @@ function ClosingFooter() {
           </p>
         </div>
       </footer>
-    </>
   );
 }
 
-export { ClosingFooter };
+export { ClosingCard, SiteFooter };

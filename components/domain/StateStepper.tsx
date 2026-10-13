@@ -38,7 +38,9 @@ function StateStepper({ state, ending, compact = false, className }: StateSteppe
         data-compact={compact || undefined}
         role="list"
         aria-label="Case progress"
-        className="flex w-full items-start"
+        // The Needs info pill sits 28px above its marker: the row keeps that room for it, so it
+        // never lies over whatever is above the stepper (the case header's meta line).
+        className={cn("flex w-full items-start", state === "needs_info" && !ending && !compact && "pt-7")}
       >
         {MAIN_PATH.map((step, index) => {
           const done = !ending && index < activeIndex
