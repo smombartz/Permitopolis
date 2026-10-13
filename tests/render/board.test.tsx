@@ -125,8 +125,10 @@ describe('the board (S5): "With the city" is never a black hole', () => {
 
     // The intake check waits on the neighbors, so no date is promised.
     expect(screen.getByText("2 cards at intake with the City Clerk, no expected date yet")).toBeInTheDocument();
-    expect(screen.getByText("31 days at intake with the City Clerk, then Health & Legal · no expected date yet")).toBeInTheDocument();
-    expect(screen.getByText("31 days at intake with the City Clerk, then Public Works & Safety · no expected date yet")).toBeInTheDocument();
+    // Submitted Apr 13, 20 days before today: the figure on the Clerk's Intake row, not the 31
+    // days since the cards were uploaded to a Draft.
+    expect(screen.getByText("20 days at intake with the City Clerk, then Health & Legal · no expected date yet")).toBeInTheDocument();
+    expect(screen.getByText("20 days at intake with the City Clerk, then Public Works & Safety · no expected date yet")).toBeInTheDocument();
     expect(screen.queryByText(/days with Health & Legal/)).not.toBeInTheDocument();
   });
 

@@ -720,7 +720,11 @@ looked at in a browser.**
   date it is expected back; a summary line heads the column (`withCityInfo()`,
   `withCityColumnSummary()` in `lib/view/board.ts`). The holder and the date are read off the
   city's own task: the card's `verify:*` task, its department's open review, or, before routing,
-  the Clerk's intake check ("at intake with the City Clerk, then Health & Legal").
+  the Clerk's intake check ("at intake with the City Clerk, then Health & Legal"). The days are
+  how long that holder has had the card: since the application went in for a card at intake
+  (the Intake row's "20 days"), since routing for a card under a review (the queue row's "0 days
+  waiting"), or since it was sent when that was later. A card uploaded to a Draft does not count
+  the days before anybody at the city had it.
 - **The card form validates.** `CardPaymentForm` checks the number, name, expiry and security
   code on submit. The prefilled test card passes; an emptied field no longer "pays".
 - **The wizard's late fee** is decided by `lateFeeCarriesDate()` alone, so a date in the past or
@@ -777,7 +781,7 @@ other way passes whatever the panel does.
 
 | File | Holds |
 |---|---|
-| `tests/both-sides.test.ts` | For every "With the city" card on the seed: the applicant is told the holder, the expected-by date, "overdue" and the days waited that the city's own task, queue and Documents tab show |
+| `tests/both-sides.test.ts` | For every "With the city" card on the seed: the applicant is told the holder, the expected-by date and "overdue" that the city's own task and queue show, and the days the holder has had it: the Intake row's days before routing, the queue row's after (never more than the Documents tab's days since the upload) |
 | `tests/render/role-tools.test.tsx` | The registry opens the shared panels for every role, at the right width; the review panel hands off to the request panel; S3 and S6 walked through Reviews, Documents and Conditions and fees after each role acts; Issue permit's checklist against `checkIssuePermit()` |
 | `tests/render/handoffs.test.tsx` | Demo paths 3, 4, 5 and 6, clicked from first step to last across the board, the queues, the case, checkout, Active permits and the wizard, with the role switcher |
 

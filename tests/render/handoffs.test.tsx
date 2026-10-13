@@ -791,6 +791,8 @@ describe("the demo paths that cross surfaces have a control for every step", () 
   it("path 4: three sign-offs, the Clerk accepts from Intake and routes from the case, and Public Works & Safety's queue has the block party", async () => {
     const { user } = await renderApp({ scenario: "S4" });
     expect(here()).toBe(routes.event(S4));
+    // Submitted Apr 13: 20 days at intake, the figure the Clerk's Intake row has two clicks on.
+    expect(screen.getByText("20 days at intake with the City Clerk, then Health & Legal · no expected date yet")).toBeInTheDocument();
 
     // The block captain: the last three neighbors.
     await user.click(screen.getByRole("button", { name: /Neighbor sign-off/ }));
@@ -804,6 +806,7 @@ describe("the demo paths that cross surfaces have a control for every step", () 
     await user.click(screen.getByRole("link", { name: "Intake" }));
     await user.click(screen.getByRole("tab", { name: /^Reviewed/ }));
     const row = within(screen.getByText("Maple Street block party").closest("tr")!);
+    expect(row.getByText("20 days")).toBeInTheDocument();
     await user.click(row.getByRole("button", { name: "Accept as complete" }));
     expect(storedCase(S4).dateHold.status).toBe("held");
 
@@ -825,6 +828,16 @@ describe("the demo paths that cross surfaces have a control for every step", () 
     expectRealScreen();
     expect(queueFor(useDemo.getState().cases, "pws", useDemo.getState().demoToday).some((r) => r.case.id === S4)).toBe(true);
     expect(screen.getByText("Maple Street block party")).toBeInTheDocument();
+    const queueRow = within(screen.getByText("Maple Street block party").closest("a")!);
+    expect(queueRow.getByText("0 days waiting")).toBeInTheDocument();
+
+    // The block captain again: each card says the same of the department that has it since today.
+    await user.click(queueRow.getByText("Maple Street block party"));
+    await closePanel(user);
+    await switchTo(user, "applicant");
+    expect(here()).toBe(routes.event(S4));
+    expect(screen.getByText("0 days with Public Works & Safety · expected by Mon, May 17")).toBeInTheDocument();
+    expect(screen.getByText("0 days with Health & Legal · expected by Mon, May 17")).toBeInTheDocument();
   }, 30_000);
 
   it("path 5: the Clerk sees two parties up and why Issue permit waits, Health & Legal verifies from its queue, the applicant signs and pays, the Clerk issues, Public Works & Safety has its work orders and the route on its map, and a new plaza event that day is warned", async () => {

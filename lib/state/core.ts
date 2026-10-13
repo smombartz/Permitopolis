@@ -57,8 +57,9 @@ export function taskDueDate(task: Task): ISODate | null {
 
 /**
  * The day a card last went to the city: its most recent move to `submitted`, from its own
- * history. Null if it never has. The applicant's "N days with ..." and the city's "waiting N
- * days" both count from here.
+ * history. Null if it never has. The city's Documents tab counts "waiting N days" from here. The
+ * applicant's "N days with ..." does too, unless the party it names got the case later than that
+ * (see `withCityInfo()`).
  */
 export function taskSubmittedOn(task: Task): ISODate | null {
   for (let i = task.history.length - 1; i >= 0; i--) {

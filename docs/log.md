@@ -1,5 +1,21 @@
 # Change log
 
+## 2026-10-13 - Phase 4 review fixes
+
+**What Changed:**
+- The Phase 4 acceptance review returned 18 findings (1 high, 8 medium, 9 low). Plan, and what turned out differently from it: `docs/plans/2026-10-13-phase-4-review-fixes.md`. Each finding was confirmed in the code and given a test that failed before its fix
+- **High, demo path 4's first screen:** the applicant's "With the city" note counted the days since a card was uploaded and said the current holder had had it that long. S4's cards read "31 days at intake with the City Clerk" while the Clerk's Intake row said 20 days, and "31 days with Health & Legal" on the day it was routed. `withCityInfo()` now counts from the day the party it names got the card: the day the application went in for a card at intake, the day of routing for a card under a review, the day its verify task opened for a card under one, or the day it was sent when that was later. `tests/both-sides.test.ts` compares the figure with `intakeRows().daysInIntake` and `queueFor().daysWaiting` for every such card on the seed, and walks S4 from intake to routed; demo path 4's click-through reads "20 days" on the board and on the Intake row, and "0 days" on the board and in the queue after routing
+
+**Why:**
+- The review found the first screen of a P0 demo path showing a figure the next screen contradicted
+
+**Files Modified:**
+- `lib/view/board.ts`, `lib/state/core.ts` (comment)
+- `tests/both-sides.test.ts`, `tests/render/board.test.tsx`, `tests/render/handoffs.test.tsx`
+- `docs/readme.md`, `docs/log.md`, `docs/plans/2026-10-13-phase-4-review-fixes.md` (new)
+
+---
+
 ## 2026-10-13 - Phase 4 integration: the role tools meet
 
 **What Changed:**

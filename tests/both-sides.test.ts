@@ -14,6 +14,7 @@ import { boardColumns, buildSeed, cardUnderVerification, queueFor, taskDueDate, 
 import type { Action } from "@/lib/state";
 import type { Actor, EventCase, ISODate, Task } from "@/lib/types";
 import { withCityColumnSummary, withCityInfo } from "@/lib/view/board";
+import { intakeRows } from "@/lib/view/cityLists";
 import { daysWaiting } from "@/lib/view/verify";
 
 const TODAY = DEFAULT_DEMO_TODAY;
@@ -99,8 +100,31 @@ describe("a card With the city: what the applicant is told is what the city sees
     }
   });
 
-  it("the days a card has waited are the days the city's Documents tab counts", () => {
-    for (const { c, card, info } of rows) expect(info.daysWaiting, `${c.id} ${card.catalogId}`).toBe(daysWaiting(card, TODAY));
+  it("the days are how long the party named has had the card: the Intake row's days before routing, the queue row's after", () => {
+    const intake = new Map([...intakeRows(seed, "special", TODAY, DEFAULT_CONFIG), ...intakeRows(seed, "reviewed", TODAY, DEFAULT_CONFIG)].map((row) => [row.case.id, row.daysInIntake]));
+    const compared = { intake: 0, queue: 0, sentEarlier: 0 };
+    for (const { c, card, info, cityTask } of rows) {
+      const where = `${c.id} ${card.catalogId}`;
+      // The Documents tab counts from the upload itself ("Submitted Fri, Apr 2 · waiting 31 days"),
+      // which may be before anybody at the city had the case. Never fewer days than the holder's own.
+      const sinceUpload = daysWaiting(card, TODAY)!;
+      expect(info.daysWaiting, where).toBeLessThanOrEqual(sinceUpload);
+      if (info.daysWaiting < sinceUpload) compared.sentEarlier += 1;
+      if (info.atIntake) {
+        if (!intake.has(c.id)) continue;
+        expect(info.daysWaiting, `${where}: the Intake queue's row`).toBe(intake.get(c.id));
+        compared.intake += 1;
+      } else if (cityTask) {
+        const inQueue = queueFor(seed, info.dept, TODAY).find((row) => row.task.id === cityTask.id)!;
+        expect(info.daysWaiting, `${where}: ${info.dept}'s queue row`).toBe(inQueue.daysWaiting);
+        compared.queue += 1;
+      }
+    }
+    // The seed has all three: cards at intake, cards under a review or a verify task, and cards
+    // uploaded while the case was still a Draft or before it was routed.
+    expect(compared.intake).toBeGreaterThan(5);
+    expect(compared.queue).toBeGreaterThan(5);
+    expect(compared.sentEarlier).toBeGreaterThan(5);
   });
 
   it("the column's summary line counts the same cards under the same holders, with the soonest date", () => {
@@ -142,6 +166,29 @@ describe("the named cases", () => {
     expect(c.tasks.find((t) => t.catalogId === "intake_check")?.status).toBe("locked");
     for (const card of boardColumns(c).with_city) {
       expect(withCityInfo(c, card, TODAY)).toMatchObject({ dept: "clerk", atIntake: true, expectedBy: null, overdue: false });
+    }
+  });
+
+  it("S4 (demo path 4): 20 days at intake, as the Clerk's Intake row says, and 0 days with each department on the day it is routed", () => {
+    // The cards were uploaded on Apr 2, while the application was a Draft. It went in on Apr 13.
+    let c = get(S4);
+    expect(c.submittedAt?.slice(0, 10)).toBe("2027-04-13");
+    const intakeRow = intakeRows(seed, "reviewed", TODAY, DEFAULT_CONFIG).find((row) => row.case.id === S4)!;
+    expect(intakeRow.daysInIntake).toBe(20);
+    for (const card of boardColumns(c).with_city) expect(withCityInfo(c, card, TODAY)?.daysWaiting, card.catalogId).toBe(20);
+
+    // The last three neighbors sign, the Clerk accepts and routes: each department has had it since today.
+    for (let i = 0; i < 3; i++) c = run(c, { type: "simulate_signoff" }, "neighbor");
+    c = run(c, { type: "accept_complete" }, "clerk");
+    const reviewers = (["pws", "hl"] as const).map((dept) => ({ dept, sections: ["Its sections"], dueDate: "2027-05-17" }));
+    c = run(c, { type: "confirm_routing", reviewers }, "clerk");
+    const cards = boardColumns(c).with_city;
+    expect(cards.map((t) => t.catalogId)).toEqual(["insurance_certificate", "city_services_request"]);
+    for (const card of cards) {
+      const info = withCityInfo(c, card, TODAY)!;
+      const inQueue = queueFor([c], info.dept, TODAY).find((row) => row.task.catalogId === `review:${info.dept}`)!;
+      expect([info.atIntake, info.daysWaiting], card.catalogId).toEqual([false, inQueue.daysWaiting]);
+      expect(info.daysWaiting).toBe(0);
     }
   });
 

@@ -408,15 +408,16 @@ export interface WithCityInfo {
   reviewerLabel: string;
   /** Not routed yet: the Clerk's intake has the application, and the reviewer starts after routing. */
   atIntake: boolean;
+  /** Days `dept` has had the card: since it was sent, or since `dept` got the case if that was later. */
   daysWaiting: number;
   expectedBy: ISODate | null;
   overdue: boolean;
 }
 
 /**
- * Who has a "With the city" card, how many days it has waited, and when it is expected back,
- * so the column is never a black hole. Every part is read off the task the city itself works
- * from, so the board cannot disagree with a reviewer's queue (`tests/both-sides.test.ts`):
+ * Who has a "With the city" card, how many days they have had it, and when it is expected
+ * back, so the column is never a black hole. Every part is read off the task the city itself
+ * works from, so the board cannot disagree with a reviewer's queue (`tests/both-sides.test.ts`):
  *
  * - the card's own `verify:*` task, once its department has decided its review;
  * - the department's `review:<dept>` task while that review is open, which covers every card
@@ -425,27 +426,38 @@ export interface WithCityInfo {
  *   the City Clerk routes the case" on the city's side), so the Clerk is who holds it. While
  *   the intake check itself waits (on a neighbor sign-off, on an answer) there is no date.
  *
+ * The days are counted from the day the party named got the card, not from the upload: a card
+ * uploaded to a Draft has been at intake since the application went in (the Intake queue's
+ * "20 days"), and a department has had it since the Clerk routed the case (its queue's "0 days
+ * waiting"). A card sent later than that counts from when it was sent.
+ *
  * Null for a card nobody checks.
  */
 export function withCityInfo(c: EventCase, task: Task, today: ISODate): WithCityInfo | null {
   const reviewer = task.reviewer;
   if (!reviewer) return null;
-  // Counted from the day the card last went to the city, as the city's Documents tab counts it.
-  const since = taskSubmittedOn(task) ?? today;
-  const daysWaiting = Math.max(0, daysBetween(since, today));
+  const sent = taskSubmittedOn(task) ?? today;
+  const laterOf = (day: string | null | undefined): ISODate => (day && day.slice(0, 10) > sent ? day.slice(0, 10) : sent);
   const atIntake = c.reviews.length === 0;
 
   let expectedBy: ISODate | null = null;
+  let since: ISODate;
   const verifyTask = c.tasks.find((t) => t.catalogId.startsWith("verify:") && t.status !== "done" && cardUnderVerification(c, t)?.id === task.id);
   if (verifyTask) {
     expectedBy = taskDueDate(verifyTask);
+    // A verify task is opened for this one card, and opened again when it is uploaded again.
+    since = laterOf([...verifyTask.history].reverse().find((h) => h.status === "todo")?.at);
   } else if (atIntake) {
     const intake = c.tasks.find((t) => t.catalogId === "intake_check" && t.status === "todo");
     expectedBy = intake ? taskDueDate(intake) : null;
+    since = laterOf(c.submittedAt);
   } else {
     const reviewTask = c.tasks.find((t) => t.catalogId === `review:${reviewer}` && t.status === "todo");
     expectedBy = reviewTask ? taskDueDate(reviewTask) : null;
+    // A card the Clerk checks itself has been the Clerk's since the application went in.
+    since = laterOf(c.reviews.find((r) => r.dept === reviewer)?.clock.startedOn ?? c.submittedAt);
   }
+  const daysWaiting = Math.max(0, daysBetween(since, today));
 
   const dept: Dept = atIntake ? "clerk" : reviewer;
   return {
