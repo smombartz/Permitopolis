@@ -97,7 +97,7 @@ import {
   CommandShortcut,
 } from "@/components/ui/command"
 import { Toaster } from "@/components/ui/sonner"
-import { PageHeader } from "@/components/ui/page-header"
+import { BackLink, PageHeader } from "@/components/ui/page-header"
 import { Section } from "@/components/ui/section"
 import { KeyValueList } from "@/components/ui/key-value"
 import { ConfirmDialog } from "@/components/ui/confirm-dialog"
@@ -114,6 +114,7 @@ import { CopyButton } from "@/components/ui/copy-button"
 import {
   ActivityTimeline,
   AvailabilityBadge,
+  BillingBadge,
   CASE_STATE_ICON,
   CaseHeader,
   CaseId,
@@ -143,6 +144,7 @@ import {
   TaskCard,
   TaskKindLabel,
   TierBadge,
+  TierLegend,
   WaitingOnChips,
   WhoIsUp,
 } from "@/components/domain"
@@ -174,6 +176,7 @@ const TIERS: Tier[] = ["instant", "reviewed", "special"];
 const CASE_STATES = Object.keys(STATE_LABEL) as CaseState[];
 const ENDINGS = Object.keys(ENDING_LABEL) as Ending[];
 const TASK_KINDS = Object.keys(TASK_KIND_ICON) as TaskKind[];
+const BILLINGS = ["paid", "due", "upcoming", "skipped"] as const;
 const REVIEW_STATUSES: ReviewStatus[] = [
   "not_routed",
   "pending",
@@ -1177,6 +1180,21 @@ function KitScreen() {
               />
             ))}
           </div>
+        </KitSection>
+
+        {/* ---- Shared since Phase 3: built in two surfaces each, then moved here ---- */}
+        <KitSection
+          id="phase-3-shared"
+          title="Domain: BillingBadge, TierLegend, and the back link"
+          description="Where a series session stands (the wizard, the board's schedule and the permit), the key for a view colored by tier (the map and the calendar), and the back link above a screen that opens with CaseHeader."
+        >
+          <Row>
+            {BILLINGS.map((billing) => (
+              <BillingBadge key={billing} billing={billing} />
+            ))}
+          </Row>
+          <TierLegend aria-label="Legend: tiers" />
+          <BackLink href="/dev/kit#phase-3-shared">Back to My queue</BackLink>
         </KitSection>
 
         {/* ---- Domain: case row pieces ---- */}

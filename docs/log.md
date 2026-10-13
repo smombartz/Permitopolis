@@ -1,5 +1,217 @@
 # Change log
 
+## 2026-10-13 - Phase 3 integration: the seven surfaces meet
+
+**What Changed:**
+- Merged `phase3/landing`, `wizard`, `board`, `checkout`, `lists`, `case` and `active` into `build` (2026-10-12; no conflicts) and made the surfaces hand off to each other. Plan, with the table of what was broken: `docs/plans/2026-10-12-phase-3-integration.md`. The work was cut off by a usage limit on 2026-10-12 with its changes uncommitted, and resumed and finished on 2026-10-13
+- **Hand-offs fixed (11):**
+  - My queue, Intake and Who's up pass a task's id in `?task=`, which the case detail read only as its own action key, so the sheet opened empty. `resolveOpenKey()` takes either and opens the panel that moves that task on for whoever is looking, or nothing
+  - Intake's "Request information" opened Accept as complete, and a row had no link to its case. The link carries `request_info`; the event name opens the case
+  - A case went "Back to cases" whatever list it came from. `routes.city.case(id, { from })`: the four lists pass their own URL and the case names the list it returns to, filters included
+  - Booking's back link went to a board an Instant Draft does not have. It goes to the wizard's plan step
+  - A Draft whose board exists was sent back into the wizard from My events, and its board offered "Amend". It opens its board; the menu offers "Edit your plan" for a Draft, and "View permit" once there is one
+  - A series' payment card in Quote sent opened a session schedule whose links checkout refuses. The quote's own payment goes to the quote; the schedule offers "Pay this session" only where checkout takes it (`canPaySession()`)
+  - After a session or the final bill was paid, checkout fell through to "Nothing to pay here". It shows a toast and returns to the board
+  - The permit's QR code held a path, not a URL, and nothing linked to the check. It holds the full URL, and "Open the verification page" links to it
+  - The landing page's "Plan an event" landed on My events for anybody with an event. It is always the wizard
+  - `state=closed` gave an empty pipeline unless "Closed and ended" was also on. Choosing that state shows those cases
+  - A page opened under the wrong role (the Applicant on a city case link) offered a switch that dropped the link for the role's queue. The switch stays on a page the new role owns (`pageIsFor()` in `lib/view/shell.ts`)
+- The demo guide had no way back: it has a back link to the landing page
+- **`tests/render/handoffs.test.tsx` (new, 69 tests)** mounts the real layouts and pages by URL and follows every hand-off of the brief into the screen it lands on: the wizard's last step to checkout and the permit, or to the board; the board's cards to checkout in each mode; the permit to the public check; every queue row of all three roles to its panel; pipeline, Intake and Active permits rows, calendar items and map bookings to the case and back; the landing page's doors and all seven demo paths; "Book again next year"; and every role switch on every shared city page and between the Applicant and a city role on a case. Demo paths 3 and 4 are clicked from their first step to their last, through the board, My queue, Intake, the case, checkout and Active permits, with the role switcher between them
+- **Consistency:** one `applicantNameOf()`; one `useIsNarrow`; one `BackLink`; `BillingBadge` and `TierLegend` in `components/domain` (each had been built twice); one set of phase names (`TASK_PHASE_LABEL`, `TASK_PHASES`) for the wizard's plan and the board's swimlanes; "Reviewers" as the one heading; the board's reviewers row through `ReviewStatusDot`; a session's date and "Skipped" mark the same in the wizard, on the board and on the permit; `Stat`, `Money`, `DateText` and `plural()` where a surface had its own; the system's label treatment on block labels; every screen's root at `gap-6`; the verify page's `<h1>`
+- **Toasts:** every toast is a sentence. The board confirms what an applicant did ("Sent.", "Application submitted.", "Permit cancelled.") as checkout and the city's panels do
+- **Contract change requests:** applied 3D's (the `lib/state` barrel exports `dueAtQuote`, `quoteBalance`, `quotePaid`, `lateFeeApplies`, `insideLeadTime`, and with them the checks `transition()` runs); declined 3E's (typing `sort`, `dir` and `closed` into `CasesFilters`: nothing links to a sorted pipeline, and `lib/routes.ts` must not import the pipeline's own types)
+- `docs/readme.md`: "The screens (Phase 3)", with the case detail's action registry and how to override a panel for a role; nine new questions for the owner. The main plan: Phase 3 ticked, "12. What to look at"
+
+**Why:**
+- Seven builders built one surface each without seeing the others. Each surface's own tests stop at "the router was pushed to X"; nothing had rendered X. The demo's six paths cross surfaces at every step, so a link that lands on an empty sheet or "Nothing to pay here" breaks the walkthrough
+
+**Files Modified:**
+- `lib/view/shell.ts`, `lib/view/caseDetail.ts`, `lib/view/board.ts`, `lib/view/checkout.ts`, `lib/view/cityLists.ts`, `lib/view/landing.ts`, `lib/view/wizard.ts` and their tests
+- `lib/routes.ts` (contract: `from` on `routes.city.case`), `lib/types.ts` (contract: `TASK_PHASE_LABEL`, `TASK_PHASES`), `lib/state/index.ts`, `lib/data/people.ts`
+- `components/shell/useRoleSwitch.ts`, `components/shell/index.ts`, `components/shell/DemoMenu.tsx`, `components/ui/page-header.tsx`
+- `components/domain/BillingBadge.tsx` (new), `components/domain/TierLegend.tsx` (new), `components/domain/index.ts`, `components/map/PermitopolisMap.tsx`
+- `components/landing/{Hero,Nav,StaffInterlude,ClosingFooter,TodoBoard,DemoGuideScreen}.tsx`, `components/landing/hooks.ts`
+- `components/wizard/{WizardScreen,ResultPanel,StepPlan,StepWhen}.tsx`
+- `components/board/{BoardScreen,BoardColumns,BoardMenu,CardSheet,MyEventsScreen,SeriesScheduleSheet,VendorStackSheet}.tsx`
+- `components/checkout/{CheckoutScreen,BookingPanel,QuotePanel,SessionPanel,FinalPanel,CardPaymentForm}.tsx`, `components/permit/{PermitScreen,PermitCard,SessionList,VerifyScreen}.tsx`
+- `components/city/lists/{QueueScreen,CasesScreen,PipelineBoard,PipelineTable,IntakeScreen}.tsx`
+- `components/case/{CaseDetailScreen,ActionSheet}.tsx`, `components/case/tabs/{OverviewTab,DocumentsTab,ConditionsFeesTab}.tsx`, `components/case/actions/generic/*` (imports from the barrel)
+- `components/active/{ActiveScreen,ActiveListView,ActiveCalendarView,ActiveCloseoutView,RoleOverlay}.tsx`
+- `tests/render/handoffs.test.tsx` (new), `tests/render/city-lists.test.tsx`
+- `docs/readme.md`, `docs/log.md`, `docs/plans/2026-10-12-phase-3-integration.md` (new), `docs/plans/2026-10-12-permitopolis-prototype.md`
+
+---
+
+## 2026-10-12 - Workstream 3A: the public landing page and the presenter's demo guide
+
+**What Changed:**
+- Replaced the `/` placeholder with the Clerk's Office landing page, a resident-facing page in the full Rime & Ink treatment with no shell: a floating glass nav; a hero whose live preview panel runs the real `classify()` and `estimateFees()` on a small form and never writes to the store; a scroll-thread "how it works" walkthrough; three tier cards and a comparison table read from the rules engine and the seed; a to-do-board block built from Jazz in the Plaza's own `TaskCard`s; fee and cancellation panels from `DEFAULT_CONFIG`; a dark "for city staff" interlude; an eight-item FAQ; and a closing call to action and footer
+- Replaced the `/demo` placeholder with the demo guide: what the prototype is, the four roles, the demo date jumps, Reset behind a confirmation, the seven `DEMO_PATHS` as "Start this path" cards, the six-scenario jump table, and a "what is faked" list. It waits for `useHydrated()`, since everything on it writes to the store
+- The two doors ("Plan an event", "City staff") are plain links that also set the role once the stored demo has been read
+- Added `lib/view/landing.ts`: the hero form's mapping to `EventAnswers`, the tier-card and comparison rows, the fee and cancellation rows, the FAQ text and the demo path jumps, tested against the real seed
+- `tests/render/smoke.test.tsx` asserted the placeholder's literal "Permitopolis" heading; it now checks for an `<h1>`
+
+**Why:**
+- Workstream 3A of Phase 3 (plan section 7): the page a resident would arrive on, with fees and lead times rendered from the same config the app uses so they cannot drift, and the page a presenter starts the demo from
+
+**Files Modified:**
+- `app/page.tsx`, `app/demo/page.tsx`
+- `components/landing/LandingScreen.tsx`, `Nav.tsx`, `Hero.tsx`, `HeroPreviewPanel.tsx`, `HowItWorks.tsx`, `EventTiers.tsx`, `ComparisonTable.tsx`, `TodoBoard.tsx`, `FeesPanels.tsx`, `StaffInterlude.tsx`, `Faq.tsx`, `ClosingFooter.tsx`, `SectionHeading.tsx`, `DemoGuideScreen.tsx`, `hooks.ts`
+- `lib/view/landing.ts`, `lib/view/landing.test.ts`
+- `tests/render/landing.test.tsx`, `tests/render/smoke.test.tsx`
+
+---
+
+## 2026-10-12 - Workstream 3B: the applicant wizard
+
+**What Changed:**
+- Replaced the `/apply` placeholder with `WizardScreen`, a five-step wizard (What, Where, When, Size, Plan) rendered inside `AppShell`
+- Added `components/wizard/**`: `WizardScreen.tsx` (URL and store orchestration), `ResultPanel.tsx` (the live classify, what-if, fee estimate and date-gate panel), `StepWhat.tsx`, `StepWhere.tsx`, `StepWhen.tsx`, `StepSize.tsx`, `StepPlan.tsx`, `DatePickerPopover.tsx` (a Rime & Ink-styled react-day-picker popover, no new dependency), `constants.ts` (event-type icons and blurbs)
+- With no `case` the wizard holds its answers until the first edit, then creates the Draft and puts its id in the URL; with `?case=` it opens the Draft at its saved step. Every field change autosaves. A case that is no longer a Draft goes to its board; an unknown id shows `CaseNotFound`
+- The result panel sits beside the steps from 1024 px and becomes a one-line bar with a bottom sheet below that; a tier change is highlighted and announced
+- The last step's button: an Instant event goes to the quote route, where checkout books it; a Reviewed or Special event dispatches `create_board` and goes to its board
+- Added `lib/view/wizard.ts`: step order, `buildResultPanel`, add-on effect copy, the date gate's "drop an add-on" and late-fee helpers, missing-field detection, and the plan's cards grouped by phase, with `lib/view/wizard.test.ts` against the real seed
+- Added `tests/render/wizard.test.tsx`: unknown and non-draft cases, S2's reopened draft, a full click-through of demo path 2, a booked date and the three gate fixes
+
+**Why:**
+- Workstream 3B of Phase 3: the applicant's five-step event wizard and its live result panel, so an applicant can describe an event and reach the quote or their board
+
+**Files Modified:**
+- `app/apply/page.tsx`
+- `components/wizard/WizardScreen.tsx`, `ResultPanel.tsx`, `StepWhat.tsx`, `StepWhere.tsx`, `StepWhen.tsx`, `StepSize.tsx`, `StepPlan.tsx`, `DatePickerPopover.tsx`, `constants.ts`
+- `lib/view/wizard.ts`, `lib/view/wizard.test.ts`
+- `tests/render/wizard.test.tsx`
+
+---
+
+## 2026-10-12 - Workstream 3C: My events and the applicant to-do board
+
+**What Changed:**
+- `app/events/page.tsx`, `app/events/[id]/page.tsx` - swapped the placeholder for `MyEventsScreen` and `BoardScreen`, kept the `<Suspense>`
+- `components/board/MyEventsScreen.tsx`, `EventRow.tsx` - My events: sorted rows, a Past section, the empty state, "Plan an event"
+- `components/board/BoardScreen.tsx` - the board's status strip (`CaseHeader`, the waiting-on chips and the reviewers row), the grouping toggle, the Draft-not-yet-planned and case-not-found states, and all URL state (`group`, `tab`, `card`)
+- `components/board/BoardColumns.tsx` - the four columns, tabs below 768 px, the phase swimlanes, and whether a card opens its sheet or links straight out
+- `components/board/CardSheet.tsx`, `CardForms.tsx` - the card detail sheet and its small forms per catalogue id
+- `components/board/SeriesScheduleSheet.tsx`, `VendorStackSheet.tsx` - a series' payment schedule and the stacked vendor-permit cards, expanded
+- `components/board/BoardMenu.tsx` - Withdraw, Cancel (with today's refund) and Amend
+- `lib/view/board.ts` and `lib/view/board.test.ts` - pure view-models (My events ordering, next-action text, column and swimlane grouping, vendor stacking, reviewer wording, waiting-on chips, direct links, series sessions), tested against the real seed
+- `tests/render/board.test.tsx` - render tests for scenarios S3 to S6, a withdrawn background case, My events for Maya Chen and for a new applicant, and the tab layout below 768 px
+
+**Why:**
+- Workstream 3C of Phase 3: the applicant's event list and to-do board, per `docs/spec/prd.md` "Applicant to-do board" and demo paths 3, 4 and 6
+
+**Files Modified:**
+- `app/events/page.tsx`
+- `app/events/[id]/page.tsx`
+- `components/board/BoardColumns.tsx`
+- `components/board/BoardMenu.tsx`
+- `components/board/BoardScreen.tsx`
+- `components/board/CardForms.tsx`
+- `components/board/CardSheet.tsx`
+- `components/board/EventRow.tsx`
+- `components/board/MyEventsScreen.tsx`
+- `components/board/SeriesScheduleSheet.tsx`
+- `components/board/VendorStackSheet.tsx`
+- `lib/view/board.ts`
+- `lib/view/board.test.ts`
+- `tests/render/board.test.tsx`
+
+---
+
+## 2026-10-12 - Workstream 3D: quote, permit and public verification
+
+**What Changed:**
+- Built the checkout screen at `/events/[id]/quote` with four modes: BOOKING (an Instant Draft books and pays in one step), QUOTE (accept conditions, sign, then pay: the one place an applicant pays for a quote), SESSION (`?pay=session&date=`, one series session) and FINAL (`?pay=final`, the closeout bill), chosen by a pure `checkoutDecision()`. Every other state explains where the case stands and links elsewhere instead of offering a payment the engine would refuse
+- Built the permit screen at `/events/[id]/permit`: a mobile-first card with the QR code (qrcode.react, for `/verify/[id]`), a map thumbnail, every session's date with its paid, due, upcoming or skipped mark, attendance, what the permit covers, conditions, the City Clerk's day-of contact and today's cancellation refund. "Download PDF" calls `window.print()`; a print stylesheet scopes printing to the card
+- Built the public check at `/verify/[id]` (no shell, no role): a large Valid or Not valid with its reason, gated on `useHydrated()`
+- Added `lib/view/checkout.ts` and `lib/view/permit.ts`, pure view-models tested against the real seed (mode decision, plan summary, fee previews, session rows, verify status)
+- Added render tests covering demo paths 1 and 5 end to end, S3's not-ready quote, S1's permit facts, `/verify` for S1 and S5, an unknown case id and the city-role guard
+
+**Why:**
+- Workstream 3D of Phase 3: the applicant's one payment surface, the permit they carry, and the officer's public verification check (PRD "Quote, permit, amend and cancel"; demo paths 1, 3 and 5)
+
+**Files Modified:**
+- `app/events/[id]/quote/page.tsx` - renders `CheckoutScreen`
+- `app/events/[id]/permit/page.tsx` - renders `PermitScreen`
+- `app/verify/[id]/page.tsx` - renders `VerifyScreen`
+- `components/checkout/CheckoutScreen.tsx`, `BookingPanel.tsx`, `QuotePanel.tsx`, `SessionPanel.tsx`, `FinalPanel.tsx`, `CardPaymentForm.tsx`, `SignatureForm.tsx`, `PlanSummaryCard.tsx` - new
+- `components/permit/PermitScreen.tsx`, `PermitCard.tsx`, `SessionList.tsx`, `VerifyScreen.tsx`, `PermitPrintStyles.tsx` - new
+- `lib/view/checkout.ts`, `lib/view/checkout.test.ts` - new
+- `lib/view/permit.ts`, `lib/view/permit.test.ts` - new
+- `tests/render/checkout.test.tsx`, `tests/render/permit.test.tsx` - new
+
+---
+
+## 2026-10-12 - Workstream 3E: city lists (My queue, Cases pipeline, Intake)
+
+**What Changed:**
+- Built `QueueScreen` (`/city/queue`): `queueFor()` grouped Overdue, Due this week and Later with a briefing line, a collapsed "Waiting on others" group, the triggers and review clock for the two reviewing departments, and a designed empty state
+- Built `CasesScreen` (`/city/cases`): a Board (one column per pipeline state) and a sortable Table, switched by a `SegmentedControl`, with tier, state, waiting-on, event-date range, Involves me, Closed and ended, search and sort all kept in the URL; a result count, removable filter chips, "Clear filters" and a no-result empty state. A case that has ended shows its ending on its board card as well as in the table
+- Built `IntakeScreen` (`/city/intake`): Special, Reviewed and Instant-exceptions tabs with counts; each row's completeness summary, competing-application note (through `rules.availability()`), lead-time flag, and Accept as complete and Request information actions taken from `availableActions()`
+- Added `lib/view/cityLists.ts`, the pure view-model behind all three screens (queue grouping and briefing, pipeline filtering, sorting and URL parsing, intake completeness and the competing-application finder), with `lib/view/cityLists.test.ts` (43 tests against the real seed)
+- Added `tests/render/city-lists.test.tsx` (15 tests) and small local helpers (`useRovingListNav`, `KeyboardFooter`, `PipelineBoard`, `PipelineTable`) under `components/city/lists/`
+- Swapped the placeholder in `app/city/queue/page.tsx`, `app/city/cases/page.tsx` and `app/city/intake/page.tsx` for the new screens
+
+**Why:**
+- Workstream 3E of Phase 3: the city's list views, the part of the brief ("interaction design for complex data: density, filtering, status changes, history, and the empty, error and edge states") this surface exists to answer
+
+**Files Modified:**
+- `app/city/queue/page.tsx`
+- `app/city/cases/page.tsx`
+- `app/city/intake/page.tsx`
+- `components/city/lists/QueueScreen.tsx`
+- `components/city/lists/CasesScreen.tsx`
+- `components/city/lists/IntakeScreen.tsx`
+- `components/city/lists/PipelineBoard.tsx`
+- `components/city/lists/PipelineTable.tsx`
+- `components/city/lists/KeyboardFooter.tsx`
+- `components/city/lists/useRovingListNav.ts`
+- `lib/view/cityLists.ts`
+- `lib/view/cityLists.test.ts`
+- `tests/render/city-lists.test.tsx`
+
+---
+
+## 2026-10-12 - Workstream 3F: city case detail
+
+**What Changed:**
+- Built `/city/cases/[id]` for the three city roles inside `CityShell`: the header (stepper, hold, review clock), Who's up with the next-move sentence, five tabs (Overview, Reviews, Documents, Conditions and fees, Activity), and a sticky "Your actions" panel driven by `availableActions()`
+- Added one small, complete action panel per action type a city role can take (`components/case/actions/generic/*`), registered by type in `components/case/actions/registry.ts`, with empty per-role override maps (`clerk.tsx`, `pws.tsx`, `hl.tsx`) for a later phase to fill in richer tools
+- The open action or task lives in the URL as `?task=` (an action type, or `type:arg`), resolved by pure helpers in `lib/view/caseDetail.ts`, so Who's-up tasks, Documents cards, Reviews buttons and links from outside all open the right panel in a right-hand sheet
+- Handled the edge states the brief calls out: an unknown id, a Draft (not visible to the city), an ended case (banner, only "Add a note"), a department not routed, empty tabs, long names, a 25-card vendor stack and a 22-session series (summarized, not listed), and an `aria-live` region for status changes
+
+**Why:**
+- Workstream 3F of Phase 3: the case detail is one of the two views the take-home brief singles out for depth, and it is what makes demo paths 3 through 6 clickable end to end for the City Clerk, Public Works & Safety and Health & Legal
+
+**Files Modified:**
+- `app/city/cases/[id]/page.tsx` - swapped the placeholder for `CaseDetailScreen`
+- `components/case/CaseDetailScreen.tsx`, `ActionSheet.tsx`, `ActionsPanel.tsx`
+- `components/case/tabs/{OverviewTab,ReviewsTab,DocumentsTab,ConditionsFeesTab,ActivityTab}.tsx`
+- `components/case/actions/{types.ts,panelKit.tsx,registry.ts,clerk.tsx,pws.tsx,hl.tsx}` and `components/case/actions/generic/*` (17 panels and their index)
+- `lib/view/caseDetail.ts` and `lib/view/caseDetail.test.ts`
+- `tests/render/case-detail.test.tsx`
+
+---
+
+## 2026-10-12 - Workstream 3G: Active permits (list, calendar, map, closeout)
+
+**What Changed:**
+- Built `/city/active`, shared by the City Clerk, Public Works & Safety and Health & Legal: a Today strip, List, Calendar, Map and Closeout tabs, an "Include held dates" toggle, and an overlay for each role (work orders for Public Works & Safety, vendor health permits for Health & Legal, the day-of contact and a compliance-log placeholder for the Clerk)
+- Added `lib/view/active.ts`, the pure view-model: which cases are active or held, a series collapsed to its next session ("+N more") or expanded to every session, the calendar and map items, the Today-strip headline, the Closeout tab's rows, month and week navigation, and each role's overlay per case and in total
+- `app/city/active/page.tsx` now renders `ActiveScreen` in place of the placeholder
+
+**Why:**
+- Workstream 3G of Phase 3: the PRD's shared "Active permits" view (list, calendar, map, day-of and closeout) for all three city roles
+
+**Files Modified:**
+- `app/city/active/page.tsx`
+- `lib/view/active.ts`, `lib/view/active.test.ts`
+- `components/active/ActiveScreen.tsx`, `ActiveListView.tsx`, `ActiveCalendarView.tsx`, `ActiveMapView.tsx`, `ActiveCloseoutView.tsx`, `TodayStrip.tsx`, `RoleOverlay.tsx`
+- `tests/render/active.test.tsx`
+
+---
+
 ## 2026-10-12 - Phase 2 review fixes
 
 **What Changed:**

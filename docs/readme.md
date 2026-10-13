@@ -45,9 +45,10 @@ Architecture, integrations and decisions worth remembering. The full plan, with 
 - **Fixed demo date.** Nothing reads the real clock; lint rejects `new Date()` and `Date.now()`.
 - **Next.js 16 with Cache Components.** A client component that reads the URL must sit under
   `<Suspense>` or the build fails, hence the page pattern in `CLAUDE.md`.
-- **Dropbox.** `node_modules` and `.next` carry the `com.dropbox.ignored` attribute so they do not
-  sync. Set it again if either folder is deleted and recreated:
-  `xattr -w com.dropbox.ignored 1 node_modules .next`.
+- **Dropbox.** `node_modules`, `.next` and `.claude/worktrees` (where a phase's builders work, each
+  with its own `node_modules`) carry the `com.dropbox.ignored` attribute so they do not sync. Set it
+  again if a folder is deleted and recreated:
+  `xattr -w com.dropbox.ignored 1 node_modules .next .claude/worktrees`.
 - **No deploy, no browser tests.** Runtime checks are jsdom render tests in `tests/render/`.
 
 ## Building a screen (Phase 2)
@@ -125,6 +126,10 @@ components. Start here, then read "How the engine behaves" for the engine's fine
   - Landing on the Applicant sets the persona to the applicant of the case the page is about, so
     a board never shows one organizer's event under another's name. That can be a persona the
     picker does not offer (a filler or background case); the picker then lists it first.
+  - A page opened under the wrong role (a typed or shared link) shows the shell's "built for"
+    panel. Switching from there to a role the page is built for stays on the page:
+    `pageIsFor(role, href)` is the test. So `/city/cases/PMT-27-0097` opened as the Applicant
+    becomes that case for whichever city role is picked, not that role's queue.
 - **Picking a persona navigates** (`usePersonaSwitch()`, rule in `pathForPersona()`): a blank
   wizard for someone with no event yet (New applicant), the wizard where it was left for someone
   whose only event is a draft (S2 opens at step 3), My events for everyone else.
@@ -229,6 +234,12 @@ components. Start here, then read "How the engine behaves" for the engine's fine
 - A test that mocks `lib/state/seed` must also provide `seedFingerprint`.
 - `tests/render/blocks-seed.test.tsx` renders the shared case components for all 38 seeded
   cases. If you change one of them, it tells you which seeded case it breaks on.
+- `tests/render/handoffs.test.tsx` renders the whole app by URL (the real layouts and pages
+  behind a small router) and follows each link from one surface into the next. A link between
+  two surfaces gets its test there; see "The screens (Phase 3)".
+- While a sheet or dialog is open, the page behind it is `aria-hidden`: `getByRole` sees only
+  the panel. Use `within(screen.getByRole("dialog"))` for the panel and `{ hidden: true }` for
+  the page.
 
 ### Shared components: which one for what
 
@@ -261,6 +272,11 @@ one in every state. Reach for these before writing markup of your own.
 | `ActivityTimeline` | The activity log; pass the items in the order to show, and `collapsedCount` for "Show all" |
 | `EndingBanner` | A case that ended: Withdrawn, Denied, Cancelled or Hold expired, with `case.endingReason` |
 | `EventTitle` | A list row's identity cell: event name over applicant name, both truncated |
+| `BackLink` (from `@/components/ui/page-header`) | The back link above a screen that opens with `CaseHeader`; `PageHeader` renders the same one from `backHref` |
+| `ReviewStatusDot` | A department with its review status: icon, colored dot, plain words. `label` replaces the words (the board's "Asked you for something") |
+| `BillingBadge` | Where one session of a series stands: Paid, Due, Upcoming or Skipped. The wizard, the board's schedule and the permit all use it |
+| `TierLegend` | The key for a view that colors by tier (the map, the calendar): dot, icon and name |
+| `Stat` | A labeled figure: counts, and a case's Total, Paid, Due and Deposit |
 | `LeadTimeRisk` | The lead-time flag: `risk={leadTimeRisk(c, today, cfg)}`. Renders nothing when "ok" |
 | `AvailabilityBadge` | Open, Impacted, Booked or Blackout for a place and date |
 | `TaskKindLabel`, `PersonaAvatar`, `PartyAvatar`, `PartyChip`, `TierBadge`, `StateChip`, `StateStepper`, `HoldStatus`, `ReviewClock`, `DueDate`, `Money`, `DateText`, `CaseId` | The small pieces. Use them wherever a tier, state, party, date, amount or id appears, so each reads the same on every screen |
@@ -293,7 +309,268 @@ Every one is pure. Read cases, the date and the config from the store
 
 - A screen changes a case only with `useDemo.getState().dispatch(caseId, action)`. It acts as
   the current role and returns `{ ok, reason }`; show the reason when it is refused.
-- The applicant's name for a case is `PERSONA_BY_ID[c.applicantId].name` (`lib/data/people.ts`).
+- The applicant's name for a case is `applicantNameOf(c)` (`lib/data/people.ts`), which also
+  covers an applicant the personas do not list.
+- A card's phase reads `TASK_PHASE_LABEL[task.phase]`, in the order of `TASK_PHASES`
+  (`lib/types.ts`): the wizard's plan and the board's swimlanes use the same names.
+
+## The screens (Phase 3)
+
+Seven surfaces, each built on its own and then joined. Every one is a client screen under
+`components/<surface>/`, rendered by a thin `page.tsx`, reading the store and a pure view-model in
+`lib/view/<surface>.ts`. They meet only through `lib/routes.ts` and the store.
+
+### How the surfaces hand off
+
+- **A link is a route from `lib/routes.ts`; a change is a `dispatch`.** No surface imports
+  another's components (`tests/guards.test.ts`). When one surface needs another's rule, it reads
+  the other's view-model: the board's session schedule asks `canPaySession()` in
+  `lib/view/checkout.ts` before it offers "Pay this session", so its link never lands on "Nothing
+  to pay here".
+- **The page that opens decides what it shows.** The wizard does not book an Instant event; it
+  goes to `routes.quote(id)` and checkout books it. A card does not pay; it goes to the quote.
+  So a link never needs to know the state of the case, and a stale link shows a reason instead
+  of failing.
+- **`tests/render/handoffs.test.tsx` walks every hand-off.** It mounts the real layouts and
+  pages from `app/` behind a small router (`<App />`, chosen by the mocked location), acts on one
+  surface, and looks at the surface that renders at the URL the router received. Each surface's
+  own test stops at "the router was pushed to X"; this one renders X. **Add a test there when you
+  add a link between surfaces**, and call `expectRealScreen()`: not a placeholder, not a "built
+  for another role" panel, not "Case not found", and exactly one `<h1>`.
+- **A sheet or dialog is modal.** While one is open, the page behind it is hidden from assistive
+  technology and the top bar cannot be clicked. In a test, a query by role sees only the panel
+  (pass `{ hidden: true }` to read the page behind, or read `[data-slot="back-link"]`). In the
+  app, the role switcher is reached only after the panel is shut, and shutting it takes its param
+  (`?card=`, `?task=`) out of the URL.
+- **A page opened under the wrong role stays put.** A link opened as the wrong role shows the
+  shell's "This screen is built for ..." panel. Switching from there to a role the page is built
+  for keeps the page (`pageIsFor()` in `lib/view/shell.ts`), so a link from the list in the plan's
+  section 12 opens what it names. Landing on the Applicant that way also sets the event's own
+  persona.
+- **What a surface says after an action.** A success toast, a short sentence with a period
+  ("Paid.", "Quote sent.", "Sent."). A refusal shows the engine's own reason: inline in a panel
+  or a form that has room for it, as an error toast on the board's cards.
+
+| From | To | How |
+|---|---|---|
+| Landing "Plan an event" | Wizard | Sets the Applicant role, then `planAnEventPath()`: the persona's one draft, or a blank wizard |
+| Landing "City staff", "Open the staff workspace" | My queue | Sets a city role (the Clerk, or the city role already current), then `/city/queue` |
+| Landing footer, Demo menu | Demo guide | `routes.demo()`; the guide's back link returns to `/` |
+| Demo guide "Start this path", "Jump" | The path's or scenario's first screen | Sets role and persona, then `demoPathJump()` or the `SCENARIO_JUMPS` page |
+| Wizard step 5, Instant | Checkout, booking mode | `routes.quote(id)`; nothing is dispatched |
+| Wizard step 5, Reviewed or Special | Board | Dispatches `create_board`, then `routes.event(id)` |
+| Wizard "Save and finish later" | My events | `routes.events()`; every edit is already saved |
+| My events row | Wizard or board | The wizard while the Draft has no cards (`isUnplannedDraft()`), its board after |
+| My events, board "View permit" | Permit | `permitHrefFor()`: only while the permit is live |
+| Board card: Accept conditions and sign, Pay fees and deposit | Checkout, quote mode | `directLinkHref()`: no sheet, straight to `routes.quote(id)` |
+| Board card: a series' payment card, once paid | Session schedule sheet, then checkout, session mode | `?card=series`; each owed session links to `routes.quote(id, { pay: "session", date })` |
+| Board card: Final bill or refund | Checkout, final mode | `routes.quote(id, { pay: "final" })` |
+| Board card: Carry your permit | Permit | `routes.permit(id)`, once it is unlocked |
+| Board card: Book again next year | Wizard on the new draft | Dispatches `book_again`; the result's `spawnedIds[0]` is the new case |
+| Board menu | Wizard ("Edit your plan", a Draft) or `/events/[id]/amend` ("Amend", 5A's placeholder) | Links |
+| Checkout, booking | Permit | Dispatches `book_and_pay`, then `routes.permit(id)`. Back goes to the wizard's plan step |
+| Checkout, session or final | Board | Dispatches `pay`, a toast, then `routes.event(id)` |
+| Permit | `/verify/[id]` | The QR code holds the full URL; "Open the verification page" is the same link |
+| My queue row | Case, with the task's panel open | `routes.city.case(id, { task: task.id, from })` |
+| Pipeline card or row, Active permits row, calendar item, map booking, day strip, Closeout row | Case | `routes.city.case(id, { from })` |
+| Intake row | Case; "Request information" opens that panel; an Instant exception opens Reconcile and close | `{ from }`, `{ task: "request_info", from }`, `{ task: task.id, from }` |
+| Case back link | The list it came from | `caseBackLink(from, role)`: My queue, Cases, Active permits or Intake, with that list's own query string |
+| Role switcher | The same case for the other side, or the role's last page | `resolveRoleSwitch()` |
+
+### Landing page and demo guide (3A)
+
+- **Routes**: `/` and `/demo`, both without a shell.
+- **Files**: `components/landing/` (`LandingScreen`, `Nav`, `Hero`, `HeroPreviewPanel`,
+  `HowItWorks`, `EventTiers`, `ComparisonTable`, `TodoBoard`, `FeesPanels`, `StaffInterlude`,
+  `Faq`, `ClosingFooter`, `DemoGuideScreen`, `hooks.ts`).
+- **View-model**: `lib/view/landing.ts`. The hero's small form maps to real `EventAnswers` and
+  runs `classify()`, `estimateFees()` and `whatIf()`; tier cards, the comparison table, fees and
+  the cancellation schedule are read off `DEFAULT_CONFIG` and `buildSeed()`, never typed in. The
+  hero never writes to the store.
+- **Hands off** through `useDoors()` (`hooks.ts`): each door is a plain link that also sets the
+  role once `useHydrated()` is true. The landing page renders in full before the stored demo is
+  read; the demo guide waits for it, because Reset, the date jumps and every jump write to the store.
+- **For later phases**: 5E adds demo hints and the command palette under `app/demo/**` and
+  `components/shell/hints/**`. The "Live activity" log in the staff section is the landing page's
+  own markup on night tokens; `ActivityTimeline` is the app's.
+
+### Wizard (3B)
+
+- **Route**: `/apply?case=<id>&step=what|where|when|size|plan`, inside `AppShell`.
+- **Files**: `components/wizard/` (`WizardScreen`, `StepWhat`, `StepWhere`, `StepWhen`,
+  `StepSize`, `StepPlan`, `ResultPanel`, `DatePickerPopover`, `constants.ts`).
+- **View-model**: `lib/view/wizard.ts`. `buildResultPanel()` runs `classify`, `whatIf`,
+  `estimateFees` and `dateGate` together; `missingFields()`, `primaryButtonReady()` and
+  `dateGateSatisfied()` decide the last button; `groupTasksByPhase()` lists the plan's cards under
+  the board's phase names (`TASK_PHASE_LABEL`).
+- **State**: with no `case` the answers are local until the first edit, which calls
+  `createDraft()` and replaces the URL with the new id. Every later edit is `updateDraft()`. A case
+  that is no longer a Draft is sent to its board; an unknown id gets `CaseNotFound`.
+- **Below 1024 px** the result panel is a one-line bar that opens a bottom sheet.
+- **For later phases**: 5A reopens the wizard on a submitted record for an amendment
+  (`components/wizard/amend/**`); the steps take `answers` and `onChange`, so they can be reused.
+  `DatePickerPopover` is the only date popover; move it to `components/ui` when a second surface
+  wants one (the city's panels use native date inputs).
+
+### My events and the board (3C)
+
+- **Routes**: `/events`; `/events/[id]?group=phase&tab=<column>&card=<id>`, inside `AppShell`.
+- **Files**: `components/board/` (`MyEventsScreen`, `EventRow`, `BoardScreen`, `BoardColumns`,
+  `BoardMenu`, `CardSheet`, `CardForms`, `SeriesScheduleSheet`, `VendorStackSheet`).
+- **View-model**: `lib/view/board.ts`: `myEvents()`, `nextActionFor()`, `boardColumnsGrouped()`
+  and `phaseGroups()` (per-vendor health permits stack unless one is pinned by an open request),
+  `reviewerRows()` (each department's status in the applicant's words), `waitingOnChipItems()`,
+  `dateHoldFootnote()`, `directLinkHref()`, `opensSessionSchedule()`, `seriesSessions()`.
+- **`?card=`** is a task id, or one of two values that are not a task: `stack:<catalogId>` (the
+  vendor-permit stack) and `series` (a series' session schedule).
+- **The status strip** is `CaseHeader` plus the board's own `StatusStrip`: "Waiting on" chips in
+  the applicant's words and the reviewers row (`ReviewStatusDot` with its `label`).
+- **Below 768 px** the four columns are tabs with counts (`useIsNarrow()`, not CSS).
+- **For Phase 4 (4E, after the event)**: the feedback and book-again bodies are in `CardSheet.tsx`
+  and the series schedule in `SeriesScheduleSheet.tsx`; both are small on purpose. A refund
+  finishes the final-bill card at reconciliation, so only a bill that is owed links to checkout;
+  a finished card opens its sheet. `CardForms.tsx` holds the small structured forms per catalogue
+  id, shaped as the seed scripts write them.
+
+### Checkout, permit and the public check (3D)
+
+- **Routes**: `/events/[id]/quote` (also `?pay=session&date=<date>` and `?pay=final`),
+  `/events/[id]/permit`, both inside `AppShell`; `/verify/[id]` with no shell and no role.
+- **Files**: `components/checkout/` (`CheckoutScreen`, `BookingPanel`, `QuotePanel`,
+  `SessionPanel`, `FinalPanel`, `CardPaymentForm`, `SignatureForm`, `PlanSummaryCard`);
+  `components/permit/` (`PermitScreen`, `PermitCard`, `SessionList`, `VerifyScreen`,
+  `PermitPrintStyles`).
+- **View-models**: `lib/view/checkout.ts` (`checkoutDecision()` picks the mode: booking for an
+  Instant Draft, quote for Quote sent, session, final, or `not_ready` with a reason and a link
+  elsewhere; `canPaySession()`; the amounts) and `lib/view/permit.ts` (`permitPageInfo()`,
+  `sessionRows()`, `verifyStatus()`).
+- **It is the one place an applicant pays.** The booking's gate and reason come from
+  `availableActions()`'s `book_and_pay` row, so the screen cannot disagree with `dispatch`. The
+  card form waits 650 ms and then always succeeds unless the engine refuses.
+- **The quote's "I accept" boxes are local.** They gate the Sign button; `accept_and_sign`
+  accepts every condition, since the action carries no condition ids.
+- **For Phase 4**: 4B's Record payment and 4E's final bill use the figures the barrel exports
+  (`dueAtQuote`, `quoteBalance`, `quotePaid`, `caseTotals`, `nextUnpaidSession`). "Download PDF" is
+  `window.print()`, scoped to the permit card by `PermitPrintStyles`.
+
+### City lists: My queue, Cases, Intake (3E)
+
+- **Routes**: `/city/queue`; `/city/cases?view=board|table&tier=&state=&waiting=&from=&to=&involves=&q=`
+  plus the screen's own `sort`, `dir` and `closed`; `/city/intake?tab=special|reviewed|instant`
+  (the Clerk's). All inside `CityShell`.
+- **Files**: `components/city/lists/` (`QueueScreen`, `CasesScreen`, `PipelineBoard`,
+  `PipelineTable`, `IntakeScreen`, `KeyboardFooter`, `useRovingListNav`).
+- **View-model**: `lib/view/cityLists.ts`: the queue's groups and briefing line; the pipeline's
+  filters to and from the URL (`parseCasesFilters()`, `casesQueryString()`), `filteredCases()`,
+  board columns and table rows with sorting; Intake's completeness, the competing application
+  (`rules.availability()`, as `accept_complete` checks it) and the Instant exceptions.
+- **Every list passes its own URL as `from`** when it opens a case, and My queue passes the
+  task's id as `task`. Intake's "Accept as complete" dispatches from the row, wired to
+  `availableActions()`'s row so a disabled button carries the engine's reason.
+- **Keys**: `j`, `k` and the arrows move through rows, Enter opens, `/` focuses search.
+- **For Phase 4 (4F, edge states)**: empty states are in place for an empty queue, filters with no
+  result (it names them and offers "Clear filters") and an empty Intake tab. `state=closed` and
+  `state=off_path` show those cases without the "Closed and ended" toggle. A new list that opens
+  a case (5B's payments, 5C's work orders, 5D's verifications) passes `from` too, and needs a line
+  in `BACK_LABEL` in `lib/view/caseDetail.ts` or the case goes back to "cases".
+
+### Case detail (3F)
+
+- **Route**: `/city/cases/[id]?tab=overview|reviews|documents|conditions|activity&task=<key>&from=<list>`,
+  inside `CityShell`, shared by the three city roles.
+- **Files**: `components/case/` (`CaseDetailScreen`, `ActionsPanel`, `ActionSheet`, `tabs/*`,
+  `actions/registry.ts`, `actions/types.ts`, `actions/panelKit.tsx`, `actions/generic/*`,
+  `actions/clerk.tsx`, `actions/pws.tsx`, `actions/hl.tsx`).
+- **View-model**: `lib/view/caseDetail.ts`: `caseBackLink()`, `headerReviewClock()`,
+  `buildOverview()`, `documentGroups()`, `reviewSummaries()`, `filterActivity()`, and the open-key
+  helpers below.
+- **The page**: `CaseHeader`; an `EndingBanner` or the commission banner; five tabs (Overview with
+  `WhoIsUp`; Reviews, one section per department, the viewer's own actionable; Documents, by
+  reviewer, with Verify and Send back; Conditions and fees, with Actual and Difference from
+  closeout on; Activity, newest first, by actor); and the sticky "Your actions" panel, one button
+  per row of `availableActions(c, role, ctx)`. A disabled row shows the engine's reason under it.
+  A Draft is explained as not visible to the city; an ended case offers only "Add a note".
+
+**The action registry.** Every action a city role can take has one panel, opened in a sheet.
+
+- `panelFor(action, role)` in `actions/registry.ts` returns the role's own panel when it has
+  one, otherwise the generic one: `ROLE_OVERRIDES[role]?.[action] ?? GENERIC_PANELS[action]`.
+- **To give a role a richer panel**, write a component that takes `ActionPanelProps`
+  (`{ caseId, arg?, role, onClose }`, in `actions/types.ts`) and add it to that role's map, keyed
+  by action type. Nothing else changes: the screen, the URL and the generic panel stay as they are.
+
+  ```tsx
+  // components/case/actions/clerk.tsx
+  import { QuoteBuilderPanel } from "@/components/case/clerk/QuoteBuilderPanel";
+
+  export const CLERK_OVERRIDES: Partial<Record<ActionType, ActionPanelComponent>> = {
+    send_quote: QuoteBuilderPanel,
+  };
+  ```
+
+- **One file per role, so two workstreams share two of them.** 4A and 4B both register in
+  `clerk.tsx` (4A: `request_info`, `confirm_routing`, `send_quote`, `deny`,
+  `send_to_commission`; 4B: `pay`, `issue_permit`, `reconcile_close`). 4C's review panel serves
+  both departments, so `review_decide` goes into `pws.tsx` and into `hl.tsx`, which is 4D's file
+  for `verify_document` and `reject_document`. Each builder adds only its own keys; the
+  integrator merges the maps.
+- **`panelKit.tsx`** is what every panel is made of: `useCaseContext(caseId)` (the live case,
+  today, config, all cases), `useCaseDispatch(caseId)` (returns `(action, successMessage) =>
+  { ok, reason }`, with the success toast built in), and `PanelHeader`, `PanelBody`,
+  `PanelActions` (the footer shows the refusal reason above Cancel and the primary button).
+- **Show the reason before the click.** `@/lib/state` exports the checks `transition()` runs
+  (`checkAcceptComplete`, `checkConfirmRouting`, `checkRequestInfo`, `checkReviewDecide`,
+  `checkSendQuote`, `checkIssuePermit`, `checkVerifyOrReject`, `checkScheduleMeeting`,
+  `checkCompleteCityTask`, `checkLogCloseout`, `checkReconcileClose`). A panel calls its check to
+  disable the button with the engine's own words.
+- **What `?task=` holds.** Either a task's id, which is what a link from outside carries (a My
+  queue row, an Intake row, a Who's up task), or an open key, which is what this screen's own
+  buttons write: an action type (`issue_permit`) or `type:arg` (`verify_document:<card id>`,
+  `request_info:<card id>`, `remind:applicant`). `resolveOpenKey(c, param, role)` turns either
+  into one panel, or into none, and then the sheet stays shut.
+  - A task id resolves through `openKeyForTask()`: the viewer's own city task opens the action
+    that moves it on (`cityTaskAction()` maps the catalogue id: `intake_check` to
+    `accept_complete`, `review:*` to `review_decide`, `verify:*` to `verify_document` for the
+    card under verification, `consolidate` to `send_quote`, `work_order:*` to
+    `complete_city_task`, `instant_exception` and `reconcile` to `reconcile_close`). Anybody
+    else's task opens a reminder to whoever holds it.
+  - **A new kind of city task needs a line in `cityTaskAction()`**, or selecting it does nothing.
+  - `arg` is a task id for `verify_document`, `reject_document`, `schedule_meeting`,
+    `complete_city_task` and `request_info` (the card it is about), and a party for `remind`.
+- **What the generic panels leave for Phase 4.** Send quote dispatches `{ conditions: [],
+  feeLines: [] }`, which the engine reads as "the case's merged conditions and fee lines as they
+  stand": 4A's quote builder passes real arrays. Review decide (4C) already has the three
+  decisions, condition templates, fee lines, an internal note and a message; `transition()`
+  decides as the role that dispatches. Verify and Send back (4D) show the card's files and form;
+  `VerifyDocument.tsx` exports `CardContent` for both. Log closeout (4C) starts each line's
+  actual quantity at its estimate, and a line left alone keeps it. Record payment (4B) takes an
+  amount that defaults to what is due; Issue permit and Reconcile and close are one confirmation
+  each.
+- **A panel must work for whoever is looking.** The page is shared: a link with `?task=<task id>`
+  opened by another role resolves again for that role, usually to a reminder.
+
+### Active permits (3G)
+
+- **Route**: `/city/active?view=list|calendar|map|closeout&date=<date>` plus the screen's own
+  `holds=1` (Include held dates), `sessions=1` (Show every session) and `cal=week`. Inside
+  `CityShell`, shared by the three city roles.
+- **Files**: `components/active/` (`ActiveScreen`, `TodayStrip`, `ActiveListView`,
+  `ActiveCalendarView`, `ActiveMapView`, `ActiveCloseoutView`, `RoleOverlay`).
+- **View-model**: `lib/view/active.ts`: `activeListRows()` (a series collapsed to its next session
+  with "+N more", or one row per session), `activeCalendarItems()`, `activeMapHighlights()` for
+  one day, `todayLine()`, `closeoutRows()`, and each role's overlay per case and in total.
+- **One `date`** moves the day strip, the calendar and the map together. A held date is shown
+  with `HoldStatus` or "(held)", not with a color of its own.
+- **Role overlays**: work orders, closures and walkthroughs for Public Works & Safety; vendor
+  permits verified for Health & Legal; the day-of contact and a compliance-log count for the
+  Clerk (always "No log entries yet" until 6B builds the log).
+- **For later phases**: 5C's `/city/map` shows closures for a date range; this map shows one day.
+
+### What is still a placeholder
+
+`/events/[id]/amend` (5A; the board's menu already links to it), `/city/payments` (5B),
+`/city/map` and `/city/work-orders` (5C), `/city/verifications` (5D), `/city/inspections` (6B) and
+`/city/settings` (6A) render `PlaceholderScreen`. The sidebar links to the city ones.
 
 ## How the engine behaves
 
@@ -434,7 +711,8 @@ Things a screen builder needs to know that the type signatures do not say.
 - **Issue permit** is a Clerk task created locked by `send_quote`. It unlocks when the case is
   signed, the quote is paid and the insurance card is done, whichever comes last. Re-uploading
   verified insurance locks it again until Health & Legal has checked the new certificate.
-- **What a quote asks for** is `dueAtQuote(case, cfg)` in `lib/state/core.ts`: everything for a
+- **What a quote asks for** is `dueAtQuote(case, cfg)` (in `lib/state/core.ts`, exported from
+  `@/lib/state` with `quoteBalance()` and `quotePaid()`): everything for a
   single event; for a series, the one-off lines and the first session, with the later sessions
   billed on schedule (the PRD's "first session now and the rest on schedule"). It is the amount on
   the `pay_fees` card, and what Issue permit and the hold's expiry test. Paying it marks the first
@@ -591,3 +869,37 @@ change if you would rather have the other.
 - **The role switcher's arrow keys switch role at once.** That is how a radio group behaves, and
   a switch between the Applicant and a city role navigates. If moving focus should not switch,
   the control becomes a group of toggle buttons, each its own tab stop.
+
+Raised while the Phase 3 screens were built and joined:
+
+- **The Today strip's caption.** The PRD's line is "Mon, May 3: 1 event today". The shared
+  `DayStrip` says "no events today" for an empty day but only "1 event" for a day with one.
+  Active permits writes the PRD's line itself, above the strip (`todayLine()`). Should the
+  strip's own caption say "today" too? It is one line in `DayStrip`'s `summary()`.
+- **The Active permits map shows one day.** The day strip, the calendar and the map share one
+  date. A date range with overlaps is what Public Works & Safety's own Closures and routes page
+  (5C) is for. Say if the shared map should take a week instead.
+- **A held date has no color of its own.** With "Include held dates" on, a Quote sent case shows
+  as "Date held until ..." in the list and "(held)" on the calendar and map, in its tier's color.
+  The design system has no "held" status color; adding one is a token.
+- **The repeat weekday cannot be edited.** The PRD lists the weekday as a Repeat field. The
+  wizard shows it read-only, taken from the date picked, since a series that starts on a Sunday
+  and repeats on Tuesdays has no coherent first session. Say if it should be a field that moves
+  the start date.
+- **Accepting conditions one by one is the quote's own.** The checkboxes gate the Sign button,
+  but `accept_and_sign` accepts every condition: the action carries no condition ids. If an
+  applicant should be able to sign for some and dispute others, that is a new action.
+- **"Plan an event" from the landing page reopens a lone draft.** Somebody whose only event is
+  an unfinished draft (Sunrise Yoga Club) lands back in it; everybody else gets a blank wizard,
+  as "Plan an event" inside the app always gives. Say if the landing page's door should always
+  start a new event.
+- **A link opened under the wrong role stays where it is.** The Applicant on a city case link
+  sees "This screen is built for a city role", and the switch it offers opens that case. Before,
+  the switch went to the role's queue or last page. The role switcher itself still follows its
+  rule between pages; say if a typed link should rather be left for the role's own home.
+- **The board confirms with a toast.** Sending a document, submitting, giving feedback,
+  withdrawing and cancelling each show a short toast ("Sent."), as paying and the city's actions
+  already did. If the card moving to its new column is confirmation enough, the toasts are one
+  map in `CardSheet.tsx`.
+- **Amend is on the board's menu before it exists.** "Amend" opens "This screen is being built"
+  until 5A. Say if the item should be hidden until then.

@@ -700,6 +700,132 @@ describe("(g) the landing page's two doors and the demo guide's paths land on re
 });
 
 /* ------------------------------------------------------------------------ */
+/* Demo paths 3 and 4, clicked through every surface they cross              */
+/* ------------------------------------------------------------------------ */
+
+/** The open sheet's own button, apart from a button of the same name on the page behind it. */
+function panelButton(name: string | RegExp): HTMLElement {
+  return within(screen.getByRole("dialog")).getByRole("button", { name });
+}
+
+describe("the demo paths that cross surfaces have a control for every step", () => {
+  it("path 3: the applicant answers, Health & Legal verifies and approves, the Clerk quotes, the applicant signs and pays, the Clerk issues", async () => {
+    const { user } = await renderApp({ scenario: "S3" });
+    expect(here()).toBe(routes.event(S3));
+
+    // The applicant, on the board: the pinned card, the sample file, send.
+    await user.click(screen.getByRole("button", { name: /Health permit: Rolling Dumpling Co\./ }));
+    await user.click(panelButton("Use sample file"));
+    await user.click(panelButton("Reply and attach"));
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    expect(storedCase(S3).state).toBe("in_review");
+
+    // Health & Legal: the switch follows the case. Its queue has the review back, and the row
+    // opens the decision; the answer itself is verified on the Documents tab first.
+    await switchTo(user, "hl");
+    expect(here()).toBe(routes.city.case(S3));
+    await user.click(screen.getByRole("link", { name: /^My queue/ }));
+    const review = queueFor(useDemo.getState().cases, "hl", useDemo.getState().demoToday).find((row) => row.case.id === S3)!;
+    await user.click(linkTo(routes.city.case(S3, { task: review.task.id, from: routes.city.queue() })));
+    expect(within(screen.getByRole("dialog")).getByRole("heading", { name: "Decide your review" })).toBeInTheDocument();
+    await user.click(panelButton("Cancel"));
+
+    await user.click(screen.getByRole("tab", { name: "Documents" }));
+    await user.click(within(screen.getByTestId(`document-card-${S3}:vendor_health_permit:1`)).getByRole("button", { name: "Verify" }));
+    await user.click(panelButton("Verify"));
+    expect(storedCase(S3).tasks.find((t) => t.id === `${S3}:vendor_health_permit:1`)!.status).toBe("done");
+
+    // The Reviews tab's own button; "Your actions" beside it has the same one.
+    await user.click(screen.getByRole("tab", { name: "Reviews" }));
+    await user.click(screen.getAllByRole("button", { name: "Decide your review" })[0]);
+    await user.click(panelButton("Approve"));
+    expect(storedCase(S3).reviews.find((r) => r.dept === "hl")!.status).toBe("approved");
+
+    // The Clerk, on the same page: Public Works & Safety's conditions carry over into the $715 quote.
+    await switchTo(user, "clerk");
+    expect(navState.pathname).toBe(`/city/cases/${S3}`);
+    await user.click(screen.getByRole("button", { name: "Send quote" }));
+    await user.click(panelButton("Send quote"));
+    expect(storedCase(S3).state).toBe("quote_sent");
+    expect(storedCase(S3).feeLines.reduce((sum, line) => sum + line.estimate, 0)).toBe(715);
+
+    // The applicant again: the board's card opens the quote; accept, sign, pay.
+    await switchTo(user, "applicant");
+    expect(here()).toBe(routes.event(S3));
+    expect(useDemo.getState().personaId).toBe("downtown-arts-collective");
+    await user.click(screen.getByRole("button", { name: /Accept conditions and sign/ }));
+    expect(here()).toBe(routes.quote(S3));
+    for (const box of screen.getAllByRole("checkbox", { name: /^Accept:/ })) await user.click(box);
+    await user.type(screen.getByLabelText(/Type your full legal name/), "Dana Whitfield");
+    await user.click(screen.getByRole("checkbox", { name: /I have read and accept/ }));
+    await user.click(screen.getByRole("button", { name: "Accept and sign" }));
+    expect(storedCase(S3).flags.signed).toBe(true);
+    await user.click(screen.getByRole("button", { name: "Pay $715" }));
+    await waitForPayment();
+    expect(screen.getByText("Paid. The City Clerk will issue your permit.")).toBeInTheDocument();
+
+    // The Clerk issues the permit, and Active permits lists it.
+    await switchTo(user, "clerk");
+    expect(here()).toBe(routes.city.case(S3));
+    // "Your actions" has the button; Who's up lists the same task.
+    await user.click(within(screen.getByRole("complementary", { name: "Your actions" })).getByRole("button", { name: "Issue permit" }));
+    await user.click(panelButton("Issue permit"));
+    expect(storedCase(S3).state).toBe("permitted");
+
+    await user.click(screen.getByRole("link", { name: "Active permits" }));
+    expectRealScreen();
+    expect(screen.getByRole("link", { name: /^Jazz in the Plaza/ })).toBeInTheDocument();
+
+    // The applicant comes back to the page they left, the quote. It has nothing left to pay,
+    // says so, and points at the permit.
+    await switchTo(user, "applicant");
+    expect(here()).toBe(routes.quote(S3));
+    expectRealScreen();
+    expect(screen.getByText("This event already has its permit.")).toBeInTheDocument();
+    await user.click(screen.getByRole("link", { name: "View permit" }));
+    expect(here()).toBe(routes.permit(S3));
+    expectRealScreen();
+    expect(screen.getByText("Permitopolis event permit")).toBeInTheDocument();
+  }, 30_000);
+
+  it("path 4: three sign-offs, the Clerk accepts from Intake and routes from the case, and Public Works & Safety's queue has the block party", async () => {
+    const { user } = await renderApp({ scenario: "S4" });
+    expect(here()).toBe(routes.event(S4));
+
+    // The block captain: the last three neighbors.
+    await user.click(screen.getByRole("button", { name: /Neighbor sign-off/ }));
+    for (let i = 0; i < 3; i++) await user.click(panelButton(/Simulate a sign-off/));
+    expect(storedCase(S4).tasks.find((t) => t.catalogId === "neighbor_signoff")!.status).toBe("done");
+    await closePanel(user);
+
+    // The Clerk: the switch follows the case, but Accept is on Intake's own row too.
+    await switchTo(user, "clerk");
+    expect(here()).toBe(routes.city.case(S4));
+    await user.click(screen.getByRole("link", { name: "Intake" }));
+    await user.click(screen.getByRole("tab", { name: /^Reviewed/ }));
+    const row = within(screen.getByText("Maple Street block party").closest("tr")!);
+    await user.click(row.getByRole("button", { name: "Accept as complete" }));
+    expect(storedCase(S4).dateHold.status).toBe("held");
+
+    // Routing is the Clerk's next task: its queue row opens the case with Confirm routing.
+    await user.click(screen.getByRole("link", { name: /^My queue/ }));
+    const routing = queueFor(useDemo.getState().cases, "clerk", useDemo.getState().demoToday).find((r) => r.case.id === S4)!;
+    await user.click(linkTo(routes.city.case(S4, { task: routing.task.id, from: routes.city.queue() })));
+    expect(within(screen.getByRole("dialog")).getByRole("heading", { name: "Confirm routing" })).toBeInTheDocument();
+    await user.click(panelButton("Confirm routing"));
+    expect(storedCase(S4).state).toBe("in_review");
+    expect(screen.getByText("Date held")).toBeInTheDocument();
+
+    // Public Works & Safety: the case is in its queue.
+    await switchTo(user, "pws");
+    await user.click(screen.getByRole("link", { name: /^My queue/ }));
+    expectRealScreen();
+    expect(queueFor(useDemo.getState().cases, "pws", useDemo.getState().demoToday).some((r) => r.case.id === S4)).toBe(true);
+    expect(screen.getByText("Maple Street block party")).toBeInTheDocument();
+  }, 30_000);
+});
+
+/* ------------------------------------------------------------------------ */
 /* (h): Book again next year                                                 */
 /* ------------------------------------------------------------------------ */
 

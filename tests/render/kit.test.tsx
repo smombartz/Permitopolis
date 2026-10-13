@@ -27,6 +27,7 @@ describe("the Phase 1 kit page", () => {
       "Shared UI: wizard stepper, filter bar, count badge, toolbar",
       "Shared UI: progress, inline alert, sticky aside, truncate, copy button",
       "Domain: persona avatar, task kind label, availability badge, ending banner",
+      "Domain: BillingBadge, TierLegend, and the back link",
       "Domain: EventTitle, LeadTimeRisk, DeptStatusDots",
       "Domain: CaseHeader",
       "Domain: ActivityTimeline",

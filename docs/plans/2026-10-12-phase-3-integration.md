@@ -9,13 +9,15 @@ branches are in one tree.
 - [x] Merge `phase3/landing`, `wizard`, `board`, `checkout`, `lists`, `case`, `active` into `build`,
       one at a time, no fast-forward. (No conflicts; the gate passed on the merged tree before any
       change: 1,155 tests in 68 files.)
-- [ ] Walk every hand-off, fix what does not line up, and cover each with a test in
-      `tests/render/handoffs.test.tsx` that renders the real layouts and pages by URL.
-- [ ] Consistency pass: the same thing reads the same on every surface.
-- [ ] Decide the builders' contract change requests.
-- [ ] `docs/readme.md`: "The screens (Phase 3)". `docs/log.md`: one entry per workstream and one for
+- [x] Walk every hand-off, fix what does not line up, and cover each with a test in
+      `tests/render/handoffs.test.tsx` that renders the real layouts and pages by URL. (69 tests:
+      groups (a) to (i) of the brief, and demo paths 3 and 4 clicked through every surface they
+      cross; commits `cb2d326`, `f4d41be` and the one after.)
+- [x] Consistency pass: the same thing reads the same on every surface. (Commit `f4d41be`.)
+- [x] Decide the builders' contract change requests. (One applied, one declined; below.)
+- [x] `docs/readme.md`: "The screens (Phase 3)". `docs/log.md`: one entry per workstream and one for
       the integration. The main plan: Phase 3 ticked, "12. What to look at", a Changes line.
-- [ ] Gate (`pnpm check`), commit, remove the merged worktrees and branches.
+- [x] Gate (`pnpm check`), commit, remove the merged worktrees and branches.
 
 ## Hand-offs found broken or missing
 
@@ -79,13 +81,42 @@ Added when the pass was resumed on 2026-10-13:
 
 ## Contract change requests
 
-- **Applied**: `lib/state`'s barrel re-exports the money and check helpers the readme points to
-  (3D's request), and the callers import from it.
-- **Applied (integrator's own)**: `routes.city.case()` takes `from`, and documents what `task` holds.
-- **Declined**: typing `sort`, `dir` and `closed` into `CasesFilters` (3E's request). No other
-  surface links to a sorted pipeline; a link that wants closed or ended cases uses `state`, which
-  now works on its own; a case's back link carries the list's whole URL.
+Decided against the main plan's section 3 (decisions) and section 5 (the frozen contracts: a
+builder asks, the orchestrator decides). Five builders asked for nothing (3B, 3C, 3F, 3G; 3A's
+result was lost, and its commit touches no contract file).
+
+| From | Request | Decision | Why |
+|---|---|---|---|
+| 3D | Re-export `dueAtQuote`, `quoteBalance` and `quotePaid` (`lib/state/core.ts`) and `lateFeeApplies` and `insideLeadTime` (`lib/state/checks.ts`) from the `lib/state` barrel | **Applied** | `docs/readme.md` ("What a quote asks for", "Payments") already sends builders to them, and 4B, 4E, 5A and 5B need the same figures. `lib/view/checkout.ts` imports them from `@/lib/state` now |
+| 3E | Type the pipeline's `sort`, `dir` and `closed` into `CasesFilters` in `lib/routes.ts` | **Declined** | Not needed by anyone: no surface links to a sorted pipeline; a link that wants closed or ended cases uses `state`, which now works on its own (hand-off 10); a case's back link carries the list's whole URL, so the three survive the round trip. The sort field's type belongs to the pipeline's view-model, and `lib/routes.ts` must not import from `lib/view`. The three stay the screen's own params, as 3G's `holds`, `sessions` and `cal` are on Active permits |
+
+Changes the integration itself made to shared files, all additive:
+
+| File | Change | Why |
+|---|---|---|
+| `lib/routes.ts` | `routes.city.case(id, { from })`, and a comment on what `task` holds | Hand-offs 1 and 3: a case goes back to the list it came from, and `?task=` takes a task id or an action key |
+| `lib/state/index.ts` | Besides 3D's five, the barrel exports the checks `transition()` runs (`checkAcceptComplete` and the other ten), `cardUnderVerification`, `meetingCardFor`, `nextUnpaidSession` and the `CheckResult` type | The case panels showed the engine's reason before a button is pressed by importing `lib/state/checks` directly; 4A to 4D will do the same and should not reach past the barrel |
+| `lib/types.ts` | `TASK_PHASE_LABEL` and `TASK_PHASES` (section 5.1) | One set of phase names for the wizard's plan and the board's swimlanes, beside the other shared labels |
+| `lib/data/people.ts` | `applicantNameOf(c)` | Five surfaces each had their own fallback for an unknown applicant |
+| `lib/view/shell.ts` | `resolveRoleSwitch()` takes `search` and stays on a page opened under the wrong role; `pageIsFor(role, href)` | Hand-off 11 |
+| `components/ui/page-header.tsx` | Exports `BackLink` | A screen that opens with `CaseHeader` gets the same back link `PageHeader` renders |
+| `components/domain` | `BillingBadge`, `TierLegend` (section 5.5) | Both were built twice, in two surfaces each |
+| `components/shell/index.ts` | Exports `useIsNarrow` | The board, the wizard and the landing page each needed it |
+
+Not requested, and left alone: `CaseHeader` has no slot for the board's own-words "Waiting on"
+chips and reviewers row (3C built a `StatusStrip` under it); `DayStrip`'s caption reads "1 event"
+where the PRD's Today strip says "1 event today" (3G writes that line itself, above the strip;
+it is an open question for the owner in `docs/readme.md`).
 
 ## Changes
 
 - 2026-10-12: Written before the fixes; boxes ticked as each step landed.
+- 2026-10-13: The integration was cut off by a usage limit on 2026-10-12, after the merges and
+  with hand-offs 1 to 10 and the first consistency pass written but not committed, and with 11
+  hand-off tests failing. Resumed on 2026-10-13. Of the 11, ten were the tests' own (an
+  unfinished name or query: an Instant series' card is "Pay and book"; one fee table per
+  department; a modal panel hides the page behind it from a query by role, and puts the role
+  switcher out of reach until it is shut; My queue is a page two city roles share, so the switch
+  back keeps it) and one was the code's (hand-off 11). Added since: hand-off 11, the map, the
+  queue's "Waiting on others" rows and the demo guide's links (the guide had no way back to the
+  landing page), the second half of the consistency pass, the contract decisions and the docs.

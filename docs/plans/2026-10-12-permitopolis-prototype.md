@@ -401,6 +401,7 @@ useHydrated(): boolean                                       // gate rendering u
 - `components/calendar`: `MonthGrid`, `WeekGrid`, `DayStrip`.
 - Added in Phase 2 (workstream 2D). `components/ui`: `PageHeader`, `Section`, `KeyValueList`, `ConfirmDialog`, `WizardStepper`, `FilterBar`, `FilterChip`, `CountBadge`, `Toolbar`, `Progress`, `InlineAlert`, `StickyAside`, `Truncate`, `CopyButton`. `components/domain`: `PersonaAvatar`, `TaskKindLabel`, `AvailabilityBadge`, `EndingBanner`, `EventTitle`, `LeadTimeRisk`, `DeptStatusDots`, `CaseHeader`, `ActivityTimeline`, `FeeTable`, `ConditionList`, `WhoIsUp`, `TaskCard`, `StackedTaskCard`.
 - `components/shell` (workstream 2B): `AppShell`, `CityShell`, `PlaceholderScreen`, `CaseNotFound`, `useRoleSwitch`, `usePersonaSwitch`.
+- Added in Phase 3 (integration). `components/domain`: `BillingBadge`, `TierLegend`. `components/ui/page-header`: `BackLink`. `components/shell`: `useIsNarrow`. `lib/types.ts`: `TASK_PHASE_LABEL`, `TASK_PHASES`. `lib/data/people.ts`: `applicantNameOf(c)`. `lib/routes.ts`: `routes.city.case(id, { task, tab, from })`, where `task` is a task id or an action key and `from` is the list to go back to. `@/lib/state` also exports `dueAtQuote`, `quoteBalance`, `quotePaid`, `lateFeeApplies`, `insideLeadTime` and the `check*` functions `transition()` runs.
 
 ---
 
@@ -601,6 +602,19 @@ Every builder also writes `lib/view/<surface>.ts` with tests, handles loading, e
 
 **Gate:** paths 1 to 4 have a control for every step. **Checkpoint:** your first full walkthrough, and the main design review of the list and detail views.
 
+- [x] **3A Landing and demo guide** (`e15d852`): `/` and `/demo`.
+- [x] **3B Wizard** (`59d8fbe`): `/apply`, steps 1 to 5 with the live result panel.
+- [x] **3C Board** (`c90e48d`): `/events` and `/events/[id]`.
+- [x] **3D Quote and permit** (`de06974`): `/events/[id]/quote`, `/events/[id]/permit`, `/verify/[id]`.
+- [x] **3E City lists** (`afa694e`, `6682c88`): `/city/queue`, `/city/cases`, `/city/intake`.
+- [x] **3F Case detail** (`4f280e5`): `/city/cases/[id]`, a generic panel for every action, empty registries for 4A to 4D.
+- [x] **3G Active permits** (`0adb264`): `/city/active`.
+- [x] **Integration**: the seven branches merged with no conflicts; 11 hand-offs between surfaces fixed, each covered in `tests/render/handoffs.test.tsx`; the consistency pass; the builders' contract change requests decided (`docs/plans/2026-10-12-phase-3-integration.md`).
+- [x] **Gate**: paths 1 to 4 have a control for every step. Paths 3 and 4 are clicked from first step to last across the board, My queue, Intake, the case, checkout and Active permits in `tests/render/handoffs.test.tsx`; path 1 in its group (a) with `tests/render/active.test.tsx`; path 2 in `tests/render/wizard.test.tsx`.
+- [ ] **Review**: the read-only review of Phase 3 against the PRD (section 9) has not run yet.
+
+**Done 2026-10-13**, the review aside. Gate: type-check, lint, 1,255 tests in 69 files and build pass. What a Phase 4 builder needs is in `docs/readme.md`, "The screens (Phase 3)"; what to open in a browser is in section 12.
+
 ### Phase 4: Role tools and money (6 builders)
 
 | | Owns | Builds |
@@ -693,8 +707,120 @@ For the Loom's "what I chose not to build":
 
 ---
 
+## 12. What to look at
+
+The screens to open once the build is done, collected from each builder as its phase lands. Nothing
+here has been looked at in a browser: every screen is checked by render tests in jsdom, which see
+structure and behavior and not layout, spacing or color. Run `pnpm dev` and open each URL.
+
+How to use the list: start from a fresh seed (Demo menu, Reset demo data), on Mon, May 3, 2027. Each
+row names the role to be in and, for the Applicant, the persona. If a link opens as the wrong role
+it shows "This screen is built for ...", and the switch offered there opens the page. The Demo
+menu's scenario jumps (S1 to S6) set role, persona and page in one step.
+
+### Phase 1 and 2 checkpoints (not linked from the app)
+
+| URL | Look for |
+|---|---|
+| `/dev/kit` | Every primitive and domain component in every state, on the Rime & Ink tokens: buttons at each size and state; form controls; tier badges, party chips and state chips (color always with an icon and a label); the stepper; `TaskCard` locked, pinned, overdue, sent back and done; `WhoIsUp`; `FeeTable` with Actual and Difference; the stress rows (a 101-character event name, a 60-character organization, "Not provided", an ended case). Since Phase 3: `BillingBadge`, `TierLegend` and the back link, in "Domain: BillingBadge, TierLegend, and the back link". The three places section 3.2 bends the design system are worth a look here: identity tints on avatars and dots only, `fg-label` for labels, blur on chrome only |
+| `/dev/map` | The Permitopolis map in its four picking modes (bookable spaces, draw an area, street segments, draw a route), each with its keyboard list beside it; residential blocks marked; the display map with overlapping bookings and its tier legend; `MapThumbnail`; the month grid, week grid and day strip |
+
+### Landing page and demo guide (3A)
+
+| URL | As | Look for |
+|---|---|---|
+| `/` | Anybody | The full Rime & Ink marketing treatment: floating glass nav, grid, grain and atmosphere, the scroll thread through "How it works". The hero's preview panel: change the event type, place and add-ons and watch the tier and the fee move (alcohol on: Reviewed; a street: Special event) |
+| `/` | Anybody | Three tier cards with a real example each, the comparison table, the to-do board block built from Jazz in the Plaza's own cards, the fee and cancellation panels, the dark "For city staff" section with its live activity log, the FAQ, the closing section and footer |
+| `/` | Anybody, at 375 px | The nav collapses; the hero stacks; nothing scrolls sideways |
+| `/` | Anybody | The two doors: "Plan an event" opens the wizard as the Applicant; "City staff" and "Open the staff workspace" open My queue as the City Clerk |
+| `/demo` | Anybody | The four roles, the three date jumps, the seven demo paths as cards (each step with its role chip), "Start this path" on each, the six-scenario table with "Jump", "What is faked", Reset behind a confirmation, and "Back to Permitopolis" |
+
+### Wizard (3B)
+
+| URL | As | Look for |
+|---|---|---|
+| `/apply` | Applicant, New applicant | Step 1: the six event-type cards (icon and a one-line blurb), the name and description fields, and the result panel on the right starting from a blank draft |
+| `/apply?case=PMT-27-0142&step=when` | Applicant, Sunrise Yoga Club (S2) | Reopened at step 3: Repeat on, 13 Sundays listed with an availability badge each, Jul 11 marked Impacted, and the panel's fee estimate showing $20 per session, 13 sessions, $260 total |
+| `/apply` | Applicant, New applicant | Pick Picnic or party, Shelter 2, 40 people, then turn Alcohol on at step 4: the tier badge's highlight as it moves from Instant to Reviewed, and the what-if button "Remove alcohol: Instant, book today" in the panel |
+| `/apply` (any draft at step 5) | Applicant | The tier card with its reasons, "One Permitopolis event permit. It covers:", the reviewers, the timeline, the plan's cards grouped by phase (the same phase names as the board's swimlanes), the fee table, the visual "Create your account" button, and the primary action, disabled with a reason when the date gate fails or an answer is missing |
+| Any wizard step, under 1024 px | Applicant | The right-hand panel is replaced by a one-line summary bar at the bottom that opens a bottom sheet with the same content |
+
+### My events and the board (3C)
+
+| URL | As | Look for |
+|---|---|---|
+| `/events` | Applicant, Maya Chen | Her picnic's row with a "View permit" link to `/events/PMT-27-0109/permit` |
+| `/events` | Applicant, New applicant | The empty state: "No events yet", "Plan an event" |
+| `/events/PMT-27-0118` | Applicant, Downtown Arts Collective (S3) | The status strip reads "Waiting on: You"; the reviewers row gives each department's status in plain words; Do now has exactly one pinned card (Health permit: Rolling Dumpling Co., due Wed, May 5). Open it, "Use sample file", "Reply and attach": it moves to With the city and the strip switches to waiting on Health & Legal |
+| `/events/PMT-27-0126` | Applicant, Maple Street block captain (S4) | The neighbor sign-off card shows "9 of 12 neighbors"; the strip shows "No date hold yet" and "3 neighbor sign-offs to go". Open the card and click "Simulate a sign-off" three times |
+| `/events/PMT-27-0097` | Applicant, Riverfront Running Club (S5) | Do now has "Accept conditions and sign" and "Pay fees and deposit"; both go straight to the quote page, not a sheet |
+| `/events/PMT-27-0031` | Applicant, Main Street Business Alliance (S6) | Coming up lists "Final bill or refund" and "Tell us how it went" (the case is in Closeout on load); the 25 vendor health permits are one stacked card in Done |
+| `/events/PMT-27-0048` | Applicant | Sunnyvale Block Association's withdrawn board: an ending banner and only a Done column, with no status strip and no grouping toggle |
+| `/events/PMT-27-0034` | Applicant, Riverside Tai Chi Circle | A permitted series on its day: "Carry your permit" in Do now; the done "Pay and book" card opens the session schedule, with "Pay this session" on the sessions still owed |
+| Any board above, under 768 px | Applicant | The four columns become tabs with counts; try the "By status" and "By phase" toggle |
+
+### Checkout, permit and the public check (3D)
+
+| URL | As | Look for |
+|---|---|---|
+| `/events/PMT-27-0142/quote` | Applicant, Sunrise Yoga Club | Booking mode: 13 sessions, $20 a session, $20 due now; "Back to your plan" returns to the wizard; paying lands on `/events/PMT-27-0142/permit` (demo path 1) |
+| `/events/PMT-27-0097/quote` | Applicant, Riverfront Running Club | Quote mode: conditions grouped by department with accept checkboxes, the Fri, May 14 hold warning, sign, then pay $6,530, then "Paid. Waiting on Health & Legal to verify your insurance." (demo path 5) |
+| `/events/PMT-27-0118/quote` | Applicant, Downtown Arts Collective | The not-ready state: "Your quote isn't ready yet", with a link back to the board |
+| `/events/PMT-27-0109/permit` | Applicant, Maya Chen (S1) | The permit card at 375 px: QR code, "Open the verification page", the Shelter 3 map thumbnail, Sat, May 22, 11 am to 4 pm, the $62.50 cancellation refund; "Download PDF" opens the print layout with the card alone |
+| `/verify/PMT-27-0109` | Anybody | A large "Valid", with the event, place, date and hours, attendance and conditions |
+| `/verify/PMT-27-0097` | Anybody | "Not valid": "This permit hasn't been issued yet." |
+
+### City lists: My queue, Cases, Intake (3E)
+
+| URL | As | Look for |
+|---|---|---|
+| `/city/queue` | City Clerk | The briefing line as the page's heading, the Overdue, Due this week and Later groups, and Downtown Art Walk with a due date and days waiting. A row opens its case with that task's panel open, and the case goes "Back to My queue" |
+| `/city/queue` | Public Works & Safety, then Health & Legal | The triggers and review clock on each row, and the "Waiting on others" disclosure at the bottom |
+| `/city/cases` | Any city role, Board view | The seven columns, the density of a card, the "Waiting on" chips; after turning on "Closed and ended", an ended case's ending chip on its card |
+| `/city/cases?view=table` | Any city role | The sortable headers (Event date, State, Waiting on, Due), the sticky header, mono ids and dates, and the department status dots' tooltip on hover and on focus |
+| `/city/cases` | Any city role | An impossible filter (tier Instant and search "5K"): the empty state names the filters and "Clear filters" restores the list; try the removable filter chips. A case opened from a filtered list comes back to the same filters |
+| `/city/intake` | City Clerk | The Reviewed tab's Maple Street block party (Accept disabled, "9 of 12 items", "Waiting on 3 neighbor sign-offs") next to Plaza wedding photos ("Competing with Jazz in the Plaza — complete first"); the Special tab's Downtown Art Walk (Accept enabled); the Instant exceptions tab lists the Brightline Logistics company picnic, whose link opens Reconcile and close |
+
+### Case detail (3F)
+
+| URL | As | Look for |
+|---|---|---|
+| `/city/cases/PMT-27-0097` | City Clerk (scenario S5) | Who's up shows two "Up now" rows (the applicant, Health & Legal); "Issue permit" is disabled in the sticky panel with the combined reason; the next-move sentence names both parties |
+| `/city/cases/PMT-27-0097?task=issue_permit` | City Clerk | The link opens the Issue permit panel directly |
+| `/city/cases/PMT-27-0118` | Health & Legal (the case behind S3) | Documents tab: the pinned vendor health permit card and its request thread. Reviews tab: Health & Legal's own section with "Decide your review" and "Request information" |
+| `/city/cases/PMT-27-0126` | City Clerk (switch role on the case; the S4 jump opens as the applicant) | The sticky panel's "Accept as complete" (the hold appears in the header once accepted) and "Confirm routing" (reviewers, sections and due dates prefilled) |
+| `/city/cases/PMT-27-0031` | Public Works & Safety (scenario S6) | The Log closeout panel's actual quantity per fee line and the extra Cleanup crew hours field; then, as the City Clerk, "Reconcile and close" and the Conditions and fees tab's Actual and Difference columns |
+| `/city/cases/PMT-27-9999` | Any city role | "Case not found" |
+| `/city/cases/PMT-27-0118?tab=activity` | Any city role | The activity log, newest first, with the actor filter |
+| Any case above | Each city role in turn | The page keeps its URL and tab through the role switcher; the header's review clock and "Your actions" change with the role |
+
+### Active permits (3G)
+
+| URL | As | Look for |
+|---|---|---|
+| `/city/active` | City Clerk | The List tab: Maya Chen's picnic and Little League Opening Day as rows, the Day-of contact and Compliance log columns, and the Today strip's headline naming the Monday tai chi session |
+| `/city/active?holds=1&sessions=1` | City Clerk | "Show every session" and "Include held dates" both on: the Riverside Tai Chi series is one row per Monday, and the Riverfront Summer 5K appears as held ("Date held until ..."), not as permitted |
+| `/city/active?view=calendar&date=2027-06-07` | City Clerk | After booking the Sunrise Yoga Club's draft (demo path 1): its Sundays on Field 4. The month and week toggle, the tier legend, and the role overlay panel on the right |
+| `/city/active?view=map&date=2027-07-11&holds=1` | Public Works & Safety | The Riverfront 5K's route on the map; a booking in the list under the map opens its case and comes back to this day. An empty day (2027-05-20) shows the empty state |
+| `/city/active?view=closeout` | Any city role | The Main Street Food Truck Festival, held by Public Works & Safety, with its remaining steps |
+| `/city/active` | Public Works & Safety, then Health & Legal | The list's own-role column and the Calendar and Map side panel change from work orders to vendor permits |
+
+### Across the surfaces (Phase 3 integration)
+
+| Start at | As | Look for |
+|---|---|---|
+| `/demo`, "Start this path" on each of the seven | Anybody | Each lands on a real screen in the right role; paths 1 to 4 can then be clicked through to the end with a control for every step |
+| `/apply?case=PMT-27-0142&step=plan` | Applicant, Sunrise Yoga Club | "Book and pay $20", pay, and the permit page shows the permit with its 13 sessions; then `/city/active?view=calendar&date=2027-06-07` as the City Clerk shows the Sundays |
+| `/apply` | Applicant, New applicant | A Reviewed plan (a picnic with alcohol): "Create my to-do board" opens the board with its cards; My events then opens the board, and the board's menu offers "Edit your plan" |
+| `/events/PMT-27-0118` | Applicant, then each city role, then the Applicant again | The role switcher follows the case to `/city/cases/PMT-27-0118` and back to the board, as Downtown Arts Collective |
+| `/city/cases/PMT-27-0097` | Applicant | "This screen is built for a city role."; "Switch to Health & Legal" opens the case, not the queue |
+| `/city/intake` | City Clerk, then Public Works & Safety | The switch leaves the Clerk's Intake for the queue; a case opened from Intake as the Clerk says "Back to Intake" |
+
+---
+
 ## Changes
 
+- 2026-10-13: Phase 3 done (the read-only review has still to run). Built: the public landing page and the demo guide (3A); the five-step wizard with its live result panel (3B); My events and the to-do board (3C); checkout in four modes, the permit with its QR code and the public check (3D); My queue, the Cases pipeline and Intake (3E); the city's case detail with a panel for every action and a registry Phase 4 overrides by role (3F); Active permits as list, calendar, map and closeout (3G). The seven branches merged with no conflicts and the gate passed on the merged tree (1,155 tests in 68 files) before any integration change. **The integration was interrupted by a usage limit on 2026-10-12**, after the merges and with its first changes uncommitted, **and was resumed and finished on 2026-10-13**; it now commits at each checkpoint. What it changed, and why: (1) **11 hand-offs between surfaces were broken or missing** (a queue row opened an empty sheet; a case always went "Back to cases"; a booked session fell through to "Nothing to pay here"; the permit's QR code held a path; a page opened under the wrong role lost its link on the switch; the full table is in `docs/plans/2026-10-12-phase-3-integration.md`), each fixed and each covered by `tests/render/handoffs.test.tsx`, which mounts the real layouts and pages by URL and follows a link from one surface into the next (69 tests, with demo paths 3 and 4 clicked through from first step to last); (2) **consistency**: one set of phase names for the wizard and the board, `BillingBadge` and `TierLegend` moved into `components/domain`, one `applicantNameOf()`, one `BackLink`, the board's reviewers row through `ReviewStatusDot`, success toasts on the board as on checkout and the city's panels; (3) **contracts, all additive**: `routes.city.case()` takes `from`; `lib/types.ts` gains `TASK_PHASE_LABEL` and `TASK_PHASES`; the `lib/state` barrel exports the quote figures and the `check*` functions (3D's request, applied); 3E's request to type the pipeline's `sort`, `dir` and `closed` into `CasesFilters` was declined; (4) the role-switch rule gained one case: a page opened under the wrong role stays put when the switch is to a role it is built for. Gate on the final tree: type-check, lint, 1,255 tests in 69 files and build pass. Section 12, "What to look at", is new and collects every builder's list of screens. Nine new questions for the owner are at the end of `docs/readme.md`. For Phase 4: `clerk.tsx` is shared by 4A and 4B, and `hl.tsx` by 4C (the review panel) and 4D (verification), so each adds only its own keys.
 - 2026-10-12: Phase 2 review fixes (21 findings: 3 high, 14 medium, 4 low; all fixed). Plan and what changed from it: `docs/plans/2026-10-12-phase-2-review-fixes.md`. What they change for Phase 3 and later: (1) **the render harness follows the URL**: the `next/navigation` mock is a live router, so a screen that keeps a step, tab or filter in the URL can be clicked through, and `renderScreen()` takes a `stored` demo for reload tests; (2) **the store hydrates on every route** through a `StoreHydrator` in the root layout, `useHydrated()` is one flag per page load, and nothing is written before the stored demo is read, so a shell-less page (3A's landing page and demo guide, 3C's verify page) must wait for `useHydrated()` before it shows or changes the store; (3) **city tool pages belong to one role** (section 4's route map): a switch between two city roles keeps the URL only on My queue, Cases, a case and Active permits, and `CityShell` guards the rest, so 4A to 4D build their tool screens for their own role only; (4) **contract, additive**: `PartyStatus.nextTask` (section 5.3), the locked task a waiting party gets next; (5) engine behaviour screens will meet: `complete_task` refuses cards with an action of their own; an ended case offers only `add_note` and its board keeps only Done cards; `pay` has rows for a series' next session and a closed case's final bill; a scheduled meeting is due on its day; the review clock's allowance is the Clerk's due date; the Clerk's `consolidate` task exists, locked, from routing; a closed case releases its hold; a series' session is marked `due` on its day and "Carry your permit" reopens for each session; (6) **seed** (section 6.2): each role's opening queue is asserted row by row, with one planned overdue row each; B16's past sessions are paid; city staff act on working days; (7) `DEMO_PATHS`: every applicant step names its persona, and path 5 ends as the new applicant; (8) `TaskCard`, `WhoIsUp` and `DeptStatusDots` show what the wireframes show (scheduled dates, changes requested, amendment, done dates; a heading, the applicant's name, the waiting party's next task; a glyph per review status). Gate: type-check, lint, 885 tests in 52 files and build pass. Seven questions for the owner are at the end of `docs/readme.md`; the series quote (`dueAtQuote`) is still one of them.
 - 2026-10-12: Phase 2 done, with a third workstream added to it: **2D, shared building blocks and Phase 1 review polish**, built beside 2A and 2B because seven screen builders come next and would otherwise each invent their own page headers, cards, fee tables and filter bars. Built: the seed by replay with `tests/seed.test.ts` and `tests/demo-paths.test.ts`, plus the eight engine findings the Phase 1 review left open (2A); the app shell, the Demo menu, the render harness and a placeholder page for all 19 routes not yet built (2B); 13 page and list primitives, 14 case components and the Phase 1 review's polish (2D). Gate on the merged tree: type-check, lint, 760 tests in 49 files and build all pass. What the integration changed, and why: (1) the shell now meets the real seed: `tests/seed.test.ts` checks every Demo menu jump, persona and date jump against `buildSeed()`, and the shell's render tests run on the 38 seeded cases; (2) role and persona switching: picking a persona navigates (the wizard for S2 and for a new applicant, My events otherwise), landing on the Applicant sets the persona of the case the page is about, a Draft is not followed to a city role, two city roles keep the URL with its query string, and a role's remembered page includes its query string; (3) both shells now put the screen inside the page container, so a screen never adds `page-container` (the placeholder overflowed the city layout by the sidebar's width); (4) Reset goes to the Applicant's home, since it puts the role switcher back on the Applicant; (5) the shell uses 2D's `ConfirmDialog`, `PageHeader`, `PersonaAvatar` and `CountBadge`; (6) `WhoIsUp` lists every open action with its own due date (the PRD's "each open action with its due date"; S5's applicant has two), and `CaseHeader` takes a Draft with no date; (7) contracts, all additive or comments: `StateApi` gained `boardColumns`, `whoIsUp`, `involvement`, `actorsFor`, `hasActivePermit`, `holdsDateAtQuote`, `activePermits` and `permitSessions` (section 5.3); `RulesApi.routing` takes an optional config (5.2); `simulate_signoff` may be raised by the applicant (5.4); the Security and medical plan card follows the tier instead of a hardcoded 1,000; comments in `lib/rules/types.ts`, `lib/state/types.ts` and `lib/state/actions.ts` say what the engine does. Declined: `DateGate.daysUntil` as `number | null` (a breaking change for a state the wizard never shows; it is documented as 0 when no date is chosen). Left open for later workstreams: a case routed without a department that reviews one of its cards (4A), submitting a pending amendment (5A), and the hold status of closed cases.
 - 2026-10-12: Phase 1 review fixes (18 findings, all high and medium). What they change for later phases: (1) contract, additive: `updateDraft`'s patch takes `lateFee?: boolean`, which sets `flags.lateFee`; this is what the wizard's third gate fix dispatches (3B). `book_and_pay` and `submit` now enforce the tier's lead time and add the "Late fee" line. (2) The store keeps a Draft's sessions, tier and triggers in step with its answers on every edit (`syncDraft()`), so the wizard stores only the date, times and recurrence; 2A's replay should create each Draft with `syncDraft(newCase(...), ctx)`. (3) A block party submitted before its sign-offs are in leaves the Clerk's intake check locked, so S4 shows the applicant up and the Clerk waiting, as the PRD's seed table says. (4) A Reviewed or Special series pays its one-off lines and first session at the quote (`dueAtQuote()`), the rest on schedule (4E), following the PRD's quote section; **this one is open for your confirmation** and is a one-line switch back. (5) Seed scripts: B03, B04, B16 and B19 moved outside their lead times; B05 moved to Thu, May 13 so that the overdue In review case is also at lead-time risk (section 6.2); every case starts with a "Started a draft." activity entry, which gives B01 its one entry. (6) `tests/engines.test.ts` now replays all 38 scripts through both engines (`tests/replay.ts`, test-only until 2A's replay). One part of one finding was not applied: the review clock stays a count of days elapsed, so the due date reads "Day 14 of 14"; counting the routing day as Day 1 would show every review as over its allowance on the day it is due.
