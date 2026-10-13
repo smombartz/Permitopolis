@@ -1,9 +1,9 @@
 "use client";
 
 import { cn } from "@/lib/utils";
-import { fmtDateShort, plural } from "@/lib/format";
+import { fmtDateShort } from "@/lib/format";
 import { SELECTED_DAY } from "@/components/calendar/tierStyles";
-import type { ClosureDay } from "@/lib/view/closures";
+import { closureDayLabel, type ClosureDay } from "@/lib/view/closures";
 import type { ISODate } from "@/lib/types";
 
 const FOCUS_RING =
@@ -15,7 +15,7 @@ interface ClosuresCalendarStripProps {
   onSelectDay: (date: ISODate) => void;
 }
 
-/** The days in the chosen range, each with its count of closures and any blackout or impacted mark. */
+/** The days in the chosen range, each with what is on the map that day (closures and bookings apart) and any blackout or impacted mark. */
 function ClosuresCalendarStrip({ days, selected, onSelectDay }: ClosuresCalendarStripProps) {
   return (
     <div className="flex gap-2 overflow-x-auto" role="list" aria-label="Days in range">
@@ -32,7 +32,7 @@ function ClosuresCalendarStrip({ days, selected, onSelectDay }: ClosuresCalendar
             )}
           >
             <p className="text-xs font-semibold text-fg-label">{fmtDateShort(day.date)}</p>
-            <p className="text-sm text-fg">{day.count === 0 ? "No closures" : plural(day.count, "closure")}</p>
+            <p className="text-sm text-fg">{closureDayLabel(day)}</p>
             {day.blackoutLabel ? (
               <p className="mt-0.5 truncate text-[11px] font-medium text-danger-fg" title={day.blackoutLabel}>
                 Blackout

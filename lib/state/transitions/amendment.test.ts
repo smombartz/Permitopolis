@@ -11,6 +11,7 @@ import type { Action } from "../actions";
 import { amendmentBalance, amendmentPaymentDue, amendmentStage, pendingAmendment, permittedPlan } from "../amendment";
 import { availableActions } from "../availableActions";
 import { advanceClock } from "../clock";
+import { quoteBalance } from "../core";
 import { buildSeed } from "../seed";
 import { caseTotals, queueFor, refundIfCancelled } from "../selectors";
 import { transition } from "../transition";
@@ -119,6 +120,63 @@ describe("a change that adds no card takes effect at once, and what it costs is 
   });
 });
 
+describe("a change at Quote sent that adds no card brings the quote's payment card in step", () => {
+  const S5 = "PMT-27-0097"; // Riverfront Summer 5K: Quote sent, $6,530, nothing paid
+
+  it("S5 drops its amplified sound: the fee lines, the board's payment card and what checkout takes are all $6,490", () => {
+    const s5 = find(S5);
+    expect(s5).toMatchObject({ state: "quote_sent", permit: null });
+    expect(card(s5, "pay_fees")).toMatchObject({ status: "todo", payload: { amount: 6530 } });
+
+    const quieter = run(s5, { type: "amend", answers: { ...s5, addOns: { ...s5.addOns, amplifiedSound: false } } }, "applicant");
+    expect(quieter.flags.amendmentPending).toBe(false);
+    expect(caseTotals(quieter)).toMatchObject({ total: 6490, paid: 0, due: 6490 });
+    expect(quoteBalance(quieter, CFG)).toBe(6490);
+    // The card on the board says what the quote now asks for, not the figure it was sent with.
+    expect(card(quieter, "pay_fees")).toMatchObject({ status: "todo", payload: { amount: 6490 } });
+    expect(refusal(quieter, { type: "pay", amount: 6490, method: "card", kind: "quote" }, "applicant")).toBeNull();
+  });
+
+  it("a change that adds a card is pending, and the card still asks what checkout asks; a decline puts the quote's own figure back", () => {
+    const s5 = find(S5);
+    expect(s5.addOns.tentsStages).toBeNull();
+    const withTent = run(s5, { type: "amend", answers: { ...s5, addOns: { ...s5.addOns, tentsStages: { count: 1 } } } }, "applicant");
+    expect(withTent.flags.amendmentPending).toBe(true);
+    const asked = quoteBalance(withTent, CFG);
+    expect(asked).toBeGreaterThan(6530);
+    expect(card(withTent, "pay_fees")).toMatchObject({ status: "todo", payload: { amount: asked } });
+
+    let c = run(withTent, { type: "complete_task", taskId: `${S5}:structure_specs`, files: [{ name: "tent.pdf", size: 100_000, type: "application/pdf" }] }, "applicant");
+    c = run(c, { type: "submit" }, "applicant");
+    const declined = run(c, { type: "decide_amendment", decision: "decline", reason: "No tents on the route." }, "clerk");
+    expect(declined.feeLines).toEqual(s5.feeLines);
+    expect(card(declined, "pay_fees")).toMatchObject({ status: "todo", payload: { amount: 6530 } });
+  });
+
+  it("a quote part paid: the card asks for what is left of the new figure", () => {
+    const part = run(find(S5), { type: "pay", amount: 1000, method: "in_person", kind: "quote" }, "clerk");
+    expect(card(part, "pay_fees")).toMatchObject({ status: "todo", payload: { amount: 5530 } });
+    const quieter = run(part, { type: "amend", answers: { ...part, addOns: { ...part.addOns, amplifiedSound: false } } }, "applicant");
+    expect(card(quieter, "pay_fees")).toMatchObject({ status: "todo", payload: { amount: 5490 } });
+  });
+});
+
+describe("a series amended after a session is paid keeps that session paid", () => {
+  it("an hour longer, from a wizard that rebuilt the schedule with no session list: the first Sunday stays paid and owes its own difference, nothing is refunded", () => {
+    const booked = run(find(S2), { type: "book_and_pay", method: "card" }, "applicant");
+    expect(booked.schedule?.occurrences.map((o) => o.billing).slice(0, 2)).toEqual(["paid", "upcoming"]);
+    // The wizard's When step empties the list whenever the hours or the date are edited.
+    const longer = run(booked, { type: "amend", answers: { ...booked, schedule: { ...booked.schedule!, end: "10:00", occurrences: [] } } }, "applicant");
+    expect(longer.schedule?.occurrences).toHaveLength(13);
+    expect(longer.schedule?.occurrences.map((o) => o.billing).slice(0, 2)).toEqual(["paid", "upcoming"]);
+    // 13 sessions at $40 now. The 12 to come are billed on their day; the one already paid owes its other $20.
+    expect(caseTotals(longer)).toMatchObject({ total: 520, paid: 20 });
+    expect(longer.payments).toEqual(booked.payments);
+    expect(amendmentBalance(longer, CFG)).toBe(20);
+    expect(card(longer, "pay_fees")).toMatchObject({ status: "todo", payload: { amount: 20 } });
+  });
+});
+
 describe("a pending amendment leaves the permit on the plan it was issued for", () => {
   const s1 = find(S1);
   const withDjOnALaterDay = { ...s1, addOns: { ...s1.addOns, amplifiedSound: true }, schedule: { ...s1.schedule!, date: "2027-06-12", occurrences: [] } };
@@ -196,13 +254,16 @@ describe("an amendment before the permit: the application under review changes",
       ["structure_specs", "todo"],
     ]);
     expect(pendingAmendment(c)).toMatchObject({ priorSubmit: { status: "done", unlocksOn: null, tags: [] }, priorFeeLines: s3.feeLines });
+    // While it is the amendment's, the card is named for what it sends.
+    expect(card(c, "submit_application")).toMatchObject({ title: "Submit amendment", why: "Send your change to the City Clerk" });
     c = run(c, { type: "complete_task", taskId: `${S3}:structure_specs`, files: [{ name: "tent-layout.pdf", size: 200_000, type: "application/pdf" }] }, "applicant");
     c = run(c, { type: "submit" }, "applicant");
     return { s3, c };
   }
 
   it("Public Works & Safety, which had decided its review, gets the new card to check; then the Clerk decides", () => {
-    const { c } = submitted();
+    const { s3, c } = submitted();
+    const s3card = card(s3, "submit_application")!;
     expect(card(c, "verify:structure_specs")).toMatchObject({ owner: "pws", status: "todo" });
     expect(card(c, "decide_amendment")).toMatchObject({ status: "locked" });
     const verified = run(c, { type: "verify_document", taskId: `${S3}:structure_specs` }, "pws");
@@ -221,6 +282,8 @@ describe("an amendment before the permit: the application under review changes",
       ["system", "The amendment is part of the application now."],
     ]);
     expect(approved.state).toBe("needs_info");
+    // The application's own card again, under its own name.
+    expect(card(approved, "submit_application")).toMatchObject({ status: "done", title: s3card.title, why: s3card.why });
   });
 
   it("a decline puts the application back: its own Submit card done again, the fee lines to the cent, the new card and its check gone", () => {
@@ -228,7 +291,7 @@ describe("an amendment before the permit: the application under review changes",
     const declined = run(c, { type: "decide_amendment", decision: "decline", reason: "The plaza cannot take a tent that size." }, "clerk");
     expect(declined).toMatchObject({ tier: s3.tier, triggers: s3.triggers, addOns: s3.addOns, schedule: s3.schedule, state: s3.state, flags: s3.flags });
     expect(declined.feeLines).toEqual(s3.feeLines);
-    expect(card(declined, "submit_application")).toMatchObject({ status: "done", tags: [], unlocksOn: null });
+    expect(card(declined, "submit_application")).toMatchObject({ status: "done", tags: [], unlocksOn: null, title: "Submit application", why: "Send your application to the City Clerk" });
     expect(card(declined, "structure_specs")).toBeUndefined();
     expect(card(declined, "verify:structure_specs")).toBeUndefined();
     // Every card and task the application had is as it was; the one addition is the Clerk's decision.

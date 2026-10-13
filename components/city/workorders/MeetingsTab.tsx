@@ -8,7 +8,7 @@ import { CaseId, EventTitle, TierBadge } from "@/components/domain";
 import { applicantNameOf } from "@/lib/data/people";
 import { fmtDate } from "@/lib/format";
 import { routes } from "@/lib/routes";
-import { checkCompleteCityTask } from "@/lib/state";
+import { checkCompleteCityTask, checkScheduleMeeting } from "@/lib/state";
 import type { Dept, ISODate } from "@/lib/types";
 import { MEETING_KIND_LABEL, type MeetingRow } from "@/lib/view/workOrders";
 
@@ -19,7 +19,7 @@ interface MeetingsTabProps {
   here: string;
 }
 
-/** Every site walkthrough and coordination meeting: Schedule (or Reschedule) and Mark held. */
+/** Every site walkthrough and coordination meeting: Schedule (or Reschedule) and Mark held, each offered only where the engine allows it. */
 function MeetingsTab({ rows, role, today, here }: MeetingsTabProps) {
   if (rows.length === 0) {
     return <EmptyState icon={CalendarClockIcon} title="No walkthroughs or meetings" text="A Special event's coordination meeting and site walkthrough show up here once its application is in." />;
@@ -28,7 +28,11 @@ function MeetingsTab({ rows, role, today, here }: MeetingsTabProps) {
   return (
     <ul className="flex flex-col gap-2" aria-label="Walkthroughs and meetings">
       {rows.map((row) => {
-        const canHold = row.scheduledFor && !row.held ? checkCompleteCityTask(row.case, row.task.id, role, today) : null;
+        // Asked of the engine before the link is drawn, as for Mark held: a meeting that was held
+        // has nothing to schedule, and one another department hosts says whose it is.
+        const canSchedule = row.held ? null : checkScheduleMeeting(row.case, row.task.id, role);
+        // Mark held is for a role that hosts the meeting; for anybody else that one reason is the whole answer.
+        const canHold = canSchedule?.ok && row.scheduledFor ? checkCompleteCityTask(row.case, row.task.id, role, today) : null;
         return (
           <li key={row.task.id} className="flex flex-col gap-2 rounded-panel border border-line-subtle bg-surface-1 p-3">
             <div className="flex flex-wrap items-center justify-between gap-3">
@@ -38,14 +42,16 @@ function MeetingsTab({ rows, role, today, here }: MeetingsTabProps) {
                 <TierBadge tier={row.case.tier} />
               </div>
               <div className="flex shrink-0 items-center gap-2">
-                <Button asChild size="sm" variant="secondary">
-                  <Link
-                    href={routes.city.case(row.case.id, { task: `schedule_meeting:${row.task.id}`, from: here })}
-                    aria-label={`${row.scheduledFor ? "Reschedule" : "Schedule"}: ${MEETING_KIND_LABEL[row.kind]}, ${row.case.name}`}
-                  >
-                    {row.scheduledFor ? "Reschedule" : "Schedule"}
-                  </Link>
-                </Button>
+                {canSchedule?.ok ? (
+                  <Button asChild size="sm" variant="secondary">
+                    <Link
+                      href={routes.city.case(row.case.id, { task: `schedule_meeting:${row.task.id}`, from: here })}
+                      aria-label={`${row.scheduledFor ? "Reschedule" : "Schedule"}: ${MEETING_KIND_LABEL[row.kind]}, ${row.case.name}`}
+                    >
+                      {row.scheduledFor ? "Reschedule" : "Schedule"}
+                    </Link>
+                  </Button>
+                ) : null}
                 {row.held || !canHold ? null : canHold.ok ? (
                   <Button asChild size="sm">
                     <Link
@@ -66,6 +72,7 @@ function MeetingsTab({ rows, role, today, here }: MeetingsTabProps) {
               {MEETING_KIND_LABEL[row.kind]} ·{" "}
               {row.held ? "Held" : row.scheduledFor ? `Scheduled for ${fmtDate(row.scheduledFor)}` : "Not yet scheduled"}
             </p>
+            {canSchedule && !canSchedule.ok ? <p className="text-xs text-fg-secondary">{canSchedule.reason}</p> : null}
             {canHold && !canHold.ok ? (
               <p id={`meeting-reason-${row.task.id}`} className="text-xs text-fg-secondary">
                 {canHold.reason}

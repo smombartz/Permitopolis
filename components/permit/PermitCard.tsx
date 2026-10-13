@@ -10,10 +10,9 @@ import { Eyebrow } from "@/components/ui/eyebrow";
 import { Separator } from "@/components/ui/separator";
 import { CITY_STAFF_BY_DEPT } from "@/lib/data/people";
 import { fmtDate, fmtNumber, fmtTimeRange } from "@/lib/format";
-import { classify } from "@/lib/rules";
 import type { RulesConfig } from "@/lib/rules";
 import { routes } from "@/lib/routes";
-import { permittedPlan, refundIfCancelled } from "@/lib/state";
+import { permitCovers, permittedPlan, refundIfCancelled } from "@/lib/state";
 import type { EventCase, ISODate } from "@/lib/types";
 import { sessionRows } from "@/lib/view/permit";
 
@@ -40,7 +39,8 @@ function PermitCard({ c: record, today, cfg }: { c: EventCase; today: ISODate; c
   // (PRD: "the current permit stays valid for the original plan until the amendment is
   // approved"): its place, hours, tier and what it covers, not the amended ones on the record.
   const c = permittedPlan(record);
-  const cls = classify(c, cfg);
+  // What it covers is the record's own, not the tier rules re-read as Settings has them now.
+  const covers = permitCovers(record);
   const contact = CITY_STAFF_BY_DEPT.clerk;
   // What `cancel` would pay back today: capped at what was paid, the deposit included.
   const refund = refundIfCancelled(record, today, cfg);
@@ -124,7 +124,7 @@ function PermitCard({ c: record, today, cfg }: { c: EventCase; today: ISODate; c
       <div className="flex flex-col gap-1.5">
         <p className="text-eyebrow font-bold tracking-[.12em] text-fg-label uppercase">This permit covers</p>
         <ul className="flex flex-col gap-1 text-sm text-fg">
-          {cls.components.map((component) => (
+          {covers.map((component) => (
             <li key={component.id}>
               {component.label} <span className="text-fg-label">· {component.approvedBy}</span>
             </li>

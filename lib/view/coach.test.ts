@@ -2,7 +2,7 @@
  * `pathProgress()` against the real store: each of the seven demo
  * paths is replayed step by step the way tests/demo-paths.test.ts does, and the derived step
  * must advance exactly once per coach step and read done at the end; after reset() it is back
- * at step 1. See lib/view/coach.ts for why path 7's three steps land together.
+ * at step 1. See lib/view/coach.ts for why path 7's wizard is one step.
  */
 import { beforeEach, describe, expect, it } from "vitest";
 import { DEMO_PATHS } from "@/lib/data/demoScript";
@@ -207,9 +207,10 @@ describe("pathProgress", () => {
     expect(progress(6)).toEqual({ step: 1, done: false });
   });
 
-  it("path 7 (S1, P1): amend applies the tier change, the late fee and the new cards together", () => {
+  it("path 7 (S1, P1): the wizard is one step, and the cards on the board stay the current step until the amendment leaves Maya's hands", () => {
     const S1 = "PMT-27-0109";
     as("applicant", "maya-chen");
+    expect(path(7).steps.map((step) => step.id)).toEqual(["add-dj", "amendment-cards"]);
     expect(progress(7)).toEqual({ step: 1, done: false });
 
     const original = store().cases.find((c) => c.id === S1)!;
@@ -223,9 +224,18 @@ describe("pathProgress", () => {
       addOns: { ...original.addOns, amplifiedSound: true },
     };
     // The engine keeps no intermediate state between the tier change, the late fee and the new
-    // cards: all three land in the same transition, so the derived step jumps straight to done.
+    // cards: all three land in one transition, so the wizard is one step of the script.
     act(S1, { type: "amend", answers: withDj, lateFee: true });
-    expect(progress(7)).toEqual({ step: 3, done: true });
+    // The path's payoff, on the board, is the step the presenter is now on: it tells them what to point at.
+    expect(progress(7)).toEqual({ step: 2, done: false });
+    expect(pathProgress(path(7), ctx()).step).toMatchObject({ id: "amendment-cards", text: "New cards tagged Amendment appear, and the current permit stays valid for the original plan." });
+
+    // It stays current while she works on the cards, and is done once the amendment is submitted.
+    act(S1, { type: "complete_task", taskId: `${S1}:sound_details`, form: { equipment: "One DJ booth", soundCheckTime: "10:30" } });
+    act(S1, { type: "complete_task", taskId: `${S1}:insurance_certificate`, files: [{ name: "coi.pdf", size: 200_000, type: "application/pdf" }] });
+    expect(progress(7)).toEqual({ step: 2, done: false });
+    act(S1, { type: "submit" });
+    expect(progress(7)).toEqual({ step: 2, done: true });
 
     store().reset();
     expect(progress(7)).toEqual({ step: 1, done: false });

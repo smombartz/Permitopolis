@@ -4,10 +4,9 @@
  * store: CaseDetailScreen and its tabs read the pieces of store state this needs and pass them
  * in. Covered by lib/view/caseDetail.test.ts against the real seed.
  */
-import { classify } from "@/lib/rules";
-import type { PermitComponent, RulesConfig } from "@/lib/rules/types";
+import type { PermitComponent } from "@/lib/rules/types";
 import { addDaysISO } from "@/lib/dates";
-import { cardUnderVerification, meetingCardFor, reviewClock } from "@/lib/state";
+import { cardUnderVerification, meetingCardFor, permitCovers, reviewClock } from "@/lib/state";
 import type { ActionAvailability, ReviewClockView } from "@/lib/state/types";
 import { ACTION_TYPES, type ActionType } from "@/lib/state/actions";
 import type { CaseTab } from "@/lib/routes";
@@ -171,8 +170,13 @@ export interface OverviewData {
   mapHighlight: MapHighlight | null;
 }
 
-/** The Overview tab's event summary: type, description, place, date, setup/teardown, sessions, attendance, add-ons. */
-export function buildOverview(c: EventCase, cfg: RulesConfig): OverviewData {
+/**
+ * The Overview tab's event summary: type, description, place, date, setup/teardown, sessions,
+ * attendance, add-ons. "What the permit covers" is the record's own list (`permitCovers()`): the
+ * plan the permit is for while an amendment is pending, and never the tier rules re-read as
+ * Settings has them now.
+ */
+export function buildOverview(c: EventCase): OverviewData {
   const sched = c.schedule;
   const rows: KeyValueItem[] = [
     { label: "Event type", value: c.eventType ? EVENT_TYPE_LABEL[c.eventType] : null },
@@ -186,7 +190,7 @@ export function buildOverview(c: EventCase, cfg: RulesConfig): OverviewData {
     // No add-ons is an answer ("None"), not a missing one.
     { label: "Add-ons", value: addOnsSummary(c) ?? "None" },
   ];
-  return { rows, triggers: c.triggers, components: classify(c, cfg).components, mapHighlight: mapHighlightFor(c) };
+  return { rows, triggers: c.triggers, components: permitCovers(c), mapHighlight: mapHighlightFor(c) };
 }
 
 /* ---------- documents tab ---------- */
@@ -253,6 +257,33 @@ export function reviewSummaries(c: EventCase, role: Party): ReviewSummary[] {
       isOwn: dept === role,
     };
   });
+}
+
+/** Where a card of a pending amendment stands, as the end of a sentence. */
+const AMENDMENT_CARD_WHERE: Record<Task["status"], string> = {
+  locked: "not open yet",
+  todo: "with the applicant",
+  submitted: "being checked",
+  changes_requested: "sent back to the applicant",
+  done: "checked",
+};
+
+/**
+ * What the Reviews tab says of a department that has no review on the case. A department named
+ * on a card before routing is waiting for it. One named on a card a pending amendment added is
+ * not: an amendment is never routed, its cards are checked one by one (the department has
+ * "Verify Sound details" in its queue), so the line says that and where each card is.
+ */
+export function unroutedDeptNote(c: EventCase, dept: Dept): string {
+  if (dept === "clerk") return "No license review on this case.";
+  if (c.ending) return "This case ended before it could be routed here.";
+  const named = c.tasks.filter((t) => t.owner === "applicant" && t.reviewer === dept);
+  const amending = c.flags.amendmentPending ? named.filter((t) => t.tags.includes("amendment")) : [];
+  if (amending.length > 0) {
+    return `Checks the amendment's ${amending.length === 1 ? "card" : "cards"}: ${amending.map((t) => `${t.title} (${AMENDMENT_CARD_WHERE[t.status]})`).join(", ")}.`;
+  }
+  if (named.length > 0) return `Named on ${named.length === 1 ? "a card" : "cards"} (${named.map((t) => t.title).join(", ")}), waiting for routing.`;
+  return "The City Clerk has not routed this case to this department.";
 }
 
 /* ---------- activity tab ---------- */

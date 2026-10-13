@@ -78,13 +78,23 @@ describe("boothRowsFor", () => {
 });
 
 describe("buildInspectionGroups", () => {
-  it("on May 3, only an event with vendors already inside the 14-day window shows up", () => {
+  it("lists only an event that has its permit: nothing on the seed, where every food event in the window is still under review", () => {
     const cases = buildSeed();
-    const groups = buildInspectionGroups(cases, TODAY);
-    // St. Agnes Parish's festival, May 13, is the one seeded case with food vendors whose day
-    // falls in the window; Jazz in the Plaza (Jun 18) and the Food Truck Festival (past) do not.
-    expect(groups.map((g) => g.caseId)).toEqual(["PMT-27-0012"]);
-    expect(groups[0].bucket).toBe("upcoming");
+    // St. Agnes Parish's festival, May 13, has five vendors and is ten days out, and it is
+    // still In review: no permit, no day-of, nothing to inspect yet.
+    const parish = cases.find((c) => c.id === "PMT-27-0012")!;
+    expect(parish).toMatchObject({ state: "in_review", permit: null });
+    expect(buildInspectionGroups(cases, TODAY)).toEqual([]);
+    // On Jun 18 with nothing done since: the Farmers Market's twelve stalls for Jun 19 never left
+    // In review, and Jazz in the Plaza is still waiting on its answer.
+    expect(buildInspectionGroups(cases, "2027-06-18")).toEqual([]);
+  });
+
+  it("the same festival once it is permitted is on the list for its day", () => {
+    const parish = buildSeed().find((c) => c.id === "PMT-27-0012")!;
+    const permitted = { ...parish, state: "permitted" as const, permit: { issuedOn: TODAY, signature: "St. Agnes Parish" } };
+    expect(buildInspectionGroups([permitted], TODAY)).toMatchObject([{ caseId: "PMT-27-0012", eventDate: "2027-05-13", bucket: "upcoming" }]);
+    expect(buildInspectionGroups([permitted], TODAY)[0].booths).toHaveLength(5);
   });
 
   it("jumping the demo date to Jun 18, after Jazz in the Plaza is permitted, shows its one booth", () => {
@@ -120,14 +130,17 @@ describe("groupsByBucket", () => {
   });
 });
 
-describe("a Draft is never on the inspections list", () => {
+describe("a Draft is never on the inspections list, and neither is an application still under review", () => {
   it("an applicant's draft with food vendors next week is the applicant's alone", () => {
     const vendor = makeTask({ id: "PMT-27-0001:vendor_health_permit:1", catalogId: "vendor_health_permit", payload: { vendorName: "Taco Cart" } });
     const schedule = { date: "2027-05-08", start: "11:00", end: "15:00", occurrences: [{ date: "2027-05-08", availability: { status: "open" as const }, billing: "upcoming" as const }] };
     const draft = makeCase({ state: "draft", schedule, tasks: [vendor] });
     expect(buildInspectionGroups([draft], "2027-05-03")).toEqual([]);
-    // The same plan once it is with the city is listed, named as every list names an event.
+    // Nor is the same plan while the city is still reviewing it: there is no permit to hold a day-of under.
     const submitted = { ...draft, state: "submitted" as const, name: "Spring cookout", applicantId: "maya-chen" };
-    expect(buildInspectionGroups([submitted], "2027-05-03")).toMatchObject([{ caseName: "Spring cookout", applicantName: "Maya Chen", tier: "instant", eventDate: "2027-05-08", bucket: "upcoming" }]);
+    expect(buildInspectionGroups([submitted], "2027-05-03")).toEqual([]);
+    // Permitted, it is listed, named as every list names an event.
+    const permitted = { ...submitted, state: "permitted" as const, permit: { issuedOn: "2027-05-03", signature: null } };
+    expect(buildInspectionGroups([permitted], "2027-05-03")).toMatchObject([{ caseName: "Spring cookout", applicantName: "Maya Chen", tier: "instant", eventDate: "2027-05-08", bucket: "upcoming" }]);
   });
 });

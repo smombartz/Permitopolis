@@ -221,6 +221,8 @@ export interface MeetingItem {
   tier: Tier;
   /** Who attends, applicant first: the parties the catalogue's own "why" names for this meeting. */
   attendees: Party[];
+  /** The same parties by name, in that order: `meetingAttendees()`. */
+  attendeeNames: string;
   held: boolean;
 }
 
@@ -230,6 +232,15 @@ const MEETING_ATTENDEES: Record<string, Party[]> = {
   coordination_meeting: ["applicant", "clerk", "pws"],
   site_walkthrough: ["applicant", "pws"],
 };
+
+/**
+ * Who attends a meeting, by its card's catalogue id, as one line: "Applicant, City Clerk, Public
+ * Works & Safety". The calendar's tooltip and the panel that schedules the meeting both print
+ * this, so they cannot name different people.
+ */
+export function meetingAttendees(catalogId: string): string {
+  return (MEETING_ATTENDEES[catalogId] ?? ["applicant"]).map((p) => PARTY_LABEL[p]).join(", ");
+}
 
 /**
  * Every meeting card with a scheduled date, on any open case: the pre-application meeting, the
@@ -256,6 +267,7 @@ export function meetingItems(cases: EventCase[], options: { from?: ISODate; to?:
         eventName: c.name,
         tier: c.tier,
         attendees: MEETING_ATTENDEES[t.catalogId] ?? ["applicant"],
+        attendeeNames: meetingAttendees(t.catalogId),
         held: t.status === "done",
       });
     }
@@ -275,7 +287,7 @@ export function meetingCalendarItems(meetings: MeetingItem[]): ActiveCalendarIte
     label: `${m.label}${m.held ? " (held)" : ""}: ${m.eventName}`,
     tier: m.tier,
     kind: "meeting" as const,
-    detail: `Meeting: ${m.label}${m.held ? " (held)" : ""} · ${m.eventName} · ${m.attendees.map((p) => PARTY_LABEL[p]).join(", ")}`,
+    detail: `Meeting: ${m.label}${m.held ? " (held)" : ""} · ${m.eventName} · ${m.attendeeNames}`,
   }));
 }
 

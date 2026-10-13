@@ -238,8 +238,8 @@ export interface StateApi {
   boardColumn(task: Task): BoardColumn;
   /**
    * The applicant's board: their cards by column. Do now is in the PRD's order: a city request
-   * pinned on top, then Submit application once it has unlocked, then by due date. The other
-   * columns keep the order of the plan.
+   * pinned on top, then Submit application once it has unlocked, then by due date (signing
+   * before paying when both are due the same day). The other columns keep the order of the plan.
    */
   boardColumns(c: EventCase): Record<BoardColumn, Task[]>;
   /** The parties that are up now, in the order applicant, clerk, pws, hl. Empty when nobody is. */

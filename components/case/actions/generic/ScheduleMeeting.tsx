@@ -5,7 +5,7 @@ import { Field } from "@/components/ui/field"
 import { Input } from "@/components/ui/input"
 import { InlineAlert } from "@/components/ui/inline-alert"
 import { checkScheduleMeeting, meetingCardFor } from "@/lib/state"
-import { PARTY_LABEL } from "@/lib/types"
+import { meetingAttendees } from "@/lib/view/active"
 import { PanelActions, PanelBody, PanelHeader, useCaseContext, useCaseDispatch } from "../panelKit"
 import type { ActionPanelProps } from "../types"
 
@@ -23,7 +23,6 @@ function ScheduleMeetingPanel({ caseId, arg, role, onClose }: ActionPanelProps) 
   // The day in the field, asked of the engine before the click: today or later, before the
   // event, not a citywide blackout.
   const dateCheck = checkScheduleMeeting(c, arg, role, { date, today })
-  const attendees = [PARTY_LABEL.clerk, ...(card.reviewer && card.reviewer !== "clerk" ? [PARTY_LABEL[card.reviewer]] : []), PARTY_LABEL.applicant]
 
   function submit() {
     const result = dispatch({ type: "schedule_meeting", taskId: arg as string, date }, `Scheduled "${card!.title}".`)
@@ -37,7 +36,8 @@ function ScheduleMeetingPanel({ caseId, arg, role, onClose }: ActionPanelProps) 
       <PanelBody>
         {!check.ok ? <InlineAlert variant="warning">{check.reason}</InlineAlert> : null}
         <p className="text-sm text-fg-secondary">
-          <span className="font-semibold text-fg">Attends:</span> {attendees.join(", ")}
+          {/* The list the calendar's tooltip gives for this meeting, and the card's own "why" in names. */}
+          <span className="font-semibold text-fg">Attends:</span> {meetingAttendees(card.catalogId)}
         </p>
         <Field label="Date" error={check.ok && !dateCheck.ok ? dateCheck.reason : undefined}>
           <Input type="date" value={date} onChange={(e) => setDate(e.target.value)} />

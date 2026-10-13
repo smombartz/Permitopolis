@@ -7,6 +7,7 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { Chip } from "@/components/ui/chip";
 import { CaseId, DueDate, EventTitle, TierBadge } from "@/components/domain";
 import { applicantNameOf } from "@/lib/data/people";
+import { fmtDate } from "@/lib/format";
 import { routes } from "@/lib/routes";
 import { WORK_ORDER_KIND_LABEL, groupWorkOrdersByEvent, type WorkOrderRow } from "@/lib/view/workOrders";
 import type { ISODate } from "@/lib/types";
@@ -54,7 +55,14 @@ function WorkOrdersList({ rows, today, here, filtered = false }: WorkOrdersListP
                   </p>
                 </div>
                 <div className="flex shrink-0 flex-wrap items-center gap-3">
-                  {row.due ? <DueDate date={row.due} today={today} /> : <span className="text-xs text-fg-secondary">No due date</span>}
+                  {/* A finished order has no countdown left to run: its date is a plain fact, never "Overdue by 94 days". */}
+                  {!row.due ? (
+                    <span className="text-xs text-fg-secondary">No due date</span>
+                  ) : row.status === "done" ? (
+                    <span className="text-sm text-fg-secondary">Was due {fmtDate(row.due)}</span>
+                  ) : (
+                    <DueDate date={row.due} today={today} />
+                  )}
                   <Chip variant={row.overdue ? "danger" : row.status === "done" ? "success" : "neutral"}>
                     {row.status === "done" ? "Done" : row.overdue ? "Overdue" : "Scheduled"}
                   </Chip>

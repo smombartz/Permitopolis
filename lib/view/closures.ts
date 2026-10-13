@@ -10,7 +10,7 @@
  * because the map has to show a date the Clerk accepted before routing finished too.
  */
 import { citywideBlackoutOn } from "@/lib/rules";
-import { fmtTime, fmtTimeRange } from "@/lib/format";
+import { fmtTime, fmtTimeRange, plural } from "@/lib/format";
 import { addDaysISO, datesEvery } from "@/lib/dates";
 import { impactedOn } from "@/components/calendar/utils";
 import { occupiedIds } from "@/components/map/geometry";
@@ -159,19 +159,29 @@ export function closureOverlaps(items: ClosureItem[]): ClosureOverlap[] {
 
 export interface ClosureDay {
   date: ISODate;
+  /** Everything on the map that day: `closures` and `bookings` together, the figure the side list counts. */
   count: number;
+  /** Streets and routes closed. */
+  closures: number;
+  /** Plazas, open areas and bookable spaces occupied: on the map, but no street is closed for them. */
+  bookings: number;
   blackoutLabel: string | null;
   impactedReason: string | null;
 }
 
-/** Every day in the range, for the calendar strip: a count of closures, blackout and impacted marks. */
+/** Every day in the range, for the calendar strip: what is on the map, closures and bookings apart, and the blackout and impacted marks. */
 export function closureCalendarDays(range: ClosureRange, items: ClosureItem[]): ClosureDay[] {
-  return datesEvery(range.from, range.to, 1).map((date) => ({
-    date,
-    count: items.filter((item) => item.dates.includes(date)).length,
-    blackoutLabel: citywideBlackoutOn(date),
-    impactedReason: impactedOn(date)[0]?.reason ?? null,
-  }));
+  return datesEvery(range.from, range.to, 1).map((date) => {
+    const onTheDay = items.filter((item) => item.dates.includes(date));
+    const closures = onTheDay.filter((item) => item.case.location && occupiesStreet(item.case.location)).length;
+    return { date, count: onTheDay.length, closures, bookings: onTheDay.length - closures, blackoutLabel: citywideBlackoutOn(date), impactedReason: impactedOn(date)[0]?.reason ?? null };
+  });
+}
+
+/** A day of the strip in words: "1 closure, 2 bookings". A tai chi class on a field is a booking, never a closure. */
+export function closureDayLabel(day: ClosureDay): string {
+  const parts = [day.closures > 0 ? plural(day.closures, "closure") : null, day.bookings > 0 ? plural(day.bookings, "booking") : null].filter((part) => part !== null);
+  return parts.length > 0 ? parts.join(", ") : "No closures or bookings";
 }
 
 /* ---------- the URL ---------- */

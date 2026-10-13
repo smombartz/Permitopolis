@@ -123,7 +123,7 @@ function EventGroupCard({ group }: { group: InspectionEventGroup }) {
 
 /**
  * /city/inspections, Health & Legal's tool (workstream 5D, P2): day-of food booth inspections
- * by event, for each event with vendors on its event day and the next 14 days. There is no
+ * by event, for each permitted event with vendors on its event day and the next 14 days. There is no
  * engine storage for an inspection: a result is written as a fixed, readable activity note and
  * read back from the case's own log (lib/view/inspections.ts).
  */
@@ -145,7 +145,7 @@ function InspectionsScreen() {
         <EmptyState
           icon={ClipboardCheckIcon}
           title="No food booths to inspect"
-          text="Events with food vendors on their day, or in the next 14 days, will show up here."
+          text="No permitted event with food vendors is on today or in the next 14 days."
         />
       ) : (
         <div className="flex flex-col gap-8">

@@ -13,6 +13,8 @@ import {
   clerkOverlay,
   dayOfContactRows,
   hlOverlayForCase,
+  meetingAttendees,
+  meetingCalendarItems,
   meetingItems,
   monthAnchorOf,
   monthGridRange,
@@ -227,6 +229,14 @@ describe("meetingItems", () => {
     expect(coordination.attendees).toEqual(["applicant", "clerk", "pws"]);
     const walkthrough = items.find((i) => i.date === "2027-07-02")!;
     expect(walkthrough.attendees).toEqual(["applicant", "pws"]);
+    // The panel that schedules a meeting names the same people, in the same order, as the calendar's tooltip.
+    expect(meetingAttendees("coordination_meeting")).toBe("Applicant, City Clerk, Public Works & Safety");
+    expect(meetingAttendees("site_walkthrough")).toBe("Applicant, Public Works & Safety");
+    expect(meetingAttendees("pre_application_meeting")).toBe("Applicant, City Clerk, Public Works & Safety, Health & Legal");
+    for (const item of meetingCalendarItems(meetingItems(cases))) {
+      const catalogId = cases.flatMap((c) => c.tasks).find((t) => t.id === item.id)!.catalogId;
+      expect(item.detail?.endsWith(` · ${meetingAttendees(catalogId)}`), item.id).toBe(true);
+    }
     // Scheduled, but S5 is still Quote sent: these two cards stay locked until the permit is
     // issued (the pre-application meeting, held back on Mar 17, is the one already done).
     expect(coordination.held).toBe(false);

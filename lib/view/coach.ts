@@ -15,7 +15,7 @@
  *
  * Owned by workstream 5E (components/shell, lib/data/demoScript.ts, lib/view/palette.ts).
  */
-import { caseTotals } from "@/lib/state";
+import { amendmentStage, caseTotals } from "@/lib/state";
 import { MAIN_PATH, type CaseState, type EventCase, type ISODate, type Party } from "@/lib/types";
 import { DEMO_PATHS, SCENARIO_JUMPS, type DemoPath, type DemoStep, type ScenarioKey } from "@/lib/data/demoScript";
 
@@ -140,12 +140,16 @@ const PATH_CHECKS: Record<number, (ctx: CoachContext) => boolean[]> = {
     return [c.closeout.hoursLoggedOn !== null, atLeastState(c, "closed"), roleReached(ctx, "applicant", "main-street-business-alliance")];
   },
   // Amend up a tier (S1, P1): `amend` applies the tier change, the late fee and the new cards
-  // in one transition, so these three become true together — the engine keeps no state between
-  // them for the coach to read, and a P1 path is not worth a contract change for it.
+  // in one transition, and the wizard keeps its answers to itself until then, so adding the DJ
+  // and choosing the late fee are one step. The path's payoff is the second: the new cards on
+  // the board, with the permit as it was. It stays the current step while the amendment is in
+  // Maya's hands, so the strip tells the presenter what to point at, and is done once she has
+  // submitted it (or it has been decided, or taken effect).
   7: (ctx) => {
     const c = caseFor(ctx, "S1");
-    if (!c) return [false, false, false];
-    return [c.flags.lateFee, c.flags.amendmentPending, c.tasks.some((t) => t.tags.includes("amendment"))];
+    if (!c) return [false, false];
+    const amended = c.tasks.some((t) => t.tags.includes("amendment"));
+    return [amended, amended && amendmentStage(c) !== "proposed"];
   },
 };
 

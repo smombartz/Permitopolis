@@ -327,7 +327,7 @@ Every one is pure. Read cases, the date and the config from the store
 |---|---|
 | My events, board | `applicantCases(cases, personaId)`, `boardColumns(c)` (cards by column, Do now in the PRD's order), `boardColumn(task)`, `taskDueDate(task)`, `taskSubmittedOn(task)` (the day a card last went to the city), `eventDate(c, today)`, `daysUntilEvent(c, today)`, `caseTotals(c)` |
 | My queue | `queueFor(cases, role, today)`: `{ case, task, group, daysWaiting }`, oldest due first; `daysWaiting` counts from the start of the stretch the task has been open for now (a review parked on a request counts from the answer). `waitingOnOthers(cases, role, today)`: the cases where somebody else is up, never one nobody is up on (unless it is stalled). A task with no due date is `later` while fresh and `this_week` once it has been open more than seven days |
-| Money | `caseTotals(c)`; `dueAtQuote`, `quoteBalance`, `quotePaid` (the quote); `refundIfCancelled(c, today, cfg)`: `{ refund, deposit, rule, canCancel }`, what `cancel` pays back today; `closeoutSettlement(c)`: `{ over, deposit, fromDeposit, refund, bill }`, what `reconcile_close` does. Show these, never a sum of your own: each is the figure its transition uses |
+| Money | `caseTotals(c)`; `dueAtQuote`, `quoteBalance`, `quotePaid` (the quote); `sessionPrice(c, cfg)` (what one session of a series costs, at the rates the case was priced with); `refundIfCancelled(c, today, cfg)`: `{ refund, deposit, rule, canCancel }`, what `cancel` pays back today; `closeoutSettlement(c)`: `{ over, deposit, fromDeposit, refund, bill }`, what `reconcile_close` does. Show these, never a sum of your own: each is the figure its transition uses |
 | Cases pipeline | `isVisibleToCity(c)`, `isOpen(c)`, `involves(c, role)`, `involvement(c, party)`, `whoIsUp(c, today)`, `leadTimeRisk(c, today, cfg)`, `reviewClock(c, dept, today)` |
 | Case detail | `waitingOn(c, today)`, `nextMove(c, today, applicantName)`, `availableActions(c, role, { today, cases, cfg })`, `actorsFor(type)` |
 | Active permits | `activePermits(cases, today, { includeHolds })`, `permitSessions(cases, { from, to, includeHolds })` (one entry per held session, for the calendar and map), `hasActivePermit(c)`, `holdsDateAtQuote(c)`, `sessionDates(c)`, `isSessionDate(c, date)`, `lastSessionDate(c)` |
@@ -910,9 +910,9 @@ types its URL in gets "This screen is built for ...", and the switch offered the
 | Amendment | `/events/[id]/amend?step=` | Applicant | `components/wizard/amend/` (`AmendWizardScreen`, `AmendResultPanel`, `AmendReviewStep`) | `lib/view/amend.ts` | The wizard reopened on the same record, on a local copy of the answers. A live panel compares the new plan with the current one (tier, cards added and removed, the fee difference, the date gate). Nothing is dispatched until the last step is confirmed |
 | Payments | `/city/payments?tab=due\|received\|refunds&q=&method=&start=&end=` | City Clerk | `components/city/payments/PaymentsScreen.tsx` | `lib/view/payments.ts` | Due: every quote balance, amendment balance, session due and final bill, oldest first, each with "Record payment" (the case's own payment panel). Received: every payment, by method and date range, a series collapsed to its progress. Refunds: owed (a closeout logged and not reconciled) and issued, each with the rule behind it. A header with collected this month, outstanding and refunds this month |
 | Closures and routes | `/city/map?mode=day\|week\|range&from=&to=&status=&streets=1` | Public Works & Safety | `components/city/closures/` (`ClosuresMapScreen`, `ClosuresSideList`, `ClosuresCalendarStrip`) | `lib/view/closures.ts` | The map for a day, a week or a range: every closure, route and occupied space as Permitted, Date held or Pending review; overlaps named first with both events and their hours; a strip of the days in range with counts and blackout or impacted marks; a side list that opens each case |
-| Work orders | `/city/work-orders?tab=orders\|meetings&status=&kind=&from=&to=` | Public Works & Safety | `components/city/workorders/` (`WorkOrdersScreen`, `WorkOrdersList`, `MeetingsTab`, `TodayPanel`) | `lib/view/workOrders.ts` | Every open case's work orders by event, with what, how many, where, due, overdue and "Mark done" (the work order's panel on its case). A second tab of site walkthroughs and coordination meetings with Schedule, Reschedule and Mark held. On Event day, a "Today" panel for each street closure: its work orders as a checklist, and the time it closed and reopened |
+| Work orders | `/city/work-orders?tab=orders\|meetings&status=&kind=&from=&to=` | Public Works & Safety | `components/city/workorders/` (`WorkOrdersScreen`, `WorkOrdersList`, `MeetingsTab`, `TodayPanel`) | `lib/view/workOrders.ts` | Every open case's work orders by event, with what, how many, where, due, overdue and "Mark done" (the work order's panel on its case); a finished order reads "Was due Thu, Apr 22" with its Done chip, never a countdown. A second tab of site walkthroughs and coordination meetings with Schedule, Reschedule and Mark held, each offered only where the engine allows it (`checkScheduleMeeting()`, `checkCompleteCityTask()`): a held meeting has neither, and a meeting another department hosts says whose it is. On Event day, a "Today" panel for each street closure: its work orders as a checklist, and the time it closed and reopened |
 | Verifications | `/city/verifications?tab=queue\|decided&group=type\|event&type=&result=fail&overdue=1&q=` | Health & Legal | `components/city/verifications/VerificationsScreen.tsx` | `lib/view/verifications.ts` (on `lib/view/verify.ts`) | One queue of every document waiting on Health & Legal across cases, by document type or by event, each row with its checklist already read ("4 of 4 pass", "1 fails: ..."). "Verify the next one" opens the longest-waiting. A row opens the case on Documents with that card's Verify panel. "Recently decided" lists what was verified or sent back, and by whom |
-| Inspections | `/city/inspections` | Health & Legal | `components/city/inspections/InspectionsScreen.tsx` | `lib/view/inspections.ts` | Food booths by event, for every event with food vendors today or in the next 14 days: a booth per vendor, with Pass, Fail or Re-inspect and a note |
+| Inspections | `/city/inspections` | Health & Legal | `components/city/inspections/InspectionsScreen.tsx` | `lib/view/inspections.ts` | Food booths by event, for every permitted event with food vendors today or in the next 14 days: a booth per vendor, with Pass, Fail or Re-inspect and a note. An application still under review is not listed |
 | Settings | `/city/settings?section=fees\|inventory\|blackout\|templates\|service-levels` | City Clerk | `components/city/settings/` (`SettingsScreen` and a file per section) | `lib/view/settings.ts` | Tier rules (thresholds and lead times, with guard rails and a live "What this changes" panel), Fees and deposits, Service levels: all editable. Inventory and rates, the Blackout calendar and Templates: read-only views of `lib/data` |
 
 Also new, on pages that existed:
@@ -952,19 +952,32 @@ Maya Chen adding a DJ to her permitted Instant picnic (S1).
    filled in. On every change the panel shows the tier before and after, "This change makes your
    event Reviewed. Everything you entered is kept; 4 new cards will be added.", the cards, the
    fee difference and the date gate with its three fixes. The last step ("What changes", "What
-   stays", "What happens next") dispatches `amend`.
+   stays", "What happens next") dispatches `amend`. **The money on the panel is the engine's
+   own**: `buildAmendmentDiff()` prices the record `amend` itself would build (`amendedPlan()`),
+   so "To pay" is `amendmentBalance()` of that record, the figure that is then settled. On a
+   permitted event it reads New total, Already paid, "Later sessions, paid on their day" for a
+   series, and To pay or To be refunded. Before the permit nothing has been paid for, so it
+   reads Current total, New total and "Added to your fees" or "Taken off your fees", and says
+   nothing about a permit.
 2. **What `amend` does.** It classifies the record again and runs the date gate again (a place
    that is no longer free is refused; a tier rise or a moved date inside the new lead time needs
    `lateFee: true`). The record takes the new answers, tier, triggers, sessions and fee lines at
    once. If the change adds no card, that is all: it is in effect. On a permitted case the money
    is settled there and then (a difference in the applicant's favor is refunded; one the other
    way reopens the payment card for the applicant to pay at checkout), and Public Works &
-   Safety's work orders are brought in step with the plan (`syncWorkOrders()`).
+   Safety's work orders are brought in step with the plan (`syncWorkOrders()`). Before the
+   permit nothing is settled, but a quote that is out follows the fee lines: its payment card
+   asks for `quoteBalance()` again, the figure checkout takes. Which sessions of a series are
+   paid is the record's to say, whatever list came with the answers (the wizard empties it when
+   the hours or the date are edited), so a paid session stays paid.
 3. **A change that adds a card is pending** (`flags.amendmentPending`). The new cards join the
    board tagged `amendment`. The state, the permit, the date hold and the payments are not
-   touched. What the record looked like before is kept on the amendment's own "Submit
-   application" card (`pendingAmendment(c)`: the answers, tier, triggers, fee lines and how that
-   card stood), which is how the permit keeps its plan and how a decline puts everything back.
+   touched. What the record looked like before is kept on the amendment's own Submit card
+   (`pendingAmendment(c)`: the answers, tier, triggers, fee lines, how that card stood and, on a
+   permitted case, how the payment card stood), which is how the permit keeps its plan and how a
+   decline puts everything back. While it is the amendment's, that card is titled "Submit
+   amendment" (`AMENDMENT_SUBMIT_CARD`); an application's own card gets its name back when the
+   amendment is decided.
 4. **The permit covers the original plan.** `permittedPlan(c)` is the record with the answers,
    tier, triggers and fee lines from before a pending amendment. The permit page and the public
    check (`/verify/[id]`) render that, with a line saying an amendment is pending, and a
@@ -985,7 +998,10 @@ Maya Chen adding a DJ to her permitted Instant picnic (S1).
    application now. On a permitted case the cards the amendment added that wait on a stage the
    case is past open ("Accept conditions and sign", for an event that never had a signature),
    what the amended plan costs beyond what was paid goes on the reopened payment card (nothing is
-   charged; a difference the other way is refunded on the spot), the work orders follow the plan,
+   charged; a difference the other way is refunded on the spot). That card is then "Pay fees and
+   deposit: What your change adds, beyond what you have paid", not the booking's "Pay and book",
+   and the board lists signing before it (cards due the same day: sign first, pay last, the
+   order checkout takes them in). The work orders follow the plan,
    and Health & Legal gets "Issue food permits" if the plan now has food permits to issue. The
    applicant signs and pays at `/events/[id]/quote`, which is the quote page on a case that
    already has its permit.
@@ -1029,9 +1045,11 @@ payment" on a case that never had a quote.
   `lib/view/coach.ts` reads one check per step off the cases (a card's status, a review decided,
   the state reached, a role switched to) and takes the first that has not happened. It is never
   a count of clicks, so it is right after a reload, after the presenter improvises and after
-  Reset, and it goes back a step when the presenter does (path 2's what-if). Path 7's three steps
-  land together: adding the DJ and choosing the late fee happen in the wizard, and one `amend`
-  does all three.
+  Reset, and it goes back a step when the presenter does (path 2's what-if). Path 7 has two steps:
+  adding the DJ and choosing the late fee happen in the wizard, on its own copy of the answers,
+  and one `amend` does both, so they are one step. The second, the new cards on the board with
+  the permit as it was, stays current while the amendment is in Maya's hands, so the strip tells
+  the presenter what to point at; it is done once she submits it.
 - **The strip** (`components/shell/CoachStrip.tsx`, mounted by both shells under the top bar,
   only while Demo hints are on): "Path 3 · Step 2 of 5", the step's text, and one button that
   sets the step's role and persona and opens its page ("Switch to Health & Legal", or "Go to
@@ -1068,7 +1086,15 @@ Every edit calls `setConfig()`, which is a shallow merge (pass a whole `threshol
   open Drafts an edit moves and the six scenarios under the edited values, against the rules as
   they were when the section opened.
 - **Fees and deposits, Service levels.** New estimates, due dates and review allowances use
-  them; a quote already sent keeps its lines.
+  them; a quote already sent keeps its lines. So does a series that is booked: what one of its
+  sessions costs is read off the case's own fee lines (`sessionPrice()`), on Payments, on the
+  board's schedule, at checkout and in the engine's own balance, so doubling the Field rate does
+  not turn a $20 session into a $40 one.
+- **A permit keeps what it was issued for.** "This permit covers" on the permit, "What the
+  permit covers" on the case's Overview and the list in Issue permit are `permitCovers(c)`: the
+  record's stored triggers (and the plan the permit is for, while an amendment is pending),
+  never the tier rules re-read. Lowering "Reviewed at" to 30 does not add an insurance check to
+  Maya's Instant permit for 45 people.
 - **Reset** puts the config back to `DEFAULT_CONFIG` with everything else. "Restore defaults" on
   the page resets the tier rules alone.
 
@@ -1102,16 +1128,48 @@ by the page and read back from the case's log, so Reset and a seed replay carry 
   the store; both are stored and put back by Reset.
 - **`Payment.amendment`**, **`CalendarItem.kind` and `detail`**: additive.
 
+### What the final review changed
+
+The final read-only review returned 17 findings (3 high, 6 medium, 8 low), all confirmed and
+fixed (`docs/plans/2026-10-13-final-review-fixes.md`). What a builder now has to know:
+
+- **A card to finish before submitting is never due in the past.** `cardDueDate()` gives a
+  `submit_by` card the tier's notice before the event, or today when that day is already gone (a
+  late fee taken at the date gate, an amendment close to the day).
+- **The plan a permit covers carries its own money.** `permittedPlan(c)` returns the fee lines
+  from before a pending amendment, `refundIfCancelled()` works from it, and
+  `paidTowardPendingAmendment(c, cfg)` is what has been paid toward an amendment that has not
+  taken effect.
+- **A pending amendment lapses when the event arrives** (`lapseAmendment()`, called first thing
+  by `applyTick()`; "Amendment, end to end", step 9).
+- **One function builds an amended record**: `amendedPlan(c, answers, lateFeeChosen, ctx)`
+  (`{ record, cls, estimate, summary, newCards }`). `amend` starts from it and the wizard's panel
+  prices its diff from it. `tierSummary()` in `lib/rules/classify.ts` writes the one-line
+  result, with the late fee in it when the estimate carries one ("$518.75 with the $53.75 late
+  fee"), on the panel and in the activity log.
+- **`permitCovers(c)`** for what a permit covers and **`sessionPrice(c, cfg)`** for what a
+  session costs: both read the record, not the settings ("Settings, and what it changes").
+- **Signing sorts before paying** when both are due the same day (`byDueDate()` in
+  `lib/state/core.ts`), so the board's Do now, Who's up and the "Next:" sentence all lead with
+  "Accept conditions and sign" on an approved amendment.
+- **Wording that has one source now**: `ENDING_PHRASE` (how an ended case reads in a sentence:
+  "lost its date hold"), `meetingAttendees(catalogId)` in `lib/view/active.ts` (the calendar's
+  tooltip and the Schedule panel), `unroutedDeptNote(c, dept)` in `lib/view/caseDetail.ts` (the
+  Reviews tab's line for a department with no review: "Checks the amendment's card: Sound
+  details (being checked)."), `closureDayLabel(day)` (the day strip: "1 closure, 2 bookings"),
+  `fmtFileType()` ("PDF", never "application/pdf").
+
 ### Tests that hold the new pieces to each other
 
 | File | Holds |
 |---|---|
 | `tests/tool-pages.test.ts` | Each tool page to the case it lists, on the seed and after demo paths 5, 6 and 7: work orders and Public Works & Safety's queue; meetings on the calendar, on the work orders tab and on the card; closures and `permitSessions()`; the verification queue and the Documents tab; inspections and the vendor cards; Payments' Due, Received and Refunds and the engine's figures; an amendment's banner and panel, stage by stage |
-| `tests/demo-paths.test.ts` | The coach's step after every step of all seven paths; path 7 through the checks, the decision, the signature and the payment, and a decline |
+| `tests/demo-paths.test.ts` | The coach's step after every step of all seven paths; path 7 through the checks, the decision, the signature and the payment, a decline, and the date moved to Jun 18 with the amendment still pending |
 | `tests/render/handoffs.test.tsx`, "(j)" | Every sidebar tool link reaches a built page; every new list opens the case and the case returns to it; Settings reach the wizard's live panel; each coach step's page is a built page for its role; the palette reaches every page of each role; demo path 7 clicked from the permit to the amended permit |
 | `tests/both-sides.test.ts` | An amendment's cards "With the city": the department that has each, and its date |
 | `tests/guards.test.ts` | No page under `app/` renders `PlaceholderScreen` |
-| `lib/state/transitions/amendment.test.ts`, `foodPermits.test.ts` | The two engine additions against the real rules and seed |
+| `lib/state/transitions/amendment.test.ts`, `foodPermits.test.ts` | The two engine additions against the real rules and seed: an amendment at every stage when the event arrives, cancelled while pending, at Quote sent, and on a series with a session paid |
+| `lib/view/amend.test.ts` | The wizard's fee difference against `amend`: an amendment that changes nothing costs nothing on every seeded case that can be amended, and what the panel says is to pay is what the engine settles |
 
 ### What is still a placeholder
 
@@ -1280,9 +1338,13 @@ Things a screen builder needs to know that the type signatures do not say.
   "Amplified sound", "Temporary alcohol license", "Food or vendor permit", "Structure fire
   inspection", "Police", "Barricades", "Refundable cleanup deposit", "Late fee". Code that needs
   one line finds it by label; `cancellationRefund()` does so for the application fee.
-- **A series is billed per session.** `estimateFees()` returns `perSession`, `sessions` and
-  `dueNow` (the first session, plus the one-off lines for a Reviewed or Special series, plus a
-  late fee); the fee line itself carries the whole series.
+- **A series is billed per session.** `estimateFees()` returns `perSession`, `sessions`,
+  `perSessionLabels` (which lines are billed once per session) and `dueNow` (the first session,
+  plus the one-off lines for a Reviewed or Special series, plus a late fee); the fee line itself
+  carries the whole series. `perSession` is the fee schedule's price today. A case that has been
+  priced is read with `sessionPrice(c, cfg)` instead (`lib/state/core.ts`): its own per-session
+  lines divided by its sessions, which is what `dueAtQuote()`, `amendmentBalance()` and every
+  screen that names a session's price use. A Draft is still being priced and gets today's.
 - **Every space booked is billed.** Fields 1 and 2 for six hours is one "Field reservation" line
   of 12 hours, $240. The kind of space comes from `lib/data/inventory.ts`, not from its id.
 - **What takes a slot**: a date hold, or a live permit (Permitted, Event day, Closeout). A case
@@ -1475,7 +1537,9 @@ Things a screen builder needs to know that the type signatures do not say.
   share of the fees plus the deposit, never more than was paid. The permit page and the board's
   Cancel dialog print it. `cancellationRefund()` in `lib/rules` is the schedule alone. For a
   series it applies the band to the fees paid so far, not to every session on the fee line: one
-  $20 session of 13 paid, 30 or more days out, is $20 minus the $10 processing fee. The case's
+  $20 session of 13 paid, 30 or more days out, is $20 minus the $10 processing fee. While an
+  amendment is pending it is the permit's own plan that is refunded (`permittedPlan()`), plus
+  anything already paid toward the amendment, whole. The case's
   `endingReason` is a sentence with the amount: "Cancelled by the applicant. Refunded $62.50
   (10 to 29 days before: ...)."
 - **Money after the event.** `closeout.balance` is what the event ran over the estimate and
@@ -1805,17 +1869,17 @@ Amendment:
   moves the date holds the new date, and frees the old one, before anybody has approved it.
   Keeping the original on the calendars until approval means holding two plans on one record.
 - **The applicant cannot take an amendment back.** Once proposed it is pending until the Clerk
-  decides; before it is submitted nobody can end it, and after an approval it waits for the
-  signature and the payment with no deadline that does anything. Should there be "Discard this
-  change" on the board, and should an approved amendment lapse?
+  decides, or until the event arrives: an amendment still pending then lapses, at whatever stage
+  (final review fixes, below). Before that nobody but the Clerk can end it. Should there be
+  "Discard this change" on the board?
 - **A declined amendment leaves nothing on the applicant's board.** The reason is on the case's
   activity log, which the board does not show. Say if the board should carry it until dismissed.
 - **Four new cards, where the PRD's sentence says three.** Maya's banner counts the certificate
-  of insurance, the sound details, Submit application and Accept conditions and sign. The fourth
+  of insurance, the sound details, Submit amendment and Accept conditions and sign. The fourth
   is the signature her Instant event never had.
-- **After approval the payment card comes before the signature card.** Both are due the same
-  day, and the board keeps the order the case got them in; the payment card was on the Instant
-  plan. Either opens the same page, where signing comes first.
+- **After approval the signature card comes before the payment card.** Both are due the same
+  day; the board now lists signing first and paying last among cards due together, as checkout
+  takes them. Either opens the same page.
 - **"Amend" and "Change your event".** The board's menu and the permit say "Change your event";
   the engine's own row for it (`availableActions()`) is still labelled "Amend".
 
@@ -1858,9 +1922,12 @@ Verifications, vendors and inspections:
 - **Food permits are issued in one click.** "Issue food permits" opens the applicant's download
   card; there is no permit per vendor to look at. Before Phase 5 the applicant's card opened
   with the permit itself.
-- **Upcoming inspections include events not yet permitted.** St. Agnes Parish's festival, in
-  review and ten days out, is on the list with its five booths, and a result can be recorded for
-  a booth before its day.
+- **Inspections list permitted events only.** The final review changed this: St. Agnes Parish's
+  festival, in review and ten days out, was on the list with its five booths, and a result could
+  be recorded for an event with no permit. So the page is empty on the seed, and on Jun 18 it
+  lists Jazz in the Plaza only once demo path 3 has permitted it. A result can still be recorded
+  for a booth before its day. Say if Health & Legal should see what is coming while it is still
+  under review, as a list with nothing to record.
 
 The coach and the palette:
 
@@ -1868,8 +1935,9 @@ The coach and the palette:
   a scenario jump. Opening a scenario's case some other way shows nothing.
 - **"Start this path" opens the scenario's first screen; "Continue" opens the current step.**
   Path 7 so starts on Maya's permit, one click from the wizard its first step names.
-- **Path 7 goes from step 1 to done in one click**, because the wizard keeps the DJ and the late
-  fee to itself until the change is confirmed.
+- **Path 7 is two steps, not the PRD's three.** The wizard keeps the DJ and the late fee to
+  itself until the change is confirmed, so they are one step; the second, the tagged cards on
+  the board, stays current until Maya submits the amendment or the presenter picks another path.
 - **Path 2 and the end of path 5 share the new applicant's draft**, so on the demo guide's
   overview finishing path 5 can read as progress on path 2. The strip shows one path.
 
@@ -1883,6 +1951,42 @@ Settings:
   number that is not negative. "What this changes" starts over when the Clerk leaves the section.
 - **No attendance threshold moves the 5K.** Its route and its police make it Special whatever
   the numbers say; the brief's example of it dropping to Reviewed does not happen.
+
+From the final review fixes (2026-10-13):
+
+- **An amendment lapses when the event arrives.** The review asked for it, and the PRD says only
+  that the permit stays valid for the original plan "until the amendment is approved". It is
+  built as: on the morning of the last day the permit covers, an amendment that is not in effect
+  is undone, whatever stage it reached, and anything paid toward it is refunded. So an amendment
+  the Clerk approved the day before, signed and half paid, is gone on event day. Should an
+  approved one be payable through the day, or should the board warn as the day comes near?
+- **An amendment that moves the date lapses on the permit's day.** Maya asks to move her picnic
+  from May 22 to Jun 12 and nobody decides: on May 22 the record goes back to May 22 and that
+  is event day. (One that asks for an earlier date lapses on that earlier date, and the permit
+  stands for the later one.) The other reading is that asking to move gives up the old date.
+- **An amendment while a quote is out.** A change that adds no card takes effect at once, and
+  the quote's payment card now follows the new fee lines (the 5K without its sound: $6,490 on
+  the board and at checkout). The conditions the quote was sent with stay as they are (the 5K
+  keeps "Finish-line sound off by 11 am" with no sound left), and the Clerk is not asked again.
+  Should any amendment on a case whose quote is out go back to the Clerk to re-issue the quote?
+- **A card made inside its lead time is due today.** A Reviewed event 17 days out, taken with the
+  late fee, has its insurance and its Submit card due the day the board is made, where they
+  used to read "Overdue by 13 days". The other choice was a few days' grace
+  (`sla.requestResponseDays`).
+- **The reopened payment card is "Pay fees and deposit"**, with "What your change adds, beyond
+  what you have paid", also on an Instant event that has no deposit (two more hours at a
+  shelter, $50). The button beside it says "Pay the difference". Say if the card should too.
+- **Before the permit, an amendment's fee difference is "Added to your fees" or "Taken off your
+  fees"**, set against the current total; nothing is said to be due or refunded, because nothing
+  has been paid for yet.
+- **A booked series keeps its price when the fee schedule changes**, for the sessions still to
+  come as well as the ones paid. An amendment re-prices the whole series at today's rates.
+- **A finished work order reads "Was due Thu, Apr 22"** beside its Done chip. The day it was
+  finished is in the task's history and is not shown.
+- **The closures day strip says "bookings"** for a plaza, an open area or a bookable space that
+  is on the map without a street closed ("1 closure, 2 bookings").
+- **A row on Walkthroughs and meetings with nothing to offer shows the reason as text** ("Only
+  the City Clerk can schedule this meeting.") and no button; a held meeting shows neither.
 
 Accessibility (the pass that held the prototype to WCAG 2.2 AA; "Accessibility" above):
 

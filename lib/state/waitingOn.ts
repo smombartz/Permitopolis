@@ -277,7 +277,7 @@ function partyName(party: Party, applicantName?: string): string {
 }
 
 /** How an ended case reads in a sentence: "this case was denied", "lost its date hold". */
-const ENDING_PHRASE: Record<Ending, string> = {
+export const ENDING_PHRASE: Record<Ending, string> = {
   withdrawn: "was withdrawn",
   denied: "was denied",
   cancelled: "was cancelled",

@@ -1,7 +1,9 @@
 import { describe, expect, it } from "vitest";
 import { DEFAULT_CONFIG, DEFAULT_DEMO_TODAY } from "@/lib/rules";
-import { buildSeed, transition } from "@/lib/state";
+import { amendmentBalance, buildSeed, sessionPrice, transition } from "@/lib/state";
 import type { EventCase } from "@/lib/types";
+import { seriesSessions } from "./board";
+import { seriesQuoteNote, sessionAmount } from "./checkout";
 import {
   dueRows,
   dueTotal,
@@ -200,5 +202,41 @@ describe("paymentsSummary", () => {
     expect(summary.refundsIssuedThisMonth).toBe(
       refundsIssuedTotal(refundsIssuedRows(cases).filter((r) => r.at.slice(0, 7) === "2027-05")),
     );
+  });
+});
+
+describe("a permitted series keeps the price it was booked at when the Clerk edits the fee schedule", () => {
+  const cases = buildSeed();
+  const TAI_CHI = cases.find((c) => c.name.includes("Tai Chi"))!;
+  const doubled = { ...CFG, fees: { ...CFG.fees, fieldPerHour: CFG.fees.fieldPerHour * 2 } };
+
+  it("Tai Chi's due session is $20 on Payments before and after the Field rate doubles, as its own fee line says", () => {
+    expect(TAI_CHI).toMatchObject({ state: "event_day", tier: "instant" });
+    expect(TAI_CHI.feeLines.map((line) => [line.label, line.qty, line.unitPrice])).toEqual([["Field reservation", 21, 20]]);
+    const session = (cfg: typeof CFG) => dueRows(cases, TODAY, cfg).filter((row) => row.caseId === TAI_CHI.id && row.kind === "session");
+    expect(session(CFG).map((row) => row.amount)).toEqual([20]);
+    expect(session(doubled).map((row) => row.amount)).toEqual([20]);
+    // Settings says a quote or estimate already sent keeps its lines: so does what is outstanding.
+    expect(dueTotal(dueRows(cases, TODAY, doubled))).toBe(dueTotal(dueRows(cases, TODAY, CFG)));
+  });
+
+  it("the board's session schedule, the checkout page and the engine's own balance read the same price", () => {
+    expect(sessionPrice(TAI_CHI, CFG)).toBe(20);
+    expect(sessionPrice(TAI_CHI, doubled)).toBe(20);
+    expect(seriesSessions(TAI_CHI, doubled).map((row) => row.amount)).toEqual(seriesSessions(TAI_CHI, CFG).map((row) => row.amount));
+    expect(sessionAmount(TAI_CHI, doubled)).toBe(20);
+    expect(seriesQuoteNote(TAI_CHI, doubled)?.perSession).toBe(20);
+    // Nothing is owed or refunded on a series nobody has touched, whatever the rate is today.
+    expect(amendmentBalance(TAI_CHI, doubled)).toBe(0);
+  });
+
+  it("a Draft is still being priced: it reads the schedule as it stands, whatever lines an earlier board left on it", () => {
+    const yoga = cases.find((c) => c.id === "PMT-27-0142")!;
+    expect(yoga).toMatchObject({ state: "draft" });
+    expect(sessionPrice(yoga, CFG)).toBe(20);
+    expect(sessionPrice(yoga, doubled)).toBe(40);
+    // Its board, built before the rate changed, carries lines at $20: the booking will not charge that.
+    const withBoard = { ...yoga, feeLines: TAI_CHI.feeLines };
+    expect(sessionPrice(withBoard, doubled)).toBe(40);
   });
 });

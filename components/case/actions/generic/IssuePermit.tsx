@@ -4,8 +4,7 @@ import * as React from "react"
 import { Badge } from "@/components/ui/badge"
 import { InlineAlert } from "@/components/ui/inline-alert"
 import { ConditionList, PartyChip } from "@/components/domain"
-import { classify, permitComponents } from "@/lib/rules"
-import { checkIssuePermit } from "@/lib/state"
+import { checkIssuePermit, permitCovers } from "@/lib/state"
 import { fmtDate } from "@/lib/format"
 import { issuePermitChecklist } from "@/lib/view/clerkTools"
 import { PanelActions, PanelBody, PanelHeader, useCaseContext, useCaseDispatch } from "../panelKit"
@@ -45,7 +44,7 @@ function IssuePermitPanel({ caseId, onClose }: ActionPanelProps) {
 
   const check = checkIssuePermit(c, { today, cases, cfg })
   const checklist = issuePermitChecklist(c)
-  const components = permitComponents(c, c.triggers, classify(c, cfg).blockPartyException)
+  const components = permitCovers(c)
 
   function submit() {
     const result = dispatch({ type: "issue_permit" }, "Permit issued.")

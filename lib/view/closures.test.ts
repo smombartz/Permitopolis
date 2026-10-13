@@ -6,6 +6,7 @@ import { routeLocation, streetsLocation, areaLocation, singleSchedule } from "@/
 import type { EventCase } from "@/lib/types";
 import {
   closureCalendarDays,
+  closureDayLabel,
   closureHoursLabel,
   closureOverlaps,
   closureStatus,
@@ -170,6 +171,30 @@ describe("closureCalendarDays", () => {
     const items = closuresInRange(cases, range);
     const days = closureCalendarDays(range, items);
     expect(days.find((d) => d.date === "2027-06-18")?.count).toBe(2);
+  });
+
+  it("a booked field is not a closure: today's one tai chi class on Field 3 reads \"1 booking\", and the 5K's route on Jul 11 reads \"1 closure\"", () => {
+    const cases = buildSeed();
+    const dayOf = (date: string) => closureCalendarDays({ from: date, to: date }, closuresInRange(cases, { from: date, to: date }))[0];
+
+    const today = dayOf(TODAY);
+    expect(closuresInRange(cases, { from: TODAY, to: TODAY }).map((item) => item.case.location?.label)).toEqual(["Field 3, Riverside Park"]);
+    expect(today).toMatchObject({ count: 1, closures: 0, bookings: 1 });
+    expect(closureDayLabel(today)).toBe("1 booking");
+
+    const race = dayOf("2027-07-11");
+    expect(race.closures).toBe(1);
+    expect(closureDayLabel(race)).toBe(race.bookings > 0 ? `1 closure, ${race.bookings === 1 ? "1 booking" : `${race.bookings} bookings`}` : "1 closure");
+    // Every day's two figures add up to what the map's own list counts beside it.
+    for (const day of closureCalendarDays({ from: "2027-06-14", to: "2027-06-20" }, closuresInRange(cases, { from: "2027-06-14", to: "2027-06-20" }))) expect(day.closures + day.bookings).toBe(day.count);
+  });
+
+  it("the strip's words for a day: nothing, closures, bookings, or both", () => {
+    const day = (closures: number, bookings: number) => ({ date: TODAY, count: closures + bookings, closures, bookings, blackoutLabel: null, impactedReason: null });
+    expect(closureDayLabel(day(0, 0))).toBe("No closures or bookings");
+    expect(closureDayLabel(day(2, 0))).toBe("2 closures");
+    expect(closureDayLabel(day(0, 3))).toBe("3 bookings");
+    expect(closureDayLabel(day(1, 2))).toBe("1 closure, 2 bookings");
   });
 
   it("marks Jul 11 as impacted the week the 5K runs", () => {

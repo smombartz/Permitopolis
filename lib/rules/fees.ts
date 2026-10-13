@@ -113,6 +113,7 @@ export const estimateFees = (
   if (isSeries) {
     const perSessionTotal = round2(perSession.reduce((sum, l) => sum + l.qty * l.unitPrice, 0));
     result.perSession = perSessionTotal;
+    result.perSessionLabels = perSession.map((l) => l.label);
     result.sessions = sessions;
     const oneOffForTierDueNow = cls.tier === "instant" ? 0 : round2(oneOff.reduce((sum, l) => sum + l.qty * l.unitPrice, 0));
     // The late fee is charged once, for taking the booking at short notice, so it is due now.

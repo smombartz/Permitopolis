@@ -93,6 +93,24 @@ describe("boardColumns", () => {
     expect(boardColumns(c).do_now.map((t) => t.catalogId)).toEqual(["asked_for", "submit_application", "sooner", "later", "no_date"]);
   });
 
+  it("Do now: signing comes before paying when both are due the same day, whichever card the case got first", () => {
+    // An approved amendment on an Instant event: the payment card was on the plan from the start, the signature came with the change.
+    const c = makeCase({
+      state: "permitted",
+      tasks: [
+        card("pay_fees", { dueDate: "2027-05-17" }),
+        card("carry_permit", { status: "locked" }),
+        card("sound_details", { dueDate: "2027-05-17" }),
+        card("accept_and_sign", { dueDate: "2027-05-17" }),
+        card("sooner", { dueDate: "2027-05-10" }),
+      ],
+    });
+    expect(boardColumns(c).do_now.map((t) => t.catalogId)).toEqual(["sooner", "accept_and_sign", "sound_details", "pay_fees"]);
+    // A different day decides it, as before.
+    const paysFirst = makeCase({ state: "permitted", tasks: [card("accept_and_sign", { dueDate: "2027-05-18" }), card("pay_fees", { dueDate: "2027-05-17" })] });
+    expect(boardColumns(paysFirst).do_now.map((t) => t.catalogId)).toEqual(["pay_fees", "accept_and_sign"]);
+  });
+
   it("an answered request no longer pins its card", () => {
     const c = makeCase({ tasks: [card("sooner", { dueDate: "2027-05-10" }), card("answered", { dueDate: "2027-06-04", status: "changes_requested", request: { ...request, resolved: true } })] });
     expect(boardColumns(c).do_now.map((t) => t.catalogId)).toEqual(["sooner", "answered"]);

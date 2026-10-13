@@ -150,6 +150,8 @@ function QuotePanel({ c, today, amendment = false, onSettled }: QuotePanelProps)
           description={signed ? undefined : c.conditions.length > 0 ? "Read every condition, then check each one to accept it." : "This plan carries no conditions; your signature accepts the plan as amended."}
         >
           <ConditionList conditions={c.conditions} editable={!signed} acceptedIds={acceptedIds} onToggleAccept={toggleAccept} />
+          {/* Signed with nothing to accept (an amendment's quote): the heading is not left with nothing under it. */}
+          {signed && c.conditions.length === 0 ? <p className="text-sm text-fg-secondary">No conditions on this plan.</p> : null}
         </Section>
       ) : null}
 

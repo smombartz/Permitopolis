@@ -24,10 +24,11 @@ import { addDaysISO } from "@/lib/dates";
 import { fmtMoney } from "@/lib/format";
 import { classify, dueDate, estimateFees, requirements } from "@/lib/rules";
 import { CARD_BY_ID, CITY_TASKS, type CardSpec } from "@/lib/rules/catalog";
-import type { FeeEstimate, RulesCtx } from "@/lib/rules/types";
+import { tierSummary } from "@/lib/rules/classify";
+import type { Classification, FeeEstimate, RulesCtx } from "@/lib/rules/types";
 import type { Actor, EventAnswers, EventCase, ISODate, Task, UnlockEvent } from "@/lib/types";
 import type { Action } from "../actions";
-import { amendmentBalance, amendmentCardsInFlight, amendmentPayOpen, amendmentSignOpen, amendmentStage, pendingAmendment, type PendingAmendment } from "../amendment";
+import { AMENDMENT_SUBMIT_CARD, amendmentBalance, amendmentCardsInFlight, amendmentPayOpen, amendmentSignOpen, amendmentStage, pendingAmendment, type PendingAmendment } from "../amendment";
 import { amendmentNeedsNotice, checkAmend, checkAmendedDate, checkDecideAmendment, lateFeeApplies } from "../checks";
 import { withSessions } from "../newCase";
 import { addTask, appendActivity, findTask, idSuffix, moveTask, newTask, nowOf, patchTask, preSubmitCardsIn, quoteBalance, taskId, totalPaid } from "../core";
@@ -39,6 +40,8 @@ type Extract_<T extends Action["type"]> = Extract<Action, { type: T }>;
 
 const SUBMIT = "submit_application";
 const DECIDE = "decide_amendment";
+/** Why the payment card is open again on a permitted event. `pay` puts the card's own reason back when the balance is paid. */
+const AMENDMENT_BALANCE_WHY = "What your change adds, beyond what you have paid";
 
 /** Only what the wizard collects. An amendment changes the answers, never the record's history. */
 function answersOf(a: EventAnswers): EventAnswers {
@@ -59,27 +62,54 @@ function amendedFeeLines(before: EventCase, fresh: FeeEstimate, ctx: RulesCtx): 
 
 /* ---------- 1. the applicant proposes ---------- */
 
+/** A record with an amendment's answers on it, before anything is checked, tagged or settled. */
+export interface AmendedPlan {
+  /** The record with the new answers, sessions, tier, triggers and fee lines; its cards are still the old ones. */
+  record: EventCase;
+  cls: Classification;
+  /** The new plan's own estimate, with the late fee when this amendment is charged one. */
+  estimate: FeeEstimate;
+  /** "This is a Reviewed event: about 3 weeks, $518.75 with the $53.75 late fee": the tier's line, for the estimate as charged. */
+  summary: string;
+  /** The cards the new plan calls for that the record does not have yet. */
+  newCards: Task[];
+}
+
+/**
+ * What the record becomes under new answers: `amend` starts from this, and the amendment
+ * wizard's panel prices its diff from the same record (lib/view/amend.ts), so the difference it
+ * shows is the one `amend` then settles. `lateFeeChosen` is the applicant's choice at the date
+ * gate; the fee is charged only when the amendment needs notice it does not have.
+ */
+export function amendedPlan(c: EventCase, answers: EventAnswers, lateFeeChosen: boolean, ctx: RulesCtx): AmendedPlan {
+  // Sessions first, as for a Draft: the new schedule's sessions come from the rules engine. Which
+  // of them are paid (or due today) is the record's to say, whatever list came with the answers:
+  // the wizard empties it whenever the hours or the date are edited.
+  const schedule = answers.schedule && c.schedule ? { ...answers.schedule, occurrences: c.schedule.occurrences } : answers.schedule;
+  const withAnswers = withSessions({ ...c, ...answersOf(answers), schedule, flags: { ...c.flags, lateFee: lateFeeChosen } }, ctx);
+  const cls = classify(withAnswers, ctx.cfg);
+  const amended: EventCase = { ...withAnswers, tier: cls.tier, triggers: cls.triggers };
+  // The late fee is for notice the amendment needed and did not have, nothing else.
+  const lateFee = amendmentNeedsNotice(c, amended) && lateFeeApplies(amended, ctx);
+  const estimate = estimateFees(amended, cls, ctx.cfg, { caseId: c.id, lateFee });
+  const newCards = requirements(amended, cls, { caseId: c.id, today: ctx.today, cfg: ctx.cfg }).filter((t) => !c.tasks.some((existing) => existing.id === t.id));
+  const lateFeeLine = estimate.lines.find((line) => line.kind === "late_fee");
+  const summary = lateFeeLine ? tierSummary(cls.tier, estimate.total, lateFeeLine.estimate) : cls.summary;
+  return { record: { ...amended, feeLines: amendedFeeLines(c, estimate, ctx) }, cls, estimate, summary, newCards };
+}
+
 export function amend(c: EventCase, action: Extract_<"amend">, actor: Actor, ctx: RulesCtx): TransitionResult {
   const check = checkAmend(c, ctx.today, eventDate(c, ctx.today));
   if (!check.ok) return check;
 
-  // Sessions first, as for a Draft: the new schedule's sessions come from the rules engine.
-  const withAnswers = withSessions({ ...c, ...answersOf(action.answers), flags: { ...c.flags, lateFee: !!action.lateFee } }, ctx);
-  const cls = classify(withAnswers, ctx.cfg);
-  const amended: EventCase = { ...withAnswers, tier: cls.tier, triggers: cls.triggers };
+  const { record: amended, summary, newCards: fresh } = amendedPlan(c, action.answers, !!action.lateFee, ctx);
 
   const gate = checkAmendedDate(c, amended, ctx);
   if (!gate.ok) return gate;
 
-  // The late fee is for notice the amendment needed and did not have, nothing else.
-  const lateFee = amendmentNeedsNotice(c, amended) && lateFeeApplies(amended, ctx);
-  const estimate = estimateFees(amended, cls, ctx.cfg, { caseId: c.id, lateFee });
-  const freshTasks = requirements(amended, cls, { caseId: c.id, today: ctx.today, cfg: ctx.cfg });
   // A new card is dated from the amendment: it has been the applicant's since now, not since the
   // original application went in.
-  const newCards = freshTasks
-    .filter((t) => !c.tasks.some((existing) => existing.id === t.id))
-    .map((t) => ({ ...t, tags: ["amendment" as const], history: [{ at: nowOf(ctx), actor, status: t.status }] }));
+  const newCards = fresh.map((t) => ({ ...t, tags: ["amendment" as const], history: [{ at: nowOf(ctx), actor, status: t.status }] }));
 
   // Nothing new is required of anybody (a later time the same day, a smaller crowd), or the
   // change lowers the tier: there is nothing to send the City Clerk, so it takes effect at once.
@@ -88,7 +118,6 @@ export function amend(c: EventCase, action: Extract_<"amend">, actor: Actor, ctx
   let next: EventCase = {
     ...amended,
     tasks: [...c.tasks, ...newCards],
-    feeLines: amendedFeeLines(c, estimate, ctx),
     flags: { ...amended.flags, amendmentPending: material },
   };
 
@@ -98,9 +127,11 @@ export function amend(c: EventCase, action: Extract_<"amend">, actor: Actor, ctx
     // In effect now: what it costs more or less is settled, and the work orders follow the plan.
     next = syncWorkOrders(settleDifference(next, ctx), ctx);
   }
+  // Before the permit nothing is settled, but a quote already out asks for the fee lines as
+  // they now are, pending or not: its card says the figure checkout takes.
+  if (!next.permit) next = requote(next, ctx);
 
-  const lateFeeLine = estimate.lines.find((line) => line.kind === "late_fee");
-  next = appendActivity(next, actor, `Amended the plan: ${cls.summary}.${lateFeeLine ? ` Late fee: ${fmtMoney(lateFeeLine.estimate)}.` : ""}`, ctx);
+  next = appendActivity(next, actor, `Amended the plan: ${summary}.`, ctx);
   return { ok: true, case: next };
 }
 
@@ -121,7 +152,7 @@ function reopenSubmitCard(next: EventCase, before: EventCase, ctx: RulesCtx): Ev
     priorTriggers: before.triggers,
     priorLateFee: before.flags.lateFee,
     priorFeeLines: before.feeLines,
-    priorSubmit: was ? { status: was.status, unlocksOn: was.unlocksOn, tags: was.tags } : null,
+    priorSubmit: was ? { status: was.status, unlocksOn: was.unlocksOn, tags: was.tags, title: was.title, why: was.why } : null,
     // Only a permitted case has its payment card opened again by an approval; before the permit the card is still the quote's.
     priorPay: before.permit && pay ? { status: pay.status, title: pay.title, why: pay.why, dueDate: pay.dueDate, unlocksOn: pay.unlocksOn, payload: pay.payload } : null,
     proposedOn: ctx.today,
@@ -129,9 +160,9 @@ function reopenSubmitCard(next: EventCase, before: EventCase, ctx: RulesCtx): Ev
   const ready = preSubmitCardsIn(next);
   const status: "todo" | "locked" = ready ? "todo" : "locked";
   const payload = { ...card.payload, pendingAmendment: stash };
-  return card.status === status
-    ? patchTask(next, id, { tags: ["amendment"], payload })
-    : moveTask(next, id, status, ctx, "system", { tags: ["amendment"], unlocksOn: ready ? null : "presubmit_done", payload });
+  // Named for what it sends while it is the amendment's: "Submit amendment", as its sheet's button says.
+  const asAmendment = { ...AMENDMENT_SUBMIT_CARD, tags: ["amendment" as const], payload };
+  return card.status === status ? patchTask(next, id, asAmendment) : moveTask(next, id, status, ctx, "system", { ...asAmendment, unlocksOn: ready ? null : "presubmit_done" });
 }
 
 /* ---------- 2. the applicant submits ---------- */
@@ -192,14 +223,7 @@ function settleBy(c: EventCase, ctx: RulesCtx): ISODate {
 function approve(c: EventCase, actor: Actor, ctx: RulesCtx): EventCase {
   // Before the permit the amended plan simply is the application now: its review, quote and
   // payment are still ahead and cover it. A quote already out is brought up to the new figure.
-  if (!c.permit) {
-    let next = c;
-    const payCard = findTask(next, taskId(next.id, "pay_fees"));
-    if (next.state === "quote_sent" && payCard && payCard.status !== "done") {
-      next = patchTask(next, payCard.id, { payload: { ...payCard.payload, amount: Math.max(0, quoteBalance(next, ctx.cfg)) } });
-    }
-    return finish(appendActivity(next, actor, "Approved the amendment.", ctx), ctx);
-  }
+  if (!c.permit) return finish(appendActivity(requote(c, ctx), actor, "Approved the amendment.", ctx), ctx);
 
   let next = unlockCardsBehindThePermit(c, ctx);
   const balance = amendmentBalance(next, ctx.cfg);
@@ -208,6 +232,17 @@ function approve(c: EventCase, actor: Actor, ctx: RulesCtx): EventCase {
   const money = balance > 0 ? ` ${fmtMoney(balance)} more is due from the applicant.` : balance < 0 ? ` Refunded ${fmtMoney(-balance)}.` : "";
   next = appendActivity(next, actor, `Approved the amendment.${money}`, ctx);
   return maybeFinishAmendment(next, ctx);
+}
+
+/**
+ * A quote that is out follows the plan it is for: its payment card asks for what is still owed
+ * on the amended fee lines, the figure checkout takes. Nothing to do before the quote is sent
+ * (the card is still locked) or once it is paid.
+ */
+function requote(c: EventCase, ctx: RulesCtx): EventCase {
+  const payCard = findTask(c, taskId(c.id, "pay_fees"));
+  if (c.state !== "quote_sent" || !payCard || payCard.status === "done") return c;
+  return patchTask(c, payCard.id, { payload: { ...payCard.payload, amount: Math.max(0, quoteBalance(c, ctx.cfg)) } });
 }
 
 /** The amendment's cards that wait on a stage this case passed long ago (the quote, the permit) open now, each with its due date. */
@@ -236,7 +271,9 @@ function settleDifference(c: EventCase, ctx: RulesCtx): EventCase {
     return payCard ? patchTask(next, payId, { payload: { ...payCard.payload, amount: totalPaid(next) } }) : next;
   }
   if (balance === 0 || !payCard) return c;
-  const open = { unlocksOn: null, dueDate: settleBy(c, ctx), payload: { ...payCard.payload, amount: balance } };
+  // No longer the booking's card ("Pay and book: payment holds your date") on an event that is
+  // booked and permitted: it is the payment card of a plan with a balance, and says what for.
+  const open = { title: CARD_BY_ID.pay_fees.title, why: AMENDMENT_BALANCE_WHY, unlocksOn: null, dueDate: settleBy(c, ctx), payload: { ...payCard.payload, amount: balance } };
   return payCard.status === "todo" ? patchTask(c, payId, open) : moveTask(c, payId, "todo", ctx, "system", open);
 }
 
@@ -257,14 +294,17 @@ function finish(c: EventCase, ctx: RulesCtx): EventCase {
   return appendActivity(next, "system", c.permit ? "The amendment is in effect: the permit covers the amended plan." : "The amendment is part of the application now.", ctx);
 }
 
-/** The plan before the amendment is no longer needed once it is in effect or declined. */
+/**
+ * The plan before the amendment is no longer needed once it is in effect. A "Submit application"
+ * card the amendment borrowed is the application's again, under its own name.
+ */
 function dropStash(c: EventCase): EventCase {
   const id = taskId(c.id, SUBMIT);
   const card = findTask(c, id);
   if (!card || card.payload.pendingAmendment === undefined) return c;
-  const { pendingAmendment: _dropped, ...payload } = card.payload;
-  void _dropped;
-  return patchTask(c, id, { payload });
+  const { pendingAmendment: stash, ...payload } = card.payload;
+  const own = (stash as PendingAmendment).priorSubmit;
+  return patchTask(c, id, { payload, title: own?.title ?? card.title, why: own?.why ?? card.why });
 }
 
 /** Puts the record back exactly as it was before the amendment and takes the amendment's cards off the board. */
@@ -273,7 +313,8 @@ function decline(c: EventCase, reason: string, actor: Actor, ctx: RulesCtx): Eve
   const why = reason.trim().replace(/[.\s]+$/, "");
   const said = `Declined the amendment: ${why}. The original plan stands.`;
   if (!prior) return appendActivity({ ...c, flags: { ...c.flags, amendmentPending: false } }, actor, said, ctx);
-  return appendActivity(restorePlan(c, prior, "The amendment was declined", ctx), actor, said, ctx);
+  // The fee lines are the original plan's again, and so is what a quote that is out asks for.
+  return appendActivity(requote(restorePlan(c, prior, "The amendment was declined", ctx), ctx), actor, said, ctx);
 }
 
 /**

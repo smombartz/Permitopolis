@@ -29,7 +29,7 @@ function BlackoutSection({ today }: BlackoutSectionProps) {
 
   return (
     <Section title="Blackout calendar" description="Dates the city holds back from every booking, and dates a permitted event impacts without blocking one.">
-      <InlineAlert variant="info">Read-only in the prototype. Edit a rate in Fees and deposits above.</InlineAlert>
+      <InlineAlert variant="info">Read-only in the prototype.</InlineAlert>
 
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-1">

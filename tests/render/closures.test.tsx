@@ -27,6 +27,18 @@ describe("/city/map", () => {
     expect(within(row as HTMLElement).getByText("Date held")).toBeInTheDocument();
   });
 
+  it("the day strip does not call a field booking a closure: today reads \"1 booking\" for the tai chi class, and Jul 11 \"1 closure\" for the 5K", async () => {
+    const first = await renderScreen(<ClosuresMapScreen />, { role: "pws", path: routes.city.map() });
+    const strip = () => within(screen.getByRole("list", { name: "Days in range" }));
+    expect(sideList().getAllByRole("listitem")).toHaveLength(1);
+    expect(strip().getByRole("button", { name: /Mon, May 3/ })).toHaveTextContent("1 booking");
+    expect(strip().queryByText(/closure/)).not.toBeInTheDocument();
+    first.unmount();
+
+    await renderScreen(<ClosuresMapScreen />, { role: "pws", path: `${routes.city.map()}?mode=day&from=2027-07-11` });
+    expect(strip().getByRole("button", { name: /Sun, Jul 11/ })).toHaveTextContent("1 closure");
+  });
+
   it("reads permitted once the case is, through the store", async () => {
     await renderScreen(<ClosuresMapScreen />, { role: "pws", path: `${routes.city.map()}?mode=day&from=2027-07-11` });
 

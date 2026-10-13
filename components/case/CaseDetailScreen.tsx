@@ -156,7 +156,6 @@ function CaseDetailScreen() {
             <OverviewTab
               c={c}
               today={today}
-              cfg={cfg}
               applicantName={applicantName}
               whoIsUp={statuses}
               nextMove={sentence}

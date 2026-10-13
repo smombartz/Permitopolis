@@ -1,6 +1,7 @@
 import { TriangleAlertIcon } from "lucide-react"
 import { KeyValueList } from "@/components/ui/key-value"
 import { FormAnswers } from "@/components/domain"
+import { fmtFileType } from "@/lib/format"
 import type { VerificationPreview } from "@/lib/view/verify"
 import type { Task } from "@/lib/types"
 
@@ -28,7 +29,7 @@ function DocumentPreview({ preview, task }: { preview: VerificationPreview; task
           {preview.unreadableReason}
         </div>
         <p className="text-xs text-fg-secondary">
-          {preview.file ? `${preview.file.name} · ${preview.file.size} · ${preview.file.type || "unknown type"}` : "Nothing was uploaded."}
+          {preview.file ? `${preview.file.name} · ${preview.file.size} · ${fmtFileType(preview.file.type)}` : "Nothing was uploaded."}
         </p>
       </div>
     )

@@ -36,6 +36,7 @@ export {
 } from "./checks";
 // An amendment: where it stands, the plan the permit still covers, what it owes.
 export {
+  AMENDMENT_SUBMIT_CARD,
   amendmentBalance,
   amendmentCardsInFlight,
   amendmentPayOpen,
@@ -43,13 +44,16 @@ export {
   amendmentSignOpen,
   amendmentStage,
   pendingAmendment,
+  permitCovers,
   permittedPlan,
   type AmendmentStage,
   type PendingAmendment,
 } from "./amendment";
+// The record under an amendment's answers, as `amend` builds it: the amendment wizard prices its diff from it.
+export { amendedPlan, type AmendedPlan } from "./transitions/amendment";
 export { advanceClock, isSessionDate, lastSessionDate, sessionDates } from "./clock";
 // What a quote asks for and what is still owed on it ("What a quote asks for" in the readme).
-export { dueAtQuote, quoteBalance, quotePaid, taskDueDate, taskSubmittedOn, vendorHealthPermits } from "./core";
+export { dueAtQuote, quoteBalance, quotePaid, sessionPrice, taskDueDate, taskSubmittedOn, vendorHealthPermits } from "./core";
 export { classifyDraft, newCase, syncDraft } from "./newCase";
 export { buildSeed } from "./seed";
 export {
@@ -79,7 +83,7 @@ export {
 } from "./selectors";
 export { demoToday, hydrateDemoStore, resetDemoStoreForTests, useDemo, useHydrated } from "./store";
 export { transition } from "./transition";
-export { involvement, isStalled, nextMove, waitingOn } from "./waitingOn";
+export { ENDING_PHRASE, involvement, isStalled, nextMove, waitingOn } from "./waitingOn";
 
 import { availableActions } from "./availableActions";
 import { actorsFor } from "./checks";

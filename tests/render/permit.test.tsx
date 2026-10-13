@@ -56,6 +56,22 @@ describe("PermitScreen", () => {
     expect(screen.queryByText("$125")).not.toBeInTheDocument();
   });
 
+  it("a permit keeps what it was issued for when the Clerk moves a threshold in Settings: Maya's Instant permit for 45 people does not gain an insurance check when \"Reviewed at\" drops to 30", async () => {
+    await renderScreen(<PermitScreen />, { scenario: "S1", path: routes.permit(S1) });
+    const covers = () => within(screen.getByText("This permit covers").parentElement!).getAllByRole("listitem").map((item) => item.textContent);
+    expect(storedCase(S1)).toMatchObject({ tier: "instant", attendance: 45 });
+    expect(covers()).toEqual(["Space reservation · City Clerk (automatic for Instant)"]);
+
+    act(() => {
+      const { cfg, setConfig } = useDemo.getState();
+      setConfig({ thresholds: { ...cfg.thresholds, reviewedAttendance: 30 } });
+    });
+    // The case is past Draft, so it keeps its tier (Settings says so), and its permit keeps its list.
+    expect(storedCase(S1).tier).toBe("instant");
+    expect(covers()).toEqual(["Space reservation · City Clerk (automatic for Instant)"]);
+    expect(screen.queryByText(/Insurance verification/)).not.toBeInTheDocument();
+  });
+
   it("the cancellation schedule lists every band and marks the one that applies today", async () => {
     await renderScreen(<PermitScreen />, { scenario: "S1" });
 

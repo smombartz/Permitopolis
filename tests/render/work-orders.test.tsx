@@ -8,7 +8,7 @@ import { CaseDetailScreen } from "@/components/case/CaseDetailScreen";
 import { CityShell } from "@/components/shell/CityShell";
 import { WorkOrdersScreen } from "@/components/city/workorders/WorkOrdersScreen";
 import { routes } from "@/lib/routes";
-import { useDemo } from "@/lib/state";
+import { checkScheduleMeeting, useDemo } from "@/lib/state";
 import { makeCase, makeTask } from "@/lib/state/testSupport";
 import { singleSchedule, streetsLocation } from "@/lib/state/seed/helpers";
 import { renderScreen, storedCase } from "./harness";
@@ -65,6 +65,30 @@ describe("/city/work-orders: the Work orders tab", () => {
     expect(screen.getByText("2 open: 1 overdue, 1 due this week")).toBeInTheDocument();
   });
 
+  it("a finished work order is not drawn as overdue: the page's own count and its rows agree, on the seed and months later", async () => {
+    await renderScreen(<WorkOrdersScreen />, { role: "pws", path: routes.city.workOrders() });
+    const rows = () => screen.getAllByRole("listitem").filter((row) => row.closest('ul[aria-label$="work orders"]'));
+    const doneRows = () => rows().filter((row) => within(row).queryByText("Done"));
+
+    // Seven of the ten seeded work orders are done, all due on a day that has passed.
+    expect(screen.getByText("3 open: 0 overdue, 0 due this week")).toBeInTheDocument();
+    expect(rows()).toHaveLength(10);
+    expect(doneRows()).toHaveLength(7);
+    for (const row of doneRows()) {
+      expect(row).not.toHaveTextContent(/Overdue/);
+      expect(row.querySelector('[data-slot="due-date"]')).toBeNull();
+      expect(row).toHaveTextContent(/Was due \w{3}, \w{3} \d+, 2027/);
+    }
+    expect(document.querySelectorAll("[data-overdue]")).toHaveLength(0);
+
+    act(() => useDemo.getState().setDemoToday("2027-07-11"));
+    for (const row of doneRows()) expect(row).not.toHaveTextContent(/Overdue/);
+    // An open row still counts down, and goes red when it is late.
+    const open = rows().filter((row) => within(row).queryByText("Mark done"));
+    expect(open.length).toBeGreaterThan(0);
+    for (const row of open) expect(row.querySelector('[data-slot="due-date"]')).not.toBeNull();
+  });
+
   it("a kind filter narrows the list", async () => {
     const { user } = await renderScreen(<WorkOrdersScreen />, { role: "pws", path: routes.city.workOrders() });
 
@@ -116,12 +140,18 @@ describe("/city/work-orders: Walkthroughs and meetings", () => {
 
     const coordination = screen.getByText("Coordination meeting · Scheduled for Fri, Jul 23, 2027");
     const walkthrough = screen.getByText("Site walkthrough · Scheduled for Fri, Aug 6, 2027");
-    expect(within(coordination.closest("li") as HTMLElement).getByRole("link", { name: /^Reschedule: / })).toBeInTheDocument();
+    // The walkthrough is Public Works & Safety's to move; the coordination meeting is the Clerk's, and the row says so.
     expect(within(walkthrough.closest("li") as HTMLElement).getByRole("link", { name: /^Reschedule: / })).toBeInTheDocument();
+    const clerks = within(coordination.closest("li") as HTMLElement);
+    expect(clerks.queryByRole("link", { name: /^Reschedule: / })).not.toBeInTheDocument();
+    expect(clerks.getByText("Only the City Clerk can schedule this meeting.")).toBeInTheDocument();
+    // One reason, and no dead Mark held button beside it saying the same thing again.
+    expect(clerks.queryByRole("button", { name: /^Mark held: / })).not.toBeInTheDocument();
+    expect(clerks.queryByText(/can close this meeting/)).not.toBeInTheDocument();
   });
 
   it("a meeting with no date yet reads 'Not yet scheduled' and offers Schedule, not Mark held", async () => {
-    const task = makeTask({ id: "x:coordination_meeting", catalogId: "coordination_meeting", owner: "applicant", kind: "meeting", status: "locked", reviewer: "clerk" });
+    const task = makeTask({ id: "x:site_walkthrough", catalogId: "site_walkthrough", owner: "applicant", kind: "meeting", status: "locked", reviewer: "pws" });
     await renderScreen(<WorkOrdersScreen />, {
       role: "pws",
       path: `${routes.city.workOrders()}?tab=meetings`,
@@ -133,6 +163,40 @@ describe("/city/work-orders: Walkthroughs and meetings", () => {
     expect(screen.queryByText("Mark held")).not.toBeInTheDocument();
   });
 
+  it("every Schedule or Reschedule link opens a panel that can schedule: none for a meeting already held, none for a meeting somebody else hosts", async () => {
+    await renderScreen(<WorkOrdersScreen />, { role: "pws", path: `${routes.city.workOrders()}?tab=meetings` });
+    const rows = within(screen.getByRole("list", { name: "Walkthroughs and meetings" })).getAllByRole("listitem");
+    expect(rows).toHaveLength(10);
+
+    const cases = useDemo.getState().cases;
+    let links = 0;
+    for (const row of rows) {
+      const link = within(row).queryByRole("link", { name: /^(Schedule|Reschedule): / });
+      const held = /· Held$/.test(row.querySelector("p")?.textContent ?? "");
+      const clerks = row.textContent?.includes("Coordination meeting") ?? false;
+      // Four were held, and of the six still to come the three coordination meetings are the City Clerk's: seven rows with no link.
+      expect([row.textContent, link !== null]).toEqual([row.textContent, !held && !clerks]);
+      if (held) expect(row).not.toHaveTextContent(/Only the City Clerk|already been held/);
+      if (!held && clerks) expect(row).toHaveTextContent("Only the City Clerk can schedule this meeting.");
+      if (!link) continue;
+      links += 1;
+      // The link's own panel agrees: the engine lets this role schedule that meeting.
+      const [, caseId, taskId] = /\/city\/cases\/([^?]+)\?.*task=schedule_meeting%3A([^&]+)/.exec(link.getAttribute("href") ?? "") ?? [];
+      const c = cases.find((candidate) => candidate.id === caseId)!;
+      expect(checkScheduleMeeting(c, decodeURIComponent(taskId), "pws")).toEqual({ ok: true });
+    }
+    expect(links).toBe(3);
+  });
+
+  it("the City Clerk can schedule either kind, and still gets no link for a meeting that was held", async () => {
+    await renderScreen(<WorkOrdersScreen />, { role: "clerk", path: `${routes.city.workOrders()}?tab=meetings` });
+    const rows = within(screen.getByRole("list", { name: "Walkthroughs and meetings" })).getAllByRole("listitem");
+    const linked = rows.filter((row) => within(row).queryByRole("link", { name: /^(Schedule|Reschedule): / }));
+    expect(linked).toHaveLength(6);
+    expect(rows.filter((row) => /· Held$/.test(row.querySelector("p")?.textContent ?? ""))).toHaveLength(4);
+    expect(document.body).not.toHaveTextContent("Only the City Clerk");
+  });
+
   it("scheduling a walkthrough through the hand-off refuses a date after the event, with the engine's reason", async () => {
     const c = {
       ...makeCase({ id: "PMT-27-7030", tier: "special", state: "permitted", schedule: singleSchedule("2027-06-01", "09:00", "12:00") }),
@@ -141,6 +205,8 @@ describe("/city/work-orders: Walkthroughs and meetings", () => {
     await renderScreen(<CaseDetailScreen />, { role: "pws", path: routes.city.case(c.id, { task: "schedule_meeting:PMT-27-7030:site_walkthrough" }), cases: [c] });
 
     const dialog = within(screen.getByRole("dialog"));
+    // Who attends is the calendar's list for this meeting: Public Works & Safety walks the site with the applicant. The Clerk is not on it.
+    expect(dialog.getByText("Attends:").parentElement).toHaveTextContent("Attends: Applicant, Public Works & Safety");
     fireEvent.change(dialog.getByLabelText("Date"), { target: { value: "2027-06-15" } });
     expect(dialog.getByText("Choose a date before Tue, Jun 1, 2027.")).toBeInTheDocument();
     expect(dialog.getByRole("button", { name: "Schedule" })).toBeDisabled();

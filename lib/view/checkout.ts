@@ -11,7 +11,7 @@ import { format } from "date-fns";
 import { toDate } from "@/lib/dates";
 import { fmtDate, fmtMoney, fmtTimeRange, plural } from "@/lib/format";
 import { classify, estimateFees, type FeeEstimate, type RulesConfig, type RulesCtx } from "@/lib/rules";
-import { amendmentPayOpen, amendmentPaymentDue, amendmentSignOpen, caseTotals, dueAtQuote, hasActivePermit, lateFeeApplies, quoteBalance, quotePaid } from "@/lib/state";
+import { amendmentPayOpen, amendmentPaymentDue, amendmentSignOpen, caseTotals, dueAtQuote, hasActivePermit, lateFeeApplies, quoteBalance, quotePaid, sessionPrice } from "@/lib/state";
 import { ENDING_LABEL, type Condition, type EventCase, type ISODate } from "@/lib/types";
 import { routes } from "@/lib/routes";
 
@@ -223,14 +223,12 @@ export function seriesQuoteNote(c: EventCase, cfg: RulesConfig): SeriesQuoteNote
   if (!c.schedule?.recurrence) return null;
   const estimate = estimateFees(c, classify(c, cfg), cfg, { caseId: c.id });
   const sessions = estimate.sessions ?? 1;
-  return { sessionsRemaining: Math.max(0, sessions - 1), perSession: estimate.perSession ?? 0 };
+  return { sessionsRemaining: Math.max(0, sessions - 1), perSession: sessionPrice(c, cfg) };
 }
 
-/** One series session's price, for the SESSION mode's payment form. */
+/** One series session's price, for the SESSION mode's payment form: the case's own (`sessionPrice()`), not the fee schedule re-read. */
 export function sessionAmount(c: EventCase, cfg: RulesConfig): number {
-  if (!c.schedule?.recurrence) return 0;
-  const estimate = estimateFees(c, classify(c, cfg), cfg, { caseId: c.id });
-  return estimate.perSession ?? 0;
+  return sessionPrice(c, cfg);
 }
 
 /** Every condition in `conditions` has a matching id in `acceptedIds`. */

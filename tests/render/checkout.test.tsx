@@ -178,6 +178,35 @@ describe("FeeTable rendering sanity", () => {
 describe("CheckoutScreen: an amendment's quote, on a case that already has its permit", () => {
   const S1 = "PMT-27-0109";
 
+  it("demo path 7 approved: signing comes first, and once signed the Conditions section says the plan has none instead of standing empty", async () => {
+    await renderScreen(<CheckoutScreen />, { scenario: "S1", path: routes.quote(S1) });
+    act(() => {
+      const dispatch = useDemo.getState().dispatch;
+      const s1 = storedCase(S1);
+      const steps: [Parameters<typeof dispatch>[1], Parameters<typeof dispatch>[2]][] = [
+        [{ type: "amend", answers: { ...s1, addOns: { ...s1.addOns, amplifiedSound: true } }, lateFee: true }, "applicant"],
+        [{ type: "complete_task", taskId: `${S1}:sound_details`, form: { equipment: "One DJ booth", soundCheckTime: "10:30" } }, "applicant"],
+        [{ type: "complete_task", taskId: `${S1}:insurance_certificate`, files: [{ name: "coi.pdf", size: 200_000, type: "application/pdf" }] }, "applicant"],
+        [{ type: "submit" }, "applicant"],
+        [{ type: "verify_document", taskId: `${S1}:sound_details` }, "pws"],
+        [{ type: "verify_document", taskId: `${S1}:insurance_certificate` }, "hl"],
+        [{ type: "decide_amendment", decision: "approve" }, "clerk"],
+      ];
+      for (const [action, actor] of steps) expect(dispatch(S1, action, actor)).toMatchObject({ ok: true });
+    });
+    expect(storedCase(S1).conditions).toEqual([]);
+    const conditions = () => screen.getByRole("heading", { name: "Conditions" }).closest("section") as HTMLElement;
+    expect(conditions()).toHaveTextContent("This plan carries no conditions; your signature accepts the plan as amended.");
+
+    act(() => {
+      expect(useDemo.getState().dispatch(S1, { type: "accept_and_sign", signature: "Maya Chen" }, "applicant")).toMatchObject({ ok: true });
+    });
+    // Signed, with the payment still to make: the heading has a line under it.
+    expect(screen.getByText("Signed and dated.")).toBeInTheDocument();
+    expect(conditions()).toHaveTextContent("ConditionsNo conditions on this plan.");
+    expect(screen.getByRole("button", { name: "Pay $393.75" })).toBeInTheDocument();
+  });
+
   it("a change that only costs more (two more hours) has nothing to sign: the page takes the $50 and goes back to the board", async () => {
     const { user } = await renderScreen(<CheckoutScreen />, { scenario: "S1", path: routes.quote(S1) });
     // Before any change the permitted picnic has nothing to pay here.

@@ -27,7 +27,7 @@ function capacityOf(space: (typeof SPACES)[number]): string {
 function InventorySection() {
   return (
     <Section title="Inventory and rates" description="Every bookable space and area, with its capacity, amenities and rate.">
-      <InlineAlert variant="info">Inventory is fixed in the prototype. Edit a rate in Fees and deposits above.</InlineAlert>
+      <InlineAlert variant="info">Inventory is fixed in the prototype. Edit a rate in the Fees and deposits tab.</InlineAlert>
 
       <Table aria-label="Inventory and rates">
         <TableHeader>

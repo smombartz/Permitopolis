@@ -540,6 +540,12 @@ describe("canAmend", () => {
   it("a closed case cannot be amended", () => {
     expect(find(CLOSED).state).toBe("closed");
     expect(canAmend(find(CLOSED), TODAY)).toEqual({ ok: false, reason: "This case is closed; it cannot be amended." });
+    // An ending is said as a sentence, in the words the case itself uses: never "This case is hold expired".
+    const ended = (ending: "withdrawn" | "denied" | "cancelled" | "hold_expired") => canAmend({ ...find(S1), ending }, TODAY).reason;
+    expect(ended("hold_expired")).toBe("This case lost its date hold; it cannot be amended.");
+    expect(ended("withdrawn")).toBe("This case was withdrawn; it cannot be amended.");
+    expect(ended("denied")).toBe("This case was denied; it cannot be amended.");
+    expect(ended("cancelled")).toBe("This case was cancelled; it cannot be amended.");
   });
 
   it("a case past its last session cannot be amended", () => {
@@ -565,6 +571,20 @@ describe("amendmentBanner", () => {
     const locked = { ...c.tasks[0], catalogId: "submit_application", tags: ["amendment" as const], status: "locked" as const };
     const pending = { ...c, tasks: [...c.tasks, locked], flags: { ...c.flags, amendmentPending: true } };
     expect(amendmentBanner(pending)).toMatchObject({ awaitingCity: false });
+  });
+
+  it("speaks of the permit only on an event that has one: an application amended while it is still under review has no permit to stay valid", () => {
+    const s3 = find("PMT-27-0118"); // Jazz in the Plaza, Needs info: no permit yet
+    expect(s3.permit).toBeNull();
+    const card = (status: "locked" | "done") => ({ ...s3.tasks[0], id: `${s3.id}:submit_application_x`, catalogId: "submit_application", tags: ["amendment" as const], status });
+    const pending = (status: "locked" | "done") => ({ ...s3, tasks: [...s3.tasks.filter((t) => t.catalogId !== "submit_application"), card(status)], flags: { ...s3.flags, amendmentPending: true } });
+    expect(amendmentBanner(pending("locked"))?.text).toBe("An amendment is pending. Finish the new cards below, then submit it.");
+    expect(amendmentBanner(pending("done"))?.text).toBe("An amendment is pending. It is with the City Clerk for a decision.");
+    for (const status of ["locked", "done"] as const) expect(amendmentBanner(pending(status))?.text).not.toMatch(/permit/);
+    // Maya's permitted picnic keeps the sentence.
+    const s1 = find(S1);
+    const permitted = { ...s1, tasks: [...s1.tasks, { ...s1.tasks[0], catalogId: "submit_application", tags: ["amendment" as const], status: "locked" as const }], flags: { ...s1.flags, amendmentPending: true } };
+    expect(amendmentBanner(permitted)?.text).toBe("An amendment is pending. Finish the new cards below, then submit it; your current permit stays valid for the original plan until it is decided.");
   });
 
   it("tells the applicant it is with the City Clerk once Submit application (the amendment's) is done", () => {

@@ -565,7 +565,7 @@ describe("amend: Maya adds a DJ to her permitted picnic on May 3 (demo path 7)",
     expect(new Set(amended.feeLines.map((line) => line.id)).size).toBe(5);
     // What she paid for the original plan stays paid; the rest comes with the amendment's quote.
     expect(caseTotals(amended)).toMatchObject({ total: 518.75, paid: 125, due: 393.75 });
-    expect(amended.activity.at(-1)?.text).toBe("Amended the plan: This is a Reviewed event: about 3 weeks, $465 estimated. Late fee: $53.75.");
+    expect(amended.activity.at(-1)?.text).toBe("Amended the plan: This is a Reviewed event: about 3 weeks, $518.75 with the $53.75 late fee.");
     // The slot is still hers.
     expect(availability(S1.answers.location!, SHELTER_3_WINDOW, ctx(TODAY, [amended])).status).toBe("booked");
   });

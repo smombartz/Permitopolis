@@ -1,7 +1,7 @@
 /**
  * Pure view-model for Health & Legal's Inspections page (workstream 5D, P2): day-of food booth
- * inspections, one booth per food vendor, for every event on its event day or in the next 14
- * days. No React, no store.
+ * inspections, one booth per food vendor, for every permitted event on its event day or in the
+ * next 14 days. No React, no store.
  *
  * The engine keeps no inspection of its own (there is no engineRequest for one: recording a
  * result is a one-line activity note, not a new kind of state). A result is written with
@@ -11,7 +11,7 @@
  */
 import { applicantNameOf } from "@/lib/data/people";
 import { addDaysISO } from "@/lib/dates";
-import { isVisibleToCity, sessionDates } from "@/lib/state";
+import { hasActivePermit, isVisibleToCity, sessionDates } from "@/lib/state";
 import type { EventCase, ISODate, ISODateTime, Task, Tier } from "@/lib/types";
 
 export type InspectionResult = "pass" | "fail" | "re-inspect";
@@ -86,9 +86,11 @@ export interface InspectionEventGroup {
 const UPCOMING_WINDOW_DAYS = 14;
 
 /**
- * Every open event with food vendors whose day falls today or in the next 14 days, one group
- * per event, sorted by date then name. A series only ever shows its earliest matching session:
- * a food booth list is for the day, not the whole run.
+ * Every permitted event with food vendors whose day falls today or in the next 14 days, one
+ * group per event, sorted by date then name. A day-of inspection is of an event that is going
+ * ahead: an application still under review has no permit to hold its day under, so it is not
+ * listed and no result can be recorded for it. A series only ever shows its earliest matching
+ * session: a food booth list is for the day, not the whole run.
  */
 export function buildInspectionGroups(cases: EventCase[], today: ISODate): InspectionEventGroup[] {
   const horizon = addDaysISO(today, UPCOMING_WINDOW_DAYS);
@@ -96,6 +98,7 @@ export function buildInspectionGroups(cases: EventCase[], today: ISODate): Inspe
   for (const c of cases) {
     // A Draft is the applicant's alone: the city has no page for it, and no booth of its to inspect.
     if (c.ending !== null || !isVisibleToCity(c)) continue;
+    if (!hasActivePermit(c)) continue;
     const booths = boothRowsFor(c);
     if (booths.length === 0) continue;
     const upcoming = sessionDates(c).filter((d) => d >= today && d <= horizon);

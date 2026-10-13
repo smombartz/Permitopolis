@@ -7,7 +7,7 @@ import { ConditionList, FeeTable, ReviewClock, ReviewStatusDot } from "@/compone
 import { fmtDate } from "@/lib/format"
 import { checkCompleteCityTask, reviewClock, useDemo } from "@/lib/state"
 import { PARTY_LABEL, type Dept, type EventCase, type ISODate, type Party } from "@/lib/types"
-import { openKeyForAction, reviewSummaries } from "@/lib/view/caseDetail"
+import { openKeyForAction, reviewSummaries, unroutedDeptNote } from "@/lib/view/caseDetail"
 import { meetingCardsFor } from "@/lib/view/reviewTools"
 
 /**
@@ -87,7 +87,6 @@ function ReviewsTab({ c, role, onOpen }: ReviewsTabProps) {
   return (
     <div className="flex flex-col gap-8">
       {ordered.map((summary) => {
-        const cardsNamedForDept = !summary.routed ? c.tasks.filter((t) => t.owner === "applicant" && t.reviewer === summary.dept) : []
         const clock = summary.routed && !summary.review!.decidedOn && (role === "clerk" || summary.isOwn) ? reviewClock(c, summary.dept, today) : null
 
         return (
@@ -109,15 +108,7 @@ function ReviewsTab({ c, role, onOpen }: ReviewsTabProps) {
             }
           >
             {!summary.routed ? (
-              <p className="text-sm text-fg-secondary">
-                {summary.dept === "clerk"
-                  ? "No license review on this case."
-                  : c.ending
-                    ? "This case ended before it could be routed here."
-                    : cardsNamedForDept.length > 0
-                      ? `Named on ${cardsNamedForDept.length === 1 ? "a card" : "cards"} (${cardsNamedForDept.map((t) => t.title).join(", ")}), waiting for routing.`
-                      : "The City Clerk has not routed this case to this department."}
-              </p>
+              <p className="text-sm text-fg-secondary">{unroutedDeptNote(c, summary.dept)}</p>
             ) : (
               <div className="flex flex-col gap-4">
                 {clock ? <ReviewClock dayCount={clock.day} allowedDays={clock.of} paused={clock.paused} pausedDays={clock.pausedDays} /> : null}

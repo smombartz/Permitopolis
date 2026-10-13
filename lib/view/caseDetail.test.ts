@@ -25,6 +25,7 @@ import {
   reviewSummaries,
   seriesSummary,
   sinceLastActedCount,
+  unroutedDeptNote,
 } from "./caseDetail";
 
 const TODAY = DEFAULT_DEMO_TODAY;
@@ -125,7 +126,7 @@ describe("headerReviewClock", () => {
 
 describe("buildOverview", () => {
   it("fills every row it can for S5, a route with city services and amplified sound", () => {
-    const overview = buildOverview(S5, DEFAULT_CONFIG);
+    const overview = buildOverview(S5);
     const byLabel = Object.fromEntries(overview.rows.map((r) => [r.label, r.value]));
     expect(byLabel["Event type"]).toBe("Race or parade");
     expect(byLabel["Place"]).toContain("Downtown loop");
@@ -139,9 +140,35 @@ describe("buildOverview", () => {
     expect(overview.components.length).toBeGreaterThan(0);
   });
 
+  it("what the permit covers is read off the record, not off the tier rules as Settings has them now", () => {
+    const s1 = cases.find((c) => c.id === "PMT-27-0109")!;
+    const covers = (c: typeof s1) => buildOverview(c).components.map((comp) => `${comp.label} · ${comp.approvedBy}`);
+    expect(s1).toMatchObject({ tier: "instant", attendance: 45, triggers: [] });
+    expect(covers(s1)).toEqual(["Space reservation · City Clerk (automatic for Instant)"]);
+    // Every seeded case past Draft reads the same under a lowered threshold: there is no config to read.
+    expect(buildOverview.length).toBe(1);
+    // A block party's exception is on the record too (its trigger), whatever the limit is today.
+    const s4 = cases.find((c) => c.id === "PMT-27-0126")!;
+    expect(s4.triggers.map((t) => t.id)).toContain("block_party");
+    expect(covers(s4)).toContain("Block party approval · City Clerk, Public Works & Safety");
+    expect(covers(s4).some((line) => line.startsWith("Street closure"))).toBe(false);
+  });
+
+  it("while an amendment is pending the list is the plan the permit covers, under the banner that says so", () => {
+    const s1 = cases.find((c) => c.id === "PMT-27-0109")!;
+    const pending = transition(s1, { type: "amend", answers: { ...s1, addOns: { ...s1.addOns, amplifiedSound: true } }, lateFee: true }, "applicant", { today: TODAY, cases, cfg: DEFAULT_CONFIG });
+    if (!pending.ok) throw new Error(pending.reason);
+    expect(pending.case).toMatchObject({ tier: "reviewed", flags: { amendmentPending: true } });
+    const overview = buildOverview(pending.case);
+    expect(overview.components.map((comp) => comp.label)).toEqual(["Space reservation"]);
+    // The rest of the Overview is the record as amended: its add-ons and its triggers.
+    expect(overview.triggers.map((t) => t.id)).toEqual(["amplified_sound"]);
+    expect(Object.fromEntries(overview.rows.map((r) => [r.label, r.value]))["Add-ons"]).toContain("Amplified sound");
+  });
+
   it("reads 'Not provided' territory as null for what a minimal case leaves out", () => {
     const draft = makeCase({ description: undefined, location: null, schedule: null, attendance: null });
-    const overview = buildOverview(draft, DEFAULT_CONFIG);
+    const overview = buildOverview(draft);
     const byLabel = Object.fromEntries(overview.rows.map((r) => [r.label, r.value]));
     expect(byLabel["Description"]).toBeNull();
     expect(byLabel["Place"]).toBeNull();
@@ -155,13 +182,52 @@ describe("buildOverview", () => {
 
   it("a series has its Sessions row; tents and stages are counted in the plural", () => {
     const s2 = cases.find((c) => c.id === "PMT-27-0142")!;
-    const byLabel = Object.fromEntries(buildOverview(s2, DEFAULT_CONFIG).rows.map((r) => [r.label, r.value]));
+    const byLabel = Object.fromEntries(buildOverview(s2).rows.map((r) => [r.label, r.value]));
     expect(byLabel["Sessions"]).toMatch(/^Weekly, 13 sessions/);
 
     const tents = (count: number) =>
-      Object.fromEntries(buildOverview(makeCase({ addOns: { ...S5.addOns, amplifiedSound: false, cityServices: null, tentsStages: { count } } }), DEFAULT_CONFIG).rows.map((r) => [r.label, r.value]))["Add-ons"];
+      Object.fromEntries(buildOverview(makeCase({ addOns: { ...S5.addOns, amplifiedSound: false, cityServices: null, tentsStages: { count } } })).rows.map((r) => [r.label, r.value]))["Add-ons"];
     expect(tents(1)).toBe("1 tent or stage");
     expect(tents(3)).toBe("3 tents or stages");
+  });
+});
+
+describe("unroutedDeptNote: what a department with no review on the case is told on the Reviews tab", () => {
+  const ctx = { today: TODAY, cases, cfg: DEFAULT_CONFIG };
+  const run = (c: (typeof cases)[number], action: Parameters<typeof transition>[1], actor: Parameters<typeof transition>[2]) => {
+    const result = transition(c, action, actor, ctx);
+    if (!result.ok) throw new Error(result.reason);
+    return result.case;
+  };
+
+  it("before routing, a department named on a card is waiting for routing", () => {
+    const s4 = cases.find((c) => c.id === "PMT-27-0126")!; // the Maple Street block party, Submitted
+    expect(s4).toMatchObject({ state: "submitted", reviews: [] });
+    expect(unroutedDeptNote(s4, "hl")).toBe("Named on a card (Certificate of insurance), waiting for routing.");
+    expect(unroutedDeptNote(s4, "clerk")).toBe("No license review on this case.");
+  });
+
+  it("an amended Instant event is never routed: each department checks the amendment's own card, and the note says where that card is", () => {
+    const s1 = cases.find((c) => c.id === "PMT-27-0109")!;
+    let c = run(s1, { type: "amend", answers: { ...s1, addOns: { ...s1.addOns, amplifiedSound: true } }, lateFee: true }, "applicant");
+    expect(c.reviews).toEqual([]);
+    expect(unroutedDeptNote(c, "pws")).toBe("Checks the amendment's card: Sound details (with the applicant).");
+    expect(unroutedDeptNote(c, "hl")).toBe("Checks the amendment's card: Certificate of insurance (with the applicant).");
+
+    c = run(c, { type: "complete_task", taskId: `${c.id}:sound_details`, form: { equipment: "One DJ booth", soundCheckTime: "10:30" } }, "applicant");
+    // The same department has "Verify Sound details" in its queue now; nothing here is "waiting for routing".
+    expect(queueFor([c], "pws", TODAY).map((row) => row.task.catalogId)).toEqual(["verify:sound_details"]);
+    expect(unroutedDeptNote(c, "pws")).toBe("Checks the amendment's card: Sound details (being checked).");
+    for (const dept of ["pws", "hl"] as const) expect(unroutedDeptNote(c, dept)).not.toMatch(/routing/);
+
+    c = run(c, { type: "verify_document", taskId: `${c.id}:sound_details` }, "pws");
+    expect(unroutedDeptNote(c, "pws")).toBe("Checks the amendment's card: Sound details (checked).");
+  });
+
+  it("an ended case, and a department with nothing on the case", () => {
+    const s1 = cases.find((c) => c.id === "PMT-27-0109")!;
+    expect(unroutedDeptNote(s1, "pws")).toBe("The City Clerk has not routed this case to this department.");
+    expect(unroutedDeptNote({ ...s1, ending: "cancelled" }, "pws")).toBe("This case ended before it could be routed here.");
   });
 });
 

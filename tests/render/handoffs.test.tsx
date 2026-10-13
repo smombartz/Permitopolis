@@ -1442,6 +1442,12 @@ describe("(j) every new list opens the case, and the case comes back to that lis
   it("Inspections: an event opens its case, and Back returns to Inspections", async () => {
     const { user } = await renderApp({ role: "hl", path: routes.city.inspections() });
     expectRealScreen();
+    // The list is of permitted events. St. Agnes Parish's festival, in the window on the seed, is
+    // still In review; give it its permit, as the Clerk's Issue permit would.
+    expect(screen.queryByRole("link", { name: /St\. Agnes Parish/ })).not.toBeInTheDocument();
+    act(() => {
+      useDemo.setState((state) => ({ cases: state.cases.map((c) => (c.id === PARISH ? { ...c, state: "permitted" as const, permit: { issuedOn: state.demoToday, signature: "St. Agnes Parish" } } : c)) }));
+    });
 
     await user.click(screen.getByRole("link", { name: /St\. Agnes Parish/ }));
     expect(here()).toBe(routes.city.case(PARISH, { from: routes.city.inspections() }));
@@ -1598,7 +1604,7 @@ describe("(j) demo path 7, clicked from first step to last, and then on through 
     expect(here()).toBe(routes.permit(S1));
     expectRealScreen();
     // The scenario jump put the coach on path 7.
-    expect(screen.getByText("Path 7 · Step 1 of 3")).toBeInTheDocument();
+    expect(screen.getByText("Path 7 · Step 1 of 2")).toBeInTheDocument();
     const permit = () => within(document.getElementById("permit-print-area") as HTMLElement);
     expect(permit().getByText("Instant")).toBeInTheDocument();
     expect(permit().queryByText(/Amplified sound approval/)).not.toBeInTheDocument();
@@ -1615,9 +1621,9 @@ describe("(j) demo path 7, clicked from first step to last, and then on through 
     expect(diff().getByText(/This change makes your event Reviewed\. Everything you entered is kept; 4 new cards will be added\./)).toBeInTheDocument();
     // Nothing has been sent yet: the record is as it was, and so is the coach.
     expect(storedCase(S1)).toMatchObject({ tier: "instant", flags: { amendmentPending: false } });
-    expect(screen.getByText("Path 7 · Step 1 of 3")).toBeInTheDocument();
+    expect(screen.getByText("Path 7 · Step 1 of 2")).toBeInTheDocument();
 
-    // Step 2: the date gate fires (19 days left, 30 needed); she takes the late fee.
+    // Still step 1: the date gate fires (19 days left, 30 needed); she takes the late fee.
     await user.click(screen.getByRole("button", { name: "Next" })); // size -> review
     // (The coach's own line names the same gate, so the words are on screen twice.)
     expect(within(screen.getByRole("heading", { level: 2, name: "Review your change" }).closest("div")!.parentElement as HTMLElement).getByText(/19 days left, 30 needed/)).toBeInTheDocument();
@@ -1625,14 +1631,18 @@ describe("(j) demo path 7, clicked from first step to last, and then on through 
     await user.click(screen.getByRole("button", { name: /Pay a \$53\.75 late fee/ }));
     await user.click(screen.getByRole("button", { name: "Confirm change" }));
 
-    // Step 3: the board has the new cards tagged Amendment, and the permit is as it was.
+    // Step 2: the board has the new cards tagged Amendment, and the permit is as it was.
     expect(here()).toBe(routes.event(S1));
     expectRealScreen();
-    expect(screen.getByText("Path 7 · Done")).toBeInTheDocument();
+    // The coach is on the path's last step, which says what to point at here.
+    expect(screen.getByText("Path 7 · Step 2 of 2")).toBeInTheDocument();
+    expect(within(screen.getByRole("region", { name: "Demo coach" })).getByText("New cards tagged Amendment appear, and the current permit stays valid for the original plan.")).toBeInTheDocument();
     expect(storedCase(S1)).toMatchObject({ tier: "reviewed", state: "permitted", flags: { amendmentPending: true, lateFee: true } });
     expect(document.querySelector('[data-slot="amendment-pending"]')).toHaveTextContent("An amendment is pending. Finish the new cards below, then submit it; your current permit stays valid for the original plan until it is decided.");
     const cardButton = (name: RegExp) => screen.getByRole("button", { name });
-    for (const name of [/Certificate of insurance/, /Sound details/, /Submit application/, /Accept conditions and sign/]) {
+    // The amendment's own Submit card is named for what it sends, as its sheet's button is.
+    expect(screen.queryByRole("button", { name: /Submit application/ })).not.toBeInTheDocument();
+    for (const name of [/Certificate of insurance/, /Sound details/, /Submit amendment/, /Accept conditions and sign/]) {
       expect(within(cardButton(name)).getByText("Amendment")).toBeInTheDocument();
     }
     expect(within(cardButton(/Pay and book/)).queryByText("Amendment")).not.toBeInTheDocument();
@@ -1662,7 +1672,7 @@ describe("(j) demo path 7, clicked from first step to last, and then on through 
     await user.click(cardButton(/Certificate of insurance/));
     await user.click(panelButton("Use sample file"));
     await user.click(panelButton("Send"));
-    await user.click(cardButton(/Submit application/));
+    await user.click(cardButton(/Submit amendment/));
     expect(within(screen.getByRole("dialog")).getByText(/This sends your amendment to the City Clerk for a decision/)).toBeInTheDocument();
     await user.click(panelButton("Submit amendment"));
     expect(document.querySelector('[data-slot="amendment-pending"]')).toHaveTextContent("An amendment is pending. Health & Legal and Public Works & Safety are checking its cards, then the City Clerk decides. Your current permit stays valid for the original plan until it is decided.");

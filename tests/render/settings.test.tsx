@@ -110,6 +110,27 @@ describe("Settings: section nav keeps the section in the URL", () => {
   });
 });
 
+describe("Settings: the read-only sections say what they are, and nothing that is not so", () => {
+  it("Templates shows a placeholder as words, and copies the same words: never the literal {vendor}", async () => {
+    await renderScreen(<SettingsScreen />, { path: routes.city.settings(), search: { section: "templates" }, role: "clerk" });
+    expect(screen.getByText("Please upload [vendor name]'s current health permit")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Copy: Please upload [vendor name]'s current health permit" })).toBeInTheDocument();
+    expect(document.body).not.toHaveTextContent("{vendor}");
+    expect(screen.getByText("Read-only in the prototype. [vendor name] is filled in from the card a request is about.")).toBeInTheDocument();
+  });
+
+  it("the blackout calendar does not point at a rate it has none of; inventory names the tab its rates are edited in", async () => {
+    const blackout = await renderScreen(<SettingsScreen />, { path: routes.city.settings(), search: { section: "blackout" }, role: "clerk" });
+    expect(screen.getByText("Read-only in the prototype.")).toBeInTheDocument();
+    expect(document.body).not.toHaveTextContent(/Edit a rate/);
+    blackout.unmount();
+
+    await renderScreen(<SettingsScreen />, { path: routes.city.settings(), search: { section: "inventory" }, role: "clerk" });
+    expect(screen.getByText("Inventory is fixed in the prototype. Edit a rate in the Fees and deposits tab.")).toBeInTheDocument();
+    expect(document.body).not.toHaveTextContent(/above/);
+  });
+});
+
 describe("Settings: Fees and deposits", () => {
   it("editing a rate changes the store's cfg, and a new estimate for a Draft reflects it", async () => {
     const { user } = await renderScreen(<SettingsScreen />, { path: routes.city.settings(), search: { section: "fees" }, role: "clerk" });

@@ -8,20 +8,18 @@ import { MapThumbnail } from "@/components/map/MapThumbnail"
 import type { PartyStatus } from "@/lib/state/types"
 import type { EventCase, ISODate } from "@/lib/types"
 import { buildOverview } from "@/lib/view/caseDetail"
-import type { RulesConfig } from "@/lib/rules/types"
 
 interface OverviewTabProps {
   c: EventCase
   today: ISODate
-  cfg: RulesConfig
   applicantName: string
   whoIsUp: PartyStatus[]
   nextMove: string
   onSelectTask: (taskId: string) => void
 }
 
-function OverviewTab({ c, today, cfg, applicantName, whoIsUp, nextMove, onSelectTask }: OverviewTabProps) {
-  const overview = buildOverview(c, cfg)
+function OverviewTab({ c, today, applicantName, whoIsUp, nextMove, onSelectTask }: OverviewTabProps) {
+  const overview = buildOverview(c)
 
   return (
     <div className="flex flex-col gap-8">

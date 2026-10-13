@@ -71,6 +71,14 @@ describe("case detail: the Documents tab reads a card's form back in words", () 
     expect(within(sound).queryByText("soundCheckTime")).not.toBeInTheDocument();
   });
 
+  it("an uploaded file's type is a word: \"PDF\" beside its size, never \"application/pdf\"", async () => {
+    await renderScreen(<CaseDetailScreen />, { path: routes.city.case(S3, { tab: "documents" }), role: "hl" });
+    const insurance = screen.getByTestId(`document-card-${S3}:insurance_certificate`);
+    expect(storedCase(S3).tasks.find((t) => t.catalogId === "insurance_certificate")?.payload.files?.[0].type).toBe("application/pdf");
+    expect(insurance).toHaveTextContent(/\d+ KB · PDF/);
+    expect(document.body).not.toHaveTextContent(/application\/|image\//);
+  });
+
   it("S6 lists its 25 vendors once each, with Yes and No for the city services it asked for", async () => {
     await renderScreen(<CaseDetailScreen />, { path: routes.city.case(S6, { tab: "documents" }), role: "hl" });
 

@@ -5,8 +5,7 @@ import { Field } from "@/components/ui/field"
 import { Input } from "@/components/ui/input"
 import { InlineAlert } from "@/components/ui/inline-alert"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { classify, estimateFees } from "@/lib/rules"
-import { amendmentPaymentDue, caseTotals, nextUnpaidSession, quoteBalance } from "@/lib/state"
+import { amendmentPaymentDue, caseTotals, nextUnpaidSession, quoteBalance, sessionPrice } from "@/lib/state"
 import { overdueSessionDates } from "@/lib/view/clerkTools"
 import { fmtDateShort, fmtMoney } from "@/lib/format"
 import type { RulesConfig } from "@/lib/rules/types"
@@ -27,8 +26,7 @@ function paymentAsk(c: EventCase, cfg: RulesConfig, occurrenceDate?: string) {
   if (c.state === "permitted" || c.state === "event_day") {
     const chosen = occurrenceDate ?? nextUnpaidSession(c)
     if (chosen) {
-      const perSession = estimateFees(c, classify(c, cfg), cfg).perSession ?? 0
-      return { kind: "session" as Payment["kind"], label: `Session: ${fmtDateShort(chosen)}`, amount: perSession, occurrenceDate: chosen }
+      return { kind: "session" as Payment["kind"], label: `Session: ${fmtDateShort(chosen)}`, amount: sessionPrice(c, cfg), occurrenceDate: chosen }
     }
   }
   if (c.state === "closed" && caseTotals(c).due > 0) {

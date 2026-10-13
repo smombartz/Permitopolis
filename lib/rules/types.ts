@@ -153,6 +153,8 @@ export interface FeeEstimate {
   total: number;
   /** Series only: what one session costs. */
   perSession?: number;
+  /** Series only: the labels of the lines that are billed once per session (the place, sound, alcohol), not once per event. */
+  perSessionLabels?: string[];
   sessions?: number;
   /** Series only: due at booking (the first session). */
   dueNow?: number;

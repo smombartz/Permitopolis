@@ -5,7 +5,7 @@
  */
 import { fmtMoney, fmtNumber } from "@/lib/format";
 import { getSegment } from "@/lib/data/streets";
-import type { EventAnswers, Trigger, TriggerId } from "@/lib/types";
+import type { EventAnswers, Tier, Trigger, TriggerId } from "@/lib/types";
 import { TIER_LABEL } from "@/lib/types";
 import { estimateFees } from "./fees";
 import { DEFAULT_CONFIG } from "./config";
@@ -73,10 +73,23 @@ function buildTriggers(a: EventAnswers, cfg: RulesConfig, blockPartyException: b
   return triggers;
 }
 
-function durationPhrase(t: "instant" | "reviewed" | "special"): string {
+function durationPhrase(t: Tier): string {
   if (t === "instant") return "book and pay today";
   if (t === "reviewed") return "about 3 weeks";
   return "about 2 months";
+}
+
+/**
+ * The one-line result: "This is a Reviewed event: about 3 weeks, $465 estimated". `total` is
+ * null before a place is chosen. A total that carries a late fee says so, with the fee
+ * ("$518.75 with the $53.75 late fee"), so the line cannot disagree with the total printed under it.
+ */
+export function tierSummary(t: Tier, total: number | null, lateFee: number | null = null): string {
+  const article = t === "instant" ? "an" : "a";
+  const tierNoun = t === "special" ? TIER_LABEL.special : `${TIER_LABEL[t]} event`;
+  const lead = `This is ${article} ${tierNoun}: ${durationPhrase(t)}`;
+  if (total === null) return lead;
+  return lateFee ? `${lead}, ${fmtMoney(total)} with the ${fmtMoney(lateFee)} late fee` : `${lead}, ${fmtMoney(total)} estimated`;
 }
 
 export const classify = (a: EventAnswers, cfg: RulesConfig = DEFAULT_CONFIG): Classification => {
@@ -86,12 +99,8 @@ export const classify = (a: EventAnswers, cfg: RulesConfig = DEFAULT_CONFIG): Cl
   const reviewers = buildRouting(a, { tier: t, triggers, blockPartyException }, { includeClerkForSpecial: true, cfg });
   const components = permitComponents(a, triggers, blockPartyException);
 
-  const article = t === "instant" ? "an" : "a";
-  const tierNoun = t === "special" ? TIER_LABEL.special : `${TIER_LABEL[t]} event`;
   const feeTotal = a.location ? estimateFees(a, { tier: t } as Classification, cfg).total : null;
-  const summary = feeTotal !== null
-    ? `This is ${article} ${tierNoun}: ${durationPhrase(t)}, ${fmtMoney(feeTotal)} estimated`
-    : `This is ${article} ${tierNoun}: ${durationPhrase(t)}`;
+  const summary = tierSummary(t, feeTotal);
 
   return {
     tier: t,

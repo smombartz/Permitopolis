@@ -1,5 +1,6 @@
 /** `pay`: the applicant pays by card, or the Clerk records an in-person payment. */
 import { fmtMoney } from "@/lib/format";
+import { CARD_BY_ID } from "@/lib/rules/catalog";
 import type { RulesCtx } from "@/lib/rules/types";
 import type { Actor, EventCase } from "@/lib/types";
 import type { Action } from "../actions";
@@ -34,10 +35,12 @@ export function pay(c: EventCase, action: PayAction, actor: Actor, ctx: RulesCtx
     const remaining = c.state === "quote_sent" ? quoteBalance(next, ctx.cfg) : amendmentBalance(next, ctx.cfg);
     const payFees = findTask(next, taskId(next.id, "pay_fees"));
     if (payFees && payFees.status !== "done") {
+      // Done, the card is for everything paid, so an amendment's "what your change adds" gives
+      // way to the card's own reason again.
       next =
         remaining > 0
           ? patchTask(next, payFees.id, { payload: { ...payFees.payload, amount: remaining } })
-          : moveTask(next, payFees.id, "done", ctx, actor, { payload: { ...payFees.payload, amount: totalPaid(next) } });
+          : moveTask(next, payFees.id, "done", ctx, actor, { ...(forAmendment ? { why: CARD_BY_ID.pay_fees.why } : {}), payload: { ...payFees.payload, amount: totalPaid(next) } });
     }
     if (remaining <= 0) {
       next = payFirstSession(next);

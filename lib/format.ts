@@ -107,6 +107,26 @@ export function fmtMiles(miles: number): string {
   return `${miles} ${miles === 1 ? "mile" : "miles"}`;
 }
 
+const FILE_TYPE_WORD: Record<string, string> = {
+  "application/pdf": "PDF",
+  "image/jpeg": "JPEG",
+  "image/png": "PNG",
+  "image/heic": "HEIC",
+  "application/msword": "Word document",
+  "application/vnd.openxmlformats-officedocument.wordprocessingml.document": "Word document",
+  "text/plain": "Text",
+  "text/csv": "CSV",
+};
+
+/**
+ * A file's type as a word a person reads: "PDF", "JPEG". Never the MIME type ("application/pdf").
+ * A type the list does not name gives its own short name; no type at all, "unknown type".
+ */
+export function fmtFileType(type: string): string {
+  if (!type) return "unknown type";
+  return FILE_TYPE_WORD[type] ?? (type.split("/").pop() ?? type).replace(/^x-/, "").toUpperCase();
+}
+
 /** File size for the upload list: "248 KB", "1.2 MB" */
 export function fmtFileSize(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`;

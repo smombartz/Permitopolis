@@ -11,11 +11,11 @@
  * the permit covers (`permittedPlan()`) is read back from that card: the permit page and the
  * public check show it. A decline restores it exactly.
  */
-import { classify, estimateFees } from "@/lib/rules";
+import { permitComponents } from "@/lib/rules";
 import { round2 } from "@/lib/rules/shared";
-import type { RulesConfig } from "@/lib/rules/types";
+import type { PermitComponent, RulesConfig } from "@/lib/rules/types";
 import type { EventAnswers, EventCase, FeeLine, ISODate, Task, TaskStatus, Tier, Trigger, UnlockEvent } from "@/lib/types";
-import { caseTotal, findTask, taskId, totalPaid } from "./core";
+import { caseTotal, findTask, sessionPrice, taskId, totalPaid } from "./core";
 
 /** The record as it was before a pending amendment, kept so the permit can still be read and a decline can put it back. */
 export interface PendingAmendment {
@@ -26,8 +26,8 @@ export interface PendingAmendment {
   priorLateFee: boolean;
   /** The fee lines exactly as they were: a reviewer's lines, the Clerk's edits and the ids included. */
   priorFeeLines: FeeLine[];
-  /** How "Submit application" stood before the amendment reopened it; null when the amendment added the card. */
-  priorSubmit: { status: TaskStatus; unlocksOn: UnlockEvent | null; tags: Task["tags"] } | null;
+  /** How "Submit application" stood before the amendment reopened it, its own name included; null when the amendment added the card. */
+  priorSubmit: { status: TaskStatus; unlocksOn: UnlockEvent | null; tags: Task["tags"]; title?: string; why?: string } | null;
   /**
    * How a permitted case's payment card stood before the amendment: an approval opens it again
    * for the difference, and a lapse puts it back. Null before the permit (the card is still the
@@ -36,6 +36,9 @@ export interface PendingAmendment {
   priorPay?: Pick<Task, "status" | "title" | "why" | "dueDate" | "unlocksOn" | "payload"> | null;
   proposedOn: ISODate;
 }
+
+/** What the amendment's own Submit card is called while it is the amendment's: it sends a change, not an application. */
+export const AMENDMENT_SUBMIT_CARD = { title: "Submit amendment", why: "Send your change to the City Clerk" } as const;
 
 function submitCard(c: EventCase): Task | undefined {
   return findTask(c, taskId(c.id, "submit_application"));
@@ -94,9 +97,8 @@ export function amendmentPayOpen(c: EventCase): boolean {
 export function amendmentBalance(c: EventCase, cfg: RulesConfig): number {
   const total = caseTotal(c);
   if (!c.schedule?.recurrence) return round2(total - totalPaid(c));
-  const perSession = estimateFees(c, classify(c, cfg), cfg).perSession ?? 0;
   const billedLater = c.schedule.occurrences.filter((o) => o.billing === "upcoming" || o.billing === "due").length;
-  return round2(total - billedLater * perSession - totalPaid(c));
+  return round2(total - billedLater * sessionPrice(c, cfg) - totalPaid(c));
 }
 
 /** What the applicant can pay toward an amendment now: the balance while the payment card is open, else 0. */
@@ -114,6 +116,18 @@ export function amendmentPaymentDue(c: EventCase, cfg: RulesConfig): number {
 export function permittedPlan(c: EventCase): EventCase {
   const pending = pendingAmendment(c);
   return pending ? { ...c, ...pending.priorAnswers, tier: pending.priorTier, triggers: pending.priorTriggers, feeLines: pending.priorFeeLines } : c;
+}
+
+/**
+ * What the permit covers, read off the record: the plan the permit is for (`permittedPlan()`)
+ * and the triggers stored with it, never the tier rules as Settings has them today. A case past
+ * Draft keeps the tier it was submitted under, so its permit keeps its list: lowering "Reviewed
+ * at" does not add an insurance check to an Instant permit that is already issued. The block
+ * party exception is on the record as its trigger.
+ */
+export function permitCovers(c: EventCase): PermitComponent[] {
+  const plan = permittedPlan(c);
+  return permitComponents(plan, plan.triggers, plan.triggers.some((t) => t.id === "block_party"));
 }
 
 /**

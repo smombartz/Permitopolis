@@ -289,10 +289,11 @@ export const DEMO_PATHS: DemoPath[] = [
         role: "applicant",
         persona: "maya-chen",
         // The wizard reopened on the same record: the board's menu and the permit both link here.
+        // Adding the DJ and choosing the late fee are one step: the wizard works on its own copy
+        // of the answers, so nothing the coach can read changes until the change is confirmed.
         page: routes.amend(S1),
-        text: "Add a DJ. The event becomes Reviewed and the date gate fires: 19 days left, 30 needed.",
+        text: "Add a DJ. The event becomes Reviewed and the date gate fires: 19 days left, 30 needed. Choose the late fee and confirm.",
       },
-      { id: "choose-late-fee", role: "applicant", persona: "maya-chen", page: routes.amend(S1), text: "Choose the late fee." },
       {
         id: "amendment-cards",
         role: "applicant",

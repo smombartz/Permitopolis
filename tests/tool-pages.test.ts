@@ -321,7 +321,7 @@ describe("an amendment, read from the city side", () => {
     expect(review()!.cards.map((card) => [card.title, card.statusText])).toEqual([
       ["Certificate of insurance", "With the applicant"],
       ["Sound details", "With the applicant"],
-      ["Submit application", "Not open yet"],
+      ["Submit amendment", "Not open yet"],
       ["Accept conditions and sign", "Not open yet"],
     ]);
 

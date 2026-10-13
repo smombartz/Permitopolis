@@ -2,15 +2,16 @@
  * Pure view-model for the amendment wizard (`/events/[id]/amend`). No React, no store: the
  * screen keeps the applicant's proposed answers locally (nothing is dispatched until the last
  * step is confirmed) and calls `buildAmendmentDiff()` on every change to compare them with the
- * record as it stands, the same way `amend()` (`lib/state/transitions/applicant.ts`) will. The
- * two are not the same code, so a test holds them together against the real seed
- * (amend.test.ts); if they ever disagree, `amend()` is the one that counts.
+ * record as it stands. The money is the engine's own: the diff prices the record `amend()`
+ * itself would build (`amendedPlan()` in `lib/state/transitions/amendment.ts`), so what the
+ * panel says is to pay is what `amend()` then settles. The tier and the cards are worked out
+ * here from the same rules; a test holds them to `amend()` against the real seed (amend.test.ts).
  */
 import { fmtDate, fmtMoney, fmtNumber, fmtTimeRange, plural } from "@/lib/format";
-import { classify, dateGate, estimateFees, requirements, type Classification, type DateGate, type FeeEstimate } from "@/lib/rules";
+import { classify, dateGate, requirements, type Classification, type DateGate } from "@/lib/rules";
 import { CARD_BY_ID, type CardSpec } from "@/lib/rules/catalog";
 import type { RulesConfig, RulesCtx } from "@/lib/rules/types";
-import { amendmentBalance, amendmentCardsInFlight, amendmentStage, checkDecideAmendment, pendingAmendment, type AmendmentStage } from "@/lib/state";
+import { AMENDMENT_SUBMIT_CARD, amendedPlan, amendmentBalance, amendmentCardsInFlight, amendmentStage, caseTotals, checkDecideAmendment, pendingAmendment, type AmendmentStage } from "@/lib/state";
 import { PARTY_LABEL, TIER_LABEL, type AddOns, type Dept, type EventAnswers, type EventCase, type ISODate, type Task, type TaskStatus, type Tier } from "@/lib/types";
 
 /** Mirrors `answersOf()` in transitions/applicant.ts: only what the wizard collects. */
@@ -48,11 +49,22 @@ export interface AmendmentDiff {
   summary: string;
   cardsAdded: CardDiffRow[];
   cardsRemoved: CardDiffRow[];
+  /** The plan's fees and deposit as they stand, and under the change: the case's own fee lines, a reviewer's and a late fee already charged included. */
   feeBefore: number;
   feeAfter: number;
   paid: number;
-  /** Positive: more is owed. Negative: a refund. Zero: nothing changes hands. */
+  /**
+   * True once the event has its permit: the plan has been paid for, so a difference is paid or
+   * refunded (`amendmentBalance()`, the figure `amend` settles or the Clerk's approval asks for),
+   * and the permit keeps covering the original plan while a change waits. False before it:
+   * nothing is owed until the quote, so the difference is a change to the fees.
+   */
+  permitted: boolean;
+  /** Positive: more is owed (or added to the fees). Negative: a refund (or taken off them). Zero: nothing changes. */
   feeDiff: number;
+  /** A permitted series' sessions still to be paid on their own days: part of the total, never part of the difference. */
+  billedLater: number;
+  /** The late fee this change is charged, when it is; one charged earlier is in the totals and not repeated here. */
   lateFeeAmount: number | null;
   gate: DateGate;
   /** The gate's own answer to "does this amendment need the tier's notice at all" (a later date or a tier rise), mirroring `amendmentNeedsNotice()`. */
@@ -84,19 +96,24 @@ export function buildAmendmentDiff(original: EventCase, proposed: EventAnswers, 
 
   const titleFor = (catalogId: string): string => (isCatalogId(catalogId) ? (CARD_BY_ID as Record<string, CardSpec>)[catalogId]?.title ?? catalogId : catalogId);
 
+  // The Submit card an amendment adds is the amendment's own, and the board names it so.
   const cardsAdded: CardDiffRow[] = freshTasks
     .filter((t) => !existingTaskIds.has(t.id))
-    .map((t) => ({ catalogId: t.catalogId, title: t.title }));
+    .map((t) => ({ catalogId: t.catalogId, title: t.catalogId === "submit_application" ? AMENDMENT_SUBMIT_CARD.title : t.title }));
   const cardsRemoved: CardDiffRow[] = [...beforeCardIds]
     .filter((id) => !freshCardIds.has(id))
     .map((id) => ({ catalogId: id, title: titleFor(id) }));
 
   const material = cardsAdded.length > 0;
-  const fees: FeeEstimate = estimateFees(answers, afterCls, ctx.cfg, { caseId: original.id, lateFee });
-  const lateFeeLine = fees.lines.find((line) => line.kind === "late_fee");
-  const feeBefore = original.feeLines.reduce((sum, line) => sum + (line.kind === "deposit" ? line.estimate : line.kind === "fee" || line.kind === "late_fee" ? line.estimate : 0), 0);
-  const paid = original.payments.reduce((sum, p) => sum + p.amount, 0);
-  const feeAfter = fees.total;
+  // The money is read off the record `amend` would build, so it keeps what a fresh estimate
+  // drops (a reviewer's line, a late fee already charged) and bills a series as the engine does.
+  const plan = amendedPlan(original, answers, lateFee, ctx);
+  const lateFeeLine = plan.estimate.lines.find((line) => line.kind === "late_fee");
+  const feeBefore = caseTotals(original).total;
+  const feeAfter = caseTotals(plan.record).total;
+  const paid = caseTotals(original).paid;
+  const permitted = original.permit !== null;
+  const feeDiff = permitted ? amendmentBalance(plan.record, ctx.cfg) : feeAfter - feeBefore;
 
   return {
     material,
@@ -106,13 +123,15 @@ export function buildAmendmentDiff(original: EventCase, proposed: EventAnswers, 
     tierFell,
     tierLabelBefore: TIER_LABEL[beforeCls.tier],
     tierLabelAfter: TIER_LABEL[afterCls.tier],
-    summary: afterCls.summary,
+    summary: plan.summary,
     cardsAdded,
     cardsRemoved,
-    feeBefore: round2(feeBefore),
-    feeAfter: round2(feeAfter),
-    paid: round2(paid),
-    feeDiff: round2(feeAfter - paid),
+    feeBefore,
+    feeAfter,
+    paid,
+    permitted,
+    feeDiff: round2(feeDiff),
+    billedLater: permitted ? Math.max(0, round2(feeAfter - paid - feeDiff)) : 0,
     lateFeeAmount: lateFeeLine ? lateFeeLine.estimate : null,
     gate,
     needsNotice,

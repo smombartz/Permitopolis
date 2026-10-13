@@ -23,6 +23,7 @@ import {
   hasActivePermit,
   involves,
   isVisibleToCity,
+  nextMove,
   pendingAmendment,
   permitSessions,
   permittedPlan,
@@ -39,6 +40,7 @@ import {
 } from "@/lib/state";
 import { EMPTY_ADDONS, type Dept, type EventAnswers, type EventCase, type FileRef, type ISODate, type Location, type Party, type Task } from "@/lib/types";
 import { DEMO_PATHS } from "@/lib/data/demoScript";
+import { nextActionFor } from "@/lib/view/board";
 import { queueReasonLine } from "@/lib/view/cityLists";
 import { pathProgress } from "@/lib/view/coach";
 
@@ -781,7 +783,7 @@ describe("Path 7 · Amend up a tier (S1, P1)", () => {
     const queuesBefore = queueSizes();
 
     as("applicant", "maya-chen");
-    expect(coach(7)).toBe("Step 1 of 3: add-dj");
+    expect(coach(7)).toBe("Step 1 of 2: add-dj");
     const original = get(S1);
     expect(original).toMatchObject({ tier: "instant", state: "permitted", permit: { issuedOn: "2027-04-26", signature: null } });
     expect(panel(S1, "applicant", "amend")).toMatchObject({ enabled: true });
@@ -811,13 +813,14 @@ describe("Path 7 · Amend up a tier (S1, P1)", () => {
     expect(refusal(S1, { type: "amend", answers: withDj })).toBe("Needs 30 days of notice; pick a later date or add the late fee.");
     expect(get(S1)).toEqual(original);
     // Adding the DJ and choosing the late fee both happen in the wizard, on a copy of the
-    // answers: nothing reaches the store until she confirms, so the coach stays on the first step.
-    expect(coach(7)).toBe("Step 1 of 3: add-dj");
+    // answers: nothing reaches the store until she confirms, so they are one step of the script.
+    expect(coach(7)).toBe("Step 1 of 2: add-dj");
 
     // She chooses the late fee.
     act(S1, { type: "amend", answers: withDj, lateFee: true });
-    // One confirmation does all three: the tier, the late fee and the tagged cards.
-    expect(coach(7)).toBe("Done");
+    // One confirmation does all three (the tier, the late fee and the tagged cards), and the
+    // coach is on the path's last step, which says what to point at on the board.
+    expect(coach(7)).toBe("Step 2 of 2: amendment-cards");
     const amended = get(S1);
     expect(amended).toMatchObject({ tier: "reviewed", addOns: { amplifiedSound: true }, flags: { amendmentPending: true, lateFee: true } });
     expect(amended.triggers.map((t) => t.id)).toEqual(["amplified_sound"]);
@@ -878,7 +881,10 @@ describe("Path 7 · Amend up a tier (S1, P1)", () => {
     // She submits the amendment. The permit still covers the original plan, and nothing has
     // reached a city queue yet beyond the two cards already with Public Works & Safety and
     // Health & Legal.
+    expect(coach(7)).toBe("Step 2 of 2: amendment-cards");
     act(S1, { type: "submit" });
+    // The scripted path ends on the board; once the amendment is out of her hands it is done.
+    expect(coach(7)).toBe("Done");
     const submitted = get(S1);
     expect(submitted).toMatchObject({ state: "permitted", flags: { amendmentPending: true } });
     expect(task(submitted, "submit_application")).toMatchObject({ status: "done", tags: ["amendment"] });
@@ -927,15 +933,22 @@ describe("Path 7 · Amend up a tier (S1, P1)", () => {
     expect(approved.flags.amendmentPending).toBe(true);
     expect(amendmentStage(approved)).toBe("approved");
     expect(approved.payments).toEqual(original.payments);
-    // Both are due the same day, so they stand in the order the case got them: the payment
-    // card was on the Instant plan, the signature came with the amendment.
+    // Both are due the same day, and signing comes first, as it does at checkout: the payment
+    // card was on the Instant plan from the start, the signature came with the amendment.
     expect(board(approved)).toEqual({
-      do_now: ["pay_fees", "accept_and_sign"],
+      do_now: ["accept_and_sign", "pay_fees"],
       with_city: [],
       coming_up: ["carry_permit"],
       done: ["insurance_certificate", "sound_details", "submit_application"],
     });
     expect(task(approved, "pay_fees")).toMatchObject({ status: "todo", dueDate: "2027-05-17", payload: { amount: 393.75 } });
+    // It is no longer the booking's card: "Pay and book · Payment holds your date..." on an event already booked and permitted.
+    expect(original.tasks.find((t) => t.catalogId === "pay_fees")).toMatchObject({ title: "Pay and book" });
+    expect(task(approved, "pay_fees")).toMatchObject({ title: "Pay fees and deposit", why: "What your change adds, beyond what you have paid" });
+    expect(nextActionFor(approved, TODAY)).toEqual({ text: "Accept conditions and sign", due: "2027-05-17" });
+    // The city's Who's up and its "Next:" sentence name the same card the board leads with.
+    expect(note(S1, "applicant")).toBe("Up: Accept conditions and sign");
+    expect(nextMove(approved, TODAY, "Maya Chen")).toBe("Next: Maya Chen accepts the conditions and signs.");
     expect(task(approved, "accept_and_sign")).toMatchObject({ status: "todo", dueDate: "2027-05-17", tags: ["amendment"] });
     expect(up(S1)).toEqual(["applicant"]);
     expect(queueSizes()).toEqual(queuesBefore);
@@ -957,6 +970,8 @@ describe("Path 7 · Amend up a tier (S1, P1)", () => {
     expect(amendmentStage(inEffect)).toBeNull();
     expect(permittedPlan(inEffect)).toBe(inEffect);
     expect(task(inEffect, "pay_fees")).toMatchObject({ status: "done", payload: { amount: 518.75 } });
+    // Done, it is the Reviewed plan's payment card, for everything paid.
+    expect(task(inEffect, "pay_fees")).toMatchObject({ title: "Pay fees and deposit", why: "Payment holds your date and lets the City Clerk issue your permit" });
     expect(caseTotals(inEffect)).toEqual({ fees: 268.75, deposit: 250, total: 518.75, paid: 518.75, due: 0 });
     expect(inEffect).toMatchObject({ state: "permitted", tier: "reviewed", permit: original.permit, schedule: original.schedule });
     expect(hasActivePermit(inEffect)).toBe(true);
@@ -966,7 +981,7 @@ describe("Path 7 · Amend up a tier (S1, P1)", () => {
     ]);
     expect(up(S1)).toEqual([]);
     expect(panel(S1, "applicant", "amend")).toMatchObject({ enabled: true });
-    // The path ended when the cards appeared; everything since has left it done.
+    // The path ended when the amendment was submitted; everything since has left it done.
     expect(coach(7)).toBe("Done");
   });
 
@@ -1034,6 +1049,6 @@ describe("Path 7 · Amend up a tier (S1, P1)", () => {
     as("applicant", "maya-chen");
     expect(panel(S1, "applicant", "amend")).toMatchObject({ enabled: true });
     // A declined amendment leaves nothing of the path behind: the coach is back on its first step.
-    expect(coach(7)).toBe("Step 1 of 3: add-dj");
+    expect(coach(7)).toBe("Step 1 of 2: add-dj");
   });
 });

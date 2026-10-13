@@ -68,14 +68,22 @@ export function taskSubmittedOn(task: Task): ISODate | null {
   return null;
 }
 
+/** Among an applicant's cards due the same day: the signature first and the payment last, the order checkout takes them in ("Sign first"). */
+function sameDayRank(task: Task): number {
+  return task.catalogId === "accept_and_sign" ? 0 : task.catalogId === "pay_fees" ? 2 : 1;
+}
+
 /**
  * Sort order for tasks: oldest due first, by the date that applies now (see taskDueDate). A
- * task with no due date goes last; ties keep the order they had, which is the order of creation.
+ * task with no due date goes last. Tasks due the same day keep the order they had, which is the
+ * order of creation, except that signing comes before paying whichever card the case got
+ * first: an approved amendment adds the signature to an Instant plan that had its payment card
+ * from the start. The board, Who's up and "Next:" all sort with this, so they name the same card.
  */
 export function byDueDate(a: Task, b: Task): number {
   const dueA = taskDueDate(a);
   const dueB = taskDueDate(b);
-  if (dueA === dueB) return 0;
+  if (dueA === dueB) return sameDayRank(a) - sameDayRank(b);
   if (dueA === null) return 1;
   if (dueB === null) return -1;
   return dueA < dueB ? -1 : 1;
@@ -307,18 +315,34 @@ export function caseTotal(c: EventCase): number {
 }
 
 /**
+ * What one session of a series costs, read off the case's own fee lines: the lines that are
+ * billed per session, divided by the sessions they cover. A case that has been priced keeps its
+ * price ("a quote already sent keeps its lines", Settings), so doubling the Field rate does not
+ * turn a booked $20 session into a $40 one. A Draft is still being priced: it reads the fee
+ * schedule as it stands, as its estimate and its booking do, whatever lines an earlier board
+ * left on it. 0 for a single event.
+ */
+export function sessionPrice(c: EventCase, cfg: RulesConfig): number {
+  if (!c.schedule?.recurrence) return 0;
+  const estimate = estimateFees(c, classify(c, cfg), cfg);
+  const own = c.feeLines.filter((line) => line.kind === "fee" && estimate.perSessionLabels?.includes(line.label));
+  if (c.state === "draft" || own.length === 0) return estimate.perSession ?? 0;
+  return round2(own.reduce((sum, line) => sum + line.estimate, 0) / (estimate.sessions ?? 1));
+}
+
+/**
  * What the quote asks for now. A single event pays everything on it. A series pays its one-off
  * lines (application fee, permits, inspections, deposit, late fee) and its first session; the
  * later sessions are billed on schedule (PRD, the quote: "A series shows the first session now
- * and the rest on schedule"). The later sessions are taken off at the fee schedule's own
- * per-session price, so lines a reviewer or the Clerk added stay due now.
+ * and the rest on schedule"). The later sessions are taken off at the case's own per-session
+ * price (`sessionPrice()`), so lines a reviewer or the Clerk added stay due now.
  */
 export function dueAtQuote(c: EventCase, cfg: RulesConfig): number {
   const total = caseTotal(c);
   if (!c.schedule?.recurrence) return total;
   const estimate = estimateFees(c, classify(c, cfg), cfg);
   const laterSessions = Math.max(0, (estimate.sessions ?? 1) - 1);
-  return Math.max(0, round2(total - laterSessions * (estimate.perSession ?? 0)));
+  return Math.max(0, round2(total - laterSessions * sessionPrice(c, cfg)));
 }
 
 /** What is still owed on the quote, to the cent. Zero or less once it is covered. */

@@ -4,11 +4,11 @@
  */
 import { addDaysISO, daysBetween } from "@/lib/dates";
 import { fmtDate, fmtMoney } from "@/lib/format";
-import { classify, estimateFees } from "@/lib/rules";
 import { CARD_BY_ID, type CatalogId } from "@/lib/rules/catalog";
 import type { RulesConfig } from "@/lib/rules/types";
 import { routes } from "@/lib/routes";
 import {
+  ENDING_PHRASE,
   amendmentPaymentDue,
   amendmentSignOpen,
   amendmentStage,
@@ -21,6 +21,7 @@ import {
   hasActivePermit,
   involvement,
   lastSessionDate,
+  sessionPrice,
   taskDueDate,
   taskSubmittedOn,
   whoIsUp,
@@ -562,7 +563,7 @@ export interface SessionRow {
 /** Every session of a series, with its own per-session amount, in date order. */
 export function seriesSessions(c: EventCase, cfg: RulesConfig): SessionRow[] {
   if (!c.schedule?.recurrence) return [];
-  const perSession = estimateFees(c, classify(c, cfg), cfg).perSession ?? 0;
+  const perSession = sessionPrice(c, cfg);
   return [...c.schedule.occurrences]
     .sort((a, b) => a.date.localeCompare(b.date))
     .map((o) => ({
@@ -607,7 +608,7 @@ export interface AmendEligibility {
  */
 export function canAmend(c: EventCase, today: ISODate): AmendEligibility {
   if (c.state === "draft") return { ok: false, reason: "Edit your plan in the wizard instead." };
-  if (c.ending) return { ok: false, reason: `This case is ${c.ending.replace("_", " ")}; it cannot be amended.` };
+  if (c.ending) return { ok: false, reason: `This case ${ENDING_PHRASE[c.ending]}; it cannot be amended.` };
   if (c.state === "closed") return { ok: false, reason: "This case is closed; it cannot be amended." };
   const last = lastSessionDate(c);
   if (last && last < today) return { ok: false, reason: "The event has already happened; it cannot be amended." };
@@ -643,9 +644,11 @@ export function amendmentBanner(c: EventCase, cfg?: RulesConfig): AmendmentBanne
   }
   const checking = [...new Set(c.tasks.filter((t) => t.owner === "applicant" && t.tags.includes("amendment") && t.status === "submitted" && t.reviewer && t.reviewer !== "clerk").map((t) => PARTY_LABEL[t.reviewer as Dept]))];
   const withCity = checking.length > 0 ? `${checking.join(" and ")} ${checking.length === 1 ? "is" : "are"} checking its cards, then the City Clerk decides.` : "It is with the City Clerk for a decision.";
+  // The permit's sentence is for an event that has one: an application amended under review has no permit yet.
+  const permitStays = "current permit stays valid for the original plan until it is decided.";
   const text = submitted
-    ? `An amendment is pending. ${withCity} Your current permit stays valid for the original plan until it is decided.`
-    : "An amendment is pending. Finish the new cards below, then submit it; your current permit stays valid for the original plan until it is decided.";
+    ? `An amendment is pending. ${withCity}${c.permit ? ` Your ${permitStays}` : ""}`
+    : `An amendment is pending. Finish the new cards below, then submit it${c.permit ? `; your ${permitStays}` : "."}`;
   return { text, awaitingCity: submitted };
 }
 

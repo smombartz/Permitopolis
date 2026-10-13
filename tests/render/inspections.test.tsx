@@ -33,14 +33,27 @@ async function permitS3() {
 }
 
 describe("Inspections", () => {
-  it("on May 3, Jazz in the Plaza (Jun 18) is well outside the 14-day window", async () => {
+  it("on May 3 nothing is listed: Jazz in the Plaza (Jun 18) is outside the 14 days, and St. Agnes Parish's festival (May 13) has no permit yet", async () => {
     await renderScreen(<InspectionsScreen />, { role: "hl", path: routes.city.inspections() });
     expect(screen.queryByText("Jazz in the Plaza")).not.toBeInTheDocument();
-    // St. Agnes Parish's festival, May 13, has food vendors and falls in the window: it shows.
+    // In review, ten days out, five vendors: not an event to inspect, and no result to record for it.
+    expect(storedCase("PMT-27-0012")).toMatchObject({ state: "in_review", permit: null });
+    expect(screen.queryByRole("link", { name: /St\. Agnes Parish/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /^Record the result for / })).not.toBeInTheDocument();
+    expect(screen.getByText("No food booths to inspect")).toBeInTheDocument();
+    expect(screen.getByText("No permitted event with food vendors is on today or in the next 14 days.")).toBeInTheDocument();
+  });
+
+  it("a permitted event is named as every list names it, with a link to its case", async () => {
+    await renderScreen(<InspectionsScreen />, { role: "hl", path: routes.city.inspections() });
+    await permitS3();
+    await act(async () => {
+      useDemo.getState().setDemoToday("2027-06-10");
+    });
     expect(screen.getByRole("heading", { name: "Upcoming" })).toBeInTheDocument();
-    // Named as every list names an event: the event over its applicant (the parish, both times), a link to the case.
-    const festival = screen.getByRole("link", { name: /St\. Agnes Parish/ });
-    expect(festival).toHaveAttribute("href", routes.city.case("PMT-27-0012", { from: routes.city.inspections() }));
+    expect(screen.getByRole("link", { name: /Jazz in the Plaza/ })).toHaveAttribute("href", routes.city.case(S3, { from: routes.city.inspections() }));
+    // The Farmers Market's stalls for Jun 12 and 19 are in the same window, and still under review.
+    expect(screen.queryByText(/Riverside Farmers Market/)).not.toBeInTheDocument();
   });
 
   it("jumping the demo date to Jun 18, after Jazz in the Plaza is permitted, shows its one booth, under Today", async () => {

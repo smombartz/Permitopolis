@@ -7,6 +7,7 @@ import {
   fmtDue,
   fmtDueFull,
   fmtFileSize,
+  fmtFileType,
   fmtMiles,
   fmtMoney,
   fmtQty,
@@ -94,5 +95,15 @@ describe("small helpers", () => {
     expect(fmtMiles(1)).toBe("1 mile");
     expect(fmtFileSize(248 * 1024)).toBe("248 KB");
     expect(fmtFileSize(1.2 * 1024 * 1024)).toBe("1.2 MB");
+  });
+
+  it("a file's type is a word, never its MIME type", () => {
+    expect(fmtFileType("application/pdf")).toBe("PDF");
+    expect(fmtFileType("image/jpeg")).toBe("JPEG");
+    expect(fmtFileType("image/png")).toBe("PNG");
+    expect(fmtFileType("application/vnd.openxmlformats-officedocument.wordprocessingml.document")).toBe("Word document");
+    // A type the list does not name reads as its own short name, and no type at all says so.
+    expect(fmtFileType("image/webp")).toBe("WEBP");
+    expect(fmtFileType("")).toBe("unknown type");
   });
 });

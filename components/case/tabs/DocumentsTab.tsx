@@ -11,7 +11,7 @@ import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/
 import { Progress } from "@/components/ui/progress"
 import { FormAnswers, TaskKindLabel } from "@/components/domain"
 import { FilePenLineIcon, FileQuestionIcon } from "lucide-react"
-import { fmtDate, fmtFileSize, plural } from "@/lib/format"
+import { fmtDate, fmtFileSize, fmtFileType, plural } from "@/lib/format"
 import { useDemo } from "@/lib/state"
 import { PARTY_LABEL, type EventCase, type ISODate, type Party, type Task, type TaskStatus } from "@/lib/types"
 import { documentGroups } from "@/lib/view/caseDetail"
@@ -94,7 +94,7 @@ function DocumentCard({ task, role, today, onOpen }: { task: Task; role: Party; 
             <li key={i} className="flex items-center justify-between gap-3 rounded-control border border-line-subtle bg-surface-2 px-2.5 py-1.5 text-xs">
               <span className="min-w-0 truncate text-fg">{f.name}</span>
               <span className="shrink-0 font-mono text-fg-label">
-                {fmtFileSize(f.size)} &middot; {f.type || "unknown type"}
+                {fmtFileSize(f.size)} &middot; {fmtFileType(f.type)}
               </span>
             </li>
           ))}

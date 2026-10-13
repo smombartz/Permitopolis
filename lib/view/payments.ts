@@ -5,10 +5,9 @@
  * `@/lib/state` (`caseTotals`, `quoteBalance`, `closeoutSettlement`, ...), never a sum of its
  * own (see "Money" in the readme). Tested against the real seed in `lib/view/payments.test.ts`.
  */
-import { classify, estimateFees } from "@/lib/rules";
 import { round2 } from "@/lib/rules/shared";
 import type { RulesConfig } from "@/lib/rules/types";
-import { amendmentPaymentDue, caseTotals, closeoutSettlement, quoteBalance } from "@/lib/state";
+import { amendmentPaymentDue, caseTotals, closeoutSettlement, quoteBalance, sessionPrice } from "@/lib/state";
 import { applicantNameOf } from "@/lib/data/people";
 import { fmtDateShort, plural } from "@/lib/format";
 import type { EventCase, ISODate, Payment } from "@/lib/types";
@@ -103,7 +102,7 @@ export function dueRows(cases: EventCase[], today: ISODate, cfg: RulesConfig): D
     }
 
     if (c.schedule?.recurrence && (c.state === "permitted" || c.state === "event_day")) {
-      const perSession = estimateFees(c, classify(c, cfg), cfg).perSession ?? 0;
+      const perSession = sessionPrice(c, cfg);
       for (const o of c.schedule.occurrences) {
         if (o.billing !== "due") continue;
         rows.push({

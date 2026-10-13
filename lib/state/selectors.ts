@@ -24,8 +24,9 @@ export const boardColumn: StateApi["boardColumn"] = (task: Task): BoardColumn =>
 
 /**
  * The applicant's board: their cards by column. Do now is in the order the PRD gives it: a
- * city request pinned on top, then Submit application once it has unlocked, then by due date.
- * The other columns keep the order of the plan.
+ * city request pinned on top, then Submit application once it has unlocked, then by due date
+ * (`byDueDate()`: among cards due the same day, signing comes before paying). The other columns
+ * keep the order of the plan.
  *
  * A case that ended (withdrawn, denied, cancelled, hold expired) has nothing left to do, nothing
  * with the city and nothing coming up: only what was done stays on its board. The cards it left

@@ -10,6 +10,13 @@ export interface AmendResultPanelProps {
   diff: AmendmentDiff
 }
 
+/** On a permitted event the difference changes hands; before the permit it only changes what the quote will ask for. */
+function feeDiffLabel(diff: AmendmentDiff): string {
+  if (diff.feeDiff === 0) return "Difference"
+  if (diff.permitted) return diff.feeDiff > 0 ? "To pay" : "To be refunded"
+  return diff.feeDiff > 0 ? "Added to your fees" : "Taken off your fees"
+}
+
 /**
  * The amendment wizard's live panel (PRD "Amend"): compares the new plan with the current one
  * on every change (brief 5A, step 1). The date gate's own fixes are shown by `DateGateBanner`
@@ -66,18 +73,33 @@ function AmendResultPanel({ diff }: AmendResultPanelProps) {
         </div>
       ) : null}
 
-      <div className="flex flex-col gap-1.5 border-t border-line-subtle pt-3">
+      <div data-slot="amend-fees" className="flex flex-col gap-1.5 border-t border-line-subtle pt-3">
         <p className="text-eyebrow font-bold tracking-[.12em] text-fg-label uppercase">Fees</p>
+        {/* Before the permit nothing has been paid for: the change is to the fees, set against what they are now. */}
+        {diff.permitted ? null : (
+          <div className="flex items-center justify-between text-sm">
+            <span className="text-fg-secondary">Current total</span>
+            <Money amount={diff.feeBefore} />
+          </div>
+        )}
         <div className="flex items-center justify-between text-sm">
           <span className="text-fg-secondary">New total</span>
           <Money amount={diff.feeAfter} />
         </div>
-        <div className="flex items-center justify-between text-sm">
-          <span className="text-fg-secondary">Already paid</span>
-          <Money amount={diff.paid} />
-        </div>
+        {diff.permitted ? (
+          <div className="flex items-center justify-between text-sm">
+            <span className="text-fg-secondary">Already paid</span>
+            <Money amount={diff.paid} />
+          </div>
+        ) : null}
+        {diff.billedLater > 0 ? (
+          <div className="flex items-center justify-between text-sm">
+            <span className="text-fg-secondary">Later sessions, paid on their day</span>
+            <Money amount={diff.billedLater} />
+          </div>
+        ) : null}
         <div className="flex items-center justify-between text-sm font-semibold text-fg">
-          <span>{diff.feeDiff > 0 ? "To pay" : diff.feeDiff < 0 ? "To be refunded" : "Difference"}</span>
+          <span>{feeDiffLabel(diff)}</span>
           <Money amount={Math.abs(diff.feeDiff)} />
         </div>
         {diff.lateFeeAmount ? (
