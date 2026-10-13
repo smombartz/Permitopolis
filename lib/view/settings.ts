@@ -4,11 +4,10 @@
  * against the real seed in settings.test.ts.
  *
  * The "What this changes" panel (tier rules) computes both the before and the after tier with
- * `classify()` itself, from whichever config it is given, rather than trusting a case's stored
- * `tier`. That is deliberate: `setConfig()` does not re-classify the cases already in the store
- * (see the engine request in the Phase 5 log), so a stored tier can be stale the moment the
- * Clerk changes a threshold. Computing fresh from `classify()` means this panel reads right
- * whether or not that engine fix has landed yet.
+ * `classify()` itself, from the two configs it is given, and never reads a case's stored `tier`.
+ * That is deliberate: `setConfig()` re-classifies every open Draft the moment an edit is saved,
+ * so the stored tier is already the "after". The panel's "before" is the rules as they were
+ * when the section opened, which only a fresh `classify()` under that config can give.
  */
 import { addMonths, format, parseISO } from "date-fns";
 import { SCENARIO_JUMPS, type ScenarioKey } from "@/lib/data/demoScript";

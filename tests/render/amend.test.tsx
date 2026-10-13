@@ -1,4 +1,4 @@
-import { screen, within } from "@testing-library/react";
+import { fireEvent, screen, within } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 import { AmendWizardScreen } from "@/components/wizard/amend/AmendWizardScreen";
 import { routes } from "@/lib/routes";
@@ -100,22 +100,42 @@ describe("AmendWizardScreen: entry points", () => {
   });
 });
 
-describe("AmendWizardScreen: the City Clerk decides a submitted amendment", () => {
-  it("is not built on this surface (no case-detail panel): an engineRequest describes the control the Clerk needs", async () => {
-    // The applicant proposes and submits it here (this workstream's surface); the Clerk's own
-    // decision has to be exercised at the store, since no panel for it exists yet (see the
-    // engineRequests).
+describe("AmendWizardScreen: what the applicant is told happens next", () => {
+  it("a change that needs a look names the whole way: the cards, the departments' checks, the Clerk's decision, then signing and paying", async () => {
     const { user } = await renderScreen(<AmendWizardScreen />, { scenario: "S1", path: routes.amend(S1) });
     await user.click(screen.getByRole("button", { name: "Next" }));
     await user.click(screen.getByRole("button", { name: "Next" }));
     await user.click(screen.getByRole("button", { name: "Next" }));
     await user.click(screen.getByRole("switch", { name: "Amplified sound" }));
     await user.click(screen.getByRole("button", { name: "Next" }));
+
+    expect(
+      screen.getByText(
+        "This needs a look from the city. Finish the new cards and submit the amendment from your board. The departments check them, the City Clerk decides, and you then sign and pay what the change adds. Your permit keeps covering the original plan until then.",
+      ),
+    ).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: /Pay a \$53\.75 late fee/ }));
     await user.click(screen.getByRole("button", { name: "Confirm change" }));
 
+    // The Clerk's part is on the case (tests/render/handoffs.test.tsx clicks it through); here
+    // the amendment is proposed and nothing is the city's yet.
     switchRole("clerk");
     const pending = storedCase(S1);
     expect(pending.flags.amendmentPending).toBe(true);
+    expect(pending.tasks.some((t) => t.owner !== "applicant")).toBe(false);
+  });
+
+  it("a change that only costs more says the difference is then due from the board", async () => {
+    const { user } = await renderScreen(<AmendWizardScreen />, { scenario: "S1", path: routes.amend(S1) });
+    await user.click(screen.getByRole("button", { name: "Next" }));
+    await user.click(screen.getByRole("button", { name: "Next" }));
+    // Two more hours at the shelter: the same tier, the same cards, $50 more.
+    fireEvent.change(screen.getByLabelText(/^End/), { target: { value: "18:00" } });
+    await user.click(screen.getByRole("button", { name: "Next" }));
+    await user.click(screen.getByRole("button", { name: "Next" }));
+
+    expect(screen.getByText("Nothing here needs another look: it takes effect as soon as you confirm, and what it adds to your fees is then due from your board.")).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Apply change" }));
+    expect(storedCase(S1).tasks.find((t) => t.catalogId === "pay_fees")).toMatchObject({ status: "todo", payload: { amount: 50 } });
   });
 });

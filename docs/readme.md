@@ -58,8 +58,10 @@ components. Start here, then read "How the engine behaves" for the engine's fine
 
 ### The page and the shell
 
-- **Every route already has a `page.tsx`** that renders `PlaceholderScreen`. To build a screen,
-  swap the placeholder for your `'use client'` screen and keep the `<Suspense>`:
+- **Every route has a `page.tsx`**: a thin server component that renders one `'use client'`
+  screen in `<Suspense>`. Through Phase 4 the routes nobody had built yet rendered
+  `PlaceholderScreen`; none does now, and `tests/guards.test.ts` holds that. A new route
+  follows the same pattern:
 
   ```tsx
   // app/city/queue/page.tsx
@@ -136,8 +138,8 @@ components. Start here, then read "How the engine behaves" for the engine's fine
 - **Call the hooks, not the setters.** `useRoleSwitch()` and `usePersonaSwitch()` are exported
   from `@/components/shell`. `setRole()` and `setPersona()` change the store and leave the page
   where it is.
-- **Reset** restores the seed, the date, the Applicant role and the New applicant persona, then
-  goes to `/events`.
+- **Reset** restores the seed, the date, the Applicant role and the New applicant persona, the
+  configured rules (`DEFAULT_CONFIG`) and no demo path picked, then goes to `/events`.
 - **Still to handle in a screen**: a typed-in URL can show an applicant page under another
   persona; render the case by its id all the same. The wizard must cope with `?case=` naming a
   case that is no longer a Draft (S2's jump after it has been booked): send it to its board.
@@ -158,11 +160,13 @@ components. Start here, then read "How the engine behaves" for the engine's fine
 
 - **`DEMO_DATE_JUMPS`**: the "Set demo date" quick jumps (May 3, Jun 18, Jul 11).
 - **`DEMO_PATHS`**: the PRD's seven demo paths as `{ id, title, priority, scenario, summary,
-  steps: [{ role, persona?, text }] }`, for the demo guide (3A) and for demo hints. Every
-  applicant step names its `persona` (the scenario's organizer, or `"new"` for somebody starting
-  a fresh event, as in path 2 and the last step of path 5); a city step has none. So a guide can
-  call `setRole(step.role)` and, when there is one, `setPersona(step.persona)`. Hints are on when
-  `useDemo((s) => s.hints)` is true.
+  steps: [{ id, role, persona?, page, text }] }`, for the demo guide (3A) and the demo coach
+  (5E). Every applicant step names its `persona` (the scenario's organizer, or `"new"` for
+  somebody starting a fresh event, as in path 2 and the last step of path 5); a city step has
+  none. `page` is where the step happens, a `lib/routes.ts` link: the coach's button sets
+  `step.role` and `step.persona` and opens it. Hints are on when `useDemo((s) => s.hints)` is
+  true, and the coach is on the path in `useDemo((s) => s.activeDemoPath)` ("The demo coach",
+  under "P1 and P2").
 - `tests/seed.test.ts` holds all three to the seed: every jump's case exists, in the state the
   PRD's seed table gives it, with the role, page and persona above; every date jump is its
   scenario's event day.
@@ -185,7 +189,7 @@ components. Start here, then read "How the engine behaves" for the engine's fine
 
   | Option | Effect |
   |---|---|
-  | `scenario: "S5"` | The role, persona and page of that Demo menu jump |
+  | `scenario: "S5"` | The role, persona and page of that Demo menu jump, with the demo coach on the path built on it (as the jump does) |
   | `path` | The page's href; a query string becomes `useSearchParams()`, so pass a `lib/routes.ts` link |
   | `params` | Route params; `{ id }` is read off an event, case or verify path when left out |
   | `search` | Extra search params |
@@ -301,7 +305,9 @@ one in every state. Reach for these before writing markup of your own.
   left, right and top placement rules are `sm:`-scoped for that reason: a rule with a data
   attribute outranks a plain `max-sm:` rule, so never add an unscoped `data-[side=...]:` one.
 - `MonthGrid`, `WeekGrid` and `DayStrip` take `selected` (a date): that day gets the indigo ring
-  and `aria-pressed`.
+  and `aria-pressed`. A `CalendarItem` with `kind: "meeting"` is drawn as a meeting (an icon and
+  a dashed outline, "Meeting:" in its name) and is not counted among a day's events; `detail` is
+  its tooltip.
 - `PartyChip` is neutral now: the party's hue is on its avatar tile only.
 - `StateStepper compact` shows the current state's label under its dots.
 - A new raw `<button>` or link gets the system focus ring:
@@ -323,7 +329,8 @@ Every one is pure. Read cases, the date and the config from the store
 | Cases pipeline | `isVisibleToCity(c)`, `isOpen(c)`, `involves(c, role)`, `involvement(c, party)`, `whoIsUp(c, today)`, `leadTimeRisk(c, today, cfg)`, `reviewClock(c, dept, today)` |
 | Case detail | `waitingOn(c, today)`, `nextMove(c, today, applicantName)`, `availableActions(c, role, { today, cases, cfg })`, `actorsFor(type)` |
 | Active permits | `activePermits(cases, today, { includeHolds })`, `permitSessions(cases, { from, to, includeHolds })` (one entry per held session, for the calendar and map), `hasActivePermit(c)`, `holdsDateAtQuote(c)`, `sessionDates(c)`, `isSessionDate(c, date)`, `lastSessionDate(c)` |
-| Store | `useDemo`, `useHydrated()`, `hydrateDemoStore()`, `demoToday()`, `buildSeed()` |
+| Amendment | `amendmentStage(c)` (`proposed`, `submitted`, `approved`, or null), `pendingAmendment(c)` (the plan from before it), `permittedPlan(c)` (the case as its permit covers it), `amendmentBalance(c, cfg)`, `amendmentPaymentDue(c, cfg)`, `amendmentSignOpen(c)`, `amendmentPayOpen(c)`, `amendmentCardsInFlight(c)`, `checkDecideAmendment(c, decision?, reason?)` |
+| Store | `useDemo`, `useHydrated()`, `hydrateDemoStore()`, `demoToday()`, `buildSeed()`; `setConfig()` (re-classifies open Drafts), `setActiveDemoPath()` |
 
 - A screen changes a case only with `useDemo.getState().dispatch(caseId, action)`. It acts as
   the current role and returns `{ ok, reason }`; show the reason when it is refused.
@@ -385,7 +392,10 @@ Seven surfaces, each built on its own and then joined. Every one is a client scr
 | Board card: Final bill or refund | Checkout, final mode | `routes.quote(id, { pay: "final" })` |
 | Board card: Carry your permit | Permit | `routes.permit(id)`, once it is unlocked |
 | Board card: Book again next year | Wizard on the new draft | Dispatches `book_again`; the result's `spawnedIds[0]` is the new case |
-| Board menu | Wizard ("Edit your plan", a Draft) or `/events/[id]/amend` ("Amend", 5A's placeholder) | Links |
+| Board menu, permit page | Wizard ("Edit your plan", a Draft) or `/events/[id]/amend` ("Change your event") | Links; the amendment's is off, with the reason, when `canAmend()` says no |
+| Amendment wizard, last step | Board | Dispatches `amend`, then `routes.event(id)` |
+| Board card: Accept conditions and sign, Pay fees and deposit, on a permitted case | Checkout, quote mode for an amendment | `routes.quote(id)`; `checkoutDecision()` returns `{ mode: "quote", amendment: true }` |
+| Payments, Closures and routes, Work orders, Verifications, Inspections | Case, with the row's panel open where the row acts | `routes.city.case(id, { task, tab, from })`; see "The new pages" |
 | Checkout, booking | Permit | Dispatches `book_and_pay`, then `routes.permit(id)`. Back goes to the wizard's plan step |
 | Checkout, session or final | Board | Dispatches `pay`, a toast, then `routes.event(id)` |
 | Permit | `/verify/[id]` | The QR code holds the full URL; "Open the verification page" is the same link |
@@ -408,9 +418,10 @@ Seven surfaces, each built on its own and then joined. Every one is a client scr
 - **Hands off** through `useDoors()` (`hooks.ts`): each door is a plain link that also sets the
   role once `useHydrated()` is true. The landing page renders in full before the stored demo is
   read; the demo guide waits for it, because Reset, the date jumps and every jump write to the store.
-- **For later phases**: 5E adds demo hints and the command palette under `app/demo/**` and
-  `components/shell/hints/**`. The "Live activity" log in the staff section is the landing page's
-  own markup on night tokens; `ActivityTimeline` is the app's.
+- **Since Phase 5**: each path card on the demo guide shows the coach's own step for it, with
+  "Continue" and "Reset and start" once a path is under way, and "Before you present" above them
+  ("The demo coach"). The "Live activity" log in the staff section is the landing page's own
+  markup on night tokens; `ActivityTimeline` is the app's.
 
 ### Wizard (3B)
 
@@ -425,8 +436,8 @@ Seven surfaces, each built on its own and then joined. Every one is a client scr
   `createDraft()` and replaces the URL with the new id. Every later edit is `updateDraft()`. A case
   that is no longer a Draft is sent to its board; an unknown id gets `CaseNotFound`.
 - **Below 1024 px** the result panel is a one-line bar that opens a bottom sheet.
-- **For later phases**: 5A reopens the wizard on a submitted record for an amendment
-  (`components/wizard/amend/**`); the steps take `answers` and `onChange`, so they can be reused.
+- **Since Phase 5**: the amendment wizard (`components/wizard/amend/**`) reuses the five steps
+  on a local copy of a submitted record's answers; the steps take `answers` and `onChange`.
   `DatePickerPopover` is the only date popover; move it to `components/ui` when a second surface
   wants one (the city's panels use native date inputs).
 
@@ -769,8 +780,9 @@ holds that). `<CommissionBadge />`, the gavel beside it, is not dev-only.
 
 1. Every `ACTION_TYPES` entry but `tick` is dispatched somewhere in `app/` or `components/`
    (it scans the source for `dispatch({ type: "..." })`), or has a panel in the registry.
-   `amend` is the one known gap, listed in `KNOWN_GAPS`; the test fails as soon as a listed gap
-   gets a control, so the list cannot go stale. **5A removes `amend` from it.**
+   `KNOWN_GAPS` lists the actions that have none, and is empty: `amend` was the last, and its
+   control is the amendment wizard's last step. The test fails as soon as a listed gap gets a
+   control, so the list cannot go stale.
 2. On the real seed, for every case and city role, every row of `availableActions()` has a
    panel, and every enabled row's panel renders.
 3. On the real seed, every open task in Who's up resolves, for each city role, to a panel that
@@ -789,6 +801,10 @@ other way passes whatever the panel does.
 | `tests/render/handoffs.test.tsx` | Demo paths 3, 4, 5 and 6, clicked from first step to last across the board, the queues, the case, checkout, Active permits and the wizard, with the role switcher |
 
 ### What a Phase 5 builder needs to know
+
+Kept as the hand-off Phases 5 and 6 were built from. What they built, and what has changed since
+(an amendment's Clerk decision, the back labels, the food permits task), is under "P1 and P2
+(Phases 5 and 6)".
 
 - **Amendment (5A).** `amend` is the only action with no control; build it and take it out of
   `KNOWN_GAPS`. The board's menu already links to `/events/[id]/amend`, and the permit page
@@ -870,20 +886,236 @@ plan is `docs/plans/2026-10-13-phase-4-review-fixes.md`. What a builder will mee
   Instant)" only on Instant plans; "Not routed" once routing is behind the case; Intake's
   "9 of 12 sign-offs".
 
+## P1 and P2 (Phases 5 and 6)
+
+Six workstreams built the rest of the PRD's scope: amendment (5A), the Clerk's Payments page and
+meetings on the calendars (5B), Public Works & Safety's Closures and routes and Work orders (5C),
+Health & Legal's Verifications, vendor permits and Inspections (5D), the demo coach and the
+command palette (5E), and the Clerk's Settings (6A). 6B's day-of tools were folded into 5C and
+5D. No route renders a placeholder any more. What the integration decided and changed is in
+`docs/plans/2026-10-13-phase-5-6-integration.md`.
+
+### The new pages
+
+Each is a thin page under `app/`, a client screen, and a pure view-model in `lib/view`, like the
+Phase 3 surfaces. Every tool page belongs to one role (`cityToolOwner()`): another city role that
+types its URL in gets "This screen is built for ...", and the switch offered there opens it.
+
+| Page | Route | Role | Files | View-model | What it does |
+|---|---|---|---|---|---|
+| Amendment | `/events/[id]/amend?step=` | Applicant | `components/wizard/amend/` (`AmendWizardScreen`, `AmendResultPanel`, `AmendReviewStep`) | `lib/view/amend.ts` | The wizard reopened on the same record, on a local copy of the answers. A live panel compares the new plan with the current one (tier, cards added and removed, the fee difference, the date gate). Nothing is dispatched until the last step is confirmed |
+| Payments | `/city/payments?tab=due\|received\|refunds&q=&method=&start=&end=` | City Clerk | `components/city/payments/PaymentsScreen.tsx` | `lib/view/payments.ts` | Due: every quote balance, amendment balance, session due and final bill, oldest first, each with "Record payment" (the case's own payment panel). Received: every payment, by method and date range, a series collapsed to its progress. Refunds: owed (a closeout logged and not reconciled) and issued, each with the rule behind it. A header with collected this month, outstanding and refunds this month |
+| Closures and routes | `/city/map?mode=day\|week\|range&from=&to=&status=&streets=1` | Public Works & Safety | `components/city/closures/` (`ClosuresMapScreen`, `ClosuresSideList`, `ClosuresCalendarStrip`) | `lib/view/closures.ts` | The map for a day, a week or a range: every closure, route and occupied space as Permitted, Date held or Pending review; overlaps named first with both events and their hours; a strip of the days in range with counts and blackout or impacted marks; a side list that opens each case |
+| Work orders | `/city/work-orders?tab=orders\|meetings&status=&kind=&from=&to=` | Public Works & Safety | `components/city/workorders/` (`WorkOrdersScreen`, `WorkOrdersList`, `MeetingsTab`, `TodayPanel`) | `lib/view/workOrders.ts` | Every open case's work orders by event, with what, how many, where, due, overdue and "Mark done" (the work order's panel on its case). A second tab of site walkthroughs and coordination meetings with Schedule, Reschedule and Mark held. On Event day, a "Today" panel for each street closure: its work orders as a checklist, and the time it closed and reopened |
+| Verifications | `/city/verifications?tab=queue\|decided&group=type\|event&type=&result=fail&overdue=1&q=` | Health & Legal | `components/city/verifications/VerificationsScreen.tsx` | `lib/view/verifications.ts` (on `lib/view/verify.ts`) | One queue of every document waiting on Health & Legal across cases, by document type or by event, each row with its checklist already read ("4 of 4 pass", "1 fails: ..."). "Verify the next one" opens the longest-waiting. A row opens the case on Documents with that card's Verify panel. "Recently decided" lists what was verified or sent back, and by whom |
+| Inspections | `/city/inspections` | Health & Legal | `components/city/inspections/InspectionsScreen.tsx` | `lib/view/inspections.ts` | Food booths by event, for every event with food vendors today or in the next 14 days: a booth per vendor, with Pass, Fail or Re-inspect and a note |
+| Settings | `/city/settings?section=fees\|inventory\|blackout\|templates\|service-levels` | City Clerk | `components/city/settings/` (`SettingsScreen` and a file per section) | `lib/view/settings.ts` | Tier rules (thresholds and lead times, with guard rails and a live "What this changes" panel), Fees and deposits, Service levels: all editable. Inventory and rates, the Blackout calendar and Templates: read-only views of `lib/data` |
+
+Also new, on pages that existed:
+
+- **Vendors, on a case's Documents tab** (`components/case/vendors/`, `lib/view/vendors.ts`):
+  every food vendor's health permit with its status and valid-through date, the case's progress,
+  and, for a Special event once its permit is issued, "Issue food permits".
+- **Meetings on Active permits** (`lib/view/active.ts`: `meetingItems()`,
+  `meetingCalendarItems()`): every scheduled pre-application meeting, coordination meeting and
+  site walkthrough, in its own day's cell on the month, the week and the day strip, for all
+  three city roles, behind "Show meetings" (`?meetings=0` turns it off). The Clerk's side panel
+  has "Day-of contact duty" for the day in view.
+- **The Clerk's decision on an amendment**: a panel on the case (`DecideAmendment.tsx`), a task in
+  the Clerk's queue, and a banner on the case for every city role. See "Amendment, end to end".
+
+**Hand-offs.** Every new list that opens a case passes its own URL as `from`, and the case's back
+link returns there with the tab and filters it had: "Back to Payments", "Back to Closures and
+routes", "Back to Work orders", "Back to Verifications", "Back to Inspections" (`BACK_LABEL` in
+`lib/view/caseDetail.ts`; a role is never sent back to another role's tool page). A row that
+acts opens the case with the panel that does it: `?task=pay`, `?task=<work order id>`,
+`?task=schedule_meeting:<card>`, `?task=verify_document:<card>`. Settings names the open Drafts
+an edit would move and does not link them: the city has no page for a Draft.
+
+**A meeting is a kind of calendar item.** `CalendarItem` (`components/calendar/types.ts`) takes
+`kind: "meeting"` and a `detail` for its tooltip. `MonthGrid`, `WeekGrid` and `DayStrip` draw one
+with a meeting icon and a dashed outline through `ItemMark`, never a tier's color, with "Meeting:"
+in its accessible name; the strip's "2 events" does not count it.
+
+### Amendment, end to end
+
+The PRD's "Amend": the same record takes new answers and nothing entered is lost. Demo path 7 is
+Maya Chen adding a DJ to her permitted Instant picnic (S1).
+
+1. **The applicant proposes.** The board's menu and the permit page offer "Change your event"
+   while `canAmend()` allows it (not a Draft, not ended or closed, before the last session, no
+   amendment already pending; otherwise the menu item is off with the reason). The wizard opens
+   filled in. On every change the panel shows the tier before and after, "This change makes your
+   event Reviewed. Everything you entered is kept; 4 new cards will be added.", the cards, the
+   fee difference and the date gate with its three fixes. The last step ("What changes", "What
+   stays", "What happens next") dispatches `amend`.
+2. **What `amend` does.** It classifies the record again and runs the date gate again (a place
+   that is no longer free is refused; a tier rise or a moved date inside the new lead time needs
+   `lateFee: true`). The record takes the new answers, tier, triggers, sessions and fee lines at
+   once. If the change adds no card, that is all: it is in effect. On a permitted case the money
+   is settled there and then (a difference in the applicant's favor is refunded; one the other
+   way reopens the payment card for the applicant to pay at checkout), and Public Works &
+   Safety's work orders are brought in step with the plan (`syncWorkOrders()`).
+3. **A change that adds a card is pending** (`flags.amendmentPending`). The new cards join the
+   board tagged `amendment`. The state, the permit, the date hold and the payments are not
+   touched. What the record looked like before is kept on the amendment's own "Submit
+   application" card (`pendingAmendment(c)`: the answers, tier, triggers, fee lines and how that
+   card stood), which is how the permit keeps its plan and how a decline puts everything back.
+4. **The permit covers the original plan.** `permittedPlan(c)` is the record with the answers,
+   tier and triggers from before a pending amendment. The permit page and the public check
+   (`/verify/[id]`) render that, with a line saying an amendment is pending. Everything else (the
+   board, the city's lists, the calendars, the map) shows the record as amended.
+5. **The applicant finishes the cards and submits.** The cards are completed like any others;
+   on a case that is past routing each goes to its reviewer's own `verify:*` task. `submit` on a
+   case with an amendment pending is "Submit amendment": the card is done and the Clerk gets a
+   task, "Decide amendment: approve or decline the change" (`CITY_TASKS.decide_amendment`).
+6. **The departments check, then the Clerk decides.** The Clerk's task is locked while one of the
+   amendment's cards is with a department or has been sent back ("Unlocks when the amendment's
+   cards are checked"), and opens when the last is verified. `decide_amendment` is the Clerk's
+   action (`{ decision: "approve" | "decline", reason? }`). Approving is refused while a card is
+   in flight, with who has it. Declining needs a reason and never waits.
+7. **Approval is the amendment's quote.** Before the permit, the amended plan simply is the
+   application now. On a permitted case the cards the amendment added that wait on a stage the
+   case is past open ("Accept conditions and sign", for an event that never had a signature),
+   what the amended plan costs beyond what was paid goes on the reopened payment card (nothing is
+   charged; a difference the other way is refunded on the spot), the work orders follow the plan,
+   and Health & Legal gets "Issue food permits" if the plan now has food permits to issue. The
+   applicant signs and pays at `/events/[id]/quote`, which is the quote page on a case that
+   already has its permit.
+8. **In effect.** When no signature and no balance is left the flag clears, the kept plan is
+   dropped, and the permit covers the amended plan. A decline restores the answers, tier,
+   triggers and fee lines exactly, takes the amendment's cards and their checks off, and gives an
+   earlier "Submit application" card back its state; the Clerk's decision stays on the case.
+
+Where each side reads it:
+
+| Stage (`amendmentStage(c)`) | The applicant's board | The city's case |
+|---|---|---|
+| `proposed` | Banner: "An amendment is pending. Finish the new cards below, then submit it ...". The new cards in Do now with the Amendment chip. Reviewers row: "Checks your amendment", "Decides your amendment" | Banner: "Amendment pending: Instant to Reviewed, 4 new cards. Waiting on the applicant to finish its cards and submit it." |
+| `submitted` | Banner names who is checking, then that it is with the Clerk. Each card "With the city" with the department that has it and that department's date | The departments up in Who's up, each with its verify task; the Clerk waiting, then up with the decision in its queue ("The amendment's cards are checked"). "Decide amendment" under Your actions |
+| `approved` | Banner: "The City Clerk approved your amendment. Accept and sign, then pay $393.75, to put it into effect ...". The two cards link to the quote | Banner: "Approved. Waiting on the applicant to sign and pay $393.75." The balance on the Clerk's Payments page, Due tab, as "Amendment balance" |
+
+A payment or refund an amendment caused carries `amendment: true` (`Payment`, `lib/types.ts`), so
+the case and the Payments page read "Amendment payment" and "Amended plan costs less", not "Quote
+payment" on a case that never had a quote.
+
+### The demo coach
+
+- **Which path.** `activeDemoPath` on the store (a `DEMO_PATHS` id, or null). It is set by the
+  demo guide's "Start this path" and "Continue", by the coach's own "Next path" menu, by the
+  palette's path items, and by every scenario jump (the Demo menu, the guide's table, the
+  palette), which puts the coach on the path built on that scenario (`demoPathIdForScenario()`:
+  S3 is path 3). Reset clears it, and so does the strip's own dismiss. It is stored with the
+  demo, so a reload keeps it. Nothing is guessed from the page.
+- **Which step.** `pathProgress(path, { cases, role, personaId, today })` in
+  `lib/view/coach.ts` reads one check per step off the cases (a card's status, a review decided,
+  the state reached, a role switched to) and takes the first that has not happened. It is never
+  a count of clicks, so it is right after a reload, after the presenter improvises and after
+  Reset, and it goes back a step when the presenter does (path 2's what-if). Path 7's three steps
+  land together: adding the DJ and choosing the late fee happen in the wizard, and one `amend`
+  does all three.
+- **The strip** (`components/shell/CoachStrip.tsx`, mounted by both shells under the top bar,
+  only while Demo hints are on): "Path 3 · Step 2 of 5", the step's text, and one button that
+  sets the step's role and persona and opens its page ("Switch to Health & Legal", or "Go to
+  this step"). Because the path is the store's, it stays with the presenter on My queue and
+  Active permits, and a dismissal holds across the applicant's and the city's shells.
+- **The demo guide** shows each path's step and a check per step from the same function, and a
+  "Before you present" list (Reset, the hints toggle, 1280px).
+- **`DEMO_PATHS`** steps carry `id`, `role`, `persona`, `page` (a `lib/routes.ts` link) and
+  `text`. `tests/demo-paths.test.ts` asks the coach for its step after every step of every path.
+
+### The command palette and shortcuts
+
+- **Cmd+K or Ctrl+K**, or the Search button in the top bar (`CommandCenter`, `CommandPalette`,
+  `lib/view/palette.ts`). Groups: Cases (only once something is typed: by name, applicant or id;
+  the Applicant sees their own, a city role every case it can see), Go to (every page of the
+  current role: the shared ones and its own tools), Switch role, Personas (Applicant only), Demo
+  (the six scenario jumps, the seven paths, the three date jumps, the hints toggle, Reset, which
+  asks first). Arrow keys, Enter, Esc.
+- **`?`** opens the list of shortcuts (`KeyboardHelp`): Cmd+K, `/` to search a list, `j` and `k`
+  through rows, Esc. It does not fire while a field has focus.
+
+### Settings, and what it changes
+
+Every edit calls `setConfig()`, which is a shallow merge (pass a whole `thresholds`, `fees` or
+`sla`), and the config is part of the stored demo.
+
+- **Tier rules.** The attendance thresholds for Reviewed and Special, the block-party limit, the
+  heavy-resources barricade count, and the three lead times. An invalid value (Reviewed at or
+  above Special, lead times out of order) shows its error and is not saved. **Every open Draft is
+  re-classified at once** in the store: its tier, triggers and sessions follow the rules as they
+  are now, so its wizard's live panel and its board read the new tier without being touched. A
+  case past Draft keeps the tier it was submitted and priced under. "What this changes" lists the
+  open Drafts an edit moves and the six scenarios under the edited values, against the rules as
+  they were when the section opened.
+- **Fees and deposits, Service levels.** New estimates, due dates and review allowances use
+  them; a quote already sent keeps its lines.
+- **Reset** puts the config back to `DEFAULT_CONFIG` with everything else. "Restore defaults" on
+  the page resets the tier rules alone.
+
+### Day-of notes and inspections
+
+Neither has storage of its own. Each is an `add_note` activity entry in a fixed wording, written
+by the page and read back from the case's log, so Reset and a seed replay carry it like any note:
+
+| What | Written as | By | Read back by |
+|---|---|---|---|
+| A street closing or reopening | `Closed at 7:45 am.` / `Reopened at 11:40 am.` | The Work orders page's Today panel (`closedAtNote()`, `reopenedAtNote()`) | The case's Activity tab |
+| A food booth inspection | `Food booth inspection: <vendor>: pass\|fail\|re-inspect. <note>` | The Inspections page (`formatInspectionNote()`) | The Inspections page itself (`parseInspectionNote()`, newest entry per vendor) and the Activity tab |
+
+### What the integration added to the engine
+
+- **`decide_amendment`** (the Clerk), in place of `amend` overloaded for the Clerk. With it:
+  `amendmentStage()`, `pendingAmendment()`, `permittedPlan()`, `amendmentBalance()`,
+  `amendmentPaymentDue()`, `amendmentSignOpen()`, `amendmentPayOpen()`,
+  `amendmentCardsInFlight()` and `checkDecideAmendment()` from `@/lib/state`.
+- **`accept_and_sign` and a `quote` payment are taken on a permitted case** while the
+  amendment's card for each is open, and nowhere else outside Quote sent.
+- **`issue_food_permits`** (`CITY_TASKS`): Health & Legal's task, created by `issue_permit` for a
+  plan with the "Download per-vendor food permits" card, locked until every vendor's health
+  permit is verified, finished with `complete_city_task`. It raises a new unlock event,
+  `food_permits_issued`, which is what the applicant's card now waits for (it used to open with
+  the permit). S6's script issues them on Apr 15.
+- **The Clerk's license review** is titled "Review the temporary alcohol license"
+  (`reviewTaskTitle()` in the catalogue), and its queue row reads "Your own review section,
+  routed Apr 20".
+- **`setConfig()` re-classifies open Drafts; `activeDemoPath` and `setActiveDemoPath()`** are on
+  the store; both are stored and put back by Reset.
+- **`Payment.amendment`**, **`CalendarItem.kind` and `detail`**: additive.
+
+### Tests that hold the new pieces to each other
+
+| File | Holds |
+|---|---|
+| `tests/tool-pages.test.ts` | Each tool page to the case it lists, on the seed and after demo paths 5, 6 and 7: work orders and Public Works & Safety's queue; meetings on the calendar, on the work orders tab and on the card; closures and `permitSessions()`; the verification queue and the Documents tab; inspections and the vendor cards; Payments' Due, Received and Refunds and the engine's figures; an amendment's banner and panel, stage by stage |
+| `tests/demo-paths.test.ts` | The coach's step after every step of all seven paths; path 7 through the checks, the decision, the signature and the payment, and a decline |
+| `tests/render/handoffs.test.tsx`, "(j)" | Every sidebar tool link reaches a built page; every new list opens the case and the case returns to it; Settings reach the wizard's live panel; each coach step's page is a built page for its role; the palette reaches every page of each role; demo path 7 clicked from the permit to the amended permit |
+| `tests/both-sides.test.ts` | An amendment's cards "With the city": the department that has each, and its date |
+| `tests/guards.test.ts` | No page under `app/` renders `PlaceholderScreen` |
+| `lib/state/transitions/amendment.test.ts`, `foodPermits.test.ts` | The two engine additions against the real rules and seed |
+
 ### What is still a placeholder
 
-- **Routes.** `/events/[id]/amend` (5A; the board's menu already links to it), `/city/payments`
-  (5B), `/city/map` and `/city/work-orders` (5C), `/city/verifications` (5D), `/city/inspections`
-  (6B) and `/city/settings` (6A) render `PlaceholderScreen`. The sidebar links to the city ones.
-- **`amend` has no control** anywhere (the action-coverage test's one known gap).
+No route is. What is simulated, or deliberately small:
+
 - **A document preview is a drawing.** No file is stored or opened; "Use sample file" produces a
   name, a size and a type.
+- **Payments are simulated**, an amendment's included: a prefilled test card that always goes
+  through, and refunds that are recorded and nothing else.
 - **The closeout's photo is not kept.** The log's "Add a photo" shows the file as attached;
-  `log_closeout` carries no file, so nothing is stored with the case.
+  `log_closeout` carries no file.
 - **"Sent to commission" is a flag**, with a banner and a marker; there is no commission
   workflow (plan section 11).
-- **The Clerk's compliance log** on Active permits always reads "No log entries yet" (6B).
-- **The three role override maps are empty on purpose**, not unfinished (see above).
+- **Day-of records are notes.** A closure's times and a booth's inspection are activity entries
+  in a fixed wording (above), not records of their own. The police roster and the fire inspection
+  of the PRD's day-of row are not built.
+- **The Clerk's compliance log** on Active permits still reads "No log entries yet". The Clerk's
+  day-of contact duty is there; a time-stamped log with an Issue flag is not.
+- **Inventory, the blackout calendar and templates are read-only** in Settings; they are
+  `lib/data` files.
+- **`PlaceholderScreen`** is still in `components/shell` for a route added later. Nothing renders it.
+- **The three role override maps are empty on purpose**, not unfinished ("Where each role's
+  tools live").
 
 ## How the engine behaves
 
@@ -1030,7 +1262,18 @@ Things a screen builder needs to know that the type signatures do not say.
 - **`amend`** takes only the answer fields of its payload, lists the new schedule's sessions and
   runs the date gate again. It refuses inside the new tier's lead time without `lateFee: true`,
   but only when the tier rises or the date moves. It replaces the plan's fee lines, keeps lines a
-  reviewer added and tags new cards `amendment`. State, permit and hold stay as they are.
+  reviewer added and tags new cards `amendment`. State, permit and hold stay as they are. A
+  change that adds no card is in effect at once; one that adds a card is pending until the
+  applicant submits it and the Clerk decides it (`decide_amendment`). The whole flow is under
+  "Amendment, end to end".
+- **A permitted case can owe money and a signature again.** After an amendment the
+  "Pay fees and deposit" and "Accept conditions and sign" cards can be open on a Permitted case.
+  `checkPay({ kind: "quote" })` and `checkAcceptAndSign()` pass there only while that card is
+  open (`amendmentPayOpen()`, `amendmentSignOpen()`), and what is owed is `amendmentBalance()`,
+  not `quoteBalance()`.
+- **Food permits are issued, then downloaded.** The applicant's "Download per-vendor food
+  permits" card unlocks on `food_permits_issued`, raised when Health & Legal finishes its "Issue
+  food permits" task, which opens once every vendor's health permit is verified.
 - **City task ids**: `review:<dept>`, `verify:<card suffix>` (for example
   `verify:vendor_health_permit:1`), `work_order:<barricades|police|closure|trash|power>`, and the
   plain ids in `CITY_TASKS`. Meeting cards belong to the applicant and are closed by the city with
@@ -1149,8 +1392,6 @@ Things a screen builder needs to know that the type signatures do not say.
 
 **Open items for later workstreams**
 
-- **A pending amendment's `submit_application` card cannot be submitted**, because `submit`
-  needs a Draft. Workstream 5A owns that flow.
 - **`classify()`'s summary phrases** ("about 3 weeks", "about 2 months") are fixed copy from the
   PRD, not derived from the config.
 - **A role switch that navigates** sets the role before the new page arrives, so the old page's
@@ -1277,8 +1518,8 @@ Raised while the Phase 3 screens were built and joined:
   withdrawing and cancelling each show a short toast ("Sent."), as paying and the city's actions
   already did. If the card moving to its new column is confirmation enough, the toasts are one
   map in `CardSheet.tsx`.
-- **Amend is on the board's menu before it exists.** "Amend" opens "This screen is being built"
-  until 5A. Say if the item should be hidden until then.
+- **Amend is on the board's menu.** Settled by Phase 5: the item is "Change your event", opens
+  the amendment wizard, and is off with its reason when the event cannot be amended.
 
 Raised by the Phase 3 review fixes:
 
@@ -1403,3 +1644,106 @@ From the Phase 4 review fixes (2026-10-13):
   officer-hour for the reviewer to change, and a named line left at 0 stops the decision with
   "Give Police a quantity, or remove the line."
 
+Raised while Phases 5 and 6 were built and joined (2026-10-13):
+
+Amendment:
+
+- **A change that adds no card takes effect at once, whatever it changes.** The builder's rule
+  for "needs the City Clerk" is "adds a card". So a Special event can move its date, its hours or
+  its route, or drop its police, and the change is in effect on confirming, with the refund paid
+  (the Four Bridges Ultra drops its six officers and gets $2,040 back with nobody at the city
+  having seen it). The date gate still runs. Should every change to a Reviewed or Special permit
+  go to the Clerk, or every change to the date, place or city services?
+- **The Clerk alone approves an amendment.** The departments verify the cards it adds, one by
+  one; there is no routing, no review with conditions and no consolidation, so an amendment that
+  adds a DJ gets no "Sound ends at 9 pm". The other reading of the PRD is that a tier rise goes
+  through the whole review again. Say which.
+- **Approval is the amendment's quote, and the applicant pays the difference.** The builder had
+  the Clerk's approval charge the applicant on the spot. It is now what a quote is: the payment
+  card reopens for the difference and the applicant pays at checkout, after signing if the event
+  never had a signature. A difference in the applicant's favor is refunded at once. The amended
+  plan takes effect when nothing is left to sign or pay.
+- **While an amendment is pending, the record is already the amended one.** The board, the
+  city's lists, the fee table, the calendars, the map and availability show the new plan; only
+  the permit page and the public check show the plan the permit covers. So an amendment that
+  moves the date holds the new date, and frees the old one, before anybody has approved it.
+  Keeping the original on the calendars until approval means holding two plans on one record.
+- **The applicant cannot take an amendment back.** Once proposed it is pending until the Clerk
+  decides; before it is submitted nobody can end it, and after an approval it waits for the
+  signature and the payment with no deadline that does anything. Should there be "Discard this
+  change" on the board, and should an approved amendment lapse?
+- **A declined amendment leaves nothing on the applicant's board.** The reason is on the case's
+  activity log, which the board does not show. Say if the board should carry it until dismissed.
+- **Four new cards, where the PRD's sentence says three.** Maya's banner counts the certificate
+  of insurance, the sound details, Submit application and Accept conditions and sign. The fourth
+  is the signature her Instant event never had.
+- **After approval the payment card comes before the signature card.** Both are due the same
+  day, and the board keeps the order the case got them in; the payment card was on the Instant
+  plan. Either opens the same page, where signing comes first.
+- **"Amend" and "Change your event".** The board's menu and the permit say "Change your event";
+  the engine's own row for it (`availableActions()`) is still labelled "Amend".
+
+Payments, meetings and licenses:
+
+- **Two of the three header figures are for the calendar month** of the demo date ("Collected
+  this month", "Refunds issued this month"); "Outstanding" is everything due now. Say if all
+  three should be all-time.
+- **A series' sessions on the Received tab** open and close as an accordion; that is not in the
+  URL, where the tab, the search and the filters are.
+- **Licenses have no page of their own.** The PRD's row is the Clerk reviewing the alcohol
+  license "as its own review section, like any department", and that is what it is: the review
+  panel, with the task named "Review the temporary alcohol license". No vending license exists
+  apart from Health & Legal's food permits.
+- **A meeting is in its day's cell, and only there.** The builder's list of meetings under the
+  calendar is gone; who attends is in the item's tooltip. Say if the list should come back
+  beside the grid.
+
+Closures, work orders and day-of:
+
+- **"Date held" on the closures map is wider than on Active permits.** There it is a quote
+  holding its date; on the map it is any open case whose date is held, from the Clerk's
+  acceptance on, because Public Works & Safety needs to see a closure that is coming before it
+  is quoted.
+- **A list row opens the case to act.** "Mark done", "Schedule" and "Mark held" on the Work
+  orders page, and "Record payment" on Payments, open the case with the panel that does it,
+  rather than acting from the row. Say if a row should act in place.
+- **The Today panel is for street closures, and a time is a note.** "Closed at" and "Reopened
+  at" are activity entries; one can be recorded twice, and nothing checks the order. The PRD's
+  police roster and fire inspection are not built.
+
+Verifications, vendors and inspections:
+
+- **The queue is longest-waiting first.** So the 5K's certificate is not the first insurance
+  document: East End Baptist Church's (`PMT-27-0016`) has waited 44 days. "Verify the next one"
+  opens that one.
+- **Vendors are on the Documents tab twice**: in Health & Legal's own group, where each permit
+  is verified, and in the Vendors section below, with the valid-through dates and "Issue food
+  permits". Say if the section should replace the group.
+- **Food permits are issued in one click.** "Issue food permits" opens the applicant's download
+  card; there is no permit per vendor to look at. Before Phase 5 the applicant's card opened
+  with the permit itself.
+- **Upcoming inspections include events not yet permitted.** St. Agnes Parish's festival, in
+  review and ten days out, is on the list with its five booths, and a result can be recorded for
+  a booth before its day.
+
+The coach and the palette:
+
+- **The coach shows once a path is picked.** From the demo guide, the palette, its own menu, or
+  a scenario jump. Opening a scenario's case some other way shows nothing.
+- **"Start this path" opens the scenario's first screen; "Continue" opens the current step.**
+  Path 7 so starts on Maya's permit, one click from the wizard its first step names.
+- **Path 7 goes from step 1 to done in one click**, because the wizard keeps the DJ and the late
+  fee to itself until the change is confirmed.
+- **Path 2 and the end of path 5 share the new applicant's draft**, so on the demo guide's
+  overview finishing path 5 can read as progress on path 2. The strip shows one path.
+
+Settings:
+
+- **A threshold moves open Drafts and nothing else.** A submitted case keeps the tier it was
+  reviewed and priced under.
+- **Settings names the open Drafts an edit would move** (the event's name and id). A Draft is
+  otherwise the applicant's alone. Say if the panel should give a count only.
+- **Only the tier rules have guard rails and a Restore.** Fees and service levels take any
+  number that is not negative. "What this changes" starts over when the Clerk leaves the section.
+- **No attendance threshold moves the 5K.** Its route and its police make it Special whatever
+  the numbers say; the brief's example of it dropping to Reviewed does not happen.

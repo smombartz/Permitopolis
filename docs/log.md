@@ -1,5 +1,179 @@
 # Change log
 
+## 2026-10-13 - Phases 5 and 6 integration: P1 and P2 in one tree
+
+**What Changed:**
+- Merged `phase5/amend`, `coach`, `clerk`, `pws`, `hl` and `settings` into `build`, one at a time, with no conflicts. The run that built them was cut off by a usage limit and resumed; three builders had finished and three were finished in their worktrees on the resume. The gate failed on the merged tree in one expected place (`amend` had a control and was still listed as a gap). Plan, and what turned out differently from it: `docs/plans/2026-10-13-phase-5-6-integration.md`
+- **Engine requests** (ten applied, one declined, each applied one test-first, the builder's workaround removed):
+  - The Clerk's decision on an amendment is its own action, `decide_amendment`, with a task in the Clerk's queue (locked while a department still has one of the amendment's cards) and a panel on the case (`DecideAmendment.tsx`). `amend` is the applicant's alone again; the Clerk's dispatch of it, told apart by comparing answers, is gone
+  - Approving an amendment is its quote: nothing is charged. On a permitted case the payment card reopens for what the amended plan costs beyond what was paid, "Accept conditions and sign" opens where the event never had a signature, the applicant signs and pays at `/events/[id]/quote`, and the amendment takes effect when nothing is left. A difference in the applicant's favor is refunded at once. `checkPay` and `checkAcceptAndSign` pass on a permitted case only while that card is open
+  - Declining needs a reason and restores the record exactly: the builder's decline re-estimated the fee lines and dropped the application's own "Submit application" card once an amendment had borrowed it. The plan from before is kept as `pendingAmendment(c)`; `permittedPlan(c)` is the case as its permit covers it
+  - A change that takes effect at once settles its difference and brings Public Works & Safety's work orders in step with the plan (`syncWorkOrders()`)
+  - `issue_food_permits`: Health & Legal's task, created by `issue_permit` for a plan with the "Download per-vendor food permits" card, locked until every vendor's health permit is verified, finished with `complete_city_task`. The applicant's card now unlocks on a new event, `food_permits_issued`. S6's script issues them on Apr 15
+  - `activeDemoPath` and `setActiveDemoPath()` on the store: set by the demo guide, the coach's menu, the palette and every scenario jump, cleared by Reset and by dismissing the strip. The path guessed from the URL (`activeDemoPathId()`) is gone
+  - `setConfig()` re-classifies every open Draft; the config and the demo path are in the stored demo and put back by Reset
+  - `BACK_LABEL` for Payments, Closures and routes, Work orders, Verifications and Inspections. Declined for Settings: its open Drafts are named, not linked, since the city has no page for a Draft
+  - The Clerk's license review is titled "Review the temporary alcohol license" (`reviewTaskTitle()`), with "Your own review section, routed ..." in the queue
+  - A meeting is a kind of `CalendarItem`, drawn in its day's cell by `MonthGrid`, `WeekGrid` and `DayStrip` (`ItemMark`); the list under the grid (`MeetingsList.tsx`) is gone
+  - The permit page links to the amendment ("Change your event"), gated by `canAmend()`
+- **Twelve places the builders' work did not meet**, each fixed with a test (the table is in the plan): nothing on the city side showed an amendment; the permit page and the public check showed the amended plan while it was pending; the applicant's board said an amended Instant event's cards were "at intake with the City Clerk" and its departments "Not involved"; a permitted case with money owed opened "Nothing to pay here"; an amendment's balance was on no tab of Payments and its payment read "Quote payment" (`Payment.amendment`); the coach was gone on the last screen of paths 1 and 4 and a dismissal came back with every role switch; the demo guide's "Continue" reopened the first screen; path 7's first step opened the board, not the wizard; Settings linked a Draft to "This application is still a draft"; Payments' "Clear filters" cleared one filter of three; an applicant's Draft was on the inspections list
+- **Tests that hold the pieces to each other:** `tests/tool-pages.test.ts` (new) holds each tool page to the case it lists, on the seed and after demo paths 5, 6 and 7; `tests/demo-paths.test.ts` asks the coach for its step after every step of all seven paths and takes path 7 through the checks, the decision, the signature and the payment; `tests/render/handoffs.test.tsx` gains "(j)": every tool link reaches a built page, every new list opens the case and the case comes back to it, Settings reach the wizard's live panel, the coach and the palette land on real screens, and demo path 7 is clicked from the permit to the amended permit; `tests/guards.test.ts` holds that no page renders `PlaceholderScreen`; `tests/both-sides.test.ts` holds an amendment's "With the city" cards to the city's own tasks
+- **Consistency across the new pages:** tabs that split a list are the plain tab list with a `CountBadge` each; group headings carry a `CountBadge`; filters are `FilterBar`; an event in a list is `EventTitle` with `CaseId` and `TierBadge`; an empty list says whether it is the filters'; decided rows on Verifications open their case
+- **Docs:** `docs/readme.md` has "P1 and P2 (Phases 5 and 6)" (the new pages, the amendment end to end, the coach, the palette, settings, day-of notes), an updated "What is still a placeholder" (no route is), and 28 new questions for the owner; the main plan has Phases 5 and 6 ticked, the builders' screens in section 12 and a Changes line
+- Gate on the final tree: type-check, lint, 2,262 tests in 105 files and build pass. The six worktrees and the `phase5/*` branches are removed
+
+**Why:**
+- Six workstreams built in isolation agree with the engine and not with each other until something walks from one into the next. The amendment was the widest gap: the applicant's half was built and the city's half was a store dispatch with no screen
+
+**Files Modified:**
+- `lib/state/amendment.ts` (new), `lib/state/transitions/amendment.ts` (new, with `amend` moved from `applicant.ts`), `transitions/shared.ts`, `applicant.ts`, `city.ts`, `clerk.ts`, `payment.ts`
+- `lib/state/actions.ts`, `checks.ts`, `availableActions.ts`, `waitingOn.ts`, `core.ts`, `transition.ts`, `store.ts`, `types.ts`, `index.ts`, `seed/scenarios/s6.ts`
+- `lib/types.ts` (`UnlockEvent`, `Payment.amendment`), `lib/rules/catalog.ts` (`CITY_TASKS.issue_food_permits`, `decide_amendment`, `reviewTaskTitle()`, the food permits card's unlock)
+- `lib/view/amend.ts`, `board.ts`, `caseDetail.ts`, `checkout.ts`, `cityLists.ts`, `clerkTools.ts`, `coach.ts`, `payments.ts`, `vendors.ts`, `inspections.ts`, `active.ts`, `settings.ts` (comment); `lib/data/demoScript.ts`
+- `components/case/actions/generic/DecideAmendment.tsx` (new), `Pay.tsx`, `CompleteCityTask.tsx`, `index.ts`; `components/case/CaseDetailScreen.tsx`, `tabs/DocumentsTab.tsx`, `vendors/IssueFoodPermits.tsx`, `vendors/VendorsSection.tsx`
+- `components/calendar/ItemMark.tsx` (new), `MonthGrid.tsx`, `WeekGrid.tsx`, `DayStrip.tsx`, `types.ts`; `components/active/ActiveScreen.tsx`, `ActiveCalendarView.tsx`, `TodayStrip.tsx`, `MeetingsList.tsx` (removed)
+- `components/checkout/CheckoutScreen.tsx`, `QuotePanel.tsx`; `components/permit/PermitCard.tsx`, `PermitScreen.tsx`, `VerifyScreen.tsx`; `components/board/BoardScreen.tsx`; `components/wizard/amend/AmendReviewStep.tsx`
+- `components/shell/CoachStrip.tsx`, `CommandPalette.tsx`, `DemoMenu.tsx`, `AppShell.tsx`, `CityShell.tsx`; `components/landing/DemoGuideScreen.tsx`
+- `components/city/payments/PaymentsScreen.tsx`, `verifications/VerificationsScreen.tsx`, `inspections/InspectionsScreen.tsx`, `workorders/WorkOrdersScreen.tsx`, `WorkOrdersList.tsx`, `MeetingsTab.tsx`, `settings/SettingsScreen.tsx`, `TierRulesSection.tsx`
+- `tests/tool-pages.test.ts` (new), `lib/state/transitions/amendment.test.ts` (new), `foodPermits.test.ts` (new), `tests/demo-paths.test.ts`, `both-sides.test.ts`, `guards.test.ts`, `action-coverage.test.ts`, `tests/render/handoffs.test.tsx`, `harness.tsx`, and the unit and render tests of the files above
+- `docs/readme.md`, `docs/log.md`, `docs/plans/2026-10-13-phase-5-6-integration.md` (new), `docs/plans/2026-10-12-permitopolis-prototype.md`
+
+---
+
+## 2026-10-13 - Phase 5A: Amendment (PRD P1, demo path 7)
+
+**What Changed:**
+- Added `/events/[id]/amend`: the wizard reopened on the same record in "Change your event" mode, with a local copy of the answers (nothing dispatched until confirmed) and a live result panel comparing the proposed plan to the current one.
+- Added `components/wizard/amend/` (AmendWizardScreen, AmendResultPanel, AmendReviewStep) and `lib/view/amend.ts` (`buildAmendmentDiff`, `tierRiseBannerText`, `amendmentGateSatisfied`): the diff between two plans (tier, cards added and removed, fee difference, date gate), tested against the real seed, reproducing the PRD's Maya and DJ example (Reviewed, 19 days against 30 needed, a $53.75 late fee).
+- Extended `lib/state/transitions/applicant.ts` and `lib/state/checks.ts`: the `amend` action applies at once when nothing material changes or the tier falls; a material change reopens the amendment's own "Submit application" card and leaves the permit on the original plan until decided.
+- Extended `lib/view/board.ts` (`canAmend`, `amendmentBanner`) and `components/board/BoardMenu.tsx`, `BoardScreen.tsx`, `CardSheet.tsx`: the board menu's "Change your event" entry point, a pending-amendment banner, and "Submit amendment" copy on the reused card.
+- Added `lib/view/amend.test.ts`, `tests/render/amend.test.tsx`; extended `lib/state/transitions/applicant.test.ts`, `lib/view/board.test.ts`, `tests/demo-paths.test.ts` (path 7 at the store).
+- As built, the Clerk's decision was the same `amend` action raised by the Clerk, with no screen for it; the integration replaced that with `decide_amendment` and its panel (entry above).
+
+**Why:**
+- PRD P1, demo path 7: an applicant can change an event already past the wizard without losing anything already entered, and the record stays one shared one even when the change moves it up a tier.
+
+**Files Modified:**
+- `app/events/[id]/amend/page.tsx`
+- `components/wizard/amend/AmendWizardScreen.tsx`, `AmendResultPanel.tsx`, `AmendReviewStep.tsx`
+- `components/board/BoardMenu.tsx`, `BoardScreen.tsx`, `CardSheet.tsx`
+- `lib/view/amend.ts`, `lib/view/amend.test.ts`
+- `lib/view/board.ts`, `lib/view/board.test.ts`
+- `lib/state/transitions/applicant.ts`, `lib/state/transitions/applicant.test.ts`
+- `lib/state/checks.ts`
+- `tests/render/amend.test.tsx`
+- `tests/demo-paths.test.ts`
+
+---
+
+## 2026-10-13 - Phase 5B: the Clerk's Payments page, and meetings on Active permits
+
+**What Changed:**
+- Added `/city/payments` (`app/city/payments/page.tsx`, `components/city/payments/PaymentsScreen.tsx`, new `lib/view/payments.ts`): the City Clerk's Due, Received and Refunds tabs, kept in the URL with counts, totals, a header summary (collected this month, outstanding, refunds issued) and a search box.
+- Extended `lib/view/active.ts` and `components/active/**`: every scheduled meeting and walkthrough shows on the Today strip and the Calendar view, for all three city roles, behind a "Show meetings" URL toggle; the Clerk's side panel gained "Day-of contact duty" for the day in view. (Built as a list beside the grid, `MeetingsList.tsx`; the integration drew meetings in the calendar's own cells instead.)
+- New tests: `lib/view/payments.test.ts`, `tests/render/payments.test.tsx`, and additions to `lib/view/active.test.ts` and `tests/render/active.test.tsx`.
+
+**Why:**
+- PRD P1 scope: "City Clerk views" (Payments, Licenses, Consultation) and the Active permits role overlays' day-of contact duty.
+
+**Files Modified:**
+- `app/city/payments/page.tsx`
+- `components/city/payments/PaymentsScreen.tsx`
+- `components/active/ActiveScreen.tsx`, `ActiveCalendarView.tsx`, `ActiveMapView.tsx`, `TodayStrip.tsx`, `RoleOverlay.tsx`, `MeetingsList.tsx`
+- `lib/view/payments.ts`, `lib/view/payments.test.ts`
+- `lib/view/active.ts`, `lib/view/active.test.ts`
+- `tests/render/payments.test.tsx`, `tests/render/active.test.tsx`
+
+---
+
+## 2026-10-13 - Phase 5C: Closures map and work orders (Public Works & Safety)
+
+**What Changed:**
+- Replaced the placeholders on `/city/map` and `/city/work-orders` with `ClosuresMapScreen` and `WorkOrdersScreen`.
+- Added `components/city/closures/` (ClosuresMapScreen, ClosuresSideList, ClosuresCalendarStrip): the Permitopolis map for a day, a week or a custom range, every closure, route and occupied space by status (permitted, held, pending), overlaps named first with both events and their hours, a calendar strip with per-day counts and blackout or impacted marks, and a side list linking to each case.
+- Added `components/city/workorders/` (WorkOrdersScreen, WorkOrdersList, MeetingsTab, TodayPanel): every open case's work orders grouped by event with a "Mark done" hand-off, a summary line, a Walkthroughs and meetings tab (Schedule, Reschedule, and Mark held gated by the engine), and a light day-of "Today" panel recording "Closed at" and "Reopened at" notes. This is where 6B's closure checklist went.
+- Added `lib/view/closures.ts` and `lib/view/workOrders.ts` with tests against the real seed, plus render tests for both pages (`tests/render/closures.test.tsx`, `tests/render/work-orders.test.tsx`) covering demo path 5, the engine's schedule-meeting refusal, empty states, and the role gate.
+
+**Why:**
+- Phase 5 P1 and P2 scope: Public Works & Safety needed its own tool pages for closures and routes and for work orders, meetings, and day-of operations, per the PRD's "Public Works & Safety views" rows.
+
+**Files Modified:**
+- `app/city/map/page.tsx`, `app/city/work-orders/page.tsx`
+- `components/city/closures/ClosuresMapScreen.tsx`, `ClosuresSideList.tsx`, `ClosuresCalendarStrip.tsx`
+- `components/city/workorders/WorkOrdersScreen.tsx`, `WorkOrdersList.tsx`, `MeetingsTab.tsx`, `TodayPanel.tsx`
+- `lib/view/closures.ts`, `lib/view/closures.test.ts`
+- `lib/view/workOrders.ts`, `lib/view/workOrders.test.ts`
+- `tests/render/closures.test.tsx`, `tests/render/work-orders.test.tsx`
+
+---
+
+## 2026-10-13 - Phase 5D: Health & Legal's Verifications, Vendor permits and Inspections
+
+**What Changed:**
+- Added `/city/verifications` (P1): one cross-case queue of documents waiting on Health & Legal's check, grouped by document type or event, filtered by type, result, overdue and search, with a "Verify the next one" shortcut and a "Recently decided" tab.
+- Added a "Vendors" group to the case Documents tab: each food vendor's health permit status, valid-through date and overall progress, plus an "Issue food permits" action for a Special event once permitted. (Built against an engine step that did not exist; the integration added `issue_food_permits`.)
+- Added `/city/inspections` (P2): day-of food booth inspections per event (today and the next 14 days), recording pass, fail or re-inspect as a fixed-wording activity note, with no new engine state. This is where 6B's food booth inspections went.
+
+**Why:**
+- PRD rows "Verifications", "Vendor permits" and "Inspections" under Health & Legal's views, demo paths 3 and 5.
+
+**Files Modified:**
+- `app/city/verifications/page.tsx`, `app/city/inspections/page.tsx`
+- `components/city/verifications/VerificationsScreen.tsx` (new)
+- `components/city/inspections/InspectionsScreen.tsx` (new)
+- `components/case/vendors/VendorsSection.tsx`, `VendorPermitStatus.tsx`, `IssueFoodPermits.tsx` (new)
+- `components/case/tabs/DocumentsTab.tsx`
+- `lib/view/verifications.ts`, `lib/view/vendors.ts`, `lib/view/inspections.ts` (new, each with a `.test.ts`)
+- `tests/render/verifications.test.tsx`, `tests/render/vendors.test.tsx`, `tests/render/inspections.test.tsx` (new)
+
+---
+
+## 2026-10-13 - Phase 5E: demo coach, demo guide live progress, command palette and keyboard help
+
+**What Changed:**
+- `lib/view/coach.ts` (new): a pure function per path (`pathProgress`) that reads the first step not yet done off the store's cases, role, persona and demo date, so the coach is right after a reload, after the presenter improvises, and after Reset.
+- `lib/view/palette.ts` (new): builds and ranks the command palette's items (Cases, Go to, Switch role, Personas, Demo) for the current role and persona.
+- `components/shell/CoachStrip.tsx`, `CommandCenter.tsx`, `CommandPalette.tsx`, `KeyboardHelp.tsx` (new): the coach strip under the top bar, the Cmd+K or Ctrl+K command palette (arrow keys, Enter, Esc, footer hints), and the "?" keyboard-shortcuts dialog, which does not open while a field has focus.
+- `lib/data/demoScript.ts`: each `DemoStep` now carries an id, role, persona, page and the presenter's wording.
+- `components/landing/DemoGuideScreen.tsx`: each path card shows "Step X of Y" or "Done" and a check per step from the same function, "Start this path" becomes "Continue" once under way, with "Reset and start", and a "Before you present" checklist.
+- As built, the path on show was guessed from the URL; the integration put it on the store (`activeDemoPath`).
+- The workstream was built in three commits before the run was cut off; the resume verified it against the brief and changed nothing.
+
+**Why:**
+- PRD P1, "Demo hints": callouts that say what to click next on each path, and a command palette for cases, roles and scenarios.
+
+**Files Modified:**
+- `lib/view/coach.ts`, `lib/view/coach.test.ts` (new)
+- `lib/view/palette.ts`, `lib/view/palette.test.ts` (new)
+- `lib/data/demoScript.ts`
+- `components/shell/CoachStrip.tsx`, `CommandCenter.tsx`, `CommandPalette.tsx`, `KeyboardHelp.tsx` (new)
+- `components/shell/AppShell.tsx`, `CityShell.tsx`, `TopBar.tsx`
+- `components/landing/DemoGuideScreen.tsx`
+- `tests/render/coach.test.tsx`, `tests/render/palette.test.tsx` (new)
+
+---
+
+## 2026-10-13 - Phase 6A: the City Clerk's Settings tool (/city/settings)
+
+**What Changed:**
+- Built `/city/settings` (PRD P2), replacing its placeholder: a page of six sections behind an in-page nav (`?section=` in the URL): Tier rules, Fees and deposits, Inventory and rates, Blackout calendar, Templates, Service levels.
+- Tier rules: thresholds and lead times as number fields with guard rails (Reviewed below Special, lead times in order and not negative; an invalid value is never saved) and a live "What this changes" panel showing which open Drafts would change tier and how the Demo menu's six scenarios re-classify under the edited values. "Restore defaults" with a ConfirmDialog.
+- Fees and deposits: every rate in `cfg.fees` as a grouped editable table, plus the late fee rate and the date-hold length.
+- Inventory and rates, Blackout calendar, Templates: read-only views of `lib/data/{inventory,calendar,templates}.ts`.
+- Service levels: `cfg.sla`'s review, response and verification days and the meeting and notice offsets, editable.
+- New pure view-model `lib/view/settings.ts` (validation, the tier-change and scenario previews, the fee field registry, blackout and impacted rows) with `lib/view/settings.test.ts` against the real seed, plus `tests/render/settings.test.tsx` clicking through the built page.
+
+**Why:**
+- PRD P2 scope: the City Clerk needs to see and adjust the configured rules (tier thresholds, fees, service levels) that the rest of the prototype reads from `lib/rules/config.ts`, with the effect of a threshold change visible before it is relied on.
+
+**Files Modified:**
+- `app/city/settings/page.tsx`
+- `components/city/settings/SettingsScreen.tsx`, `TierRulesSection.tsx`, `FeesSection.tsx`, `InventorySection.tsx`, `BlackoutSection.tsx`, `TemplatesSection.tsx`, `ServiceLevelsSection.tsx` (new)
+- `lib/view/settings.ts`, `lib/view/settings.test.ts` (new)
+- `tests/render/settings.test.tsx` (new)
+
+---
+
 ## 2026-10-13 - Phase 4 review fixes
 
 **What Changed:**
