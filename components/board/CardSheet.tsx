@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation"
 import { toast } from "sonner"
 import { CheckIcon, DownloadIcon, LockIcon } from "lucide-react"
 import { ActivityTimeline } from "@/components/domain/ActivityTimeline"
+import { FeeTable } from "@/components/domain/FeeTable"
 import { FormAnswers } from "@/components/domain/FormAnswers"
 import { PartyChip } from "@/components/domain/PartyChip"
 import { TaskKindLabel } from "@/components/domain/TaskKindLabel"
@@ -26,7 +27,8 @@ import { Textarea } from "@/components/ui/textarea"
 import { fmtDateShort } from "@/lib/format"
 import { routes } from "@/lib/routes"
 import { checkCompleteTask, taskDueDate, useDemo, type Action } from "@/lib/state"
-import { cardRecord, unlockHintFor } from "@/lib/view/board"
+import { bookAgainDraftDate, cardRecord, finalSettlement, unlockHintFor } from "@/lib/view/board"
+import { fmtDate } from "@/lib/format"
 import { FORM_FIELDS } from "@/lib/view/cardForms"
 import { PARTY_LABEL, type CityServices, type EventCase, type FileRef, type Task, type TaskHistoryEntry } from "@/lib/types"
 
@@ -248,8 +250,20 @@ function FormBody({ c, task, dispatch, onClose }: BodyProps) {
  */
 function RecordBody({ c, task }: BodyProps) {
   const record = cardRecord(c, task)
+  const settlement = task.catalogId === "final_bill_or_refund" ? finalSettlement(c) : null
   return (
     <div className="flex flex-col gap-4">
+      {settlement ? (
+        <>
+          <FeeTable lines={c.feeLines} showActual />
+          <InlineAlert variant={settlement.payHref ? "warning" : "success"}>{settlement.sentence}</InlineAlert>
+          {settlement.payHref ? (
+            <Button asChild className="self-start">
+              <Link href={settlement.payHref}>Pay the final bill</Link>
+            </Button>
+          ) : null}
+        </>
+      ) : null}
       {record.lines.length > 0 ? (
         <ul className="flex flex-col gap-1.5 text-sm text-fg">
           {record.lines.map((line) => (
@@ -453,9 +467,13 @@ function FeedbackBody({ task, dispatch, onClose }: BodyProps) {
 function BookAgainBody({ c, task, onClose }: BodyProps) {
   const router = useRouter()
   const done = task.status === "done"
+  const draftDate = bookAgainDraftDate(c)
   return (
     <div className="flex flex-col gap-4">
-      <p className="text-sm text-fg-secondary">Starts next year&apos;s application from this one, with the same plan.</p>
+      <p className="text-sm text-fg-secondary">
+        Starts next year&apos;s application from this one, with the same plan
+        {draftDate ? `, drafted for ${fmtDate(draftDate)}` : ""}.
+      </p>
       <Button
         type="button"
         disabled={done}

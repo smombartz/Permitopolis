@@ -1,12 +1,17 @@
 import { describe, expect, it } from "vitest";
+import { fmtDate } from "@/lib/format";
 import { DEFAULT_CONFIG, DEFAULT_DEMO_TODAY } from "@/lib/rules/config";
-import { boardColumns, buildSeed } from "@/lib/state";
+import { boardColumns, buildSeed, transition } from "@/lib/state";
 import { makeTask } from "@/lib/state/testSupport";
 import { routes } from "@/lib/routes";
+import type { EventCase } from "@/lib/types";
 import {
+  bookAgainDraftDate,
   boardColumnsGrouped,
+  closeoutStatusLine,
   dateHoldFootnote,
   directLinkHref,
+  finalSettlement,
   groupColumnEntries,
   isUnplannedDraft,
   myEvents,
@@ -17,6 +22,8 @@ import {
   reviewerRows,
   seriesSessions,
   waitingOnChipItems,
+  withCityColumnSummary,
+  withCityInfo,
 } from "./board";
 
 const TODAY = DEFAULT_DEMO_TODAY;
@@ -264,5 +271,157 @@ describe("seriesSessions", () => {
 
   it("a single event has no session schedule", () => {
     expect(seriesSessions(find(S1), DEFAULT_CONFIG)).toEqual([]);
+  });
+});
+
+/**
+ * S6 as the demo path reconciles it: Public Works & Safety logs 72 officer-hours (6 over the
+ * 66 estimated, at $85) and 4 crew-hours ($60 each), $750 over in all; the Clerk then reconciles.
+ * Mirrors tests/demo-paths.test.ts's own path 6, so this view stays in step with the engine.
+ */
+function reconciledS6(): EventCase {
+  const c = find(S6);
+  const ctxForSeed = { today: TODAY, cases: buildSeed(), cfg: DEFAULT_CONFIG };
+  const police = c.feeLines.find((f) => f.label === "Police")!;
+  const logged = transition(
+    c,
+    {
+      type: "log_closeout",
+      cleanup: "pass",
+      actuals: [{ feeLineId: police.id, qty: 72 }],
+      extraLines: [{ dept: "pws", label: "Cleanup crew", qty: 4, unit: "worker-hour", unitPrice: DEFAULT_CONFIG.fees.cleanupCrewPerWorkerHour }],
+    },
+    "pws",
+    ctxForSeed,
+  );
+  if (!logged.ok) throw new Error(logged.reason);
+  const reconciled = transition(logged.case, { type: "reconcile_close" }, "clerk", ctxForSeed);
+  if (!reconciled.ok) throw new Error(reconciled.reason);
+  return reconciled.case;
+}
+
+describe("After the event: closeoutStatusLine, finalSettlement and bookAgainDraftDate", () => {
+  it("S6: Closeout says Public Works & Safety is checking cleanup before hours are logged", () => {
+    const c = find(S6);
+    expect(c.state).toBe("closeout");
+    expect(c.closeout.hoursLoggedOn).toBeNull();
+    expect(closeoutStatusLine(c)).toBe("Public Works & Safety is checking cleanup; the City Clerk then reconciles costs.");
+    expect(finalSettlement(c)).toBeNull();
+  });
+
+  it("says the Clerk is reconciling once the hours are in", () => {
+    const c = { ...find(S6), closeout: { ...find(S6).closeout, hoursLoggedOn: TODAY } };
+    expect(closeoutStatusLine(c)).toBe("Public Works & Safety logged the cleanup; the City Clerk is reconciling costs.");
+  });
+
+  it("says nothing outside Closeout, or once reconciled", () => {
+    expect(closeoutStatusLine(find(S1))).toBeNull();
+    const reconciled = { ...find(S6), closeout: { ...find(S6).closeout, hoursLoggedOn: TODAY, balance: 750, refund: 250 } };
+    expect(closeoutStatusLine(reconciled)).toBeNull();
+  });
+
+  it("Scenario S6: $750 over, kept $750 of the $1,000 deposit, $250 refunded", () => {
+    const closed = reconciledS6();
+    expect(closed.state).toBe("closed");
+    expect(closed.closeout.balance).toBe(750);
+    expect(closed.closeout.refund).toBe(250);
+    const settlement = finalSettlement(closed)!;
+    expect(settlement.sentence).toBe("Your event ran $750 over the estimate, kept from your $1,000 deposit; $250 was refunded.");
+    expect(settlement.due).toBeNull();
+    expect(settlement.payHref).toBeNull();
+  });
+
+  it("a bill still owed names its due date and the way to pay", () => {
+    // A heavier overage than the deposit covers: the rest is a bill, on the card's own due date.
+    const c = find(S6);
+    const ctxForSeed = { today: TODAY, cases: buildSeed(), cfg: DEFAULT_CONFIG };
+    const police = c.feeLines.find((f) => f.label === "Police")!;
+    const logged = transition(
+      c,
+      { type: "log_closeout", cleanup: "issues", actuals: [{ feeLineId: police.id, qty: 100 }], extraLines: [] },
+      "pws",
+      ctxForSeed,
+    );
+    if (!logged.ok) throw new Error(logged.reason);
+    const reconciled = transition(logged.case, { type: "reconcile_close" }, "clerk", ctxForSeed);
+    if (!reconciled.ok) throw new Error(reconciled.reason);
+    const over = reconciled.case;
+    expect(over.closeout.refund).toBeNull();
+
+    const billTask = over.tasks.find((t) => t.catalogId === "final_bill_or_refund")!;
+    const due = billTask.dueDate!;
+    const settlement = finalSettlement(over)!;
+    expect(settlement.sentence).toBe(`Your event ran $2,890 over the estimate. Your $1,000 deposit covered part of it; $1,890 is still owed by ${fmtDate(due)}.`);
+    expect(settlement.due).toBe(due);
+    expect(settlement.payHref).toBe(routes.quote(S6, { pay: "final" }));
+  });
+
+  it("bookAgainDraftDate: the same weekday a year later, 364 days on", () => {
+    // S6's event is Sat, Apr 24, 2027; a year later on the same weekday is Sat, Apr 22, 2028
+    // (the PRD's demo path 6 and the owner's acceptance scenario both name this date).
+    expect(bookAgainDraftDate(find(S6))).toBe("2028-04-22");
+  });
+
+  it("bookAgainDraftDate is null before any date is chosen", () => {
+    const c = { ...find(S1), schedule: null };
+    expect(bookAgainDraftDate(c)).toBeNull();
+  });
+});
+
+describe('"With the city": withCityInfo and withCityColumnSummary', () => {
+  it("S5: the re-uploaded insurance certificate is with Health & Legal, expected by Fri, May 7", () => {
+    const c = find(S5);
+    const card = c.tasks.find((t) => t.catalogId === "insurance_certificate")!;
+    expect(card.status).toBe("submitted");
+    const info = withCityInfo(c, card, TODAY)!;
+    expect(info.dept).toBe("hl");
+    expect(info.deptLabel).toBe("Health & Legal");
+    expect(info.expectedBy).toBe("2027-05-07");
+    expect(info.daysWaiting).toBe(3); // re-uploaded Apr 30, today is May 3
+    expect(info.overdue).toBe(false);
+
+    const summary = withCityColumnSummary(c, TODAY);
+    expect(summary).toEqual([{ dept: "hl", deptLabel: "Health & Legal", count: 1, expectedBy: "2027-05-07" }]);
+  });
+
+  it("turns overdue once the expected-by date has passed", () => {
+    const c = find(S5);
+    const info = withCityInfo(c, c.tasks.find((t) => t.catalogId === "insurance_certificate")!, "2027-05-10")!;
+    expect(info.overdue).toBe(true);
+    expect(info.expectedBy).toBe("2027-05-07");
+  });
+
+  it("while a department's own review is still open, the expected-by date is the review's due date", () => {
+    // F2 is In review: Public Works & Safety's review is pending, so a card sent to it is
+    // covered by the review itself, not a per-card verify task yet.
+    const c = find(F2);
+    const underReview = c.tasks.find((t) => boardColumns(c).with_city.includes(t));
+    if (underReview) {
+      const info = withCityInfo(c, underReview, TODAY)!;
+      const review = c.reviews.find((r) => r.dept === info.dept);
+      expect(info.expectedBy).toBe(review?.dueDate ?? null);
+    }
+  });
+
+  it("says so plainly when there is no expected-by date yet", () => {
+    const c = find(S3);
+    const pinned = c.tasks.find((t) => t.catalogId === "vendor_health_permit" && t.request && !t.request.resolved);
+    // A pinned re-ask sits in Do now, not With the city, and withCityInfo only reads a card's
+    // reviewer and open review/verify tasks; a card with neither has no expected-by date.
+    if (pinned) {
+      const bare = { ...pinned, status: "submitted" as const, request: undefined };
+      const info = withCityInfo(c, bare, TODAY);
+      expect(info?.expectedBy ?? null).toBeDefined();
+    }
+  });
+
+  it("returns null for a card nobody reviews", () => {
+    const c = find(S1);
+    const noReviewer = { ...c.tasks[0], reviewer: null };
+    expect(withCityInfo(c, noReviewer, TODAY)).toBeNull();
+  });
+
+  it("an empty With the city column summarizes to nothing", () => {
+    expect(withCityColumnSummary(find(S1), TODAY)).toEqual([]);
   });
 });
