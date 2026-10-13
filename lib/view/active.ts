@@ -1,0 +1,287 @@
+/**
+ * Pure view-model for Active permits (workstream 3G): which cases show on the list, how a
+ * series' sessions collapse or expand, the calendar and map items, the Today strip's headline,
+ * the Closeout tab's rows, and each city role's overlay (work orders for Public Works & Safety,
+ * vendor permits for Health & Legal, the day-of contact and compliance log for the Clerk). No
+ * React, no store: `ActiveScreen` reads `cases` and `demoToday` off the store and passes them
+ * in. Tested against the real seed in `lib/view/active.test.ts`.
+ */
+import { addDaysISO, weekdayOf } from "@/lib/dates";
+import { fmtDateShort, plural } from "@/lib/format";
+import { BLACKOUTS } from "@/lib/data/calendar";
+import { CITY_STAFF_BY_DEPT } from "@/lib/data/people";
+import { activePermits, eventDate, holdsDateAtQuote, permitSessions, sessionDates, waitingOn } from "@/lib/state";
+import type { Dept, EventCase, ISODate, Location, Party, Tier } from "@/lib/types";
+
+/* ---------- month/week navigation: string and integer math only, no new Date() ---------- */
+
+/** The first of the month a date falls in, e.g. "2027-06-18" -> "2027-06-01". */
+export function monthAnchorOf(date: ISODate): ISODate {
+  return `${date.slice(0, 7)}-01`;
+}
+
+/** `monthAnchor` moved by `delta` whole months, landing on the 1st. */
+export function shiftMonth(monthAnchor: ISODate, delta: number): ISODate {
+  const [y, m] = monthAnchor.slice(0, 7).split("-").map(Number);
+  const total = y * 12 + (m - 1) + delta;
+  const year = Math.floor(total / 12);
+  const month = (total % 12) + 1;
+  return `${year}-${String(month).padStart(2, "0")}-01`;
+}
+
+/** The Sunday on or before `date`. */
+export function weekStartOf(date: ISODate): ISODate {
+  return addDaysISO(date, -weekdayOf(date));
+}
+
+/** `weekStart` moved by `delta` whole weeks. */
+export function shiftWeek(weekStart: ISODate, delta: number): ISODate {
+  return addDaysISO(weekStart, delta * 7);
+}
+
+/* ---------- the list ---------- */
+
+export interface ActiveListRow {
+  /** The case id, or `${caseId}:${date}` for one row of an expanded series. */
+  key: string;
+  case: EventCase;
+  /** This row's date: the case's next session, or the one session it stands for when expanded. */
+  date: ISODate;
+  /** Quote sent and holding its date, shown as held rather than permitted. */
+  isHeld: boolean;
+  /** Further sessions this case has beyond this row, shown as "+N more". 0 once expanded. */
+  moreCount: number;
+}
+
+export interface ActiveListOptions {
+  /** Adds Quote sent cases holding a date, shown as held. */
+  includeHolds?: boolean;
+  /** One row per held session instead of the default one row per case. */
+  expandSessions?: boolean;
+}
+
+/**
+ * The Active permits list: every live permit, by event date, soonest first. Collapsed (the
+ * default) is one row per case, its next session, with the rest counted as "+N more"; expanded
+ * is one row per held session, via `permitSessions()`, which already carries that order.
+ */
+export function activeListRows(cases: EventCase[], today: ISODate, options: ActiveListOptions = {}): ActiveListRow[] {
+  const { includeHolds = false, expandSessions = false } = options;
+
+  if (expandSessions) {
+    return permitSessions(cases, { includeHolds }).map((s) => ({
+      key: `${s.case.id}:${s.date}`,
+      case: s.case,
+      date: s.date,
+      isHeld: holdsDateAtQuote(s.case),
+      moreCount: 0,
+    }));
+  }
+
+  const rows: ActiveListRow[] = [];
+  for (const c of activePermits(cases, today, { includeHolds })) {
+    const date = eventDate(c, today);
+    if (date === null) continue;
+    rows.push({ key: c.id, case: c, date, isHeld: holdsDateAtQuote(c), moreCount: Math.max(0, sessionDates(c).length - 1) });
+  }
+  return rows;
+}
+
+/* ---------- calendar ---------- */
+
+export interface ActiveCalendarItem {
+  id: string;
+  date: ISODate;
+  start?: string;
+  end?: string;
+  label: string;
+  tier: Tier;
+  status?: string;
+}
+
+/**
+ * Every held session, unbounded: MonthGrid, WeekGrid and DayStrip each group these by date and
+ * draw only the days in view, so one list serves all three. A series is never collapsed here.
+ */
+export function activeCalendarItems(cases: EventCase[], options: { includeHolds?: boolean } = {}): ActiveCalendarItem[] {
+  return permitSessions(cases, { includeHolds: options.includeHolds }).map((s) => {
+    const held = holdsDateAtQuote(s.case);
+    return {
+      id: `${s.case.id}:${s.date}`,
+      date: s.date,
+      start: s.case.schedule?.start,
+      end: s.case.schedule?.end,
+      label: held ? `${s.case.name} (held)` : s.case.name,
+      tier: s.case.tier,
+      status: held ? "held" : s.case.state,
+    };
+  });
+}
+
+/** "Mon, May 3: 1 event today" / "Mon, May 3: no events today". */
+export function todayLine(cases: EventCase[], today: ISODate, options: { includeHolds?: boolean } = {}): string {
+  const count = permitSessions(cases, { from: today, to: today, includeHolds: options.includeHolds }).length;
+  const day = fmtDateShort(today);
+  return count === 0 ? `${day}: no events today` : `${day}: ${plural(count, "event")} today`;
+}
+
+/* ---------- map ---------- */
+
+export interface ActiveMapHighlight {
+  id: string;
+  location: Location;
+  status: "held" | "permitted";
+  tier: Tier;
+  label: string;
+}
+
+/** What the map shows for one day: every held session that has a place, held or permitted. */
+export function activeMapHighlights(cases: EventCase[], date: ISODate, options: { includeHolds?: boolean } = {}): ActiveMapHighlight[] {
+  const highlights: ActiveMapHighlight[] = [];
+  for (const s of permitSessions(cases, { from: date, to: date, includeHolds: options.includeHolds })) {
+    if (!s.case.location) continue;
+    highlights.push({
+      id: `${s.case.id}:${s.date}`,
+      location: s.case.location,
+      status: holdsDateAtQuote(s.case) ? "held" : "permitted",
+      tier: s.case.tier,
+      label: s.case.name,
+    });
+  }
+  return highlights;
+}
+
+/** The label of a citywide blackout on this date, if any ("Memorial Day: all parks..."). */
+export function blackoutLabelOn(date: ISODate): string | null {
+  return BLACKOUTS.find((b) => b.date === date)?.label ?? null;
+}
+
+/* ---------- closeout ---------- */
+
+export interface CloseoutRow {
+  case: EventCase;
+  /** The parties up now: who holds it. Empty is a bug the store should never produce. */
+  holders: Party[];
+  /** Every open task's title, across the parties holding it. */
+  remainingSteps: string[];
+}
+
+/** Events still being reconciled, by event date, with who holds them and what is left. */
+export function closeoutRows(cases: EventCase[], today: ISODate): CloseoutRow[] {
+  const rows = cases
+    .filter((c) => c.ending === null && c.state === "closeout")
+    .map((c) => {
+      const upNow = waitingOn(c, today).filter((p) => p.status === "up_now");
+      return {
+        case: c,
+        holders: upNow.map((p) => p.party),
+        remainingSteps: upNow.flatMap((p) => p.openTasks.map((t) => t.title)),
+      };
+    });
+  return rows.sort((a, b) => (eventDate(a.case, today) ?? "").localeCompare(eventDate(b.case, today) ?? "") || a.case.id.localeCompare(b.case.id));
+}
+
+/* ---------- role overlays ---------- */
+
+const WORK_ORDER_PREFIX = "work_order:";
+
+export interface PwsOverlay {
+  workOrdersOpen: number;
+  workOrdersDone: number;
+  nextWorkOrderDue: ISODate | null;
+  closuresScheduled: number;
+  walkthroughsScheduled: number;
+}
+
+const EMPTY_PWS_OVERLAY: PwsOverlay = { workOrdersOpen: 0, workOrdersDone: 0, nextWorkOrderDue: null, closuresScheduled: 0, walkthroughsScheduled: 0 };
+
+/** Public Works & Safety's row: its work orders on this case, closures and walkthroughs scheduled. */
+export function pwsOverlayForCase(c: EventCase): PwsOverlay {
+  const workOrders = c.tasks.filter((t) => t.catalogId.startsWith(WORK_ORDER_PREFIX));
+  const open = workOrders.filter((t) => t.status !== "done");
+  const nextWorkOrderDue = open
+    .map((t) => t.dueDate)
+    .filter((d): d is ISODate => d !== null)
+    .sort()[0] ?? null;
+  return {
+    workOrdersOpen: open.length,
+    workOrdersDone: workOrders.length - open.length,
+    nextWorkOrderDue,
+    closuresScheduled: workOrders.filter((t) => t.catalogId === "work_order:closure").length,
+    walkthroughsScheduled: c.tasks.filter((t) => t.catalogId === "site_walkthrough" && t.payload.scheduledFor).length,
+  };
+}
+
+function earliest(a: ISODate | null, b: ISODate | null): ISODate | null {
+  if (a === null) return b;
+  if (b === null) return a;
+  return a < b ? a : b;
+}
+
+/** The side panel's totals across every case currently shown. */
+export function pwsOverlayTotal(cases: EventCase[]): PwsOverlay {
+  return cases.reduce((total, c) => {
+    const o = pwsOverlayForCase(c);
+    return {
+      workOrdersOpen: total.workOrdersOpen + o.workOrdersOpen,
+      workOrdersDone: total.workOrdersDone + o.workOrdersDone,
+      nextWorkOrderDue: earliest(total.nextWorkOrderDue, o.nextWorkOrderDue),
+      closuresScheduled: total.closuresScheduled + o.closuresScheduled,
+      walkthroughsScheduled: total.walkthroughsScheduled + o.walkthroughsScheduled,
+    };
+  }, EMPTY_PWS_OVERLAY);
+}
+
+export interface HlOverlay {
+  vendorsVerified: number;
+  vendorsTotal: number;
+}
+
+/** Health & Legal's row: this case's vendor health permits, and how many are verified. */
+export function hlOverlayForCase(c: EventCase): HlOverlay {
+  const vendorCards = c.tasks.filter((t) => t.catalogId === "vendor_health_permit");
+  return { vendorsVerified: vendorCards.filter((t) => t.status === "done").length, vendorsTotal: vendorCards.length };
+}
+
+/** The side panel's totals across every case currently shown. */
+export function hlOverlayTotal(cases: EventCase[]): HlOverlay {
+  return cases.reduce(
+    (total, c) => {
+      const o = hlOverlayForCase(c);
+      return { vendorsVerified: total.vendorsVerified + o.vendorsVerified, vendorsTotal: total.vendorsTotal + o.vendorsTotal };
+    },
+    { vendorsVerified: 0, vendorsTotal: 0 },
+  );
+}
+
+export interface ClerkOverlay {
+  contactName: string;
+  contactPhone: string;
+  /** A placeholder: the day-of compliance log has no entries recorded yet in this phase. */
+  complianceLogCount: number;
+}
+
+/** The Clerk's overlay: who the day-of contact is, and the (empty, for now) compliance log. */
+export function clerkOverlay(): ClerkOverlay {
+  const staff = CITY_STAFF_BY_DEPT.clerk;
+  return { contactName: staff.name, contactPhone: staff.phone, complianceLogCount: 0 };
+}
+
+export type RoleOverlay =
+  | ({ role: "pws" } & PwsOverlay)
+  | ({ role: "hl" } & HlOverlay)
+  | ({ role: "clerk" } & ClerkOverlay);
+
+/** This role's overlay for one row of the list. */
+export function roleOverlayForCase(role: Dept, c: EventCase): RoleOverlay {
+  if (role === "pws") return { role, ...pwsOverlayForCase(c) };
+  if (role === "hl") return { role, ...hlOverlayForCase(c) };
+  return { role, ...clerkOverlay() };
+}
+
+/** This role's overlay side panel, aggregated across every case currently shown. */
+export function roleOverlayTotal(role: Dept, cases: EventCase[]): RoleOverlay {
+  if (role === "pws") return { role, ...pwsOverlayTotal(cases) };
+  if (role === "hl") return { role, ...hlOverlayTotal(cases) };
+  return { role, ...clerkOverlay() };
+}
