@@ -25,6 +25,7 @@ import { eventDate, useDemo } from "@/lib/state"
 import type { BoardColumn } from "@/lib/state/types"
 import type { EventCase } from "@/lib/types"
 import {
+  amendmentBanner,
   boardColumnsGrouped,
   closeoutStatusLine,
   dateHoldFootnote,
@@ -169,6 +170,7 @@ function BoardScreen() {
 
       {c.ending ? <EndingBanner ending={c.ending} reason={c.endingReason} /> : <StatusStrip c={c} />}
       {!c.ending && closeoutStatusLine(c) ? <Banner data-slot="closeout-status">{closeoutStatusLine(c)}</Banner> : null}
+      {!c.ending && amendmentBanner(c) ? <Banner data-slot="amendment-pending">{amendmentBanner(c)!.text}</Banner> : null}
 
       {!c.ending ? (
         <div className="flex items-center justify-between gap-3">

@@ -10,6 +10,7 @@ import { ConfirmDialog } from "@/components/ui/confirm-dialog"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { routes } from "@/lib/routes"
 import { refundIfCancelled, useDemo } from "@/lib/state"
+import { canAmend } from "@/lib/view/board"
 import type { EventCase } from "@/lib/types"
 
 interface BoardMenuProps {
@@ -31,6 +32,7 @@ function BoardMenu({ c }: BoardMenuProps) {
   const hasPermit = c.permit !== null
   // The figure `cancel` pays back: capped at what was paid, the deposit included.
   const refund = hasPermit ? refundIfCancelled(c, today, cfg) : null
+  const amend = canAmend(c, today)
 
   function withdraw() {
     const result = useDemo.getState().dispatch(c.id, { type: "withdraw" })
@@ -53,19 +55,26 @@ function BoardMenu({ c }: BoardMenuProps) {
           </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end">
-          <DropdownMenuItem asChild>
-            {c.state === "draft" ? (
+          {c.state === "draft" ? (
+            <DropdownMenuItem asChild>
               <Link href={routes.apply({ caseId: c.id })}>
                 <FilePenLineIcon data-icon="inline-start" />
                 Edit your plan
               </Link>
-            ) : (
+            </DropdownMenuItem>
+          ) : amend.ok ? (
+            <DropdownMenuItem asChild>
               <Link href={routes.amend(c.id)}>
                 <FilePenLineIcon data-icon="inline-start" />
-                Amend
+                Change your event
               </Link>
-            )}
-          </DropdownMenuItem>
+            </DropdownMenuItem>
+          ) : (
+            <DropdownMenuItem disabled title={amend.reason}>
+              <FilePenLineIcon data-icon="inline-start" />
+              Change your event
+            </DropdownMenuItem>
+          )}
           {hasPermit ? (
             <DropdownMenuItem variant="destructive" onSelect={() => setCancelOpen(true)}>
               <OctagonXIcon data-icon="inline-start" />

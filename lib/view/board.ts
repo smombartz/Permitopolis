@@ -17,6 +17,7 @@ import {
   eventDate,
   hasActivePermit,
   involvement,
+  lastSessionDate,
   taskDueDate,
   taskSubmittedOn,
   whoIsUp,
@@ -552,6 +553,54 @@ export function seriesTotals(c: EventCase, cfg: RulesConfig): SeriesTotals {
   const rows = seriesSessions(c, cfg);
   const sum = (billings: Occurrence["billing"][]) => rows.filter((r) => billings.includes(r.billing)).reduce((s, r) => s + r.amount, 0);
   return { paid: sum(["paid"]), outstanding: sum(["due", "upcoming"]) };
+}
+
+/* ---------------------------------------------------------------------- */
+/* Amendment (PRD "Amend"): the board's menu, and the pending banner       */
+/* ---------------------------------------------------------------------- */
+
+export interface AmendEligibility {
+  ok: boolean;
+  /** Why it cannot be amended, for a Draft, an ended case, a closed one, or one past its last session. */
+  reason?: string;
+}
+
+/**
+ * The board menu's "Change your event" and the permit page's amend link both ask this first,
+ * so a case that cannot be amended explains why instead of opening a wizard that has nothing to
+ * do: a Draft is edited in the wizard instead (`isUnplannedDraft`'s opposite number), an ended
+ * or closed case is over, and a case cannot be amended once its last session has passed. This
+ * mirrors `checkAmend()` in `lib/state/checks.ts` for the parts a screen needs to know before
+ * the click; the engine's own check is still what `dispatch` runs.
+ */
+export function canAmend(c: EventCase, today: ISODate): AmendEligibility {
+  if (c.state === "draft") return { ok: false, reason: "Edit your plan in the wizard instead." };
+  if (c.ending) return { ok: false, reason: `This case is ${c.ending.replace("_", " ")}; it cannot be amended.` };
+  if (c.state === "closed") return { ok: false, reason: "This case is closed; it cannot be amended." };
+  const last = lastSessionDate(c);
+  if (last && last < today) return { ok: false, reason: "The event has already happened; it cannot be amended." };
+  if (c.flags.amendmentPending) return { ok: false, reason: "An amendment is already pending; wait for the City Clerk's decision." };
+  return { ok: true };
+}
+
+export interface AmendmentBanner {
+  text: string;
+  /** Once the applicant has submitted it (the amendment's own "Submit application" is done): nothing left for them to do but wait. */
+  awaitingCity: boolean;
+}
+
+/**
+ * The board's "an amendment is pending" banner (PRD "Amend", "the current permit stays valid
+ * for the original plan until the amendment is approved"). Null once there is nothing pending.
+ */
+export function amendmentBanner(c: EventCase): AmendmentBanner | null {
+  if (!c.flags.amendmentPending) return null;
+  const submitCard = c.tasks.find((t) => t.catalogId === "submit_application" && t.tags.includes("amendment"));
+  const awaitingCity = submitCard?.status === "done";
+  const text = awaitingCity
+    ? "An amendment is pending with the City Clerk. Your current permit stays valid for the original plan until it is decided."
+    : "An amendment is pending. Finish the new cards below, then submit it; your current permit stays valid for the original plan until it is decided.";
+  return { text, awaitingCity };
 }
 
 /* ---------------------------------------------------------------------- */

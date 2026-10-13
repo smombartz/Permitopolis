@@ -767,4 +767,139 @@ describe("amend", () => {
     const result = transition(c, { type: "amend", answers: c }, "applicant", makeCtx());
     expect(result.ok).toBe(false);
   });
+
+  it("applies at once, with no pending flag, when nothing new is required (a smaller crowd, the same tier)", () => {
+    vi.mocked(classify).mockReturnValue(instantCls);
+    vi.mocked(requirements).mockReturnValue([]);
+    const c = makeCase({ state: "permitted", attendance: 40, permit: { issuedOn: "2027-05-01", signature: null } });
+    const result = transition(c, { type: "amend", answers: { ...c, attendance: 20 } }, "applicant", makeCtx());
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.case).toMatchObject({ attendance: 20, flags: { amendmentPending: false } });
+  });
+
+  it("applies at once when the amendment lowers the tier (nothing new is required of a reviewer)", () => {
+    vi.mocked(classify).mockReturnValue(instantCls);
+    vi.mocked(requirements).mockReturnValue([]);
+    const c = makeCase({ state: "permitted", tier: "reviewed", permit: { issuedOn: "2027-05-01", signature: null } });
+    const result = transition(c, { type: "amend", answers: { ...c, addOns: { ...c.addOns, amplifiedSound: false } } }, "applicant", makeCtx());
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.case.tier).toBe("instant");
+    expect(result.case.flags.amendmentPending).toBe(false);
+  });
+
+  it("refuses a second amendment while one is already pending", () => {
+    vi.mocked(classify).mockReturnValue({ ...instantCls, tier: "reviewed", summary: "This is a Reviewed event" });
+    vi.mocked(requirements).mockReturnValue([makeTask({ id: "PMT-27-0001:sound_details", catalogId: "sound_details", kind: "form", reviewer: "pws" })]);
+    const c = makeCase({ state: "permitted", permit: { issuedOn: "2027-05-01", signature: null }, flags: { sentToCommission: false, lateFee: false, signed: false, acceptedComplete: false, amendmentPending: true } });
+    const result = transition(c, { type: "amend", answers: c }, "applicant", makeCtx());
+    expect(result).toEqual({ ok: false, reason: "An amendment is already pending; wait for the City Clerk's decision." });
+  });
+});
+
+describe("amend: completing and deciding it", () => {
+  function materialCaseAndAnswers() {
+    vi.mocked(classify).mockReturnValue({ ...instantCls, tier: "reviewed", summary: "This is a Reviewed event" });
+    const soundCard = makeTask({ id: "PMT-27-0001:sound_details", catalogId: "sound_details", kind: "form", reviewer: "pws", history: [] });
+    const submitCard = makeTask({ id: "PMT-27-0001:submit_application", catalogId: "submit_application", kind: "action", reviewer: "clerk", status: "locked", unlocksOn: "presubmit_done", history: [] });
+    vi.mocked(requirements).mockReturnValue([soundCard, submitCard]);
+    vi.mocked(estimateFees).mockReturnValue({
+      lines: [
+        { id: "f1", dept: "pws", label: "Amplified sound", qty: 1, unit: "event", unitPrice: 40, estimate: 40, actual: null, kind: "fee" },
+        { id: "f2", dept: "clerk", label: "Refundable cleanup deposit", qty: 1, unit: "event", unitPrice: 125, estimate: 125, actual: null, kind: "deposit" },
+      ],
+      fees: 40,
+      deposit: 125,
+      total: 165,
+    } as FeeEstimate);
+    const payFees = makeTask({ id: "PMT-27-0001:pay_fees", catalogId: "pay_fees", kind: "payment", status: "done", payload: { amount: 125 } });
+    const c = makeCase({
+      state: "permitted",
+      tier: "instant",
+      permit: { issuedOn: "2027-05-01", signature: null },
+      schedule: { date: "2027-06-26", start: "14:00", end: "20:00", occurrences: [{ date: "2027-06-26", availability: { status: "open" }, billing: "paid" }] },
+      tasks: [payFees],
+      payments: [{ id: "PMT-27-0001:pay:1", at: "2027-04-20T09:00", amount: 125, method: "card", kind: "booking" }],
+    });
+    const answers = { ...c, addOns: { ...c.addOns, amplifiedSound: true } };
+    return { c, answers };
+  }
+
+  it("locks the resubmit card until the amendment's own cards are in, then the applicant can submit it", () => {
+    const { c, answers } = materialCaseAndAnswers();
+    const amended = transition(c, { type: "amend", answers }, "applicant", makeCtx());
+    expect(amended.ok).toBe(true);
+    if (!amended.ok) return;
+    expect(amended.case.flags.amendmentPending).toBe(true);
+    expect(amended.case.tasks.find((t) => t.catalogId === "submit_application")).toMatchObject({ status: "locked", tags: ["amendment"] });
+    expect(transition(amended.case, { type: "submit" }, "applicant", makeCtx())).toMatchObject({ ok: false });
+
+    const withCard = transition(amended.case, { type: "complete_task", taskId: "PMT-27-0001:sound_details", form: { equipment: "One DJ booth" } }, "applicant", makeCtx());
+    expect(withCard.ok).toBe(true);
+    if (!withCard.ok) return;
+    expect(withCard.case.tasks.find((t) => t.catalogId === "submit_application")).toMatchObject({ status: "todo" });
+
+    const submitted = transition(withCard.case, { type: "submit" }, "applicant", makeCtx());
+    expect(submitted.ok).toBe(true);
+    if (!submitted.ok) return;
+    expect(submitted.case.tasks.find((t) => t.catalogId === "submit_application")).toMatchObject({ status: "done", tags: ["amendment"] });
+    expect(submitted.case.flags.amendmentPending).toBe(true);
+    // Submitting a second time, or as the wrong role, goes through the same checks a Draft's does.
+    expect(transition(submitted.case, { type: "submit" }, "applicant", makeCtx())).toEqual({ ok: false, reason: "The amendment is already submitted." });
+  });
+
+  it("the City Clerk approves a submitted amendment: the pending flag clears and the fee difference reopens 'Pay fees and deposit'", () => {
+    const { c, answers } = materialCaseAndAnswers();
+    const amended = transition(c, { type: "amend", answers }, "applicant", makeCtx());
+    if (!amended.ok) throw new Error("setup");
+    const withCard = transition(amended.case, { type: "complete_task", taskId: "PMT-27-0001:sound_details", form: {} }, "applicant", makeCtx());
+    if (!withCard.ok) throw new Error("setup");
+    const submitted = transition(withCard.case, { type: "submit" }, "applicant", makeCtx());
+    if (!submitted.ok) throw new Error("setup");
+
+    // Before it is submitted, the Clerk cannot decide it.
+    expect(transition(amended.case, { type: "amend", answers }, "clerk", makeCtx())).toEqual({ ok: false, reason: "The applicant has not submitted the amendment yet." });
+
+    const decided = transition(submitted.case, { type: "amend", answers: submitted.case }, "clerk", makeCtx());
+    expect(decided.ok).toBe(true);
+    if (!decided.ok) return;
+    expect(decided.case.flags.amendmentPending).toBe(false);
+    // $165 is now owed and $125 was already paid: the $40 difference is charged through the
+    // existing payment card.
+    expect(decided.case.tasks.find((t) => t.catalogId === "pay_fees")).toMatchObject({ status: "done", payload: { amount: 165 } });
+    expect(decided.case.payments.at(-1)).toMatchObject({ amount: 40, kind: "quote" });
+    expect(decided.case.tier).toBe("reviewed");
+  });
+
+  it("the City Clerk declines a submitted amendment: the original plan and fees come back, and the amendment's cards are gone", () => {
+    const { c, answers } = materialCaseAndAnswers();
+    const amended = transition(c, { type: "amend", answers }, "applicant", makeCtx());
+    if (!amended.ok) throw new Error("setup");
+    const withCard = transition(amended.case, { type: "complete_task", taskId: "PMT-27-0001:sound_details", form: {} }, "applicant", makeCtx());
+    if (!withCard.ok) throw new Error("setup");
+    const submitted = transition(withCard.case, { type: "submit" }, "applicant", makeCtx());
+    if (!submitted.ok) throw new Error("setup");
+
+    const declined = transition(submitted.case, { type: "amend", answers: c }, "clerk", makeCtx());
+    expect(declined.ok).toBe(true);
+    if (!declined.ok) return;
+    expect(declined.case.flags.amendmentPending).toBe(false);
+    expect(declined.case.addOns.amplifiedSound).toBe(false);
+    expect(declined.case.tasks.map((t) => t.catalogId)).toEqual(["pay_fees"]);
+    expect(declined.case.permit).toEqual({ issuedOn: "2027-05-01", signature: null });
+  });
+
+  it("refuses the Clerk's decision when the answers match neither the pending plan nor the original one", () => {
+    const { c, answers } = materialCaseAndAnswers();
+    const amended = transition(c, { type: "amend", answers }, "applicant", makeCtx());
+    if (!amended.ok) throw new Error("setup");
+    const withCard = transition(amended.case, { type: "complete_task", taskId: "PMT-27-0001:sound_details", form: {} }, "applicant", makeCtx());
+    if (!withCard.ok) throw new Error("setup");
+    const submitted = transition(withCard.case, { type: "submit" }, "applicant", makeCtx());
+    if (!submitted.ok) throw new Error("setup");
+
+    const result = transition(submitted.case, { type: "amend", answers: { ...c, attendance: 999 } }, "clerk", makeCtx());
+    expect(result).toEqual({ ok: false, reason: "Approve the amendment as it stands, or decline it back to the original plan." });
+  });
 });

@@ -1,10 +1,10 @@
 import { Suspense } from "react";
-import { PlaceholderScreen } from "@/components/shell/PlaceholderScreen";
+import { AmendWizardScreen } from "@/components/wizard/amend/AmendWizardScreen";
 
 export default function Page() {
   return (
     <Suspense fallback={null}>
-      <PlaceholderScreen route="/events/[id]/amend" />
+      <AmendWizardScreen />
     </Suspense>
   );
 }
