@@ -97,6 +97,15 @@ describe("the board (S5): sign-off and payment cards link to the quote route", (
   });
 });
 
+describe('the board (S5): "With the city" is never a black hole', () => {
+  it("names Health & Legal, how many days it has waited, and the expected-by date", async () => {
+    await renderScreen(<BoardScreen />, { role: "applicant", personaId: "riverfront-running-club", path: routes.event(S5) });
+
+    expect(screen.getByText("1 card with Health & Legal, expected by Fri, May 7")).toBeInTheDocument();
+    expect(screen.getByText(/3 days with Health & Legal · expected by Fri, May 7/)).toBeInTheDocument();
+  });
+});
+
 describe("the board (S6): after the event", () => {
   it("shows the final bill and feedback coming up", async () => {
     await renderScreen(<BoardScreen />, { role: "applicant", personaId: "main-street-business-alliance", path: routes.event(S6) });
@@ -105,6 +114,57 @@ describe("the board (S6): after the event", () => {
     const comingUpColumn = comingUpHeading.parentElement!.parentElement!;
     expect(within(comingUpColumn).getByText("Final bill or refund")).toBeInTheDocument();
     expect(within(comingUpColumn).getByText("Tell us how it went")).toBeInTheDocument();
+  });
+
+  it("before the hours are logged, the board says plainly who has it", async () => {
+    await renderScreen(<BoardScreen />, { role: "applicant", personaId: "main-street-business-alliance", path: routes.event(S6) });
+    expect(screen.getByText("Public Works & Safety is checking cleanup; the City Clerk then reconciles costs.")).toBeInTheDocument();
+  });
+
+  it("demo path 6's applicant ending: the final refund, feedback, and book again to the Apr 22, 2028 draft", async () => {
+    const dialog = () => within(screen.getByRole("dialog"));
+    const { user } = await renderScreen(<BoardScreen />, { role: "applicant", personaId: "main-street-business-alliance", path: routes.event(S6) });
+
+    // Public Works & Safety logs 72 officer-hours and 4 crew-hours; the Clerk then reconciles
+    // $750 over the estimate and refunds $250 from the $1,000 deposit (the PRD's path 6).
+    const police = storedCase(S6).feeLines.find((f) => f.label === "Police")!;
+    act(() => {
+      useDemo.getState().dispatch(
+        S6,
+        {
+          type: "log_closeout",
+          cleanup: "pass",
+          actuals: [{ feeLineId: police.id, qty: 72 }],
+          extraLines: [{ dept: "pws", label: "Cleanup crew", qty: 4, unit: "worker-hour", unitPrice: useDemo.getState().cfg.fees.cleanupCrewPerWorkerHour }],
+        },
+        "pws",
+      );
+      useDemo.getState().dispatch(S6, { type: "reconcile_close" }, "clerk");
+    });
+    expect(storedCase(S6).closeout).toMatchObject({ balance: 750, refund: 250 });
+    expect(storedCase(S6).state).toBe("closed");
+
+    await user.click(screen.getByRole("button", { name: /Final bill or refund/ }));
+    expect(dialog().getByText("Your event ran $750 over the estimate, kept from your $1,000 deposit; $250 was refunded.")).toBeInTheDocument();
+    expect(dialog().getAllByRole("columnheader", { name: "Actual" }).length).toBeGreaterThan(0);
+    await user.click(screen.getByRole("button", { name: "Close" }));
+
+    await user.click(screen.getByRole("button", { name: /Tell us how it went/ }));
+    await user.click(dialog().getAllByRole("radio")[4]);
+    await user.click(dialog().getByRole("button", { name: "Send feedback" }));
+    expect(storedCase(S6).closeout.feedback).toMatchObject({ rating: 5 });
+
+    await user.click(screen.getByRole("button", { name: /Book again next year/ }));
+    expect(dialog().getByText(/drafted for Sat, Apr 22, 2028/)).toBeInTheDocument();
+    await user.click(dialog().getByRole("button", { name: "Book again next year" }));
+
+    const pushed = lastPush();
+    expect(pushed).toMatch(/^\/apply\?case=/);
+    const newId = new URLSearchParams(pushed!.split("?")[1]).get("case")!;
+    const draft = storedCase(newId);
+    expect(draft.clonedFrom).toBe(S6);
+    expect(draft.state).toBe("draft");
+    expect(draft.schedule?.date).toBe("2028-04-22");
   });
 });
 
