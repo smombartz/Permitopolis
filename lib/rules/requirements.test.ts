@@ -184,3 +184,22 @@ describe("requirements: the Security and medical plan follows the configured Spe
     expect(card?.why).toBe("Special events need a security and medical plan");
   });
 });
+
+describe("requirements: a card to finish before submitting is never due in the past", () => {
+  const reviewedOn = (date: string) => answers({ location: areaLocation("city-hall-plaza"), schedule: { date, start: "18:00", end: "21:00", occurrences: [] }, attendance: 150, addOns: addOns({ amplifiedSound: true }) });
+  const dueOf = (date: string, today: string) => {
+    const a = reviewedOn(date);
+    const tasks = requirements(a, classify(a), { caseId: "PMT-27-0001", today });
+    return Object.fromEntries(tasks.filter((t) => t.dueDate !== null).map((t) => [t.catalogId, t.dueDate]));
+  };
+
+  it("outside the lead time it is due the tier's notice before the event, rolled off a weekend", () => {
+    // Jun 18 less 30 days is Wed, May 19.
+    expect(dueOf("2027-06-18", "2027-05-03")).toMatchObject({ insurance_certificate: "2027-05-19", sound_details: "2027-05-19", submit_application: "2027-05-19" });
+  });
+
+  it("inside the lead time (a Reviewed event 17 days out, or a change taken with the late fee) it is due today, not three weeks ago", () => {
+    // May 20 less 30 days is Apr 20: before the day the card was made.
+    expect(dueOf("2027-05-20", "2027-05-03")).toMatchObject({ insurance_certificate: "2027-05-03", sound_details: "2027-05-03", submit_application: "2027-05-03" });
+  });
+});

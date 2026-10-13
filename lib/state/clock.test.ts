@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import { DEFAULT_CONFIG } from "@/lib/rules/config";
+import { EMPTY_ADDONS } from "@/lib/types";
 import { makeCase, makeCtx, makeTask } from "./testSupport";
 import { advanceClock, applyTick, sessionDates } from "./clock";
 
@@ -202,6 +203,61 @@ describe("applyTick: Closeout and Instant closing itself", () => {
     if (!result.ok) return;
     expect(result.case.state).toBe("closeout");
     expect(result.case.tasks.find((t) => t.catalogId === "instant_exception")).toBeDefined();
+  });
+
+  it("an amendment still pending when the event arrives lapses: the Instant plan the permit covers closes itself, it does not go to Closeout as the Reviewed plan nobody approved", () => {
+    const occurrences = [{ date: "2027-05-22", availability: { status: "open" as const }, billing: "paid" as const }];
+    const schedule = { date: "2027-05-22", start: "11:00", end: "16:00", occurrences };
+    const shelter = { id: "PMT-27-0001:fee:1", dept: "clerk" as const, label: "Shelter reservation", qty: 5, unit: "hour", unitPrice: 25, estimate: 125, actual: null, kind: "fee" as const };
+    const deposit = { ...shelter, id: "PMT-27-0001:fee:2", label: "Refundable cleanup deposit", qty: 1, unit: "flat", unitPrice: 250, estimate: 250, kind: "deposit" as const };
+    // Demo path 7 where the script leaves it: the DJ proposed, the new cards open, nothing submitted.
+    const pending = makeCase({
+      state: "permitted",
+      tier: "reviewed",
+      triggers: [{ id: "amplified_sound", raisesTo: "reviewed", label: "Amplified sound" }],
+      addOns: { ...EMPTY_ADDONS, amplifiedSound: true },
+      schedule,
+      permit: { issuedOn: "2027-04-26", signature: null },
+      dateHold: { status: "held", placedOn: "2027-04-26", expiresOn: null },
+      feeLines: [shelter, deposit],
+      payments: [{ id: "PMT-27-0001:pay:1", at: "2027-04-26T09:05", amount: 125, method: "card", kind: "booking" }],
+      flags: { sentToCommission: false, lateFee: false, signed: false, acceptedComplete: false, amendmentPending: true },
+      tasks: [
+        makeTask({ id: "PMT-27-0001:pay_fees", catalogId: "pay_fees", kind: "payment", status: "done", payload: { amount: 125 } }),
+        makeTask({ id: "PMT-27-0001:carry_permit", catalogId: "carry_permit", kind: "action", status: "locked", unlocksOn: "event_day", dueDate: "2027-05-22" }),
+        makeTask({ id: "PMT-27-0001:sound_details", catalogId: "sound_details", tags: ["amendment"] }),
+        makeTask({
+          id: "PMT-27-0001:submit_application",
+          catalogId: "submit_application",
+          status: "locked",
+          unlocksOn: "presubmit_done",
+          tags: ["amendment"],
+          payload: {
+            pendingAmendment: {
+              priorAnswers: { eventType: "picnic_party", name: "Test event", location: null, schedule, attendance: 40, addOns: EMPTY_ADDONS },
+              priorTier: "instant",
+              priorTriggers: [],
+              priorLateFee: false,
+              priorFeeLines: [shelter],
+              priorSubmit: null,
+              proposedOn: "2027-05-03",
+            },
+          },
+        }),
+      ],
+    });
+
+    const [eventDay] = advanceClock([pending], "2027-05-21", "2027-05-22", DEFAULT_CONFIG);
+    expect(eventDay).toMatchObject({ state: "event_day", tier: "instant", triggers: [], addOns: EMPTY_ADDONS, feeLines: [shelter], flags: { amendmentPending: false } });
+    expect(eventDay.tasks.map((t) => [t.catalogId, t.status])).toEqual([
+      ["pay_fees", "done"],
+      ["carry_permit", "todo"],
+    ]);
+
+    const [after] = advanceClock([pending], "2027-05-21", "2027-05-23", DEFAULT_CONFIG);
+    expect(after).toMatchObject({ state: "closed", tier: "instant", dateHold: { status: "released" } });
+    expect(after.tasks.filter((t) => t.tags.includes("amendment"))).toEqual([]);
+    expect(after.tasks.some((t) => t.catalogId === "cleanup_inspection")).toBe(false);
   });
 
   it("returns a no-op when nothing changes for the case today", () => {

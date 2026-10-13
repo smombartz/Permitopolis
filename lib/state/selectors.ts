@@ -8,6 +8,7 @@ import { cancellationRefund } from "@/lib/rules";
 import { round2 } from "@/lib/rules/shared";
 import type { Dept, EventCase, ISODate, Party, Task } from "@/lib/types";
 import type { RulesConfig } from "@/lib/rules/types";
+import { paidTowardPendingAmendment, permittedPlan } from "./amendment";
 import { checkCancel } from "./checks";
 import { lastSessionDate, sessionDates } from "./clock";
 import { byDueDate, sumFeeLines, totalPaid } from "./core";
@@ -256,12 +257,17 @@ export interface CancelRefund {
  * The cancellation schedule works from the fees (for a series, the ones paid so far) and leaves
  * the deposit out. This is the amount that actually goes back: the schedule's share plus the
  * deposit.
+ *
+ * It is the permit that is cancelled, so the fees are the ones of the plan the permit covers:
+ * while an amendment is pending, the amended plan's lines (a deposit and a late fee nobody has
+ * paid) are left out, and anything already paid toward the amendment goes back whole.
  */
 export function refundIfCancelled(c: EventCase, today: ISODate, cfg: RulesConfig): CancelRefund {
-  const result = cancellationRefund(c, today, cfg);
-  const deposit = round2(c.feeLines.filter((f) => f.kind === "deposit").reduce((s, f) => s + f.estimate, 0));
+  const plan = permittedPlan(c);
+  const result = cancellationRefund(plan, today, cfg);
+  const deposit = round2(plan.feeLines.filter((f) => f.kind === "deposit").reduce((s, f) => s + f.estimate, 0));
   // A refund never exceeds what the applicant has paid. To the cent, like every amount.
-  const refund = Math.min(round2(result.refund + deposit), Math.max(0, totalPaid(c)));
+  const refund = Math.min(round2(result.refund + deposit + paidTowardPendingAmendment(c, cfg)), Math.max(0, totalPaid(c)));
   return { refund, deposit, rule: result.rule, canCancel: checkCancel(c, today, lastSessionDate(c)).ok };
 }
 

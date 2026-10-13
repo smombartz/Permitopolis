@@ -833,6 +833,16 @@ describe("Path 7 · Amend up a tier (S1, P1)", () => {
     ]);
     expect(board(amended)).toEqual({ do_now: ["insurance_certificate", "sound_details"], with_city: [], coming_up: ["carry_permit", "submit_application", "accept_and_sign"], done: ["pay_fees"] });
     expect(up(S1)).toEqual(["applicant"]);
+    // The change is taken 19 days out, inside the 30 its tier asks for: a card to finish before
+    // submitting is due today, not on the day the notice would have started (Thu, Apr 22).
+    const amendmentCards = amended.tasks.filter((t) => t.tags.includes("amendment"));
+    expect(amendmentCards.map((t) => [t.catalogId, t.dueDate])).toEqual([
+      ["insurance_certificate", TODAY],
+      ["sound_details", TODAY],
+      ["submit_application", TODAY],
+      ["accept_and_sign", null],
+    ]);
+    expect(amendmentCards.filter((t) => t.dueDate !== null && t.dueDate < TODAY)).toEqual([]);
     // ...with the late fee on the new plan's fees.
     expect(amended.feeLines.map((line) => [line.label, line.estimate, line.kind])).toEqual([
       ["Shelter reservation", 125, "fee"],
@@ -958,6 +968,29 @@ describe("Path 7 · Amend up a tier (S1, P1)", () => {
     expect(panel(S1, "applicant", "amend")).toMatchObject({ enabled: true });
     // The path ended when the cards appeared; everything since has left it done.
     expect(coach(7)).toBe("Done");
+  });
+
+  it("the path left where the script ends, then the Demo menu's jump to Jun 18: the amendment lapsed on the day, and the picnic closed as the Instant event its permit was for", () => {
+    as("applicant", "maya-chen");
+    const original = get(S1);
+    act(S1, { type: "amend", answers: { ...original, addOns: { ...original.addOns, amplifiedSound: true } }, lateFee: true });
+    expect(get(S1)).toMatchObject({ tier: "reviewed", flags: { amendmentPending: true } });
+    expect(caseTotals(get(S1)).due).toBe(393.75);
+
+    store().setDemoToday("2027-06-18");
+    const after = get(S1);
+    // Closed, not Closeout: no cleanup inspection for Public Works & Safety, nothing due, nothing refunded.
+    expect(after).toMatchObject({ state: "closed", ending: null, tier: "instant", triggers: [], addOns: { amplifiedSound: false }, flags: { amendmentPending: false, lateFee: false } });
+    expect(after.feeLines).toEqual(original.feeLines);
+    expect(after.payments).toEqual(original.payments);
+    expect(caseTotals(after)).toEqual({ fees: 125, deposit: 0, total: 125, paid: 125, due: 0 });
+    expect(queue("pws", S1)).toEqual([]);
+    expect(queue("clerk", S1)).toEqual([]);
+    // Her board has no amendment card left on it, overdue or otherwise.
+    expect(after.tasks.filter((t) => t.tags.includes("amendment"))).toEqual([]);
+    expect(board(after)).toEqual({ do_now: ["feedback", "book_again"], with_city: [], coming_up: [], done: ["pay_fees", "carry_permit"] });
+    expect(after.activity.map((a) => a.text)).toContain("The amendment lapsed: it was not in effect by the event, which goes ahead under the original plan.");
+    expect(amendmentStage(after)).toBeNull();
   });
 
   it("the City Clerk can decline a submitted amendment instead: the original plan comes back and its cards are gone", () => {

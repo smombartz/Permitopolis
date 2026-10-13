@@ -966,9 +966,12 @@ Maya Chen adding a DJ to her permitted Instant picnic (S1).
    application" card (`pendingAmendment(c)`: the answers, tier, triggers, fee lines and how that
    card stood), which is how the permit keeps its plan and how a decline puts everything back.
 4. **The permit covers the original plan.** `permittedPlan(c)` is the record with the answers,
-   tier and triggers from before a pending amendment. The permit page and the public check
-   (`/verify/[id]`) render that, with a line saying an amendment is pending. Everything else (the
-   board, the city's lists, the calendars, the map) shows the record as amended.
+   tier, triggers and fee lines from before a pending amendment. The permit page and the public
+   check (`/verify/[id]`) render that, with a line saying an amendment is pending, and a
+   cancellation refunds it: `refundIfCancelled()` works from the permit's plan, so the amended
+   plan's deposit and late fee, which nobody has paid, are not in the figure, and anything
+   already paid toward the amendment goes back whole. Everything else (the board, the city's
+   lists, the calendars, the map) shows the record as amended.
 5. **The applicant finishes the cards and submits.** The cards are completed like any others;
    on a case that is past routing each goes to its reviewer's own `verify:*` task. `submit` on a
    case with an amendment pending is "Submit amendment": the card is done and the Clerk gets a
@@ -990,6 +993,17 @@ Maya Chen adding a DJ to her permitted Instant picnic (S1).
    dropped, and the permit covers the amended plan. A decline restores the answers, tier,
    triggers and fee lines exactly, takes the amendment's cards and their checks off, and gives an
    earlier "Submit application" card back its state; the Clerk's decision stays on the case.
+9. **Or the event arrives first, and it lapses.** An amendment still pending on a permitted case
+   when the event comes never took effect, at whatever stage it stood. `applyTick()` calls
+   `lapseAmendment()` before anything else that day: the record is restored as a decline restores
+   it, the Clerk's open "Decide amendment" is closed (`payload.decision: "lapsed"`), the payment
+   card an approval had reopened is put back as it stood (`pendingAmendment(c).priorPay`),
+   anything paid toward the amendment is refunded, a signature given on the amendment's own card
+   goes with the card, and the work orders follow the plan that stands. The activity log says
+   "The amendment lapsed: it was not in effect by the event, which goes ahead under the original
+   plan." The day that counts is the last session of the plan the permit covers; an amendment
+   that asked for an earlier date lapses on that date instead. So the clock always reads the tier
+   the permit was issued for: Maya's picnic with a DJ nobody approved still closes as Instant.
 
 Where each side reads it:
 

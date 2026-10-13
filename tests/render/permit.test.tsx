@@ -39,6 +39,23 @@ describe("PermitScreen", () => {
     expect(screen.queryByText("$250")).not.toBeInTheDocument();
   });
 
+  it("with an amendment pending (demo path 7) the permit still refunds its own plan: $62.50, and no deposit Maya never paid", async () => {
+    await renderScreen(<PermitScreen />, { scenario: "S1", path: routes.permit(S1) });
+    const s1 = storedCase(S1);
+    act(() => {
+      const result = useDemo.getState().dispatch(S1, { type: "amend", answers: { ...s1, addOns: { ...s1.addOns, amplifiedSound: true } }, lateFee: true }, "applicant");
+      if (!result.ok) throw new Error(result.reason);
+    });
+    // The record carries the amended plan's lines: a $250 deposit and a late fee, neither paid.
+    expect(storedCase(S1).feeLines.map((line) => line.kind)).toEqual(["fee", "fee", "fee", "deposit", "late_fee"]);
+    expect(screen.getByText(/This permit covers the original plan/)).toBeInTheDocument();
+
+    const line = screen.getByText(/If cancelled today/);
+    expect(line).toHaveTextContent("If cancelled today (Mon, May 3, 2027): $62.50 refund.");
+    expect(screen.queryByText(/deposit is returned in full/)).not.toBeInTheDocument();
+    expect(screen.queryByText("$125")).not.toBeInTheDocument();
+  });
+
   it("the cancellation schedule lists every band and marks the one that applies today", async () => {
     await renderScreen(<PermitScreen />, { scenario: "S1" });
 

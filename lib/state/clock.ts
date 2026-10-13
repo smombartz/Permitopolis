@@ -8,7 +8,9 @@ import { closeoutCards, dueDate as dueDateRule } from "@/lib/rules";
 import { CITY_TASKS } from "@/lib/rules/catalog";
 import type { RulesConfig, RulesCtx } from "@/lib/rules/types";
 import type { EventCase, ISODate, ISODateTime } from "@/lib/types";
+import { permittedPlan } from "./amendment";
 import { appendActivity, applyUnlockEvent, findTask, heldSessionDates, moveTask, newTask, quotePaid, releaseHold, taskId } from "./core";
+import { lapseAmendment } from "./transitions/amendment";
 import type { TransitionResult } from "./types";
 
 /** Every date the event takes place on. A session skipped for a blackout is not one of them. */
@@ -58,10 +60,25 @@ export function computeNow(c: EventCase, today: ISODate): ISODateTime {
   return `${today}T${hh}:${mm}`;
 }
 
+/**
+ * A pending amendment the event has caught up with. The permit covers the plan from before it,
+ * so the day that counts is that plan's last session. An amendment that asked for an earlier
+ * date is caught up with on that date instead: it came without the amendment in effect.
+ */
+function amendmentOvertaken(c: EventCase, today: ISODate): boolean {
+  if (!c.flags.amendmentPending || !c.permit || (c.state !== "permitted" && c.state !== "event_day")) return false;
+  return [lastSessionDate(c), lastSessionDate(permittedPlan(c))].some((last) => last !== null && last <= today);
+}
+
 /** The system transition raised once per day by advanceClock(). */
-export function applyTick(c: EventCase, ctx: RulesCtx): TransitionResult {
-  if (c.ending) return { ok: false, reason: "This case has an ending; nothing to tick." };
+export function applyTick(record: EventCase, ctx: RulesCtx): TransitionResult {
+  if (record.ending) return { ok: false, reason: "This case has an ending; nothing to tick." };
   const today = ctx.today;
+  // An amendment still pending when the event arrives never took effect. It lapses first, so
+  // everything below (Event day, and the tier that decides between Closed and Closeout) reads
+  // the plan the permit covers, not one nobody approved.
+  const lapsed = amendmentOvertaken(record, today);
+  let c = lapsed ? lapseAmendment(record, ctx) : record;
 
   if (c.state === "quote_sent" && c.dateHold.expiresOn && isBefore(c.dateHold.expiresOn, today) && !quotePaid(c, ctx.cfg)) {
     let next: EventCase = {
@@ -139,7 +156,7 @@ export function applyTick(c: EventCase, ctx: RulesCtx): TransitionResult {
     return { ok: true, case: next };
   }
 
-  return { ok: false, reason: "Nothing changes for this case today." };
+  return lapsed ? { ok: true, case: c } : { ok: false, reason: "Nothing changes for this case today." };
 }
 
 /** Applies the system transitions for every day from `from` (exclusive) to `to` (inclusive). */

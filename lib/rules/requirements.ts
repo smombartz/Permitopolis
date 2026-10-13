@@ -17,8 +17,12 @@ function cardDueDate(spec: CardSpec, a: EventAnswers, cls: Classification, today
   switch (spec.due.type) {
     case "none":
       return null;
-    case "submit_by":
-      return dueDate(eventDate, -cls.leadTimeDays, cfg);
+    case "submit_by": {
+      // The tier's notice before the event. A board made inside that notice (a late fee taken at
+      // the date gate, an amendment close to the day) is due today: never on a day already gone.
+      const by = dueDate(eventDate, -cls.leadTimeDays, cfg);
+      return by < today ? today : by;
+    }
     case "before_event":
       return dueDate(eventDate, -cfg.sla[spec.due.sla], cfg);
     case "after_unlock":

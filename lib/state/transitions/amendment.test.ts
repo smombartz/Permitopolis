@@ -10,8 +10,9 @@ import type { Actor, EventCase } from "@/lib/types";
 import type { Action } from "../actions";
 import { amendmentBalance, amendmentPaymentDue, amendmentStage, pendingAmendment, permittedPlan } from "../amendment";
 import { availableActions } from "../availableActions";
+import { advanceClock } from "../clock";
 import { buildSeed } from "../seed";
-import { caseTotals, queueFor } from "../selectors";
+import { caseTotals, queueFor, refundIfCancelled } from "../selectors";
 import { transition } from "../transition";
 import { waitingOn } from "../waitingOn";
 
@@ -143,6 +144,45 @@ describe("a pending amendment leaves the permit on the plan it was issued for", 
     const pending = run(s1, { type: "amend", answers: withDjOnALaterDay }, "applicant");
     expect(refusal(pending, { type: "amend", answers: s1 }, "applicant")).toBe("An amendment is already pending; wait for the City Clerk's decision.");
   });
+
+  /** Demo path 7 as far as it is scripted: the DJ on the same day, with the late fee. */
+  const withDj = () => run(s1, { type: "amend", answers: { ...s1, addOns: { ...s1.addOns, amplifiedSound: true } }, lateFee: true }, "applicant");
+  const approved = () => {
+    let c = run(withDj(), { type: "complete_task", taskId: `${S1}:sound_details`, form: { equipment: "One DJ booth", soundCheckTime: "10:30" } }, "applicant");
+    c = run(c, { type: "complete_task", taskId: `${S1}:insurance_certificate`, files: [{ name: "coi.pdf", size: 200_000, type: "application/pdf" }] }, "applicant");
+    c = run(c, { type: "submit" }, "applicant");
+    c = run(c, { type: "verify_document", taskId: `${S1}:sound_details` }, "pws");
+    c = run(c, { type: "verify_document", taskId: `${S1}:insurance_certificate` }, "hl");
+    return run(c, { type: "decide_amendment", decision: "approve" }, "clerk");
+  };
+
+  it("the plan the permit covers keeps its own fee lines: the amended plan's deposit and late fee are not on it", () => {
+    const pending = withDj();
+    expect(pending.feeLines.map((line) => line.kind)).toEqual(["fee", "fee", "fee", "deposit", "late_fee"]);
+    expect(permittedPlan(pending).feeLines).toEqual(s1.feeLines);
+    expect(caseTotals(permittedPlan(pending))).toMatchObject({ total: 125, paid: 125, due: 0 });
+  });
+
+  it("cancelling while it is pending refunds what the permit's plan refunds: $62.50, with no deposit she never paid", () => {
+    const seeded = refundIfCancelled(s1, TODAY, CFG);
+    expect(seeded).toMatchObject({ refund: 62.5, deposit: 0, canCancel: true });
+    for (const pending of [withDj(), approved()]) {
+      // The figure the permit page and the Cancel dialog show...
+      expect(refundIfCancelled(pending, TODAY, CFG)).toEqual(seeded);
+      // ...is the one `cancel` pays, and the one the case and Payments then read.
+      const cancelled = run(pending, { type: "cancel" }, "applicant");
+      expect(cancelled.payments.at(-1)).toMatchObject({ amount: -62.5, kind: "refund" });
+      expect(cancelled.endingReason).toBe("Cancelled by the applicant. Refunded $62.50 (10 to 29 days before: 50% of space and permit fees; the application fee is kept).");
+    }
+  });
+
+  it("what was paid toward an amendment that never took effect goes back whole when the permit is cancelled", () => {
+    // The Clerk records $100 of the $393.75 at the counter; the amendment still waits for the rest.
+    const part = run(run(approved(), { type: "accept_and_sign", signature: "Maya Chen" }, "applicant"), { type: "pay", amount: 100, method: "in_person", kind: "quote" }, "clerk");
+    expect(part.flags.amendmentPending).toBe(true);
+    expect(refundIfCancelled(part, TODAY, CFG)).toMatchObject({ refund: 162.5, deposit: 0 });
+    expect(run(part, { type: "cancel" }, "applicant").payments.at(-1)).toMatchObject({ amount: -162.5, kind: "refund" });
+  });
 });
 
 describe("an amendment before the permit: the application under review changes", () => {
@@ -195,5 +235,122 @@ describe("an amendment before the permit: the application under review changes",
     const before = s3.tasks.map((t) => [t.catalogId, t.status]);
     expect(declined.tasks.map((t) => [t.catalogId, t.status])).toEqual([...before, ["decide_amendment", "done"]]);
     expect(caseTotals(declined)).toEqual(caseTotals(s3));
+  });
+});
+
+describe("an amendment still pending when the event arrives lapses: the event is held under the plan the permit covers", () => {
+  const s1 = find(S1);
+  const EVENT_DAY = "2027-05-22";
+  const JUN_18 = "2027-06-18"; // the Demo menu's jump
+  const tick = (c: EventCase, to: string) => advanceClock([c], TODAY, to, CFG)[0];
+  const withoutActivity = (c: EventCase) => ({ ...c, activity: [] });
+
+  const proposed = () => run(s1, { type: "amend", answers: { ...s1, addOns: { ...s1.addOns, amplifiedSound: true } }, lateFee: true }, "applicant");
+  const submitted = () => {
+    let c = run(proposed(), { type: "complete_task", taskId: `${S1}:sound_details`, form: { equipment: "One DJ booth", soundCheckTime: "10:30" } }, "applicant");
+    c = run(c, { type: "complete_task", taskId: `${S1}:insurance_certificate`, files: [{ name: "coi.pdf", size: 200_000, type: "application/pdf" }] }, "applicant");
+    return run(c, { type: "submit" }, "applicant");
+  };
+  const approved = () => {
+    let c = run(submitted(), { type: "verify_document", taskId: `${S1}:sound_details` }, "pws");
+    c = run(c, { type: "verify_document", taskId: `${S1}:insurance_certificate` }, "hl");
+    return run(c, { type: "decide_amendment", decision: "approve" }, "clerk");
+  };
+
+  it("demo path 7 as scripted (proposed), then the date moved to Jun 18: Maya's picnic closes as the Instant event it was", () => {
+    const pending = proposed();
+    expect(pending).toMatchObject({ tier: "reviewed", flags: { amendmentPending: true } });
+
+    // On the day: the original plan, and the one card that is for today.
+    const eventDay = tick(pending, EVENT_DAY);
+    expect(eventDay).toMatchObject({ state: "event_day", tier: "instant", triggers: [], addOns: { amplifiedSound: false }, flags: { amendmentPending: false, lateFee: false } });
+    expect(eventDay.feeLines).toEqual(s1.feeLines);
+    expect(eventDay.tasks.map((t) => [t.catalogId, t.status, t.tags])).toEqual([
+      ["pay_fees", "done", []],
+      ["carry_permit", "todo", []],
+    ]);
+    expect(caseTotals(eventDay)).toEqual({ fees: 125, deposit: 0, total: 125, paid: 125, due: 0 });
+    expect(eventDay.activity.slice(-2).map((a) => [a.actor, a.text])).toEqual([
+      ["system", "The amendment lapsed: it was not in effect by the event, which goes ahead under the original plan."],
+      ["system", "Today is event day."],
+    ]);
+    expect(permittedPlan(eventDay)).toBe(eventDay);
+
+    // After it: Closed, not Closeout; nobody has a cleanup inspection and nothing is due.
+    const after = tick(pending, JUN_18);
+    expect(after).toMatchObject({ state: "closed", tier: "instant", payments: s1.payments });
+    expect(after.tasks.filter((t) => t.tags.includes("amendment"))).toEqual([]);
+    expect(queueFor([after], "pws", JUN_18)).toEqual([]);
+    expect(caseTotals(after)).toMatchObject({ total: 125, paid: 125, due: 0 });
+    // Apart from the line that says so, the record is the one the seed reaches with no amendment at all.
+    expect(withoutActivity(after)).toEqual(withoutActivity(tick(s1, JUN_18)));
+  });
+
+  it("submitted: the departments' checks and the Clerk's decision leave their queues", () => {
+    const pending = submitted();
+    expect(queueFor([pending], "pws", TODAY).map((row) => row.task.catalogId)).toEqual(["verify:sound_details"]);
+    const eventDay = tick(pending, EVENT_DAY);
+    expect(eventDay).toMatchObject({ state: "event_day", tier: "instant", flags: { amendmentPending: false } });
+    for (const dept of ["clerk", "pws", "hl"] as const) expect(queueFor([eventDay], dept, EVENT_DAY)).toEqual([]);
+    // The decision is kept for the file, closed; the cards and their checks are gone.
+    expect(eventDay.tasks.map((t) => [t.catalogId, t.status])).toEqual([
+      ["pay_fees", "done"],
+      ["carry_permit", "todo"],
+      ["decide_amendment", "done"],
+    ]);
+    expect(card(eventDay, "decide_amendment")?.payload).toEqual({ decision: "lapsed" });
+    expect(tick(pending, JUN_18)).toMatchObject({ state: "closed", tier: "instant" });
+  });
+
+  it("approved and not paid: the payment card is the booking's again, and nothing is due", () => {
+    const pending = approved();
+    expect(card(pending, "pay_fees")).toMatchObject({ status: "todo", payload: { amount: 393.75 } });
+    const eventDay = tick(pending, EVENT_DAY);
+    expect(eventDay).toMatchObject({ state: "event_day", tier: "instant", flags: { amendmentPending: false, signed: false } });
+    const seeded = card(s1, "pay_fees")!;
+    expect(card(eventDay, "pay_fees")).toMatchObject({ status: "done", title: seeded.title, why: seeded.why, dueDate: seeded.dueDate, payload: seeded.payload });
+    expect(card(eventDay, "accept_and_sign")).toBeUndefined();
+    expect(eventDay.payments).toEqual(s1.payments);
+    expect(up(eventDay)).toEqual(["applicant"]); // "Carry your permit", nothing else
+    expect(availableActions(eventDay, "applicant", ctxFor(eventDay)).find((a) => a.type === "pay")).toBeUndefined();
+
+    const after = tick(pending, JUN_18);
+    expect(after).toMatchObject({ state: "closed", tier: "instant" });
+    expect(caseTotals(after)).toMatchObject({ total: 125, paid: 125, due: 0 });
+  });
+
+  it("approved, signed and part paid: what was paid toward it goes back, and the signature goes with its card", () => {
+    const part = run(run(approved(), { type: "accept_and_sign", signature: "Maya Chen" }, "applicant"), { type: "pay", amount: 100, method: "in_person", kind: "quote" }, "clerk");
+    expect(part.flags).toMatchObject({ amendmentPending: true, signed: true });
+    const eventDay = tick(part, EVENT_DAY);
+    expect(eventDay.flags).toMatchObject({ amendmentPending: false, signed: false });
+    expect(eventDay.payments.map((p) => [p.amount, p.kind])).toEqual([
+      [125, "booking"],
+      [100, "quote"],
+      [-100, "refund"],
+    ]);
+    expect(card(eventDay, "pay_fees")).toMatchObject({ status: "done", title: "Pay and book", payload: { amount: 125 } });
+    expect(caseTotals(eventDay)).toEqual({ fees: 125, deposit: 0, total: 125, paid: 125, due: 0 });
+    expect(eventDay.activity.at(-2)?.text).toBe("The amendment lapsed: it was not in effect by the event, which goes ahead under the original plan. Refunded $100 paid toward it.");
+  });
+
+  it("an amendment that moves the date lapses on the day the permit is for, not on the day it asked for", () => {
+    // The DJ on Sat, Jun 12 instead: outside the 30 days, so no late fee, and still pending on May 22.
+    const moved = run(s1, { type: "amend", answers: { ...s1, addOns: { ...s1.addOns, amplifiedSound: true }, schedule: { ...s1.schedule!, date: "2027-06-12", occurrences: [] } } }, "applicant");
+    expect(moved.schedule?.date).toBe("2027-06-12");
+    expect(tick(moved, "2027-05-21")).toBe(moved);
+    const eventDay = tick(moved, EVENT_DAY);
+    expect(eventDay).toMatchObject({ state: "event_day", tier: "instant", schedule: s1.schedule, flags: { amendmentPending: false } });
+    expect(tick(moved, JUN_18)).toMatchObject({ state: "closed", tier: "instant" });
+  });
+
+  it("an amendment in effect before the day is not touched by the clock", () => {
+    const paid = run(run(approved(), { type: "accept_and_sign", signature: "Maya Chen" }, "applicant"), { type: "pay", amount: 393.75, method: "card", kind: "quote" }, "applicant");
+    expect(paid.flags.amendmentPending).toBe(false);
+    const eventDay = tick(paid, EVENT_DAY);
+    expect(eventDay).toMatchObject({ state: "event_day", tier: "reviewed", addOns: { amplifiedSound: true } });
+    expect(eventDay.activity.some((a) => a.text.includes("lapsed"))).toBe(false);
+    // A Reviewed event goes through Closeout, as it should.
+    expect(tick(paid, JUN_18)).toMatchObject({ state: "closeout", tier: "reviewed" });
   });
 });

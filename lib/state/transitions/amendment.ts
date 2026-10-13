@@ -16,6 +16,9 @@
  *    costs beyond what was paid (a difference in the applicant's favor is refunded on the spot).
  * 4. The amendment is in effect when nothing of that is left: `flags.amendmentPending` clears and
  *    the permit covers the amended plan.
+ *
+ * An amendment that is still pending when the event arrives never took effect: it lapses
+ * (`lapseAmendment`, called by the clock), and the event is held under the plan the permit covers.
  */
 import { addDaysISO } from "@/lib/dates";
 import { fmtMoney } from "@/lib/format";
@@ -111,6 +114,7 @@ function reopenSubmitCard(next: EventCase, before: EventCase, ctx: RulesCtx): Ev
   const card = findTask(next, id);
   if (!card) return next;
   const was = findTask(before, id);
+  const pay = findTask(before, taskId(before.id, "pay_fees"));
   const stash: PendingAmendment = {
     priorAnswers: answersOf(before),
     priorTier: before.tier,
@@ -118,6 +122,8 @@ function reopenSubmitCard(next: EventCase, before: EventCase, ctx: RulesCtx): Ev
     priorLateFee: before.flags.lateFee,
     priorFeeLines: before.feeLines,
     priorSubmit: was ? { status: was.status, unlocksOn: was.unlocksOn, tags: was.tags } : null,
+    // Only a permitted case has its payment card opened again by an approval; before the permit the card is still the quote's.
+    priorPay: before.permit && pay ? { status: pay.status, title: pay.title, why: pay.why, dueDate: pay.dueDate, unlocksOn: pay.unlocksOn, payload: pay.payload } : null,
     proposedOn: ctx.today,
   };
   const ready = preSubmitCardsIn(next);
@@ -267,7 +273,15 @@ function decline(c: EventCase, reason: string, actor: Actor, ctx: RulesCtx): Eve
   const why = reason.trim().replace(/[.\s]+$/, "");
   const said = `Declined the amendment: ${why}. The original plan stands.`;
   if (!prior) return appendActivity({ ...c, flags: { ...c.flags, amendmentPending: false } }, actor, said, ctx);
+  return appendActivity(restorePlan(c, prior, "The amendment was declined", ctx), actor, said, ctx);
+}
 
+/**
+ * The record with the answers, tier, triggers and fee lines it had before the amendment, and
+ * without the cards the amendment added: what a decline and a lapse both come to. `note` says
+ * which it was, on the card that is put back.
+ */
+function restorePlan(c: EventCase, prior: PendingAmendment, note: string, ctx: RulesCtx): EventCase {
   // A series' session paid while the amendment was pending stays paid.
   const paidNow = new Set((c.schedule?.occurrences ?? []).filter((o) => o.billing === "paid").map((o) => o.date));
   const schedule = prior.priorAnswers.schedule
@@ -279,15 +293,17 @@ function decline(c: EventCase, reason: string, actor: Actor, ctx: RulesCtx): Eve
   const added = new Set(c.tasks.filter((t) => t.tags.includes("amendment") && !(t.id === submitId && prior.priorSubmit)).map((t) => idSuffix(c, t.id)));
   const tasks = c.tasks
     .filter((t) => !added.has(idSuffix(c, t.id)) && !(t.catalogId.startsWith("verify:") && added.has(t.catalogId.slice("verify:".length))))
+    // Health & Legal's "Issue food permits" came with the card an approval opened; it goes with it unless it is done.
+    .filter((t) => !(t.catalogId === "issue_food_permits" && t.status !== "done" && added.has("vendor_food_permits")))
     .map((t): Task => {
       if (t.id !== submitId || !prior.priorSubmit) return t;
       // "Submit application" was there before the amendment borrowed it: back to how it stood.
       const { pendingAmendment: _dropped, ...payload } = t.payload;
       void _dropped;
-      return { ...t, ...prior.priorSubmit, payload, history: [...t.history, { at: nowOf(ctx), actor: "system", status: prior.priorSubmit.status, note: "The amendment was declined" }] };
+      return { ...t, ...prior.priorSubmit, payload, history: [...t.history, { at: nowOf(ctx), actor: "system", status: prior.priorSubmit.status, note }] };
     });
 
-  const next: EventCase = {
+  return {
     ...c,
     ...prior.priorAnswers,
     schedule,
@@ -295,7 +311,46 @@ function decline(c: EventCase, reason: string, actor: Actor, ctx: RulesCtx): Eve
     triggers: prior.priorTriggers,
     feeLines: prior.priorFeeLines,
     tasks,
-    flags: { ...c.flags, lateFee: prior.priorLateFee, amendmentPending: false },
+    // A signature given on the amendment's own card goes with the card.
+    flags: { ...c.flags, lateFee: prior.priorLateFee, signed: c.flags.signed && !added.has("accept_and_sign"), amendmentPending: false },
   };
-  return appendActivity(next, actor, said, ctx);
+}
+
+/* ---------- the event arrives first ---------- */
+
+const LAPSED = "The amendment lapsed";
+
+/**
+ * The event arrived with the amendment still pending: never submitted, never decided, or
+ * approved and not yet signed and paid. It never took effect, so the event is held under the
+ * plan the permit covers. The record goes back as a decline puts it back, and what an approval
+ * had already moved goes back with it: the payment card, the work orders, and anything paid
+ * toward the amendment, which is refunded. Called by the clock (`applyTick`); a no-op when no
+ * amendment is pending.
+ */
+export function lapseAmendment(c: EventCase, ctx: RulesCtx): EventCase {
+  if (!c.flags.amendmentPending) return c;
+  const prior = pendingAmendment(c);
+  let next: EventCase = prior ? restorePlan(c, prior, LAPSED, ctx) : { ...c, flags: { ...c.flags, amendmentPending: false } };
+
+  // The Clerk has nothing left to decide: the task leaves the queue and stays on the file.
+  const decide = findTask(next, taskId(next.id, DECIDE));
+  if (decide && decide.status !== "done") next = moveTask(next, decide.id, "done", ctx, "system", { dueDate: null, payload: { decision: "lapsed" } }, LAPSED);
+
+  // The payment card as it stood before an approval opened it for the difference.
+  const payId = taskId(next.id, "pay_fees");
+  const pay = findTask(next, payId);
+  const was = prior?.priorPay;
+  if (pay && was && (pay.status !== was.status || pay.title !== was.title || pay.payload.amount !== was.payload.amount)) {
+    next = pay.status === was.status ? patchTask(next, payId, was) : moveTask(next, payId, was.status, ctx, "system", was, LAPSED);
+  }
+  // What was paid toward the amendment goes back, and the card says what the plan that stands asks for.
+  const refunded = Math.max(0, -amendmentBalance(next, ctx.cfg));
+  next = settleDifference(next, ctx);
+  const open = findTask(next, payId);
+  if (open?.status === "todo" && amendmentBalance(next, ctx.cfg) <= 0) next = moveTask(next, payId, "done", ctx, "system", { payload: { ...open.payload, amount: totalPaid(next) } }, LAPSED);
+
+  next = syncWorkOrders(next, ctx);
+  const money = refunded > 0 ? ` Refunded ${fmtMoney(refunded)} paid toward it.` : "";
+  return appendActivity(next, "system", `${LAPSED}: it was not in effect by the event, which goes ahead under the original plan.${money}`, ctx);
 }

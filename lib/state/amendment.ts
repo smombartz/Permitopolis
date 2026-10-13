@@ -28,6 +28,12 @@ export interface PendingAmendment {
   priorFeeLines: FeeLine[];
   /** How "Submit application" stood before the amendment reopened it; null when the amendment added the card. */
   priorSubmit: { status: TaskStatus; unlocksOn: UnlockEvent | null; tags: Task["tags"] } | null;
+  /**
+   * How a permitted case's payment card stood before the amendment: an approval opens it again
+   * for the difference, and a lapse puts it back. Null before the permit (the card is still the
+   * quote's) and when the plan has none; absent on an amendment proposed before this was kept.
+   */
+  priorPay?: Pick<Task, "status" | "title" | "why" | "dueDate" | "unlocksOn" | "payload"> | null;
   proposedOn: ISODate;
 }
 
@@ -100,11 +106,22 @@ export function amendmentPaymentDue(c: EventCase, cfg: RulesConfig): number {
 
 /**
  * The case as its permit covers it: the record itself, or, while an amendment is pending, the
- * record with the answers, tier and triggers it had before ("The current permit stays valid for
- * the original plan until the amendment is approved"). The permit page and the public check
- * show this; everything else shows the record.
+ * record with the answers, tier, triggers and fee lines it had before ("The current permit stays
+ * valid for the original plan until the amendment is approved"). The permit page and the public
+ * check show this, and a cancellation refunds it (the amended plan's deposit and late fee are
+ * nobody's until the amendment takes effect); everything else shows the record.
  */
 export function permittedPlan(c: EventCase): EventCase {
   const pending = pendingAmendment(c);
-  return pending ? { ...c, ...pending.priorAnswers, tier: pending.priorTier, triggers: pending.priorTriggers } : c;
+  return pending ? { ...c, ...pending.priorAnswers, tier: pending.priorTier, triggers: pending.priorTriggers, feeLines: pending.priorFeeLines } : c;
+}
+
+/**
+ * What has been paid toward a pending amendment: whatever is paid beyond what the plan the
+ * permit covers asks for. It was paid for the amended plan, so it goes back whole if that plan
+ * never takes effect (the permit is cancelled, or the event arrives first). 0 with none pending.
+ */
+export function paidTowardPendingAmendment(c: EventCase, cfg: RulesConfig): number {
+  const plan = permittedPlan(c);
+  return plan === c ? 0 : Math.max(0, -amendmentBalance(plan, cfg));
 }

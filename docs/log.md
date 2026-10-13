@@ -1,5 +1,27 @@
 # Change log
 
+## 2026-10-13 - Final review fixes
+
+**What Changed:**
+- The final read-only review of `build` returned 17 findings (3 high, 6 medium, 8 low). Plan, with what each fix turned out to be: `docs/plans/2026-10-13-final-review-fixes.md`
+- **High 1, amendment cards read "Overdue by 11 days" the moment they appeared (demo path 7).** A card to finish before submitting is due the tier's notice before the event; on a board made inside that notice (a late fee taken at the date gate, an amendment close to the day) that day is already gone. `cardDueDate()` now gives such a card today's date, never an earlier one. The seed is unchanged: no seeded board was made inside its lead time
+- **High 2, the permit page and Cancel refunded the amended plan while the amendment was pending.** Maya's permit read "Your $250 deposit is returned in full ... $125 refund" for a deposit she never paid, and `cancel` paid the $125. `permittedPlan()` now carries the fee lines the plan had, and `refundIfCancelled()` works from it, so the permit page, the Cancel dialog and `cancel` are one figure again ($62.50). Anything already paid toward an amendment that has not taken effect goes back whole (`paidTowardPendingAmendment()`)
+- **High 3, a pending amendment never lapsed.** Moving the demo date past the event ran the clock on the amended, unapproved tier: Maya's Instant picnic went to Closeout, into Public Works & Safety's queue, with $393.75 "due" and a $250 "deposit" to refund. `applyTick()` now lapses an amendment the event has caught up with (`lapseAmendment()`), before it reads the tier: the record goes back as a decline puts it back, the Clerk's open decision is closed, the payment card an approval reopened is the booking's again, anything paid toward the amendment is refunded, a signature given on the amendment's own card goes with the card, and the work orders follow the plan that stands. The day that counts is the last session of the plan the permit covers, or the amended plan's own date if that comes first
+
+**Why:**
+- The final review before the prototype is handed over; the three high findings are all on demo path 7, the one the PRD's P1 scope is shown with
+
+**Files Modified:**
+- `lib/rules/requirements.ts` - `submit_by` is never in the past
+- `lib/state/amendment.ts` - `permittedPlan()` carries the prior fee lines; `paidTowardPendingAmendment()`; `PendingAmendment.priorPay`
+- `lib/state/selectors.ts` - `refundIfCancelled()` reads the plan the permit covers
+- `lib/state/transitions/amendment.ts` - `restorePlan()` shared by decline and lapse; `lapseAmendment()`; the payment card kept with the stash
+- `lib/state/clock.ts` - `applyTick()` lapses an overtaken amendment first
+- `lib/rules/requirements.test.ts`, `lib/state/clock.test.ts`, `lib/state/transitions/amendment.test.ts`, `tests/demo-paths.test.ts`, `tests/render/permit.test.tsx` - a test per finding, each failing before its fix
+- `docs/plans/2026-10-13-final-review-fixes.md`, `docs/plans/2026-10-12-permitopolis-prototype.md`, `docs/readme.md` - the plan, its line in the parent plan, and "Amendment, end to end"
+
+---
+
 ## 2026-10-13 - Accessibility and responsive pass
 
 **What Changed:**
