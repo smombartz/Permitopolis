@@ -254,6 +254,8 @@ export interface ReviewerRow {
  */
 export function reviewerRows(c: EventCase): ReviewerRow[] {
   return DEPTS.map((dept): ReviewerRow => {
+    const amending = amendmentRow(c, dept);
+    if (amending) return amending;
     const review = c.reviews.find((r) => r.dept === dept);
     if (review) return { dept, status: review.status, label: REVIEW_STATUS_WORD[review.status] ?? "Reviewing" };
     if (dept !== "clerk") return { dept, status: "not_routed", label: involvement(c, dept) === "awaiting_routing" ? "Starts after intake" : "Not involved" };
@@ -269,6 +271,30 @@ export function reviewerRows(c: EventCase): ReviewerRow[] {
     if (c.state === "in_review" || c.state === "needs_info") return { dept, status: "pending", label: "Waiting on reviews" };
     return { dept, status: "approved", label: "Approved" };
   });
+}
+
+/**
+ * A department's part in a pending amendment, which is reviewed without a routing: the
+ * departments that check the cards it added verify them one by one, then the City Clerk
+ * decides. While it is pending this is what the row says, whatever the department's review of
+ * the original application read (or that it never had one: an Instant event's first reviewers
+ * arrive with its amendment). Null for a department the amendment gives nothing to, and when
+ * nothing is pending.
+ */
+function amendmentRow(c: EventCase, dept: Dept): ReviewerRow | null {
+  const stage = amendmentStage(c);
+  if (stage === null) return null;
+  if (dept === "clerk") {
+    if (stage === "approved") return { dept, status: "approved", label: "Approved your amendment" };
+    const deciding = stage === "submitted" && c.tasks.some((t) => t.catalogId === "decide_amendment" && t.status === "todo");
+    return deciding ? { dept, status: "pending", label: "Deciding your amendment" } : { dept, status: "not_routed", label: "Decides your amendment" };
+  }
+  const cards = c.tasks.filter((t) => t.owner === "applicant" && t.tags.includes("amendment") && t.reviewer === dept);
+  if (cards.length === 0) return null;
+  if (cards.some((t) => t.status === "changes_requested")) return { dept, status: "needs_info", label: REVIEW_STATUS_WORD.needs_info };
+  if (cards.some((t) => t.status === "submitted")) return { dept, status: "pending", label: "Checking your amendment" };
+  if (cards.every((t) => t.status === "done")) return { dept, status: "approved", label: "Checked your amendment" };
+  return { dept, status: "not_routed", label: "Checks your amendment" };
 }
 
 /** The extra line HoldStatus's "No date hold yet" needs: how many sign-offs are still out. */
@@ -433,7 +459,8 @@ export interface WithCityInfo {
  * back, so the column is never a black hole. Every part is read off the task the city itself
  * works from, so the board cannot disagree with a reviewer's queue (`tests/both-sides.test.ts`):
  *
- * - the card's own `verify:*` task, once its department has decided its review;
+ * - the card's own `verify:*` task, once its department has decided its review (or, on an
+ *   Instant event an amendment raised, with no review at all);
  * - the department's `review:<dept>` task while that review is open, which covers every card
  *   sent to it;
  * - before routing, the Clerk's intake check. The card's reviewer has not started ("Starts when
@@ -452,11 +479,13 @@ export function withCityInfo(c: EventCase, task: Task, today: ISODate): WithCity
   if (!reviewer) return null;
   const sent = taskSubmittedOn(task) ?? today;
   const laterOf = (day: string | null | undefined): ISODate => (day && day.slice(0, 10) > sent ? day.slice(0, 10) : sent);
-  const atIntake = c.reviews.length === 0;
+  const verifyTask = c.tasks.find((t) => t.catalogId.startsWith("verify:") && t.status !== "done" && cardUnderVerification(c, t)?.id === task.id);
+  // Not routed, and nobody is checking this card on its own yet. An Instant event was never
+  // routed at all: a card an amendment adds to it goes straight to its reviewer's verify task.
+  const atIntake = c.reviews.length === 0 && !verifyTask;
 
   let expectedBy: ISODate | null = null;
   let since: ISODate;
-  const verifyTask = c.tasks.find((t) => t.catalogId.startsWith("verify:") && t.status !== "done" && cardUnderVerification(c, t)?.id === task.id);
   if (verifyTask) {
     expectedBy = taskDueDate(verifyTask);
     // A verify task is opened for this one card, and opened again when it is uploaded again.

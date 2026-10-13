@@ -18,6 +18,7 @@ import { intakeRows } from "@/lib/view/cityLists";
 import { daysWaiting } from "@/lib/view/verify";
 
 const TODAY = DEFAULT_DEMO_TODAY;
+const S1 = "PMT-27-0109";
 const S3 = "PMT-27-0118";
 const S4 = "PMT-27-0126";
 const S5 = "PMT-27-0097";
@@ -206,6 +207,33 @@ describe("the named cases", () => {
     c = run(c, { type: "verify_document", taskId: permit }, "hl");
     expect(boardColumns(c).with_city).toEqual([]);
     expect(withCityColumnSummary(c, TODAY)).toEqual([]);
+  });
+
+  it("S1 (demo path 7): an amendment's cards are With the city like any other, each with the department checking it and that department's own date", () => {
+    // Maya adds a DJ to her permitted picnic and sends in the two cards the amendment added.
+    let c = get(S1);
+    c = run(c, { type: "amend", answers: { ...c, addOns: { ...c.addOns, amplifiedSound: true } }, lateFee: true }, "applicant");
+    c = run(c, { type: "complete_task", taskId: `${S1}:sound_details`, form: { equipment: "One DJ booth" } }, "applicant");
+    c = run(c, { type: "complete_task", taskId: `${S1}:insurance_certificate`, files: [{ name: "coi.pdf", size: 100_000, type: "application/pdf" }] }, "applicant");
+    const cards = boardColumns(c).with_city;
+    expect(cards.map((t) => [t.catalogId, t.tags])).toEqual([["insurance_certificate", ["amendment"]], ["sound_details", ["amendment"]]]);
+    for (const card of cards) {
+      const info = withCityInfo(c, card, TODAY)!;
+      // No review is open on a permitted case: each card has its own verify task, in its reviewer's queue.
+      const inQueue = queueFor([c], info.dept, TODAY).find((row) => cardUnderVerification(c, row.task)?.id === card.id)!;
+      expect([info.dept, info.atIntake], card.catalogId).toEqual([card.reviewer, false]);
+      expect(info.expectedBy, card.catalogId).toBe(taskDueDate(inQueue.task));
+      expect([info.daysWaiting, info.overdue], card.catalogId).toEqual([inQueue.daysWaiting, false]);
+    }
+    expect(withCityColumnSummary(c, TODAY).map((row) => [row.dept, row.count])).toEqual([["pws", 1], ["hl", 1]]);
+
+    // Public Works & Safety sends the sound details back: the card is the applicant's again, and the Clerk's decision waits for it.
+    c = run(c, { type: "submit" }, "applicant");
+    c = run(c, { type: "reject_document", taskId: `${S1}:sound_details`, reason: "Name the speakers." }, "pws");
+    expect(boardColumns(c).do_now.map((t) => t.catalogId)).toEqual(["sound_details"]);
+    expect(boardColumns(c).with_city.map((t) => t.catalogId)).toEqual(["insurance_certificate"]);
+    expect(waitingOn(c, TODAY).filter((p) => p.status === "up_now").map((p) => p.party)).toEqual(["applicant", "hl"]);
+    expect(waitingOn(c, TODAY).find((p) => p.party === "clerk")).toMatchObject({ status: "waiting", note: "Unlocks when the amendment's cards are checked" });
   });
 
   it("S5, a second upload after the check: the same verify task reopens with a new date, and the board follows it", () => {

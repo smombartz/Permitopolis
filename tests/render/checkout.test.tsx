@@ -1,4 +1,4 @@
-import { screen, within } from "@testing-library/react";
+import { act, screen, within } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 import { CheckoutScreen } from "@/components/checkout/CheckoutScreen";
 import { routes } from "@/lib/routes";
@@ -172,5 +172,36 @@ describe("FeeTable rendering sanity", () => {
     });
     const totalRow = within(screen.getByText("Total").closest("div")!);
     expect(totalRow.getByText("$6,530")).toBeInTheDocument();
+  });
+});
+
+describe("CheckoutScreen: an amendment's quote, on a case that already has its permit", () => {
+  const S1 = "PMT-27-0109";
+
+  it("a change that only costs more (two more hours) has nothing to sign: the page takes the $50 and goes back to the board", async () => {
+    const { user } = await renderScreen(<CheckoutScreen />, { scenario: "S1", path: routes.quote(S1) });
+    // Before any change the permitted picnic has nothing to pay here.
+    expect(screen.getByText("This event already has its permit.")).toBeInTheDocument();
+
+    act(() => {
+      const s1 = storedCase(S1);
+      expect(useDemo.getState().dispatch(S1, { type: "amend", answers: { ...s1, schedule: { ...s1.schedule!, end: "18:00" } } }).ok).toBe(true);
+    });
+
+    expect(document.querySelector('[data-slot="amendment-quote"]')).toHaveTextContent("Your change is in effect. What it adds to your fees is due here.");
+    expect(screen.getByText("Paid so far: $125. Due for your change: $50.")).toBeInTheDocument();
+    // Instant, never signed, no conditions: neither section is on the page.
+    expect(screen.queryByRole("heading", { name: "Sign" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "Conditions" })).not.toBeInTheDocument();
+    expect(screen.queryByText("Signed and dated.")).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Pay $50" }));
+    await new Promise((resolve) => setTimeout(resolve, 750));
+
+    expect(storedCase(S1).payments.at(-1)).toMatchObject({ amount: 50, kind: "quote", amendment: true });
+    expect(storedCase(S1).tasks.find((t) => t.catalogId === "pay_fees")).toMatchObject({ status: "done", payload: { amount: 175 } });
+    expect(lastPush()).toBe(routes.event(S1));
+    // The page holds what was paid until the board arrives, instead of "Nothing to pay here".
+    expect(screen.queryByText("Nothing to pay here")).not.toBeInTheDocument();
   });
 });

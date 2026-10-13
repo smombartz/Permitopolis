@@ -17,7 +17,7 @@ import { Section } from "@/components/ui/section";
 import { applicantNameOf } from "@/lib/data/people";
 import { fmtDate, fmtMoney, plural } from "@/lib/format";
 import { routes } from "@/lib/routes";
-import { amendmentSignOpen, eventDate, useDemo } from "@/lib/state";
+import { amendmentSignOpen, caseTotals, eventDate, useDemo } from "@/lib/state";
 import type { EventCase } from "@/lib/types";
 import {
   afterQuotePaymentMessage,
@@ -66,6 +66,9 @@ function QuotePanel({ c, today, amendment = false, onSettled }: QuotePanelProps)
   const everyAccepted = allAccepted(c.conditions, acceptedIds);
   // An amended plan that was signed before needs no second signature: only the new card asks for one.
   const signed = amendment ? !amendmentSignOpen(c) : c.flags.signed;
+  // A change to an Instant plan that only costs more has nothing to sign and no conditions:
+  // those two sections would read "Signed and dated." for a signature nobody ever gave.
+  const showSigning = !amendment || amendmentSignOpen(c) || c.flags.signed;
 
   /** The amendment took effect with this click: the case has nothing left to sign or pay here. */
   function settledNow(): boolean {
@@ -130,18 +133,25 @@ function QuotePanel({ c, today, amendment = false, onSettled }: QuotePanelProps)
         <PlanSummaryCard plan={plan} />
       </Section>
 
-      <Section
-        title="Conditions"
-        description={signed ? undefined : c.conditions.length > 0 ? "Read every condition, then check each one to accept it." : "This plan carries no conditions; your signature accepts the plan as amended."}
-      >
-        <ConditionList conditions={c.conditions} editable={!signed} acceptedIds={acceptedIds} onToggleAccept={toggleAccept} />
-      </Section>
+      {showSigning ? (
+        <Section
+          title="Conditions"
+          description={signed ? undefined : c.conditions.length > 0 ? "Read every condition, then check each one to accept it." : "This plan carries no conditions; your signature accepts the plan as amended."}
+        >
+          <ConditionList conditions={c.conditions} editable={!signed} acceptedIds={acceptedIds} onToggleAccept={toggleAccept} />
+        </Section>
+      ) : null}
 
       <Section
         title="Fees"
-        description={plan.isSeries ? "A series pays its first session now; the rest bill on schedule." : undefined}
+        description={amendment ? "The amended plan's fees. What you have paid already comes off the total." : plan.isSeries ? "A series pays its first session now; the rest bill on schedule." : undefined}
       >
         <FeeTable lines={c.feeLines} compact={phone} />
+        {amendment ? (
+          <InlineAlert variant="info">
+            Paid so far: {fmtMoney(caseTotals(c).paid)}. {owed > 0 ? `Due for your change: ${fmtMoney(owed)}.` : "Nothing more is due."}
+          </InlineAlert>
+        ) : null}
         {series && series.sessionsRemaining > 0 ? (
           <InlineAlert variant="info">
             The other {plural(series.sessionsRemaining, "session")} bill at {fmtMoney(series.perSession)} each, on schedule.
@@ -149,22 +159,24 @@ function QuotePanel({ c, today, amendment = false, onSettled }: QuotePanelProps)
         ) : null}
       </Section>
 
-      <Section title="Sign">
-        {signed ? (
-          <InlineAlert variant="success">Signed and dated.</InlineAlert>
-        ) : (
-          <SignatureForm
-            disabled={!everyAccepted}
-            disabledReason="Check every condition above to accept it before signing."
-            onSign={handleSign}
-          />
-        )}
-      </Section>
+      {showSigning ? (
+        <Section title="Sign">
+          {signed ? (
+            <InlineAlert variant="success">Signed and dated.</InlineAlert>
+          ) : (
+            <SignatureForm
+              disabled={!everyAccepted}
+              disabledReason="Check every condition above to accept it before signing."
+              onSign={handleSign}
+            />
+          )}
+        </Section>
+      ) : null}
 
       <Section title="Pay">
         {paid ? (
           <div className="flex flex-col gap-3">
-            <InlineAlert variant="success">{amendment ? "Nothing more to pay. Sign above to put your change into effect." : afterQuotePaymentMessage(c)}</InlineAlert>
+            <InlineAlert variant="success">{amendment ? (signed ? "Nothing more to pay." : "Nothing more to pay. Sign above to put your change into effect.") : afterQuotePaymentMessage(c)}</InlineAlert>
             <Button asChild variant="secondary" className="self-start">
               <Link href={routes.event(c.id)}>Back to your board</Link>
             </Button>

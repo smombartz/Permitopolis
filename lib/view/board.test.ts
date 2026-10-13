@@ -200,6 +200,48 @@ describe("reviewerRows", () => {
     for (const id of ["PMT-27-0017", B16]) expect(reviewerRows(find(id))[0], id).toEqual({ dept: "clerk", status: "not_routed", label: "Nothing to review" });
   });
 
+  it("S1 with an amendment pending: the departments checking its cards and the Clerk deciding it read as that, stage by stage (never \"Not involved\")", () => {
+    const ctx = { today: TODAY, now: `${TODAY}T09:00`, cases: buildSeed(), cfg: DEFAULT_CONFIG };
+    const run = (c: EventCase, action: Parameters<typeof transition>[1], actor: Parameters<typeof transition>[2]) => {
+      const result = transition(c, action, actor, ctx);
+      if (!result.ok) throw new Error(result.reason);
+      return result.case;
+    };
+    const s1 = find(S1);
+    // Proposed: nobody at the city has anything yet.
+    let c = run(s1, { type: "amend", answers: { ...s1, addOns: { ...s1.addOns, amplifiedSound: true } }, lateFee: true }, "applicant");
+    expect(reviewerRows(c)).toEqual([
+      { dept: "clerk", status: "not_routed", label: "Decides your amendment" },
+      { dept: "pws", status: "not_routed", label: "Checks your amendment" },
+      { dept: "hl", status: "not_routed", label: "Checks your amendment" },
+    ]);
+    // Sent and submitted: the two departments are checking, the Clerk decides after them.
+    c = run(c, { type: "complete_task", taskId: `${S1}:sound_details`, form: { equipment: "One DJ booth" } }, "applicant");
+    c = run(c, { type: "complete_task", taskId: `${S1}:insurance_certificate`, files: [{ name: "coi.pdf", size: 1000, type: "application/pdf" }] }, "applicant");
+    c = run(c, { type: "submit" }, "applicant");
+    expect(reviewerRows(c)).toEqual([
+      { dept: "clerk", status: "not_routed", label: "Decides your amendment" },
+      { dept: "pws", status: "pending", label: "Checking your amendment" },
+      { dept: "hl", status: "pending", label: "Checking your amendment" },
+    ]);
+    // One sends its card back, the other verifies.
+    const sentBack = run(c, { type: "reject_document", taskId: `${S1}:sound_details`, reason: "Name the speakers." }, "pws");
+    expect(reviewerRows(sentBack)[1]).toEqual({ dept: "pws", status: "needs_info", label: "Asked you for something" });
+    c = run(c, { type: "verify_document", taskId: `${S1}:sound_details` }, "pws");
+    c = run(c, { type: "verify_document", taskId: `${S1}:insurance_certificate` }, "hl");
+    expect(reviewerRows(c)).toEqual([
+      { dept: "clerk", status: "pending", label: "Deciding your amendment" },
+      { dept: "pws", status: "approved", label: "Checked your amendment" },
+      { dept: "hl", status: "approved", label: "Checked your amendment" },
+    ]);
+    // Approved: the rest is the applicant's. In effect: back to what a permit reads.
+    c = run(c, { type: "decide_amendment", decision: "approve" }, "clerk");
+    expect(reviewerRows(c)[0]).toEqual({ dept: "clerk", status: "approved", label: "Approved your amendment" });
+    c = run(c, { type: "accept_and_sign", signature: "Maya Chen" }, "applicant");
+    c = run(c, { type: "pay", amount: 393.75, method: "card", kind: "quote" }, "applicant");
+    expect(reviewerRows(c)).toEqual(reviewerRows(s1));
+  });
+
   it("S4, before routing: the Clerk is checking the application, and the departments its cards name start after intake", () => {
     expect(reviewerRows(find(S4))).toEqual([
       { dept: "clerk", status: "pending", label: "Reviewing" },
