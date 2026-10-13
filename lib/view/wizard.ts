@@ -149,10 +149,11 @@ export function buildResultPanel(
 ): ResultPanel {
   const cls = classify(answers, ctx.cfg);
   const gate = dateGate(answers, cls, ctx, options.ignoreCaseId);
-  // Mirrors `lateFeeApplies()` in lib/state/checks.ts: the flag only costs anything while the
-  // date really is inside the lead time, so a flag left on after a later date is picked (or
-  // before any date is chosen) carries no fee line.
-  const lateFeeApplies = !!options.lateFee && !gate.leadTimeOk;
+  // Mirrors `lateFeeApplies()` in lib/state/checks.ts, by deferring to the same question the
+  // engine asks: does the gate itself offer the late fee as a fix (`lateFeeCarriesDate`)? A
+  // flag left on after a later date is picked, or a date too close even for the fee
+  // (`cfg.lateFee.minDaysBeforeEvent`), or a booked/blacked-out date, all carry no fee line.
+  const lateFeeApplies = lateFeeCarriesDate(gate, !!options.lateFee);
   const fees = estimateFees(answers, cls, ctx.cfg, { lateFee: lateFeeApplies, caseId: options.ignoreCaseId });
   return {
     tier: cls.tier,
@@ -333,9 +334,7 @@ export function lateFeeCarriesDate(gate: DateGate, lateFee: boolean): boolean {
 }
 
 export function dateGateSatisfied(gate: DateGate, lateFee: boolean): boolean {
-  if (gate.ok) return true;
-  if (!lateFee) return false;
-  return gate.availability.status === "open" || gate.availability.status === "impacted";
+  return gate.ok || lateFeeCarriesDate(gate, lateFee);
 }
 
 /** The primary button (book-and-pay or confirm-the-plan) is ready once nothing is missing and the date gate (or the late fee) clears. */
