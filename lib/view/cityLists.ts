@@ -12,9 +12,11 @@ import { applicantNameOf } from "@/lib/data/people";
 import type { CasesFilters, CasesView } from "@/lib/routes";
 import {
   availableActions,
+  cardUnderVerification,
   eventDate,
   involves,
   isOpen,
+  isStalled,
   isVisibleToCity,
   leadTimeRisk,
   queueFor,
@@ -27,7 +29,7 @@ import {
   type QueueItem,
   type WaitingOnOthersItem,
 } from "@/lib/state";
-import { ENDING_LABEL, PARTY_LABEL, STATE_LABEL, TIER_LABEL, type CaseState, type Dept, type EventCase, type ISODate, type Party, type Tier } from "@/lib/types";
+import { ENDING_LABEL, PARTY_LABEL, STATE_LABEL, TIER_LABEL, type CaseState, type Dept, type EventCase, type ISODate, type Party, type Task, type Tier } from "@/lib/types";
 
 /* ------------------------------------------------------------------------ */
 /* My queue                                                                  */
@@ -85,6 +87,36 @@ export function triggerLabels(c: EventCase): string[] {
   return c.triggers.map((t) => t.label);
 }
 
+/** The day a task most recently became actionable (todo or changes requested), for the reason line. */
+function lastOpenedOn(task: Task): ISODate | null {
+  const opened = [...task.history].reverse().find((h) => h.status === "todo" || h.status === "changes_requested");
+  return opened ? (opened.at.slice(0, 10) as ISODate) : null;
+}
+
+/**
+ * A one-line reason a queue row is this role's move, e.g. "Insurance certificate re-uploaded
+ * Apr 30", "Routed Apr 20", "A reviewer denied". Officials triage by deadline more than by
+ * state (the PRD's push); this is the "why now" a due date alone does not say.
+ */
+export function queueReasonLine(item: QueueItem): string {
+  const { case: c, task } = item;
+  const when = lastOpenedOn(task);
+  const since = when ? fmtMonthDay(when) : null;
+
+  if (task.catalogId.startsWith("verify:")) {
+    const card = cardUnderVerification(c, task);
+    if (card) return since ? `${card.title} re-uploaded ${since}` : `${card.title} re-uploaded`;
+  }
+  if (task.catalogId.startsWith("review:")) return since ? `Routed ${since}` : "Routed";
+  if (task.catalogId === "intake_check") return c.submittedAt ? `Submitted ${fmtMonthDay(c.submittedAt)}` : "Submitted";
+  if (task.catalogId === "confirm_routing") return since ? `Accepted as complete ${since}` : "Accepted as complete";
+  if (task.catalogId === "consolidate") return task.payload.denied === true ? "A reviewer denied" : "Every review is in";
+  if (task.catalogId === "issue_permit") return "Signed, paid and verified";
+  if (task.catalogId.startsWith("work_order:")) return since ? `Permitted ${since}` : "Permitted";
+  if (task.status === "changes_requested") return since ? `Changes requested ${since}` : "Changes requested";
+  return since ? `Opened ${since}` : task.title;
+}
+
 /** The order the three groups render in, each with its label. */
 export const QUEUE_GROUP_LABEL: Record<QueueGroup, string> = {
   overdue: "Overdue",
@@ -105,6 +137,19 @@ export const PIPELINE_BOARD_STATES: CaseState[] = ["submitted", "in_review", "ne
 export type SortField = "event_date" | "due" | "state" | "waiting";
 export type SortDir = "asc" | "desc";
 
+/** The board's "Group by" (plan 8, 4F): State is the default; Event date buckets by deadline. */
+export type BoardGroupBy = "state" | "event_date";
+
+/** The table's density toggle. */
+export type TableDensity = "comfortable" | "compact";
+
+/** Every table column that can be shown or hidden; the event's name, date and state are always on. */
+export const TOGGLABLE_TABLE_COLUMNS = ["id", "tier", "waiting", "next_action", "due", "depts", "risk"] as const;
+export type TableColumn = (typeof TOGGLABLE_TABLE_COLUMNS)[number];
+
+/** Fits 1280px with the sidebar, no horizontal scroll; "Next action" and "Depts" are opt-in. */
+export const DEFAULT_TABLE_COLUMNS: TableColumn[] = ["tier", "waiting", "due", "risk"];
+
 /** Everything the Cases pipeline keeps in the URL: the PRD's filters plus view, sort and the toggle. */
 export interface CasesListFilters {
   tier?: Tier;
@@ -118,6 +163,11 @@ export interface CasesListFilters {
   view: CasesView;
   sort: SortField;
   dir: SortDir;
+  /** The board's grouping; the table is unaffected. */
+  groupBy: BoardGroupBy;
+  /** The table's visible optional columns. */
+  columns: TableColumn[];
+  density: TableDensity;
 }
 
 /** Public Works & Safety and Health & Legal start with "Involves me" on; the Clerk starts off. */
@@ -146,7 +196,25 @@ export function parseCasesFilters(search: URLSearchParams, role: Party): CasesLi
     view: search.get("view") === "table" ? "table" : "board",
     sort: SORT_FIELDS.includes(search.get("sort") as SortField) ? (search.get("sort") as SortField) : "event_date",
     dir: SORT_DIRS.includes(search.get("dir") as SortDir) ? (search.get("dir") as SortDir) : "asc",
+    groupBy: search.get("group") === "event_date" ? "event_date" : "state",
+    columns: parseTableColumns(search.get("cols")),
+    density: search.get("density") === "compact" ? "compact" : "comfortable",
   };
+}
+
+/**
+ * A hand-edited or stale `cols` list is filtered to the columns that still exist; a missing or
+ * garbled one is the default set, and "none" (how every column hidden round-trips) is empty.
+ */
+function parseTableColumns(raw: string | null): TableColumn[] {
+  if (raw === null) return DEFAULT_TABLE_COLUMNS;
+  if (raw === "none") return [];
+  const known = raw.split(",").filter((c): c is TableColumn => (TOGGLABLE_TABLE_COLUMNS as readonly string[]).includes(c));
+  return known.length > 0 ? known : DEFAULT_TABLE_COLUMNS;
+}
+
+function sameColumns(a: TableColumn[], b: TableColumn[]): boolean {
+  return a.length === b.length && TOGGLABLE_TABLE_COLUMNS.every((c) => a.includes(c) === b.includes(c));
 }
 
 /** A date param is a date or nothing: anything else in the URL (a hand-edited link) is ignored, not shown. */
@@ -180,6 +248,9 @@ export function casesFiltersToParams(filters: CasesListFilters, role: Party): Re
     closed: filters.closedAndEnded ? "1" : undefined,
     sort: filters.sort === "event_date" ? undefined : filters.sort,
     dir: filters.dir === "asc" ? undefined : filters.dir,
+    group: filters.groupBy === "state" ? undefined : filters.groupBy,
+    cols: sameColumns(filters.columns, DEFAULT_TABLE_COLUMNS) ? undefined : filters.columns.length === 0 ? "none" : filters.columns.join(","),
+    density: filters.density === "comfortable" ? undefined : filters.density,
   };
 }
 
@@ -240,7 +311,7 @@ function dateRangeLabel(from: ISODate | undefined, to: ISODate | undefined): str
   return from ? `Event date from ${fmtMonthDay(from)}` : `Event date to ${fmtMonthDay(to!)}`;
 }
 
-export function activeFilterChips(filters: CasesListFilters): FilterChipView[] {
+export function activeFilterChips(filters: Pick<CasesListFilters, "tier" | "state" | "waiting" | "from" | "to" | "q">): FilterChipView[] {
   const chips: FilterChipView[] = [];
   if (filters.tier) chips.push({ key: "tier", label: TIER_LABEL[filters.tier] });
   if (filters.state) chips.push({ key: "state", label: filters.state === "off_path" ? "Ended" : STATE_LABEL[filters.state] });
@@ -287,9 +358,61 @@ export function boardCardWaiting(c: EventCase, today: ISODate): { party: Party; 
     .map((p) => ({ party: p.party, days: p.daysHolding }));
 }
 
+/**
+ * Grouping by deadline instead of by state (the PRD's push: "officials may triage by deadline
+ * more than by state"). A case with no event date yet (a case the Clerk has accepted but not
+ * yet scheduled is not possible, but a draft reopened as an exception could still lack one)
+ * goes to "Later" rather than being dropped.
+ */
+export const EVENT_DATE_BUCKETS = ["this_week", "next_two_weeks", "this_month", "later", "past"] as const;
+export type EventDateBucket = (typeof EVENT_DATE_BUCKETS)[number];
+
+export const EVENT_DATE_BUCKET_LABEL: Record<EventDateBucket, string> = {
+  this_week: "This week",
+  next_two_weeks: "Next two weeks",
+  this_month: "This month",
+  later: "Later",
+  past: "Past",
+};
+
+function eventDateBucket(date: ISODate | null, today: ISODate): EventDateBucket {
+  if (!date) return "later";
+  if (date < today) return "past";
+  const days = daysBetween(today, date);
+  if (days <= 7) return "this_week";
+  if (days <= 14) return "next_two_weeks";
+  if (days <= 31) return "this_month";
+  return "later";
+}
+
+/** One column per deadline bucket, each case's state shown on its own card as a chip. */
+export function pipelineEventDateColumns(cases: EventCase[], today: ISODate): Record<EventDateBucket, EventCase[]> {
+  const columns = Object.fromEntries(EVENT_DATE_BUCKETS.map((b) => [b, [] as EventCase[]])) as Record<EventDateBucket, EventCase[]>;
+  const sorted = [...cases].sort((a, b) => (eventDate(a, today) ?? "9999-12-31").localeCompare(eventDate(b, today) ?? "9999-12-31"));
+  for (const c of sorted) columns[eventDateBucket(eventDate(c, today), today)].push(c);
+  return columns;
+}
+
 /* ------------------------------------------------------------------------ */
 /* Cases pipeline: table                                                    */
 /* ------------------------------------------------------------------------ */
+
+export type AlwaysOnColumn = "event" | "event_date" | "state";
+
+/** The event's name, date and state always show; every other column only while it is toggled on. */
+export function visibleTableColumns(filters: Pick<CasesListFilters, "columns">): (AlwaysOnColumn | TableColumn)[] {
+  return ["event", "event_date", "state", ...TOGGLABLE_TABLE_COLUMNS.filter((c) => filters.columns.includes(c))];
+}
+
+export const TABLE_COLUMN_LABEL: Record<TableColumn, string> = {
+  id: "ID",
+  tier: "Tier",
+  waiting: "Waiting on",
+  next_action: "Next action",
+  due: "Due",
+  depts: "Depts",
+  risk: "Risk",
+};
 
 function deptStatusOf(c: EventCase, dept: Dept) {
   return c.reviews.find((r) => r.dept === dept)?.status ?? "not_routed";

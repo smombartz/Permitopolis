@@ -5,6 +5,7 @@ import { ChevronRightIcon, InboxIcon } from "lucide-react";
 import { DateText, EventTitle, HoldStatus, StateChip, TierBadge } from "@/components/domain";
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
+import { InlineAlert } from "@/components/ui/inline-alert";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -86,7 +87,12 @@ export function ActiveListView({ rows, today, role, includeHolds, expandSessions
                     {row.moreCount > 0 ? <span className="text-xs text-fg-secondary">+{row.moreCount} more</span> : null}
                   </div>
                 </TableCell>
-                <TableCell>{row.isHeld ? <HoldStatus hold={row.case.dateHold} /> : <StateChip state={row.case.state} />}</TableCell>
+                <TableCell>
+                  <div className="flex flex-col gap-1">
+                    {row.isHeld ? <HoldStatus hold={row.case.dateHold} /> : <StateChip state={row.case.state} />}
+                    {row.holdExpiresTomorrow ? <InlineAlert variant="warning">Expires tomorrow</InlineAlert> : null}
+                  </div>
+                </TableCell>
                 <TableCell className="text-sm text-fg-secondary">{DAY_OF_CONTACT.contactName}</TableCell>
                 <TableCell>
                   <RoleOverlayCell role={role} case={row.case} today={today} />

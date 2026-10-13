@@ -11,6 +11,7 @@ import { fmtDateShort, plural } from "@/lib/format";
 import { BLACKOUTS } from "@/lib/data/calendar";
 import { CITY_STAFF_BY_DEPT } from "@/lib/data/people";
 import { activePermits, eventDate, holdsDateAtQuote, permitSessions, sessionDates, waitingOn } from "@/lib/state";
+import { isHoldExpiringTomorrow } from "@/lib/view/caseDetail";
 import type { Dept, EventCase, ISODate, Location, Party, Tier } from "@/lib/types";
 
 /* ---------- month/week navigation: string and integer math only, no new Date() ---------- */
@@ -49,6 +50,8 @@ export interface ActiveListRow {
   date: ISODate;
   /** Quote sent and holding its date, shown as held rather than permitted. */
   isHeld: boolean;
+  /** The hold expires tomorrow: flagged in the list, same test as on the case. */
+  holdExpiresTomorrow: boolean;
   /** Further sessions this case has beyond this row, shown as "+N more". 0 once expanded. */
   moreCount: number;
 }
@@ -74,6 +77,7 @@ export function activeListRows(cases: EventCase[], today: ISODate, options: Acti
       case: s.case,
       date: s.date,
       isHeld: holdsDateAtQuote(s.case),
+      holdExpiresTomorrow: isHoldExpiringTomorrow(s.case.dateHold, today),
       moreCount: 0,
     }));
   }
@@ -82,7 +86,14 @@ export function activeListRows(cases: EventCase[], today: ISODate, options: Acti
   for (const c of activePermits(cases, today, { includeHolds })) {
     const date = eventDate(c, today);
     if (date === null) continue;
-    rows.push({ key: c.id, case: c, date, isHeld: holdsDateAtQuote(c), moreCount: Math.max(0, sessionDates(c).length - 1) });
+    rows.push({
+      key: c.id,
+      case: c,
+      date,
+      isHeld: holdsDateAtQuote(c),
+      holdExpiresTomorrow: isHoldExpiringTomorrow(c.dateHold, today),
+      moreCount: Math.max(0, sessionDates(c).length - 1),
+    });
   }
   return rows;
 }

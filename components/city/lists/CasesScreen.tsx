@@ -2,29 +2,37 @@
 
 import * as React from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { LayoutGridIcon, TableIcon } from "lucide-react";
+import { CalendarIcon, LayoutGridIcon, LayoutListIcon, TableIcon } from "lucide-react";
 import { PageHeader } from "@/components/ui/page-header";
 import { SegmentedControl } from "@/components/ui/segmented-control";
 import { FilterBar, FilterChip } from "@/components/ui/filter-bar";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Button } from "@/components/ui/button";
 import { Kbd } from "@/components/ui/kbd";
-import { PipelineBoard } from "@/components/city/lists/PipelineBoard";
+import { PipelineBoard, type BoardColumnSpec } from "@/components/city/lists/PipelineBoard";
 import { PipelineTable } from "@/components/city/lists/PipelineTable";
 import { KeyboardFooter } from "@/components/city/lists/KeyboardFooter";
 import { useDemo } from "@/lib/state";
-import { TIER_LABEL, STATE_LABEL, PARTY_LABEL, type CaseState, type Party, type Tier } from "@/lib/types";
+import { STATE_LABEL, TIER_LABEL, PARTY_LABEL, type CaseState, type Party, type Tier } from "@/lib/types";
 import {
   activeFilterChips,
   casesQueryString,
   defaultInvolvesMe,
+  EVENT_DATE_BUCKET_LABEL,
+  EVENT_DATE_BUCKETS,
   filteredCases,
   parseCasesFilters,
   pipelineBoardColumns,
+  pipelineEventDateColumns,
   pipelineTableRows,
   sortTableRows,
+  TOGGLABLE_TABLE_COLUMNS,
+  TABLE_COLUMN_LABEL,
+  type BoardGroupBy,
   type CasesListFilters,
   type SortField,
+  type TableColumn,
+  type TableDensity,
 } from "@/lib/view/cityLists";
 
 const SELECT_CLASS = "h-8 shrink-0 rounded-control border border-line-subtle bg-surface-strong px-2.5 text-xs text-fg outline-none focus-visible:border-focus-ring focus-visible:shadow-focus-halo";
@@ -145,7 +153,15 @@ function CasesScreen() {
   const universe = filteredCases(cases, role, { ...filters, tier: undefined, state: undefined, waiting: undefined, from: undefined, to: undefined, q: "", involvesMe: false }, today);
   const chips = activeFilterChips(filters);
   const rows = sortTableRows(pipelineTableRows(visible, today, cfg), filters.sort, filters.dir, today);
-  const columns = pipelineBoardColumns(visible, today, filters.state);
+  const boardColumns: BoardColumnSpec[] =
+    filters.groupBy === "event_date"
+      ? EVENT_DATE_BUCKETS.map((bucket) => ({ key: bucket, label: EVENT_DATE_BUCKET_LABEL[bucket], cases: pipelineEventDateColumns(visible, today)[bucket] }))
+      : Object.entries(pipelineBoardColumns(visible, today, filters.state)).map(([state, stateCases]) => ({ key: state, label: STATE_LABEL[state as CaseState], cases: stateCases }));
+
+  function toggleColumn(col: TableColumn) {
+    const next = filters.columns.includes(col) ? filters.columns.filter((c) => c !== col) : [...filters.columns, col];
+    update({ columns: next });
+  }
 
   return (
     <div ref={containerRef} className="flex flex-col gap-6">
@@ -212,15 +228,50 @@ function CasesScreen() {
         </div>
       ) : null}
 
-      <SegmentedControl
-        aria-label="Cases pipeline view"
-        value={filters.view}
-        onChange={(view) => update({ view })}
-        options={[
-          { value: "board", label: "Board", icon: <LayoutGridIcon className="size-3.5" aria-hidden="true" /> },
-          { value: "table", label: "Table", icon: <TableIcon className="size-3.5" aria-hidden="true" /> },
-        ]}
-      />
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <SegmentedControl
+          aria-label="Cases pipeline view"
+          value={filters.view}
+          onChange={(view) => update({ view })}
+          options={[
+            { value: "board", label: "Board", icon: <LayoutGridIcon className="size-3.5" aria-hidden="true" /> },
+            { value: "table", label: "Table", icon: <TableIcon className="size-3.5" aria-hidden="true" /> },
+          ]}
+        />
+
+        {filters.view === "board" ? (
+          <div className="flex items-center gap-2">
+            <span className="text-xs text-fg-secondary">Group by</span>
+            <SegmentedControl
+              aria-label="Group cases by"
+              value={filters.groupBy}
+              onChange={(groupBy) => update({ groupBy: groupBy as BoardGroupBy })}
+              options={[
+                { value: "state", label: "State" },
+                { value: "event_date", label: "Event date", icon: <CalendarIcon className="size-3.5" aria-hidden="true" /> },
+              ]}
+            />
+          </div>
+        ) : (
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="text-xs text-fg-secondary">Columns</span>
+            {TOGGLABLE_TABLE_COLUMNS.map((col) => (
+              <FilterChip key={col} active={filters.columns.includes(col)} onClick={() => toggleColumn(col)}>
+                {TABLE_COLUMN_LABEL[col]}
+              </FilterChip>
+            ))}
+            <SegmentedControl
+              aria-label="Table density"
+              value={filters.density}
+              onChange={(density) => update({ density: density as TableDensity })}
+              options={[
+                { value: "comfortable", label: "Comfortable", icon: <LayoutListIcon className="size-3.5" aria-hidden="true" /> },
+                { value: "compact", label: "Compact" },
+              ]}
+            />
+          </div>
+        )}
+      </div>
 
       {visible.length === 0 ? (
         <EmptyState
@@ -230,9 +281,9 @@ function CasesScreen() {
           action={<Button variant="secondary" onClick={clearFilters}>Clear filters</Button>}
         />
       ) : filters.view === "table" ? (
-        <PipelineTable rows={rows} today={today} sort={filters.sort} dir={filters.dir} onSort={handleSort} from={here} />
+        <PipelineTable rows={rows} today={today} sort={filters.sort} dir={filters.dir} onSort={handleSort} from={here} columns={filters.columns} density={filters.density} />
       ) : (
-        <PipelineBoard columns={columns} today={today} from={here} />
+        <PipelineBoard columns={boardColumns} today={today} from={here} showStateChip={filters.groupBy === "event_date"} />
       )}
 
       {filters.view === "table" ? <KeyboardFooter /> : null}

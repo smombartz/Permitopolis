@@ -1,11 +1,12 @@
 import { describe, expect, it } from "vitest";
 import { DEFAULT_CONFIG } from "@/lib/rules";
-import { buildSeed } from "@/lib/state";
+import { buildSeed, queueFor } from "@/lib/state";
 import type { EventCase } from "@/lib/types";
 import {
   activeFilterChips,
   casesFiltersToParams,
   competingApplication,
+  DEFAULT_TABLE_COLUMNS,
   defaultInvolvesMe,
   emptyQueueMessage,
   filteredCases,
@@ -15,13 +16,17 @@ import {
   intakeRows,
   parseCasesFilters,
   pipelineBoardColumns,
+  pipelineEventDateColumns,
   pipelineTableRow,
   pipelineTableRows,
   queueBriefing,
   queueGroups,
+  queueReasonLine,
   queueTotal,
   queueWaitingOnOthers,
   sortTableRows,
+  TOGGLABLE_TABLE_COLUMNS,
+  visibleTableColumns,
   type CasesListFilters,
 } from "./cityLists";
 
@@ -80,6 +85,28 @@ describe("queueGroups and queueBriefing", () => {
 
   it("an empty queue reads as none", () => {
     expect(queueBriefing({ overdue: [], this_week: [], later: [] })).toBe("0 things need you.");
+  });
+});
+
+describe("queueReasonLine: the one-line reason a row is this role's move", () => {
+  it("Health & Legal's S5 row: the insurance certificate was re-uploaded Apr 30", () => {
+    const items = queueFor(seed(), "hl", TODAY);
+    const row = items.find((i) => i.case.id === S5 && i.task.catalogId.startsWith("verify:"));
+    expect(row).toBeDefined();
+    expect(queueReasonLine(row!)).toBe("Certificate of insurance re-uploaded Apr 30");
+  });
+
+  it("a pending review's reason names when it was routed", () => {
+    const items = queueFor(seed(), "pws", TODAY);
+    const row = items.find((i) => i.task.catalogId.startsWith("review:"));
+    expect(row).toBeDefined();
+    expect(queueReasonLine(row!)).toMatch(/^Routed [A-Z][a-z]{2} \d{1,2}$/);
+  });
+
+  it("never throws for any item in any role's queue", () => {
+    for (const role of ["clerk", "pws", "hl"] as const) {
+      for (const item of queueFor(seed(), role, TODAY)) expect(() => queueReasonLine(item)).not.toThrow();
+    }
   });
 });
 
@@ -142,6 +169,65 @@ describe("pipeline board columns", () => {
     expect(Object.keys(columns).length).toBeGreaterThan(0);
     for (const cases of Object.values(columns)) expect(cases.length).toBeGreaterThan(0);
     expect(Object.values(columns).flat()).toHaveLength(ended.length);
+  });
+});
+
+describe("pipeline event-date columns (the PRD's push: triage by deadline)", () => {
+  it("every bucket exists and every visible case lands in exactly one", () => {
+    const open = seed().filter((c) => c.state !== "draft" && c.state !== "closed" && c.ending === null);
+    const columns = pipelineEventDateColumns(open, TODAY);
+    expect(Object.keys(columns)).toEqual(["this_week", "next_two_weeks", "this_month", "later", "past"]);
+    expect(Object.values(columns).flat()).toHaveLength(open.length);
+  });
+
+  it("S5 (Jul 11, more than a month out) lands in Later", () => {
+    const columns = pipelineEventDateColumns(seed(), TODAY);
+    expect(columns.later.some((c) => c.id === S5)).toBe(true);
+  });
+});
+
+describe("table column visibility", () => {
+  it("event, event date and state always show; the rest only when toggled on", () => {
+    expect(visibleTableColumns({ columns: [] })).toEqual(["event", "event_date", "state"]);
+    expect(visibleTableColumns({ columns: ["tier", "risk"] })).toEqual(["event", "event_date", "state", "tier", "risk"]);
+  });
+
+  it("the default set is small enough to fit 1280px: four optional columns, not all seven", () => {
+    expect(DEFAULT_TABLE_COLUMNS.length).toBeLessThan(TOGGLABLE_TABLE_COLUMNS.length);
+  });
+});
+
+describe("group, columns and density round-trip through the URL", () => {
+  it("groupBy defaults to state and round-trips event_date", () => {
+    expect(parseCasesFilters(new URLSearchParams(), "clerk").groupBy).toBe("state");
+    const params = new URLSearchParams(casesFiltersToParams({ ...parseCasesFilters(new URLSearchParams(), "clerk"), groupBy: "event_date" }, "clerk") as Record<string, string>);
+    expect(params.get("group")).toBe("event_date");
+    expect(parseCasesFilters(params, "clerk").groupBy).toBe("event_date");
+  });
+
+  it("density defaults to comfortable and round-trips compact", () => {
+    expect(parseCasesFilters(new URLSearchParams(), "clerk").density).toBe("comfortable");
+    const params = new URLSearchParams(casesFiltersToParams({ ...parseCasesFilters(new URLSearchParams(), "clerk"), density: "compact" }, "clerk") as Record<string, string>);
+    expect(params.get("density")).toBe("compact");
+    expect(parseCasesFilters(params, "clerk").density).toBe("compact");
+  });
+
+  it("columns default to DEFAULT_TABLE_COLUMNS and round-trip a custom set, and 'none' round-trips to hiding every optional column", () => {
+    expect(parseCasesFilters(new URLSearchParams(), "clerk").columns).toEqual(DEFAULT_TABLE_COLUMNS);
+    const custom = parseCasesFilters(
+      new URLSearchParams(casesFiltersToParams({ ...parseCasesFilters(new URLSearchParams(), "clerk"), columns: ["id", "depts"] }, "clerk") as Record<string, string>),
+      "clerk",
+    );
+    expect(custom.columns).toEqual(["id", "depts"]);
+    const none = parseCasesFilters(
+      new URLSearchParams(casesFiltersToParams({ ...parseCasesFilters(new URLSearchParams(), "clerk"), columns: [] }, "clerk") as Record<string, string>),
+      "clerk",
+    );
+    expect(none.columns).toEqual([]);
+  });
+
+  it("a garbled cols value falls back to the default set, not to nothing", () => {
+    expect(parseCasesFilters(new URLSearchParams("cols=bogus"), "clerk").columns).toEqual(DEFAULT_TABLE_COLUMNS);
   });
 });
 
@@ -260,7 +346,17 @@ describe("filters: parsed from and written to URL params", () => {
 });
 
 describe("filteredCases: every filter alone and combined", () => {
-  const BASE: CasesListFilters = { involvesMe: false, closedAndEnded: false, q: "", view: "board", sort: "event_date", dir: "asc" };
+  const BASE: CasesListFilters = {
+    involvesMe: false,
+    closedAndEnded: false,
+    q: "",
+    view: "board",
+    sort: "event_date",
+    dir: "asc",
+    groupBy: "state",
+    columns: DEFAULT_TABLE_COLUMNS,
+    density: "comfortable",
+  };
 
   it("hides drafts, closed cases and off-path endings by default", () => {
     const result = filteredCases(seed(), "clerk", BASE, TODAY);
@@ -342,12 +438,7 @@ describe("filteredCases: every filter alone and combined", () => {
 describe("active filter chips", () => {
   it("one chip per narrowing filter, none for the two toggles", () => {
     const chips = activeFilterChips({
-      involvesMe: true,
-      closedAndEnded: true,
       q: "5K",
-      view: "board",
-      sort: "event_date",
-      dir: "asc",
       tier: "special",
       state: "quote_sent",
       waiting: "me",
@@ -358,7 +449,7 @@ describe("active filter chips", () => {
   });
 
   it("no filters, no chips", () => {
-    expect(activeFilterChips({ involvesMe: false, closedAndEnded: false, q: "", view: "board", sort: "event_date", dir: "asc" })).toEqual([]);
+    expect(activeFilterChips({ q: "" })).toEqual([]);
   });
 });
 

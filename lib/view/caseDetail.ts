@@ -6,6 +6,7 @@
  */
 import { classify } from "@/lib/rules";
 import type { PermitComponent, RulesConfig } from "@/lib/rules/types";
+import { addDaysISO } from "@/lib/dates";
 import { cardUnderVerification, meetingCardFor, reviewClock } from "@/lib/state";
 import type { ActionAvailability, ReviewClockView } from "@/lib/state/types";
 import { ACTION_TYPES, type ActionType } from "@/lib/state/actions";
@@ -16,12 +17,15 @@ import { fmtDate, fmtNumber, fmtTime, fmtTimeRange, plural } from "@/lib/format"
 import {
   DEPTS,
   EVENT_TYPE_LABEL,
+  type Activity,
   type Actor,
   type Condition,
+  type DateHold,
   type Dept,
   type EventCase,
   type FeeLine,
   type ISODate,
+  type ISODateTime,
   type Party,
   type Review,
   type Task,
@@ -92,6 +96,11 @@ export function headerReviewClock(c: EventCase, role: Party, today: ISODate): Re
     if (!slowest || rc.day - rc.of > slowest.day - slowest.of) slowest = rc;
   }
   return slowest;
+}
+
+/** True while this case's date hold expires tomorrow: a case that needs attention today, not yet an error. */
+export function isHoldExpiringTomorrow(hold: DateHold, today: ISODate): boolean {
+  return hold.status === "held" && hold.expiresOn === addDaysISO(today, 1);
 }
 
 /* ---------- overview tab ---------- */
@@ -257,6 +266,46 @@ export function activityActors(c: EventCase): Actor[] {
 export function filterActivity(c: EventCase, actor: Actor | "all") {
   const items = [...c.activity].reverse();
   return actor === "all" ? items : items.filter((entry) => entry.actor === actor);
+}
+
+export interface ActivityDayGroup {
+  day: ISODate;
+  items: Activity[];
+}
+
+/** `filterActivity()`'s list (already newest first), grouped by the calendar day each entry fell on. */
+export function groupActivityByDay(items: Activity[]): ActivityDayGroup[] {
+  const groups: ActivityDayGroup[] = [];
+  for (const item of items) {
+    const day = item.at.slice(0, 10) as ISODate;
+    const last = groups.at(-1);
+    if (last && last.day === day) last.items.push(item);
+    else groups.push({ day, items: [item] });
+  }
+  return groups;
+}
+
+/**
+ * The most recent moment this role itself wrote an activity entry. A city role's own actor
+ * name is the same string as its Party, so this reads directly off `activity`; null when the
+ * viewing role has never acted on this case (nothing to mark as "since").
+ */
+export function lastActedAt(c: EventCase, role: Party): ISODateTime | null {
+  for (let i = c.activity.length - 1; i >= 0; i--) {
+    if (c.activity[i].actor === role) return c.activity[i].at;
+  }
+  return null;
+}
+
+/**
+ * Where the "Since you last acted" marker goes in a newest-first list: the number of entries at
+ * the top that happened after `lastActed`. 0 means nothing has happened since (no marker to
+ * show); null means this role has never acted (nothing to compare against, so no marker either).
+ */
+export function sinceLastActedCount(items: Activity[], lastActed: ISODateTime | null): number | null {
+  if (lastActed === null) return null;
+  const index = items.findIndex((item) => item.at <= lastActed);
+  return index === -1 ? items.length : index;
 }
 
 /* ---------- action panels ---------- */
