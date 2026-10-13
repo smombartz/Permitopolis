@@ -1,10 +1,10 @@
 import { Suspense } from "react";
-import { PlaceholderScreen } from "@/components/shell/PlaceholderScreen";
+import { MyEventsScreen } from "@/components/board/MyEventsScreen";
 
 export default function Page() {
   return (
     <Suspense fallback={null}>
-      <PlaceholderScreen route="/events" />
+      <MyEventsScreen />
     </Suspense>
   );
 }
