@@ -16,7 +16,6 @@ import {
   eventDate,
   involves,
   isOpen,
-  isStalled,
   isVisibleToCity,
   leadTimeRisk,
   queueFor,
@@ -147,8 +146,8 @@ export type TableDensity = "comfortable" | "compact";
 export const TOGGLABLE_TABLE_COLUMNS = ["id", "tier", "waiting", "next_action", "due", "depts", "risk"] as const;
 export type TableColumn = (typeof TOGGLABLE_TABLE_COLUMNS)[number];
 
-/** Fits 1280px with the sidebar, no horizontal scroll; "Next action" and "Depts" are opt-in. */
-export const DEFAULT_TABLE_COLUMNS: TableColumn[] = ["tier", "waiting", "due", "risk"];
+/** Fits 1280px with the sidebar, no horizontal scroll; "ID" and "Depts" are opt-in. */
+export const DEFAULT_TABLE_COLUMNS: TableColumn[] = ["tier", "waiting", "next_action", "due", "risk"];
 
 /** Everything the Cases pipeline keeps in the URL: the PRD's filters plus view, sort and the toggle. */
 export interface CasesListFilters {

@@ -10,15 +10,19 @@ import {
   documentGroups,
   filterActivity,
   formRows,
+  groupActivityByDay,
   hasNothingToDo,
   headerReviewClock,
   isCaseTab,
+  isHoldExpiringTomorrow,
+  lastActedAt,
   openKeyForAction,
   openKeyForTask,
   parseOpenKey,
   resolveOpenKey,
   reviewSummaries,
   seriesSummary,
+  sinceLastActedCount,
 } from "./caseDetail";
 
 const TODAY = DEFAULT_DEMO_TODAY;
@@ -266,6 +270,75 @@ describe("activityActors and filterActivity", () => {
     const hlOnly = filterActivity(S3, "hl");
     expect(hlOnly.every((entry) => entry.actor === "hl")).toBe(true);
     expect(hlOnly.length).toBeGreaterThan(0);
+  });
+});
+
+describe("groupActivityByDay", () => {
+  it("groups S3's newest-first activity into consecutive same-day runs, in the same order", () => {
+    const items = filterActivity(S3, "all");
+    const groups = groupActivityByDay(items);
+    expect(groups.flatMap((g) => g.items)).toEqual(items);
+    for (const group of groups) for (const item of group.items) expect(item.at.slice(0, 10)).toBe(group.day);
+    // Every entry in a group really did fall on that calendar day, and days are never split in two.
+    const seenDays = new Set<string>();
+    for (const group of groups) {
+      expect(seenDays.has(group.day)).toBe(false);
+      seenDays.add(group.day);
+    }
+  });
+
+  it("one entry makes one group of one", () => {
+    expect(groupActivityByDay([{ at: "2027-05-03T09:00", actor: "clerk", text: "Noted." }])).toEqual([{ day: "2027-05-03", items: [{ at: "2027-05-03T09:00", actor: "clerk", text: "Noted." }] }]);
+  });
+
+  it("empty activity is an empty list of groups", () => {
+    expect(groupActivityByDay([])).toEqual([]);
+  });
+});
+
+describe("lastActedAt and sinceLastActedCount: the 'since you last acted' marker", () => {
+  it("S3: the Clerk's own most recent entry, and the entries newer than it", () => {
+    const clerkAt = lastActedAt(S3, "clerk");
+    expect(clerkAt).not.toBeNull();
+    expect(S3.activity.some((a) => a.at === clerkAt && a.actor === "clerk")).toBe(true);
+
+    const items = filterActivity(S3, "all");
+    const count = sinceLastActedCount(items, clerkAt);
+    expect(count).not.toBeNull();
+    // Everything above the marker really is newer than the Clerk's last entry, and everything
+    // at or below it is not (newest first, so index 0 is the newest).
+    for (let i = 0; i < count!; i++) expect(items[i].at > clerkAt!).toBe(true);
+    if (count! < items.length) expect(items[count!].at <= clerkAt!).toBe(true);
+  });
+
+  it("a role that never acted on the case gets no marker", () => {
+    const neverActed = makeCase({ activity: [{ at: "2027-05-01T09:00", actor: "applicant", text: "Started a draft." }] });
+    expect(lastActedAt(neverActed, "hl")).toBeNull();
+    expect(sinceLastActedCount(filterActivity(neverActed, "all"), null)).toBeNull();
+  });
+
+  it("acting most recently leaves nothing new: the count is 0, not null", () => {
+    const c = makeCase({
+      activity: [
+        { at: "2027-05-01T09:00", actor: "applicant", text: "Submitted." },
+        { at: "2027-05-02T09:00", actor: "clerk", text: "Accepted as complete." },
+      ],
+    });
+    expect(sinceLastActedCount(filterActivity(c, "all"), lastActedAt(c, "clerk"))).toBe(0);
+  });
+});
+
+describe("isHoldExpiringTomorrow", () => {
+  it("true only while held and expiring on the day right after today", () => {
+    expect(isHoldExpiringTomorrow({ status: "held", placedOn: "2027-04-20", expiresOn: "2027-05-04" }, TODAY)).toBe(true);
+    expect(isHoldExpiringTomorrow({ status: "held", placedOn: "2027-04-20", expiresOn: "2027-05-10" }, TODAY)).toBe(false);
+    expect(isHoldExpiringTomorrow({ status: "held", placedOn: "2027-04-20", expiresOn: null }, TODAY)).toBe(false);
+    expect(isHoldExpiringTomorrow({ status: "expired", placedOn: "2027-04-20", expiresOn: "2027-05-04" }, TODAY)).toBe(false);
+    expect(isHoldExpiringTomorrow({ status: "none", placedOn: null, expiresOn: null }, TODAY)).toBe(false);
+  });
+
+  it("the seed carries at least one case worth checking and never throws for any of them", () => {
+    for (const c of cases) expect(() => isHoldExpiringTomorrow(c.dateHold, TODAY)).not.toThrow();
   });
 });
 

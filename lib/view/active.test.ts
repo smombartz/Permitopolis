@@ -82,6 +82,16 @@ describe("activeListRows", () => {
     expect(row?.moreCount).toBeGreaterThan(0);
   });
 
+  it("flags a hold expiring tomorrow, and not one expiring later or already expired", () => {
+    const cases = buildSeed();
+    const s5 = getCase(cases, S5);
+    const expiringTomorrow = { ...s5, dateHold: { ...s5.dateHold, expiresOn: addDaysISO(TODAY, 1) } };
+    const expiringLater = { ...s5, dateHold: { ...s5.dateHold, expiresOn: addDaysISO(TODAY, 10) } };
+    const rows = activeListRows([expiringTomorrow, expiringLater], TODAY, { includeHolds: true });
+    expect(rows.find((r) => r.case === expiringTomorrow)?.holdExpiresTomorrow).toBe(true);
+    expect(rows.find((r) => r.case === expiringLater)?.holdExpiresTomorrow).toBe(false);
+  });
+
   it("expands a series to one row per held session when expandSessions is on", () => {
     const cases = buildSeed();
     const expanded = activeListRows(cases, TODAY, { expandSessions: true });

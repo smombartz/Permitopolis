@@ -5,10 +5,15 @@
 import { act, fireEvent, screen, within } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 import { ActiveScreen } from "@/components/active/ActiveScreen";
+import { addDaysISO } from "@/lib/dates";
 import { routes } from "@/lib/routes";
+import { DEFAULT_DEMO_TODAY } from "@/lib/rules/config";
 import { useDemo } from "@/lib/state";
+import { makeCase } from "@/lib/state/testSupport";
 import { navigate, renderScreen, storedCase, switchRole } from "./harness";
 import { navState } from "./setup";
+
+const TODAY = DEFAULT_DEMO_TODAY;
 
 const S2 = "PMT-27-0142"; // Sunrise Yoga Club: Instant series, Draft until booked (demo path 1)
 const S5_NAME = "Riverfront Summer 5K";
@@ -148,6 +153,32 @@ describe("Active permits: the role overlay's side panel", () => {
     const panel = within(document.querySelector('[data-slot="sticky-aside"]') as HTMLElement);
     expect(panel.getByText("Done").nextElementSibling).toHaveTextContent("7");
     expect(panel.getByText("3 closures and 3 walkthroughs scheduled.")).toBeInTheDocument();
+  });
+});
+
+describe("Active permits: a hold expiring tomorrow", () => {
+  function heldCase() {
+    return makeCase({
+      id: "PMT-27-0700",
+      name: "Expiring hold picnic",
+      state: "quote_sent",
+      schedule: { date: addDaysISO(TODAY, 30), start: "09:00", end: "11:00", occurrences: [] },
+      dateHold: { status: "held", placedOn: TODAY, expiresOn: addDaysISO(TODAY, 1) },
+    });
+  }
+
+  it("is flagged in the list once held dates are included", async () => {
+    await renderScreen(<ActiveScreen />, { role: "clerk", path: routes.city.active({}), search: { holds: "1" }, cases: [heldCase()] });
+
+    expect(screen.getByText("Expires tomorrow")).toBeInTheDocument();
+  });
+
+  it("is not flagged when the hold expires further out", async () => {
+    const further = heldCase();
+    further.dateHold.expiresOn = addDaysISO(TODAY, 10);
+    await renderScreen(<ActiveScreen />, { role: "clerk", path: routes.city.active({}), search: { holds: "1" }, cases: [further] });
+
+    expect(screen.queryByText("Expires tomorrow")).not.toBeInTheDocument();
   });
 });
 

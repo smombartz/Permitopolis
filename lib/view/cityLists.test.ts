@@ -192,7 +192,7 @@ describe("table column visibility", () => {
     expect(visibleTableColumns({ columns: ["tier", "risk"] })).toEqual(["event", "event_date", "state", "tier", "risk"]);
   });
 
-  it("the default set is small enough to fit 1280px: four optional columns, not all seven", () => {
+  it("the default set leaves out ID and Depts, the two least essential at a glance", () => {
     expect(DEFAULT_TABLE_COLUMNS.length).toBeLessThan(TOGGLABLE_TABLE_COLUMNS.length);
   });
 });
