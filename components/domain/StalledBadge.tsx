@@ -5,8 +5,9 @@ const STALLED_EXPLANATION = "Nobody has an open task on this case. That is a bug
 
 /**
  * A case before Permitted with nobody up is a bug (PRD "Core model"). Development builds flag
- * it in red wherever the case shows: the queue's waiting list, pipeline cards and table rows.
- * Never shown in production, and the seed carries none (tests/seed.test.ts holds that).
+ * it in red wherever the case shows: the queue's waiting list, pipeline cards and table rows,
+ * and the case's own header. Render it when `isStalled(c, today)` is true. Never shown in
+ * production, and the seed carries none (tests/seed.test.ts holds that).
  */
 export function StalledBadge() {
   if (process.env.NODE_ENV === "production") return null;

@@ -104,7 +104,11 @@ export function queueReasonLine(item: QueueItem): string {
 
   if (task.catalogId.startsWith("verify:")) {
     const card = cardUnderVerification(c, task);
-    if (card) return since ? `${card.title} re-uploaded ${since}` : `${card.title} re-uploaded`;
+    // "Re-uploaded" only when it is: a first upload after the review was decided is just uploaded.
+    if (card) {
+      const verb = card.history.filter((h) => h.status === "submitted").length > 1 ? "re-uploaded" : "uploaded";
+      return since ? `${card.title} ${verb} ${since}` : `${card.title} ${verb}`;
+    }
   }
   if (task.catalogId.startsWith("review:")) return since ? `Routed ${since}` : "Routed";
   if (task.catalogId === "intake_check") return c.submittedAt ? `Submitted ${fmtMonthDay(c.submittedAt)}` : "Submitted";

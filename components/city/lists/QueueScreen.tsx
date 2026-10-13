@@ -8,7 +8,7 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { CountBadge } from "@/components/ui/count-badge";
 import { CaseId, DueDate, EventTitle, ReviewClock, StateChip, TierBadge, WaitingOnChips } from "@/components/domain";
 import { KeyboardFooter } from "@/components/city/lists/KeyboardFooter";
-import { StalledBadge } from "@/components/city/lists/StalledBadge";
+import { StalledBadge } from "@/components/domain/StalledBadge";
 import { useRovingListNav } from "@/components/city/lists/useRovingListNav";
 import { isStalled, reviewClock, taskDueDate, useDemo, type QueueItem } from "@/lib/state";
 import { applicantNameOf } from "@/lib/data/people";

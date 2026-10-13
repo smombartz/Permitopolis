@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Money } from "@/components/domain"
 import { FeeLineFields } from "@/components/case/FeeLineFields"
+import { DeptSelect } from "./DeptSelect"
 import { fmtMoney } from "@/lib/format"
 import type { QuoteLineRow, QuoteTotals } from "@/lib/view/clerkTools"
 import { DEPTS, PARTY_LABEL, type Dept } from "@/lib/types"
@@ -49,18 +50,7 @@ function AddLineRow({ onAdd }: { onAdd: (row: QuoteLineRow) => void }) {
 
   return (
     <div className="flex items-end gap-2">
-      <select
-        aria-label="New line's department"
-        value={dept}
-        onChange={(e) => setDept(e.target.value as Dept)}
-        className="h-9 w-40 rounded-control border border-line-subtle bg-surface-1 px-2.5 text-sm text-fg outline-none focus-visible:border-focus-ring focus-visible:shadow-focus-halo"
-      >
-        {DEPTS.map((d) => (
-          <option key={d} value={d}>
-            {PARTY_LABEL[d]}
-          </option>
-        ))}
-      </select>
+      <DeptSelect value={dept} onChange={setDept} ariaLabel="New line's department" className="w-40" />
       <Input aria-label="New line's label" className="flex-1" placeholder="New line, e.g. Extra barricades" value={label} onChange={(e) => setLabel(e.target.value)} />
       <Button type="button" variant="secondary" onClick={add} disabled={label.trim().length === 0}>
         <PlusIcon data-icon="inline-start" />

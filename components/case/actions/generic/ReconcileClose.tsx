@@ -2,9 +2,9 @@
 
 import * as React from "react"
 import { InlineAlert } from "@/components/ui/inline-alert"
-import { Badge } from "@/components/ui/badge"
 import { FeeTable } from "@/components/domain"
 import { checkReconcileClose } from "@/lib/state"
+import { CleanupResult } from "../../CleanupResult"
 import { CloseoutSettlementStats } from "../../CloseoutSettlementStats"
 import { PanelActions, PanelBody, PanelHeader, useCaseContext, useCaseDispatch } from "../panelKit"
 import type { ActionPanelProps } from "../types"
@@ -35,13 +35,7 @@ function ReconcileClosePanel({ caseId, onClose }: ActionPanelProps) {
           <InlineAlert variant="warning">{check.reason}</InlineAlert>
         ) : (
           <>
-            <div className="flex flex-col gap-2">
-              <p className="text-eyebrow font-bold tracking-[.12em] text-fg-label uppercase">Cleanup inspection</p>
-              <div className="flex flex-wrap items-center gap-2">
-                <Badge variant={c.closeout.cleanup === "pass" ? "success" : "warning"}>{c.closeout.cleanup === "pass" ? "Pass" : "Issues"}</Badge>
-                {c.closeout.notes ? <p className="text-sm text-fg-secondary">{c.closeout.notes}</p> : null}
-              </div>
-            </div>
+            <CleanupResult cleanup={c.closeout.cleanup} notes={c.closeout.notes} />
 
             <div className="flex flex-col gap-2">
               <p className="text-eyebrow font-bold tracking-[.12em] text-fg-label uppercase">Estimate against actual</p>

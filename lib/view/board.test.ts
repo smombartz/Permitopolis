@@ -399,7 +399,7 @@ describe('"With the city": withCityInfo and withCityColumnSummary', () => {
     expect(info.overdue).toBe(false);
 
     const summary = withCityColumnSummary(c, TODAY);
-    expect(summary).toEqual([{ dept: "hl", deptLabel: "Health & Legal", count: 1, expectedBy: "2027-05-07" }]);
+    expect(summary).toEqual([{ dept: "hl", deptLabel: "Health & Legal", atIntake: false, count: 1, expectedBy: "2027-05-07" }]);
   });
 
   it("turns overdue once the expected-by date has passed", () => {

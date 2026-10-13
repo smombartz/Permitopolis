@@ -56,6 +56,18 @@ export function taskDueDate(task: Task): ISODate | null {
 }
 
 /**
+ * The day a card last went to the city: its most recent move to `submitted`, from its own
+ * history. Null if it never has. The applicant's "N days with ..." and the city's "waiting N
+ * days" both count from here.
+ */
+export function taskSubmittedOn(task: Task): ISODate | null {
+  for (let i = task.history.length - 1; i >= 0; i--) {
+    if (task.history[i].status === "submitted") return task.history[i].at.slice(0, 10) as ISODate;
+  }
+  return null;
+}
+
+/**
  * Sort order for tasks: oldest due first, by the date that applies now (see taskDueDate). A
  * task with no due date goes last; ties keep the order they had, which is the order of creation.
  */

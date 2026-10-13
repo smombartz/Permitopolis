@@ -35,14 +35,16 @@ const EMPTY_TEXT: Record<BoardColumn, string> = {
 /**
  * What a "With the city" card says under itself, so the column is never a black hole (PRD,
  * "Where I'd push on the brief"): who has it, how long, and when it is expected back, or that
- * there is no expected date yet.
+ * there is no expected date yet. Before the case is routed the City Clerk's intake has it, and
+ * the note says so and names the department it goes to next.
  */
 function WithCityNote({ info }: { info: WithCityInfo }) {
-  const waited = `${plural(info.daysWaiting, "day")} with ${info.deptLabel}`
+  const holder = info.atIntake ? "at intake with the City Clerk" : `with ${info.deptLabel}`
+  const next = info.atIntake && info.reviewer !== "clerk" ? `, then ${info.reviewerLabel}` : ""
   const expected = info.expectedBy ? `expected by ${fmtDateShort(info.expectedBy)}` : "no expected date yet"
   return (
     <p className={cn("px-0.5 text-xs", info.overdue ? "font-semibold text-danger-fg" : "text-fg-secondary")}>
-      {info.overdue ? `Overdue with ${info.deptLabel} · ${expected}` : `${waited} · ${expected}`}
+      {info.overdue ? `Overdue ${holder}${next} · ${expected}` : `${plural(info.daysWaiting, "day")} ${holder}${next} · ${expected}`}
     </p>
   )
 }
@@ -55,7 +57,8 @@ function WithCitySummary({ c, today }: { c: EventCase; today: ISODate }) {
     <div className="flex flex-col gap-0.5 rounded-control bg-surface-soft px-3 py-2 text-xs text-fg-secondary" data-slot="with-city-summary">
       {rows.map((row) => (
         <p key={row.dept}>
-          {plural(row.count, "card")} with {row.deptLabel}, {row.expectedBy ? `expected by ${fmtDateShort(row.expectedBy)}` : "no expected date yet"}
+          {plural(row.count, "card")} {row.atIntake ? "at intake with the City Clerk" : `with ${row.deptLabel}`},{" "}
+          {row.expectedBy ? `expected by ${fmtDateShort(row.expectedBy)}` : "no expected date yet"}
         </p>
       ))}
     </div>

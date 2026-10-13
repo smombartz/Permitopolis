@@ -9,7 +9,7 @@ import { CARD_BY_ID, type CatalogId } from "@/lib/rules/catalog";
 import { applicantNameOf } from "@/lib/data/people";
 import { addDaysISO, daysBetween, dateOf } from "@/lib/dates";
 import { fmtDate, fmtFileSize, fmtMoney, fmtTime } from "@/lib/format";
-import { lastSessionDate, sessionDates } from "@/lib/state";
+import { lastSessionDate, sessionDates, taskSubmittedOn } from "@/lib/state";
 import type { Dept, EventCase, FileRef, HHmm, ISODate, Party, Task } from "@/lib/types";
 import { formRows, type FormRow } from "./cardForms";
 
@@ -531,7 +531,9 @@ export function canActOn(task: Task, role: Party): boolean {
 
 /**
  * One row per card, except a per-vendor catalogue id (vendor health permits): those collapse
- * into one row with "N of M verified" progress, in the position of the first vendor card.
+ * into one row with "N of M verified" progress, in the position of the first vendor card. A
+ * lone vendor's permit stays its own row: a group of one would only hide the card (and, on S3,
+ * the request pinned to it) behind a click.
  */
 export function groupDocumentsForDisplay(cards: Task[]): DocumentRow[] {
   const rows: DocumentRow[] = [];
@@ -556,6 +558,10 @@ export function groupDocumentsForDisplay(cards: Task[]): DocumentRow[] {
 
   for (const [catalogId, idx] of vendorRowIndex) {
     const tasks = vendorTasks.get(catalogId)!;
+    if (tasks.length === 1) {
+      rows[idx] = { kind: "single", task: tasks[0] };
+      continue;
+    }
     const title = GROUP_TITLE[catalogId as CatalogId] ?? CARD_BY_ID[catalogId as CatalogId]?.title.replace(": {vendor}", "s") ?? catalogId;
     rows[idx] = {
       kind: "vendor_group",
@@ -568,6 +574,16 @@ export function groupDocumentsForDisplay(cards: Task[]): DocumentRow[] {
   }
 
   return rows;
+}
+
+/**
+ * Whether a vendor group starts expanded: while any permit in it is in flight (a reviewer has
+ * asked about it, it is submitted and waiting for its check, or it was sent back). That is the
+ * same for every viewer: the Clerk following a request sees it as the department that made it
+ * does. A group with nothing in flight (all verified, or nothing uploaded yet) starts closed.
+ */
+export function groupStartsOpen(row: Extract<DocumentRow, { kind: "vendor_group" }>): boolean {
+  return row.tasks.some((t) => t.status === "submitted" || t.status === "changes_requested" || (t.request !== undefined && !t.request.resolved));
 }
 
 /** True when the viewer can act on this row (a single card, or any card in a vendor group). */
@@ -587,12 +603,9 @@ export function orderGroupsForViewer<T extends { dept: Dept }>(groups: T[], role
 
 /* ---------- how long a card has waited ---------- */
 
-/** When this card was last submitted, from its own history. Null if it never was. */
+/** When this card was last submitted, from its own history. Null if it never was. The engine's own reading (`taskSubmittedOn`), which the applicant's board counts from too. */
 export function submittedOn(task: Task): ISODate | null {
-  for (let i = task.history.length - 1; i >= 0; i--) {
-    if (task.history[i].status === "submitted") return dateOf(task.history[i].at);
-  }
-  return null;
+  return taskSubmittedOn(task);
 }
 
 /** Calendar days a still-submitted card has waited for its check. Null once it is no longer waiting. */

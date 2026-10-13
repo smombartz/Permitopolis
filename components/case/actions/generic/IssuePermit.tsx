@@ -1,8 +1,7 @@
 "use client"
 
 import * as React from "react"
-import { CheckIcon, CircleIcon } from "lucide-react"
-import { cn } from "cn"
+import { Badge } from "@/components/ui/badge"
 import { InlineAlert } from "@/components/ui/inline-alert"
 import { ConditionList, PartyChip } from "@/components/domain"
 import { classify, permitComponents } from "@/lib/rules"
@@ -12,25 +11,24 @@ import { issuePermitChecklist } from "@/lib/view/clerkTools"
 import { PanelActions, PanelBody, PanelHeader, useCaseContext, useCaseDispatch } from "../panelKit"
 import type { ActionPanelProps } from "../types"
 
-/** The checklist Issue permit waits for: who owes it, since when, and whether it is met. */
+/**
+ * The checklist Issue permit waits for: who owes it, since when, and whether it is met. Laid
+ * out as the verification checklist is (the item and its badge on one line, what is behind it
+ * below), so a checklist reads the same in both panels. This one is read-only: each item is
+ * met by its own party's action, not ticked here.
+ */
 function Checklist({ items }: { items: ReturnType<typeof issuePermitChecklist> }) {
   return (
     <ul className="flex flex-col gap-2">
       {items.map((item) => (
-        <li key={item.key} className="flex items-start gap-2.5 rounded-control border border-line-subtle bg-surface-2 px-3 py-2.5">
-          {item.done ? (
-            <CheckIcon className="mt-0.5 size-4 shrink-0 text-success-fg" aria-hidden="true" />
-          ) : (
-            <CircleIcon className="mt-0.5 size-4 shrink-0 text-fg-label" aria-hidden="true" />
-          )}
-          <div className="flex min-w-0 flex-1 flex-col gap-1">
-            <p className={cn("text-sm", item.done ? "text-fg-secondary" : "text-fg")}>{item.label}</p>
-            <div className="flex flex-wrap items-center gap-2">
-              <PartyChip party={item.owedBy} />
-              {item.sinceDate ? (
-                <span className="text-xs text-fg-label">{item.done ? `Done` : `Owed since ${fmtDate(item.sinceDate)}`}</span>
-              ) : null}
-            </div>
+        <li key={item.key} data-done={item.done} className="flex flex-col gap-1 rounded-control border border-line-subtle bg-surface-2 px-3 py-2.5">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <p className="text-sm font-medium text-fg">{item.label}</p>
+            <Badge variant={item.done ? "success" : "warning"}>{item.done ? "Done" : "Waiting"}</Badge>
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
+            <PartyChip party={item.owedBy} />
+            {!item.done && item.sinceDate ? <span className="text-xs text-fg-secondary">Owed since {fmtDate(item.sinceDate)}</span> : null}
           </div>
         </li>
       ))}

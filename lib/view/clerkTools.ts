@@ -6,6 +6,7 @@
  * useCaseDispatch() (lib/state's transition()).
  */
 import { addDaysISO, daysBetween, dateOf } from "@/lib/dates";
+import { fmtDateShort } from "@/lib/format";
 import { classify, dueDate as dueDateRule, estimateFees } from "@/lib/rules";
 import type { RulesConfig } from "@/lib/rules/types";
 import type { Condition, Dept, EventCase, FeeLine, ISODate, Party, Task, TaskStatus } from "@/lib/types";
@@ -406,6 +407,7 @@ export function paymentRows(c: EventCase): PaymentRow[] {
       at: p.at,
       amount: p.amount,
       method: p.method,
-      label: p.occurrenceDate ? `${PAYMENT_KIND_LABEL[p.kind]}: ${p.occurrenceDate}` : PAYMENT_KIND_LABEL[p.kind] ?? "Payment",
+      // A session is named by its day, written as every other date on the screen is.
+      label: p.occurrenceDate ? `${PAYMENT_KIND_LABEL[p.kind] ?? "Payment"}: ${fmtDateShort(p.occurrenceDate)}` : PAYMENT_KIND_LABEL[p.kind] ?? "Payment",
     }));
 }

@@ -9,11 +9,9 @@ import { Field } from "@/components/ui/field"
 import { Input } from "@/components/ui/input"
 import { PartyChip } from "@/components/domain"
 import { CONDITION_TEMPLATES } from "@/lib/data/templates"
-import { DEPTS, PARTY_LABEL, type Dept } from "@/lib/types"
+import type { Dept } from "@/lib/types"
 import type { ConditionRow } from "@/lib/view/clerkTools"
-
-const SELECT_CLASS =
-  "h-9 w-full rounded-control border border-line-subtle bg-surface-1 px-2.5 text-sm text-fg outline-none focus-visible:border-focus-ring focus-visible:shadow-focus-halo"
+import { DeptSelect, NATIVE_SELECT_CLASS } from "./DeptSelect"
 
 interface ConditionsEditorProps {
   rows: ConditionRow[]
@@ -28,19 +26,6 @@ let rowSeq = 0
 function nextRowId(): string {
   rowSeq += 1
   return `new-condition-${rowSeq}`
-}
-
-/** A flat list of departments or template phrases, same options everywhere: a plain native select, not Radix (no groups or icons here). */
-function DeptSelect({ value, onChange, ariaLabel, className }: { value: Dept; onChange: (dept: Dept) => void; ariaLabel?: string; className?: string }) {
-  return (
-    <select aria-label={ariaLabel} value={value} onChange={(e) => onChange(e.target.value as Dept)} className={className ?? SELECT_CLASS}>
-      {DEPTS.map((d) => (
-        <option key={d} value={d}>
-          {PARTY_LABEL[d]}
-        </option>
-      ))}
-    </select>
-  )
 }
 
 /** The add-a-condition row: a department, a template to start from (optional), and free text. */
@@ -67,7 +52,7 @@ function AddConditionRow({ onAdd }: { onAdd: (row: ConditionRow) => void }) {
               aria-label="Start from a template"
               value=""
               onChange={(e) => e.target.value && setText(e.target.value)}
-              className={SELECT_CLASS}
+              className={NATIVE_SELECT_CLASS}
             >
               <option value="">Pick wording to start from</option>
               {templates.map((t) => (
@@ -116,7 +101,7 @@ function ConditionsEditor({ rows, conflictIds, onUpdate, onRemove, onMove, onAdd
             </div>
           </div>
           <div className="flex flex-wrap items-end gap-2">
-            <DeptSelect value={row.dept} onChange={(dept) => onUpdate(row.id, { dept })} ariaLabel={`Department for "${row.text}"`} className={`${SELECT_CLASS} w-40`} />
+            <DeptSelect value={row.dept} onChange={(dept) => onUpdate(row.id, { dept })} ariaLabel={`Department for "${row.text}"`} className="w-40" />
             <Input aria-label={`Condition ${index + 1}`} className="min-w-48 flex-1" value={row.text} onChange={(e) => onUpdate(row.id, { text: e.target.value })} />
           </div>
         </div>

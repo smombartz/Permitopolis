@@ -1,8 +1,8 @@
 import Link from "next/link";
 import { CountBadge } from "@/components/ui/count-badge";
 import { CaseId, DateText, EventTitle, StateChip, TierBadge, WaitingOnChips } from "@/components/domain";
-import { CommissionBadge } from "@/components/city/lists/CommissionBadge";
-import { StalledBadge } from "@/components/city/lists/StalledBadge";
+import { CommissionBadge } from "@/components/domain/CommissionBadge";
+import { StalledBadge } from "@/components/domain/StalledBadge";
 import { routes } from "@/lib/routes";
 import { fmtDaysToGo } from "@/lib/format";
 import { eventDate, isStalled } from "@/lib/state";

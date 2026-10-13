@@ -18,6 +18,8 @@ export { TaskKindLabel, TASK_KIND_LABEL } from "@/components/domain/TaskKindLabe
 export { AvailabilityBadge } from "@/components/domain/AvailabilityBadge";
 export { BillingBadge } from "@/components/domain/BillingBadge";
 export { EndingBanner } from "@/components/domain/EndingBanner";
+export { StalledBadge } from "@/components/domain/StalledBadge";
+export { CommissionBadge } from "@/components/domain/CommissionBadge";
 export { EventTitle } from "@/components/domain/EventTitle";
 export { LeadTimeRisk } from "@/components/domain/LeadTimeRisk";
 export { DeptStatusDots, type DeptStatusEntry } from "@/components/domain/DeptStatusDots";

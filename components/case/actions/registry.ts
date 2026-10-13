@@ -31,7 +31,7 @@ export function panelFor(action: ActionType, role: Party): ActionPanelComponent 
  * the others and the quote's lines, a review's material and fee lines, a document's preview
  * beside its checklist, the estimate against the actual. The sheet opens wider for these.
  */
-const WIDE_PANELS: ReadonlySet<ActionType> = new Set<ActionType>(["send_quote", "review_decide", "verify_document", "reject_document", "reconcile_close"]);
+const WIDE_PANELS: ReadonlySet<ActionType> = new Set<ActionType>(["send_quote", "review_decide", "verify_document", "reject_document", "log_closeout", "reconcile_close"]);
 
 export type PanelWidth = "default" | "wide";
 

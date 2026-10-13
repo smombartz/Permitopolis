@@ -377,6 +377,6 @@ describe("paymentRows", () => {
 
   it("names the session date for a session payment", () => {
     const c = makeCase({ payments: [{ id: "p1", at: "2027-06-08T09:00", amount: 20, method: "card", kind: "session", occurrenceDate: "2027-06-08" }] });
-    expect(paymentRows(c)[0].label).toBe("Session payment: 2027-06-08");
+    expect(paymentRows(c)[0].label).toBe("Session payment: Tue, Jun 8");
   });
 });

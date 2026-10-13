@@ -8,6 +8,7 @@ import {
   daysWaiting,
   decidedOn,
   groupDocumentsForDisplay,
+  groupStartsOpen,
   orderGroupsForViewer,
   sortDocumentRowsForViewer,
   submittedOn,
@@ -160,6 +161,31 @@ describe("Documents tab: grouping and progress for S6's 25 vendor health permits
     expect(vendorRow.title).toBe("Vendor health permits");
     // It sits in the first vendor card's position, not appended at the end.
     expect(rows.indexOf(vendorRow)).toBeLessThan(rows.length - 1);
+  });
+
+  it("a lone vendor's permit is its own row: one card does not go behind a group (S3, and its pinned request stays in view)", () => {
+    const s3 = caseById("PMT-27-0118");
+    const rows = groupDocumentsForDisplay(s3.tasks.filter((t) => t.owner === "applicant" && t.reviewer === "hl"));
+    expect(rows.every((r) => r.kind === "single")).toBe(true);
+    expect(rows.some((r) => r.kind === "single" && r.task.catalogId === "vendor_health_permit")).toBe(true);
+  });
+
+  it("a group opens by itself while one of its permits is in flight (asked about, submitted or sent back), for whoever is looking", () => {
+    const permits = s6.tasks.filter((t) => t.catalogId === "vendor_health_permit");
+    const group = groupDocumentsForDisplay(permits)[0];
+    if (group.kind !== "vendor_group") throw new Error("expected a vendor group");
+    // All 25 verified: nothing to look at.
+    expect(groupStartsOpen(group)).toBe(false);
+    const inFlight = (patch: Partial<(typeof permits)[number]>) => {
+      const next = groupDocumentsForDisplay([{ ...permits[0], ...patch }, ...permits.slice(1)])[0];
+      if (next.kind !== "vendor_group") throw new Error("expected a vendor group");
+      return groupStartsOpen(next);
+    };
+    expect(inFlight({ status: "submitted" })).toBe(true);
+    expect(inFlight({ status: "changes_requested" })).toBe(true);
+    expect(inFlight({ status: "todo", request: { from: "hl", message: "Please upload the current permit", at: "2027-04-30T09:00", dueDate: "2027-05-05", resolved: false } })).toBe(true);
+    // Not uploaded yet, and nobody has asked: still nothing to look at.
+    expect(inFlight({ status: "todo" })).toBe(false);
   });
 
   it("every other document stays its own row", () => {

@@ -35,7 +35,7 @@ export {
 } from "./checks";
 export { advanceClock, isSessionDate, lastSessionDate, sessionDates } from "./clock";
 // What a quote asks for and what is still owed on it ("What a quote asks for" in the readme).
-export { dueAtQuote, quoteBalance, quotePaid, taskDueDate } from "./core";
+export { dueAtQuote, quoteBalance, quotePaid, taskDueDate, taskSubmittedOn } from "./core";
 export { classifyDraft, newCase, syncDraft } from "./newCase";
 export { buildSeed } from "./seed";
 export {

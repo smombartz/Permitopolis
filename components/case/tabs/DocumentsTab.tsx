@@ -19,6 +19,7 @@ import {
   daysWaiting,
   decidedOn,
   groupDocumentsForDisplay,
+  groupStartsOpen,
   orderGroupsForViewer,
   rowNeedsViewerCheck,
   sortDocumentRowsForViewer,
@@ -118,10 +119,10 @@ function VendorGroupCard({
   today: ISODate
   onOpen: (key: string) => void
 }) {
-  // Open by default while there is something here for the viewer to check, so S3's one vendor
-  // permit (and any case with a handful still pending) is not hidden a click away; a group
+  // Open by default while a permit in it is in flight (asked about, waiting for its check, sent
+  // back), so a case with a handful still pending does not hide them a click away; a group
   // that is all decided, like S6's 25 verified permits, starts collapsed.
-  const defaultOpen = row.tasks.some((task) => canActOn(task, role))
+  const defaultOpen = groupStartsOpen(row)
 
   return (
     <div className="lg:col-span-2">

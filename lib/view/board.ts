@@ -17,6 +17,7 @@ import {
   eventDate,
   hasActivePermit,
   taskDueDate,
+  taskSubmittedOn,
   whoIsUp,
 } from "@/lib/state";
 import type { BoardColumn } from "@/lib/state/types";
@@ -399,43 +400,60 @@ export function bookAgainDraftDate(c: EventCase): ISODate | null {
 /* ---------------------------------------------------------------------- */
 
 export interface WithCityInfo {
+  /** Who holds the card now: the department that checks it, or the City Clerk while the application is still at intake. */
   dept: Dept;
   deptLabel: string;
+  /** The department that checks the card: the same as `dept` once the case is routed. */
+  reviewer: Dept;
+  reviewerLabel: string;
+  /** Not routed yet: the Clerk's intake has the application, and the reviewer starts after routing. */
+  atIntake: boolean;
   daysWaiting: number;
   expectedBy: ISODate | null;
   overdue: boolean;
 }
 
-/** The day a card most recently became "with the city": its last move to `submitted`. */
-function submittedOn(task: Task): ISODate | null {
-  return [...task.history].reverse().find((h) => h.status === "submitted")?.at.slice(0, 10) ?? null;
-}
-
 /**
- * Who has a "With the city" card, how many days it has waited, and the expected-by date the
- * reviewer's own task carries (the review's due date while its review is still open, or the
- * card's own `verify:*` task's due date once the review has decided) — so "With the city" is
- * never a black hole. Null for a card with nobody tasked yet (should not happen; see the
- * readme, "A card 'With the city' always has someone tasked").
+ * Who has a "With the city" card, how many days it has waited, and when it is expected back,
+ * so the column is never a black hole. Every part is read off the task the city itself works
+ * from, so the board cannot disagree with a reviewer's queue (`tests/both-sides.test.ts`):
+ *
+ * - the card's own `verify:*` task, once its department has decided its review;
+ * - the department's `review:<dept>` task while that review is open, which covers every card
+ *   sent to it;
+ * - before routing, the Clerk's intake check. The card's reviewer has not started ("Starts when
+ *   the City Clerk routes the case" on the city's side), so the Clerk is who holds it. While
+ *   the intake check itself waits (on a neighbor sign-off, on an answer) there is no date.
+ *
+ * Null for a card nobody checks.
  */
 export function withCityInfo(c: EventCase, task: Task, today: ISODate): WithCityInfo | null {
-  const dept = task.reviewer;
-  if (!dept) return null;
-  const since = submittedOn(task) ?? task.dueDate ?? today;
+  const reviewer = task.reviewer;
+  if (!reviewer) return null;
+  // Counted from the day the card last went to the city, as the city's Documents tab counts it.
+  const since = taskSubmittedOn(task) ?? today;
   const daysWaiting = Math.max(0, daysBetween(since, today));
+  const atIntake = c.reviews.length === 0;
 
-  const verifyTask = c.tasks.find((t) => t.catalogId.startsWith("verify:") && cardUnderVerification(c, t)?.id === task.id);
   let expectedBy: ISODate | null = null;
+  const verifyTask = c.tasks.find((t) => t.catalogId.startsWith("verify:") && t.status !== "done" && cardUnderVerification(c, t)?.id === task.id);
   if (verifyTask) {
     expectedBy = taskDueDate(verifyTask);
+  } else if (atIntake) {
+    const intake = c.tasks.find((t) => t.catalogId === "intake_check" && t.status === "todo");
+    expectedBy = intake ? taskDueDate(intake) : null;
   } else {
-    const review = c.reviews.find((r) => r.dept === dept);
-    if (review && (review.status === "pending" || review.status === "needs_info")) expectedBy = review.dueDate;
+    const reviewTask = c.tasks.find((t) => t.catalogId === `review:${reviewer}` && t.status === "todo");
+    expectedBy = reviewTask ? taskDueDate(reviewTask) : null;
   }
 
+  const dept: Dept = atIntake ? "clerk" : reviewer;
   return {
     dept,
     deptLabel: PARTY_LABEL[dept],
+    reviewer,
+    reviewerLabel: PARTY_LABEL[reviewer],
+    atIntake,
     daysWaiting,
     expectedBy,
     overdue: expectedBy !== null && expectedBy < today,
@@ -445,28 +463,33 @@ export function withCityInfo(c: EventCase, task: Task, today: ISODate): WithCity
 export interface WithCitySummaryRow {
   dept: Dept;
   deptLabel: string;
+  /** These cards are at the Clerk's intake, not yet with the department that checks them. */
+  atIntake: boolean;
   count: number;
-  /** The soonest expected-by date among this department's cards; null when none has one. */
+  /** The soonest expected-by date among this holder's cards; null when none has one. */
   expectedBy: ISODate | null;
 }
 
 /**
- * The "With the city" column's own summary line, one row per department holding a card
- * ("2 documents with Health & Legal, expected by Fri, May 7"), so the column says at a glance
- * who has what and when it is expected back.
+ * The "With the city" column's own summary line, one row per party holding a card ("2 cards
+ * with Health & Legal, expected by Fri, May 7"; "3 cards at intake with the City Clerk"), so the
+ * column says at a glance who has what and when it is expected back.
  */
 export function withCityColumnSummary(c: EventCase, today: ISODate): WithCitySummaryRow[] {
   const cards = boardColumns(c).with_city;
-  const byDept = new Map<Dept, { count: number; expectedBy: ISODate | null }>();
+  const byDept = new Map<Dept, { atIntake: boolean; count: number; expectedBy: ISODate | null }>();
   for (const task of cards) {
     const info = withCityInfo(c, task, today);
     if (!info) continue;
-    const row = byDept.get(info.dept) ?? { count: 0, expectedBy: null };
+    const row = byDept.get(info.dept) ?? { atIntake: info.atIntake, count: 0, expectedBy: null };
     row.count += 1;
     if (info.expectedBy && (!row.expectedBy || info.expectedBy < row.expectedBy)) row.expectedBy = info.expectedBy;
     byDept.set(info.dept, row);
   }
-  return DEPTS.filter((d) => byDept.has(d)).map((dept) => ({ dept, deptLabel: PARTY_LABEL[dept], ...byDept.get(dept)! }));
+  return DEPTS.filter((d) => byDept.has(d)).map((dept) => {
+    const row = byDept.get(dept)!;
+    return { dept, deptLabel: PARTY_LABEL[dept], atIntake: row.atIntake, count: row.count, expectedBy: row.expectedBy };
+  });
 }
 
 /* ---------------------------------------------------------------------- */

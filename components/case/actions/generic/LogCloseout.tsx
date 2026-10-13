@@ -10,7 +10,8 @@ import { InlineAlert } from "@/components/ui/inline-alert"
 import { FileDrop } from "@/components/ui/file-drop"
 import { checkLogCloseout } from "@/lib/state"
 import { fmtDate, fmtMoney } from "@/lib/format"
-import { Money } from "@/components/domain"
+import { FeeTable, Money } from "@/components/domain"
+import { CleanupResult } from "../../CleanupResult"
 import type { FeeLineDraft } from "@/lib/state/actions"
 import type { FileRef } from "@/lib/types"
 import { closeoutRows, damageRepairLine } from "@/lib/view/reviewTools"
@@ -18,28 +19,6 @@ import { PanelActions, PanelBody, PanelHeader, useCaseContext, useCaseDispatch }
 import type { ActionPanelProps } from "../types"
 
 const SAMPLE_PHOTO: FileRef = { name: "cleanup-site-photo.jpg", size: 410_000, type: "image/jpeg" }
-
-/** The fee lines this department's closeout left behind, read straight from the case: once logged, read-only. */
-function LoggedLines({ lines }: { lines: { label: string; unit: string; qty: number; estimate: number; actual: number | null }[] }) {
-  if (lines.length === 0) return <p className="text-sm text-fg-secondary">No fee lines to reconcile.</p>
-  return (
-    <ul className="flex flex-col gap-1.5">
-      {lines.map((l, i) => {
-        const actual = l.actual ?? l.estimate
-        const diff = Math.round((actual - l.estimate) * 100) / 100
-        return (
-          <li key={i} className="flex items-center justify-between gap-3 rounded-control border border-line-subtle bg-surface-2 px-3 py-2 text-sm">
-            <span className="text-fg">{l.label}</span>
-            <span className="flex items-center gap-3 text-xs text-fg-secondary">
-              <Money amount={actual} />
-              {diff !== 0 ? <span className={diff > 0 ? "text-danger-fg" : "text-success-fg"}>{diff > 0 ? "+" : ""}{diff.toFixed(2)}</span> : null}
-            </span>
-          </li>
-        )
-      })}
-    </ul>
-  )
-}
 
 /**
  * Public Works & Safety's closeout (workstream 4C): the cleanup check, actual quantities next
@@ -81,11 +60,9 @@ function LogCloseoutPanel({ caseId, onClose }: ActionPanelProps) {
         <PanelHeader title="Closeout" description={c.closeout.hoursLoggedOn ? `Logged ${fmtDate(c.closeout.hoursLoggedOn)}.` : undefined} />
         <PanelBody>
           <InlineAlert variant="warning">{checkReason}</InlineAlert>
-          <p className="text-sm text-fg">
-            Cleanup check: <span className="font-semibold">{c.closeout.cleanup === "issues" ? "Issues found" : "Pass"}</span>
-          </p>
-          {c.closeout.notes ? <p className="text-sm text-fg-secondary">{c.closeout.notes}</p> : null}
-          <LoggedLines lines={pwsLines} />
+          <CleanupResult cleanup={c.closeout.cleanup} notes={c.closeout.notes} />
+          {/* The same table the Clerk reconciles from and the Conditions and fees tab shows. */}
+          {pwsLines.length > 0 ? <FeeTable lines={pwsLines} showActual /> : <p className="text-sm text-fg-secondary">No fee lines to reconcile.</p>}
         </PanelBody>
         <PanelActions error={null} onCancel={onClose} submitLabel="Done" onSubmit={onClose} />
       </>
@@ -108,12 +85,12 @@ function LogCloseoutPanel({ caseId, onClose }: ActionPanelProps) {
     <>
       <PanelHeader
         title="Log closeout"
-        description={isInstant ? "Pass the cleanup check, or report an issue and its repair charge." : "Pass or flag the cleanup check, then log the actual quantity for every fee line. A line left as it is keeps its estimate."}
+        description={isInstant ? "Pass the cleanup inspection, or report an issue and its repair charge." : "Pass or flag the cleanup inspection, then log the actual quantity for every fee line. A line left as it is keeps its estimate."}
       />
       <PanelBody>
         {!check.ok ? <InlineAlert variant="warning">{check.reason}</InlineAlert> : null}
         <fieldset className="flex flex-col gap-2">
-          <legend className="text-eyebrow mb-1 font-bold tracking-[.12em] text-fg-label uppercase">Cleanup check</legend>
+          <legend className="text-eyebrow mb-1 font-bold tracking-[.12em] text-fg-label uppercase">Cleanup inspection</legend>
           <RadioGroup value={cleanup} onValueChange={(v) => setCleanup(v as "pass" | "issues")} className="gap-2">
             <div className="flex items-center gap-2">
               <RadioGroupItem value="pass" id="closeout-pass" />
@@ -170,7 +147,7 @@ function LogCloseoutPanel({ caseId, onClose }: ActionPanelProps) {
                         {row.actualQty !== null ? (
                           <>
                             {" "}
-                            &middot; Difference: <span className={row.difference > 0 ? "text-danger-fg" : row.difference < 0 ? "text-success-fg" : undefined}>{row.difference > 0 ? "+" : ""}{row.difference.toFixed(2)}</span>
+                            &middot; Difference: <Money amount={row.difference} signColor className="text-xs" />
                           </>
                         ) : null}
                       </span>
@@ -189,7 +166,7 @@ function LogCloseoutPanel({ caseId, onClose }: ActionPanelProps) {
                 ))
               )}
             </div>
-            <Field label="Cleanup crew hours" hint={`Extra line, at $${cfg.fees.cleanupCrewPerWorkerHour}/hour. Leave at 0 if there was none.`}>
+            <Field label="Cleanup crew hours" hint={`An extra line, at ${fmtMoney(cfg.fees.cleanupCrewPerWorkerHour)} an hour. Leave it at 0 if there was none.`}>
               <Input type="number" min="0" step="0.5" value={crewHours} onChange={(e) => setCrewHours(e.target.value)} placeholder="0" />
             </Field>
             <div className="flex items-center justify-between border-t border-line-subtle pt-2 text-sm">

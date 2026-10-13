@@ -119,6 +119,24 @@ describe('the board (S5): "With the city" is never a black hole', () => {
     expect(screen.getByText("1 card with Health & Legal, expected by Fri, May 7")).toBeInTheDocument();
     expect(screen.getByText(/3 days with Health & Legal · expected by Fri, May 7/)).toBeInTheDocument();
   });
+
+  it("S4, not routed yet: the cards are at the City Clerk's intake, and each names the department it goes to next", async () => {
+    await renderScreen(<BoardScreen />, { role: "applicant", personaId: "maple-street-block-captain", path: routes.event(S4) });
+
+    // The intake check waits on the neighbors, so no date is promised.
+    expect(screen.getByText("2 cards at intake with the City Clerk, no expected date yet")).toBeInTheDocument();
+    expect(screen.getByText("31 days at intake with the City Clerk, then Health & Legal · no expected date yet")).toBeInTheDocument();
+    expect(screen.getByText("31 days at intake with the City Clerk, then Public Works & Safety · no expected date yet")).toBeInTheDocument();
+    expect(screen.queryByText(/days with Health & Legal/)).not.toBeInTheDocument();
+  });
+
+  it("a submitted application whose intake check is late says so, with the Clerk's own due date", async () => {
+    // B03, Maple Grove Preschool's spring fair: submitted Apr 27, the Clerk's intake check due Fri, Apr 30.
+    await renderScreen(<BoardScreen />, { role: "applicant", personaId: "maple-grove-preschool", path: routes.event("PMT-27-0006") });
+
+    expect(screen.getByText("2 cards at intake with the City Clerk, expected by Fri, Apr 30")).toBeInTheDocument();
+    expect(screen.getByText("Overdue at intake with the City Clerk, then Health & Legal · expected by Fri, Apr 30")).toBeInTheDocument();
+  });
 });
 
 describe("the board (S6): after the event", () => {

@@ -23,10 +23,12 @@ function CompleteCityTaskPanel({ caseId, arg, role, onClose }: ActionPanelProps)
   if (!task) return null
   const check = checkCompleteCityTask(c, arg, role)
   const isWorkOrder = task.catalogId.startsWith("work_order:")
+  // A meeting is held, a work order is done: the Reviews tab's button says "Mark held" too.
+  const isMeeting = task.kind === "meeting"
   const detail = isWorkOrder ? workOrderDetail(c, task) : null
 
   function submit() {
-    const result = dispatch({ type: "complete_city_task", taskId: arg as string, note: note.trim() || undefined }, `Marked "${task!.title}" done.`)
+    const result = dispatch({ type: "complete_city_task", taskId: arg as string, note: note.trim() || undefined }, `Marked "${task!.title}" ${isMeeting ? "held" : "done"}.`)
     if (result.ok) onClose()
     else setError(result.reason ?? "That could not be marked done.")
   }
@@ -45,14 +47,14 @@ function CompleteCityTaskPanel({ caseId, arg, role, onClose }: ActionPanelProps)
               { label: "Due", value: detail.due ? fmtDate(detail.due) : null },
             ]}
           />
-        ) : task.kind === "meeting" ? (
+        ) : isMeeting ? (
           <p className="text-sm text-fg-secondary">{task.payload.scheduledFor ? `Scheduled for ${fmtDate(task.payload.scheduledFor)}.` : "Not yet scheduled."}</p>
         ) : null}
         <Field label="Note" hint="Optional, kept on the task.">
           <Textarea rows={3} value={note} onChange={(e) => setNote(e.target.value)} />
         </Field>
       </PanelBody>
-      <PanelActions error={error} onCancel={onClose} submitLabel="Mark done" disabled={!check.ok} onSubmit={submit} />
+      <PanelActions error={error} onCancel={onClose} submitLabel={isMeeting ? "Mark held" : "Mark done"} disabled={!check.ok} onSubmit={submit} />
     </>
   )
 }

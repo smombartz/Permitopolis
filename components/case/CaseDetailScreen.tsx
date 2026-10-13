@@ -3,14 +3,12 @@
 import * as React from "react"
 import { useParams, useRouter, useSearchParams } from "next/navigation"
 import { FileLockIcon } from "lucide-react"
-import { CaseHeader, EndingBanner } from "@/components/domain"
+import { CaseHeader, EndingBanner, StalledBadge } from "@/components/domain"
 import { Banner } from "@/components/ui/banner"
 import { EmptyState } from "@/components/ui/empty-state"
 import { InlineAlert } from "@/components/ui/inline-alert"
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 import { BackLink, PageHeader } from "@/components/ui/page-header"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { TriangleAlertIcon } from "lucide-react"
 import { CaseNotFound } from "@/components/shell"
 import { applicantNameOf } from "@/lib/data/people"
 import { routes } from "@/lib/routes"
@@ -116,22 +114,8 @@ function CaseDetailScreen() {
         hold={c.dateHold}
         reviewClock={headerClock ? { dayCount: headerClock.day, allowedDays: headerClock.of, paused: headerClock.paused, pausedDays: headerClock.pausedDays } : null}
       />
-      {!c.ending && isStalled(c, today) && process.env.NODE_ENV !== "production" ? (
-        <TooltipProvider>
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <span
-                tabIndex={0}
-                className="inline-flex h-7 w-fit items-center gap-1.5 self-start rounded-full border border-danger-border bg-danger-surface px-2.5 text-xs font-semibold text-danger-fg outline-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring"
-              >
-                <TriangleAlertIcon className="size-3.5" aria-hidden="true" />
-                Stalled
-              </span>
-            </TooltipTrigger>
-            <TooltipContent>Nobody has an open task on this case. That is a bug in the demo data or the engine.</TooltipContent>
-          </Tooltip>
-        </TooltipProvider>
-      ) : null}
+      {/* The same dev-only chip the lists show (it renders nothing in production). */}
+      {!c.ending && isStalled(c, today) ? <StalledBadge /> : null}
       {c.ending ? <EndingBanner ending={c.ending} reason={c.endingReason} /> : null}
       {!c.ending && c.flags.sentToCommission ? <Banner variant="info">This case has been sent to the commission.</Banner> : null}
       {!c.ending && isHoldExpiringTomorrow(c.dateHold, today) ? <InlineAlert variant="warning">This case&apos;s date hold expires tomorrow.</InlineAlert> : null}

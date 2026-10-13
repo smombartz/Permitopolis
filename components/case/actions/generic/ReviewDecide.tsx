@@ -12,7 +12,7 @@ import { ConditionBuilder } from "@/components/case/review/ConditionBuilder"
 import { feeRowTotal, FeeLineBuilder, type FeeRow } from "@/components/case/review/FeeLineBuilder"
 import { SubmittedMaterial } from "@/components/case/review/SubmittedMaterial"
 import { CONDITION_TEMPLATES } from "@/lib/data/templates"
-import { fmtMoney } from "@/lib/format"
+import { fmtMoney, plural } from "@/lib/format"
 import { checkReviewDecide, reviewClock } from "@/lib/state"
 import type { FeeLineDraft, ReviewDecision } from "@/lib/state/actions"
 import { routes, type CaseTab } from "@/lib/routes"
@@ -35,7 +35,7 @@ function summaryFor(choice: DecisionChoice, conditions: string[], feeRows: FeeRo
   if (choice === "request_info") return "Opens a request to the applicant; nothing is decided here."
   if (choice === "deny") return "Denies your section. The City Clerk decides what happens to the application."
   const extras: string[] = []
-  if (conditions.length > 0) extras.push(`${conditions.length} condition${conditions.length === 1 ? "" : "s"}`)
+  if (conditions.length > 0) extras.push(plural(conditions.length, "condition"))
   const total = feeRowTotal(feeRows.filter((r) => r.label.trim().length > 0 && r.qty > 0))
   if (total > 0) extras.push(`${fmtMoney(total)} in fee lines`)
   if (extras.length === 0) return "Approves your section. Nothing else is added."
@@ -63,6 +63,11 @@ function ReviewDecidePanel({ caseId, role, onClose }: ActionPanelProps) {
   const reasons = routingReasons(c, dept, cfg)
   const clock = reviewClock(c, dept, today)
 
+  // Conditions belong to "Approve with conditions" alone (PRD, review panel): a plain approval
+  // carries none, and that decision needs at least one or it says something that is not so.
+  const withConditions = choice === "approve_with_conditions"
+  const needsCondition = withConditions && conditions.length === 0
+
   function openRequestInfo() {
     router.replace(
       routes.city.case(caseId, {
@@ -82,7 +87,7 @@ function ReviewDecidePanel({ caseId, role, onClose }: ActionPanelProps) {
       .filter((r) => r.label.trim().length > 0 && r.qty > 0)
       .map((r) => ({ dept: r.dept, label: r.label, qty: r.qty, unit: r.unit, unitPrice: r.unitPrice, kind: r.kind }))
     const result = dispatch(
-      { type: "review_decide", decision: choice, conditions: choice === "deny" ? [] : conditions, feeLines: choice === "deny" ? [] : feeLines, internalNote: internalNote.trim() || undefined, message: message.trim() || undefined },
+      { type: "review_decide", decision: choice, conditions: withConditions ? conditions : [], feeLines: choice === "deny" ? [] : feeLines, internalNote: internalNote.trim() || undefined, message: message.trim() || undefined },
       choice === "deny" ? "Section denied." : "Review decided.",
     )
     if (result.ok) onClose()
@@ -118,10 +123,12 @@ function ReviewDecidePanel({ caseId, role, onClose }: ActionPanelProps) {
 
         {choice === "approve" || choice === "approve_with_conditions" ? (
           <>
-            <div className="flex flex-col gap-2">
-              <p className="text-eyebrow font-bold tracking-[.12em] text-fg-label uppercase">Conditions</p>
-              <ConditionBuilder templates={templates} value={conditions} onChange={setConditions} />
-            </div>
+            {withConditions ? (
+              <div className="flex flex-col gap-2">
+                <p className="text-eyebrow font-bold tracking-[.12em] text-fg-label uppercase">Conditions</p>
+                <ConditionBuilder templates={templates} value={conditions} onChange={setConditions} />
+              </div>
+            ) : null}
             <div className="flex flex-col gap-2">
               <p className="text-eyebrow font-bold tracking-[.12em] text-fg-label uppercase">Fee lines</p>
               <FeeLineBuilder presets={feePresetsFor(dept, c, cfg)} existing={existingFeeLines(c, dept)} value={feeRows} onChange={setFeeRows} />
@@ -140,14 +147,14 @@ function ReviewDecidePanel({ caseId, role, onClose }: ActionPanelProps) {
           </>
         ) : null}
 
-        <InlineAlert variant="info">{summaryFor(choice, conditions, feeRows)}</InlineAlert>
+        <InlineAlert variant="info">{needsCondition ? "Add at least one condition, or choose Approve." : summaryFor(choice, withConditions ? conditions : [], feeRows)}</InlineAlert>
       </PanelBody>
       <PanelActions
         error={error}
         onCancel={onClose}
         submitLabel={choice === "request_info" ? "Continue" : CHOICE_LABEL[choice]}
         submitVariant={choice === "deny" ? "destructive" : "primary"}
-        disabled={choice !== "request_info" && !check.ok}
+        disabled={choice !== "request_info" && (!check.ok || needsCondition)}
         onSubmit={submit}
       />
     </>

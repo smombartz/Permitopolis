@@ -111,7 +111,11 @@ describe("closeout: S6 as Public Works & Safety", () => {
     navigate(routes.city.case(S6, { task: "log_closeout" }));
     expect(sheet().getByText("Hours were logged on Mon, May 3, 2027; the City Clerk is reconciling.")).toBeInTheDocument();
     expect(sheet().queryByRole("spinbutton")).not.toBeInTheDocument();
-    expect(sheet().getByText(/\+510\.00/)).toBeInTheDocument();
+    // Read-only, in the table the Clerk reconciles from: 72 officer-hours is $6,120, $510 over.
+    const police = within(sheet().getByRole("cell", { name: "Police" }).closest("tr")!);
+    expect(police.getByText("$6,120")).toBeInTheDocument();
+    expect(police.getByText("$510")).toBeInTheDocument();
+    expect(sheet().getByText("Pass")).toBeInTheDocument();
   });
 });
 

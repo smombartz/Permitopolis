@@ -3,8 +3,8 @@
 /** The consolidation panel's side-by-side view: each routed department's decision, conditions and fee lines, with conflicts flagged above. */
 import { cn } from "cn"
 import { InlineAlert } from "@/components/ui/inline-alert"
-import { ConditionList, PartyChip, ReviewStatusDot } from "@/components/domain"
-import { fmtMoney } from "@/lib/format"
+import { ConditionList, Money, PartyChip, ReviewStatusDot } from "@/components/domain"
+import { plural } from "@/lib/format"
 import type { ReviewSummary } from "@/lib/view/caseDetail"
 import type { ConditionConflict } from "@/lib/view/clerkTools"
 import { PARTY_LABEL } from "@/lib/types"
@@ -35,8 +35,8 @@ function DepartmentCard({ summary }: { summary: ReviewSummary }) {
           )}
           {summary.feeLines.length > 0 ? (
             <div className="flex items-center justify-between text-xs text-fg-label">
-              <span>{summary.feeLines.length} fee line{summary.feeLines.length === 1 ? "" : "s"}</span>
-              <span>{fmtMoney(feeTotal)}</span>
+              <span>{plural(summary.feeLines.length, "fee line")}</span>
+              <Money amount={feeTotal} className="text-xs" />
             </div>
           ) : null}
           {summary.review?.messageToApplicant ? <p className="text-xs text-fg-secondary">&ldquo;{summary.review.messageToApplicant}&rdquo;</p> : null}

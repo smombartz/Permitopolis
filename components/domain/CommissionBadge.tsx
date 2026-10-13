@@ -2,8 +2,9 @@ import { GavelIcon } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
 /**
- * "Sent to commission" is a flag on In review, not a state (PRD): a marker here, on pipeline
- * cards and table rows, pairs with the banner `CaseDetailScreen` shows on the case itself.
+ * "Sent to commission" is a flag on In review, not a state (PRD): this marker, on a list's
+ * cards and rows, pairs with the banner the case detail shows on the case itself. Render it
+ * when `c.flags.sentToCommission` is true.
  */
 export function CommissionBadge() {
   return (
