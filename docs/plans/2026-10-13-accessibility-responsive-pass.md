@@ -40,10 +40,10 @@ text, reduced motion honored.
       shortcuts dialog, toasts
 - [x] Shared components (`components/ui`, `components/domain`): names, focus rings, live regions,
       tap targets, `fg-tertiary`
-- [ ] The landing page and the demo guide
-- [ ] The wizard and the amendment
-- [ ] My events, the board and its sheets
-- [ ] Checkout, the permit and the public check
+- [x] The landing page and the demo guide
+- [x] The wizard and the amendment
+- [x] My events, the board and its sheets
+- [x] Checkout, the permit and the public check
 - [ ] My queue, Cases, Intake
 - [ ] The case detail: every tab and every action panel
 - [ ] Active permits
@@ -116,8 +116,9 @@ page's content. `tests/render/keyboard.test.tsx` was written first and failed on
   typeahead; `/` pulled focus out from under an open sheet; the arrow keys were taken from the
   whole page (a keyboard could not scroll a list page). Cmd+Shift+K is the browser's again.
 - **Live regions.** `Banner` and `InlineAlert` were `role="alert"` or `role="status"` by variant,
-  on 72 uses, nearly all of them static: a board with three pinned requests shouted three alerts
-  on arrival, and again on every remount. They carry no live role now; `live` makes one a polite
+  on 72 uses, nearly all of them static: Active permits raised an alert for every row whose
+  hold expires tomorrow, a case with such a hold raised one on arrival, and an action panel
+  that could not run raised one as it opened, each again on every remount. They carry no live role now; `live` makes one a polite
   status. `Field`'s error was `role="alert"` and cut in on every keystroke of a field that
   validates as it is typed in: it is a standing polite region. `LeadTimeRisk` was a `status`
   per table row. The case's state line no longer repeats what the action's toast just said.
@@ -133,6 +134,34 @@ page's content. `tests/render/keyboard.test.tsx` was written first and failed on
   and select items are 44px tall there; the date pickers' days too.
 - `Field required` reaches a screen reader (`aria-required`); the asterisk was `aria-hidden`
   with nothing behind it.
+
+### The applicant's side and the landing page
+
+- **Page titles.** Every route had the one title, "Permitopolis · City Clerk · Events
+  Permitting" (WCAG 2.4.2), and Next's route announcer reads the title out after each
+  client-side navigation, so it said the same words every time. Each `page.tsx` now exports its
+  own (`"My queue"`, `"Permit"`), under a template in the root layout, and a page about one
+  record adds its name from the store (`useDocumentTitle`: "Riverfront Summer 5K · Case").
+- **Landing page.** 72px and 60px headlines at 375px: "workspace," at 60px is within a few
+  pixels of a 335px column. One step down below 640px (60 and 48), and a word wraps before it
+  pushes the page sideways. The comparison table's triggers are row headers. The demo guide's
+  seven "Start this path" and six "Jump" buttons say which.
+- **Wizard.** One announcer (`WizardAnnouncer`) for a change of tier and a change at the date
+  gate, on both the wizard and the amendment (which had none): the live panel and the gate's
+  banner showed the same news side by side on a wide window and neither was mounted on some
+  steps of a narrow one. The date button's `aria-label` ("Event date") hid the date it shows.
+  The event-type cards are a radio group with a radio group's keyboard. An availability reason
+  can be another event's 90-character name in a `whitespace-nowrap` pill: it wraps. The location
+  picker's tabs had no height of their own once the list wrapped, its street names were
+  truncated in a column a third of the row wide, and a chosen space or street is marked as
+  well as tinted. A what-if sentence wraps inside the 320px panel.
+- **Board.** A phone's four tabs are 44px. The stars are a radio group that says "3 stars", not
+  "★". "Change your event", when it cannot be done, says why on the menu (it was a `title` on a
+  disabled item). Each "View permit" and "Pay this session" says which. A simulated sign-off is
+  read out. The file input is off screen, so the drop zone wears its focus ring.
+- **Checkout.** The card fields are required and say so; a submit that fails puts focus on the
+  first wrong field, whose error is its description. Signing took the signature form away with
+  the button that had focus, and paying the card form: focus moves on to the Pay section.
 
 ## Not verifiable here
 

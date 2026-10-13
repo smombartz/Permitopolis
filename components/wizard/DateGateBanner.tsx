@@ -25,7 +25,8 @@ export interface DateGateBannerProps {
  * step 3, where the date is chosen, and on step 5 above the primary button, because the gate is
  * usually tripped on step 4 (turning on sound makes the event Reviewed, which needs 30 days).
  * Once the late fee is chosen and it lets the date stand, the banner says so and offers the
- * way back. Renders nothing while the gate passes.
+ * way back. Renders nothing while the gate passes. It is not a live region: `WizardAnnouncer`
+ * reads the gate out, once, wherever on the wizard the change was made.
  */
 function DateGateBanner({ gate, leadTimeDays, lateFee, onNewDate, onDropAddOn, onLateFee }: DateGateBannerProps) {
   if (gate.ok || gate.fixes.length === 0) return null;

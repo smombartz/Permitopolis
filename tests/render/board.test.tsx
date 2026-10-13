@@ -307,7 +307,7 @@ describe("the board's Cancel dialog", () => {
     });
 
     await user.click(screen.getByRole("button", { name: "Board menu" }));
-    await user.click(screen.getByRole("menuitem", { name: "Cancel" }));
+    await user.click(screen.getByRole("menuitem", { name: "Cancel this permit" }));
 
     const dialog = screen.getByRole("dialog");
     expect(dialog).toHaveTextContent("Today's refund: $10 (30 or more days before: full refund minus a $10 processing fee)");

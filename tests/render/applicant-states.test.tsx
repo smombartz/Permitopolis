@@ -89,7 +89,7 @@ describe("Wizard: a booked, blacked-out and impacted date, and attendance over c
     const user = await pickShelterAndName("Family reunion");
     await user.click(screen.getByRole("button", { name: /^Shelter 3/ }));
     await user.click(screen.getByRole("button", { name: "Next" }));
-    await user.click(screen.getByRole("button", { name: "Event date" }));
+    await user.click(screen.getByRole("button", { name: /^Date\b/ }));
     await user.click(screen.getByRole("button", { name: /May 22nd, 2027/ }));
 
     expect(screen.getAllByText("Booked").length).toBeGreaterThan(0);
@@ -99,7 +99,7 @@ describe("Wizard: a booked, blacked-out and impacted date, and attendance over c
     const user = await pickShelterAndName("Spring cleanup");
     await user.click(screen.getByRole("button", { name: /^Shelter 2/ }));
     await user.click(screen.getByRole("button", { name: "Next" }));
-    await user.click(screen.getByRole("button", { name: "Event date" }));
+    await user.click(screen.getByRole("button", { name: /^Date\b/ }));
     await user.click(screen.getByRole("button", { name: /May 31st, 2027/ }));
 
     expect(screen.getAllByText("Blackout").length).toBeGreaterThan(0);
@@ -116,7 +116,7 @@ describe("Wizard: a booked, blacked-out and impacted date, and attendance over c
     await user.clear(screen.getByLabelText("Width (ft)"));
     await user.type(screen.getByLabelText("Width (ft)"), "80");
     await user.click(screen.getByRole("button", { name: "Next" }));
-    await user.click(screen.getByRole("button", { name: "Event date" }));
+    await user.click(screen.getByRole("button", { name: /^Date\b/ }));
     await user.click(screen.getByRole("button", { name: "Go to the Next Month" }));
     await user.click(screen.getByRole("button", { name: "Go to the Next Month" }));
     await user.click(screen.getByRole("button", { name: /July 11th, 2027/ }));
@@ -128,7 +128,7 @@ describe("Wizard: a booked, blacked-out and impacted date, and attendance over c
     const user = await pickShelterAndName("Big picnic");
     await user.click(screen.getByRole("button", { name: /^Shelter 2/ })); // capacity 40
     await user.click(screen.getByRole("button", { name: "Next" }));
-    await user.click(screen.getByRole("button", { name: "Event date" }));
+    await user.click(screen.getByRole("button", { name: /^Date\b/ }));
     await user.click(screen.getByRole("button", { name: "Go to the Next Month" }));
     await user.click(screen.getByRole("button", { name: /June 19th, 2027/ }));
     await user.click(screen.getByRole("button", { name: "Next" }));
@@ -146,7 +146,7 @@ describe("Wizard: the lead-time gate at steps 3, 4 and 5, reachable from whereve
     await user.click(screen.getByRole("button", { name: "Next" }));
     await user.click(screen.getByRole("button", { name: /^Shelter 2/ }));
     await user.click(screen.getByRole("button", { name: "Next" }));
-    await user.click(screen.getByRole("button", { name: "Event date" }));
+    await user.click(screen.getByRole("button", { name: /^Date\b/ }));
     await user.click(screen.getByRole("button", { name: /May 22nd, 2027/ })); // 19 days out
     await user.click(screen.getByRole("button", { name: "Next" }));
     await user.type(screen.getByLabelText(/Expected attendance/), "40");
@@ -289,11 +289,16 @@ describe("Payment and signature forms with invalid or empty input", () => {
   it("clearing the card number and submitting shows a field error, never a silent success", async () => {
     const { user } = await renderScreen(<CheckoutScreen />, { role: "applicant", personaId: "sunrise-yoga-club", path: routes.quote(S2) });
 
-    const numberField = screen.getByLabelText("Card number");
+    const numberField = screen.getByRole("textbox", { name: "Card number" });
+    expect(numberField).toHaveAttribute("aria-required", "true");
     await user.clear(numberField);
     await user.click(screen.getByRole("button", { name: /^Pay \$/ }));
 
     expect(screen.getByText("Card number is required.")).toBeInTheDocument();
+    // The error is the field's description, and focus is on the field that needs fixing.
+    expect(numberField).toHaveAttribute("aria-invalid", "true");
+    expect(numberField).toHaveAccessibleDescription("Card number is required.");
+    expect(numberField).toHaveFocus();
     expect(screen.getByText("Fix the fields above to pay.")).toBeInTheDocument();
     // Never silently booked: the draft stays a draft until the form is actually valid.
     expect(storedCase(S2).state).toBe("draft");
@@ -302,10 +307,10 @@ describe("Payment and signature forms with invalid or empty input", () => {
   it("a malformed expiry and security code are each called out by name", async () => {
     const { user } = await renderScreen(<CheckoutScreen />, { role: "applicant", personaId: "sunrise-yoga-club", path: routes.quote(S2) });
 
-    const expiry = screen.getByLabelText("Expiry");
+    const expiry = screen.getByRole("textbox", { name: "Expiry" });
     await user.clear(expiry);
     await user.type(expiry, "13");
-    const cvc = screen.getByLabelText("Security code");
+    const cvc = screen.getByRole("textbox", { name: "Security code" });
     await user.clear(cvc);
     await user.type(cvc, "1");
     await user.click(screen.getByRole("button", { name: /^Pay \$/ }));

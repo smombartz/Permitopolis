@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import { CheckIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
@@ -246,7 +247,8 @@ export function LocationPicker({ value, onChange, eventType, availabilityOf, cla
     <Tabs value={mode} onValueChange={(next) => choose(next as LocationPickerMode)} className={cn("w-full", className)}>
       <TabsList className="h-auto w-full flex-wrap justify-start gap-1">
         {(Object.keys(MODE_LABEL) as LocationPickerMode[]).map((key) => (
-          <TabsTrigger key={key} value={key}>
+          // The list wraps (h-auto), so a tab's height is its own: 36px, and 44px on a touch screen.
+          <TabsTrigger key={key} value={key} className="min-h-9 pointer-coarse:min-h-11">
             {MODE_LABEL[key]}
           </TabsTrigger>
         ))}
@@ -295,7 +297,11 @@ export function LocationPicker({ value, onChange, eventType, availabilityOf, cla
                       selected && "border-indigo-650 bg-pill",
                     )}
                   >
-                    <p className="font-medium text-fg">{space.name}</p>
+                    <p className="flex items-start justify-between gap-2 font-medium text-fg">
+                      {space.name}
+                      {/* The choice is a mark as well as a tint. */}
+                      {selected ? <CheckIcon className="mt-0.5 size-4 shrink-0 text-fg-accent" aria-hidden="true" /> : null}
+                    </p>
                     <p className="text-xs text-fg-secondary">{`${fmtNumber(space.capacity ?? 0)} people · ${fmtMoney(space.rate.amount)}/${space.rate.per}`}</p>
                     <p className="text-xs text-fg-secondary">{space.amenities.join(", ")}</p>
                     <AvailabilityNote location={buildInventoryLocation([space.id])} availabilityOf={availabilityOf} />
@@ -433,17 +439,17 @@ export function LocationPicker({ value, onChange, eventType, availabilityOf, cla
                     aria-pressed={selected}
                     onClick={() => selectStreet(segment.id)}
                     className={cn(
-                      "flex w-full items-center justify-between gap-2 rounded-control border border-line-subtle bg-surface-1 px-2 py-1.5 text-left text-sm hover:bg-surface-hover",
+                      "flex w-full items-center justify-between gap-2 rounded-control border border-line-subtle bg-surface-1 px-2 py-1.5 text-left text-sm hover:bg-surface-hover pointer-coarse:min-h-11",
                       FOCUS_RING,
                       selected && "border-indigo-650 bg-pill",
                     )}
                   >
-                    <span className="truncate text-fg-secondary">{segment.label}</span>
-                    {segment.kind === "residential" && (
-                      <Badge variant="outline" className="shrink-0">
-                        Residential
-                      </Badge>
-                    )}
+                    {/* The whole name, on as many lines as it takes: the column is a third of the row. */}
+                    <span className="min-w-0 break-words text-fg-secondary">{segment.label}</span>
+                    <span className="flex shrink-0 items-center gap-1.5">
+                      {segment.kind === "residential" && <Badge variant="outline">Residential</Badge>}
+                      {selected ? <CheckIcon className="size-4 text-fg-accent" aria-hidden="true" /> : null}
+                    </span>
                   </button>
                 </li>
               );
@@ -501,17 +507,19 @@ export function LocationPicker({ value, onChange, eventType, availabilityOf, cla
                       disabled={!canSelect}
                       onClick={() => (included ? undefined : selectRouteSegment(segment.id))}
                       className={cn(
-                        "flex w-full items-center gap-2 rounded-control border border-line-subtle bg-surface-1 px-2 py-1.5 text-left text-sm hover:bg-surface-hover disabled:cursor-not-allowed disabled:opacity-40",
+                        "flex w-full items-center gap-2 rounded-control border border-line-subtle bg-surface-1 px-2 py-1.5 text-left text-sm hover:bg-surface-hover disabled:cursor-not-allowed disabled:opacity-40 pointer-coarse:min-h-11",
                         FOCUS_RING,
                         included && "border-indigo-650 bg-pill",
                       )}
                     >
                       {included && (
                         <span className="flex size-5 shrink-0 items-center justify-center rounded-full bg-indigo-650 text-xs font-semibold text-fg-on-accent">
+                          <span className="sr-only">Number </span>
                           {order + 1}
+                          <span className="sr-only"> on the route: </span>
                         </span>
                       )}
-                      <span className="truncate text-fg-secondary">{segment.label}</span>
+                      <span className="min-w-0 break-words text-fg-secondary">{segment.label}</span>
                     </button>
                   </li>
                 );

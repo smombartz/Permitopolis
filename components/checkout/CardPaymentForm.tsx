@@ -42,6 +42,9 @@ function cardFieldErrors(card: { number: string; name: string; expiry: string; c
   return errors;
 }
 
+const FIELD_ORDER = ["number", "name", "expiry", "cvc"] as const;
+const FIELD_NAME: Record<(typeof FIELD_ORDER)[number], string> = { number: "cc-number", name: "cc-name", expiry: "cc-exp", cvc: "cc-csc" };
+
 function CardPaymentForm({ amount, covers, disabled = false, disabledReason, onPay }: CardPaymentFormProps) {
   // Prefilled for whoever is paying: the persona's own contact, not one name for every organizer.
   const personaId = useDemo((s) => s.personaId);
@@ -54,11 +57,16 @@ function CardPaymentForm({ amount, covers, disabled = false, disabledReason, onP
   const fieldErrors = cardFieldErrors(card);
   const hasFieldErrors = Object.keys(fieldErrors).length > 0;
 
-  function handleSubmit(e: React.FormEvent) {
+  function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     if (disabled || pending) return;
     if (hasFieldErrors) {
       setTouched(true);
+      // Focus goes to the first field that is wrong: its error is then read out as its
+      // description, and a keyboard is already where the fix is.
+      const first = FIELD_ORDER.find((key) => fieldErrors[key]);
+      const field = first ? e.currentTarget.elements.namedItem(FIELD_NAME[first]) : null;
+      if (field instanceof HTMLElement) field.focus();
       return;
     }
     setError(null);
@@ -77,8 +85,9 @@ function CardPaymentForm({ amount, covers, disabled = false, disabledReason, onP
         <p className="text-xs text-fg-label">This is a demo: no real payment is made.</p>
       </div>
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-        <Field label="Card number" className="sm:col-span-2" error={touched ? fieldErrors.number : undefined}>
+        <Field label="Card number" required className="sm:col-span-2" error={touched ? fieldErrors.number : undefined}>
           <Input
+            name={FIELD_NAME.number}
             value={card.number}
             onChange={(e) => setCard((c) => ({ ...c, number: e.target.value }))}
             inputMode="numeric"
@@ -86,24 +95,28 @@ function CardPaymentForm({ amount, covers, disabled = false, disabledReason, onP
             disabled={disabled}
           />
         </Field>
-        <Field label="Name on card" error={touched ? fieldErrors.name : undefined}>
+        <Field label="Name on card" required error={touched ? fieldErrors.name : undefined}>
           <Input
+            name={FIELD_NAME.name}
             value={card.name}
             onChange={(e) => setCard((c) => ({ ...c, name: e.target.value }))}
             autoComplete="cc-name"
             disabled={disabled}
           />
         </Field>
-        <Field label="Expiry" error={touched ? fieldErrors.expiry : undefined}>
+        <Field label="Expiry" required hint="MM/YY" error={touched ? fieldErrors.expiry : undefined}>
           <Input
+            name={FIELD_NAME.expiry}
             value={card.expiry}
             onChange={(e) => setCard((c) => ({ ...c, expiry: e.target.value }))}
             autoComplete="cc-exp"
             disabled={disabled}
           />
         </Field>
-        <Field label="Security code" error={touched ? fieldErrors.cvc : undefined}>
+        <Field label="Security code" required error={touched ? fieldErrors.cvc : undefined}>
           <Input
+            name={FIELD_NAME.cvc}
+            inputMode="numeric"
             value={card.cvc}
             onChange={(e) => setCard((c) => ({ ...c, cvc: e.target.value }))}
             autoComplete="cc-csc"
@@ -113,8 +126,13 @@ function CardPaymentForm({ amount, covers, disabled = false, disabledReason, onP
       </div>
       {disabled && disabledReason ? <InlineAlert variant="info">{disabledReason}</InlineAlert> : null}
       {touched && hasFieldErrors ? <InlineAlert variant="danger">Fix the fields above to pay.</InlineAlert> : null}
-      {error ? <InlineAlert variant="danger">{error}</InlineAlert> : null}
-      <Button type="submit" size="lg" disabled={disabled || pending} className="self-start">
+      {/* The engine's refusal arrives after the wait: it is read out. The line above is not, since each field's own error already was. */}
+      {error ? (
+        <InlineAlert variant="danger" live>
+          {error}
+        </InlineAlert>
+      ) : null}
+      <Button type="submit" size="lg" disabled={disabled || pending} aria-busy={pending} className="self-start">
         {pending ? "Processing…" : payButtonLabel(amount)}
       </Button>
     </form>

@@ -18,7 +18,7 @@ function ClosingCard() {
           variant="frosted"
           className="flex flex-col items-center gap-5 rounded-stage px-6 py-16 text-center shadow-stage"
         >
-          <h2 className="max-w-[26ch] text-display font-bold text-balance text-fg">
+          <h2 className="max-w-[26ch] text-feature font-bold text-balance break-words text-fg sm:text-display">
             Describe your event. We&rsquo;ll take it from there.
           </h2>
           <p className="max-w-[52ch] text-lead text-pretty text-fg-secondary">

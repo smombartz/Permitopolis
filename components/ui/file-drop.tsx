@@ -44,7 +44,8 @@ function FileDrop({ onFiles, sample, accept, multiple, className, label, hint }:
         onFiles(toFileRefs(e.dataTransfer.files))
       }}
       className={cn(
-        "flex flex-col items-center gap-3 rounded-panel border border-dashed px-6 py-8 text-center transition-colors duration-[var(--dur-fast)] ease-frost",
+        // The file input is off screen (sr-only): while it has focus, the drop zone wears the ring.
+        "flex flex-col items-center gap-3 rounded-panel border border-dashed px-6 py-8 text-center transition-colors duration-[var(--dur-fast)] ease-frost has-[input:focus-visible]:outline-2 has-[input:focus-visible]:outline-offset-2 has-[input:focus-visible]:outline-focus-ring",
         dragging ? "border-indigo-650 bg-pill" : "border-line-subtle bg-surface-2",
         className
       )}

@@ -24,7 +24,8 @@ function SectionHeading({ id, eyebrow, title, lead, align = "left", tone = "ligh
       <h2
         id={id}
         className={cn(
-          "text-display font-bold text-balance",
+          // 48px below 640px: at 60px "workspace," is within a few pixels of a 335px column.
+          "text-feature font-bold text-balance break-words sm:text-display",
           tone === "night" ? "text-night-fg" : "text-fg",
         )}
       >

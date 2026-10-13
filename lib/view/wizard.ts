@@ -346,6 +346,21 @@ export function lateFeeCarriesDate(gate: DateGate, lateFee: boolean): boolean {
   return lateFee && !gate.ok && gate.fixes.includes("late_fee");
 }
 
+/**
+ * What a change at the date gate is said as, by the wizard's status line: why the date cannot
+ * stand, that the late fee now lets it, or the note an impacted date carries. Empty while the
+ * gate passes with nothing to say.
+ */
+export function dateGateAnnouncement(gate: DateGate, leadTimeDays: number, lateFee: boolean): string {
+  const { status } = gate.availability;
+  const reason = gate.availability.reason?.replace(/\.$/, "");
+  if (status === "booked" || status === "blackout") return reason ? `That date isn't available: ${reason}.` : "That date isn't available.";
+  if (lateFeeCarriesDate(gate, lateFee)) return `A ${fmtMoney(gate.lateFeeAmount)} late fee is added, so this date can stand.`;
+  if (!gate.leadTimeOk) return leadTimeGapText(gate.daysUntil, leadTimeDays);
+  if (status === "impacted" && reason) return `That date is open, with a note: ${reason}.`;
+  return "";
+}
+
 export function dateGateSatisfied(gate: DateGate, lateFee: boolean): boolean {
   return gate.ok || lateFeeCarriesDate(gate, lateFee);
 }

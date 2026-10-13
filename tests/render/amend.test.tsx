@@ -53,7 +53,9 @@ describe("AmendWizardScreen: Maya adds a DJ (the PRD's example)", () => {
 
     await user.click(screen.getByRole("button", { name: "Next" })); // size -> plan (review)
     expect(screen.getByRole("heading", { level: 2, name: "Review your change" })).toBeInTheDocument();
-    expect(screen.getByText(/19 days left, 30 needed/)).toBeInTheDocument();
+    // In the banner, with its fixes; the wizard's status line said the same sentence once, when the gate tripped.
+    expect(within(document.querySelector<HTMLElement>('[data-slot="date-gate-banner"]')!).getByText(/19 days left, 30 needed/)).toBeInTheDocument();
+    expect(document.querySelector('[data-slot="wizard-date-announcement"]')).toHaveTextContent(/19 days left, 30 needed/);
     const confirmButton = screen.getByRole("button", { name: "Confirm change" });
     expect(confirmButton).toBeDisabled();
 

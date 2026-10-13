@@ -219,7 +219,7 @@ describe("(b) the wizard's last step, for a Reviewed event", () => {
     await user.click(screen.getByRole("button", { name: "Next" }));
     await user.click(screen.getByRole("button", { name: /^Shelter 2/ }));
     await user.click(screen.getByRole("button", { name: "Next" }));
-    await user.click(screen.getByRole("button", { name: "Event date" }));
+    await user.click(screen.getByRole("button", { name: /^Date\b/ }));
     await user.click(screen.getByRole("button", { name: "Go to the Next Month" }));
     await user.click(screen.getByRole("button", { name: /June 19th, 2027/ }));
     await user.click(screen.getByRole("button", { name: "Next" }));
@@ -297,9 +297,9 @@ describe("(c) the board's sign-off and payment cards reach checkout in the right
     expect(sheet.getByRole("heading", { name: "Session schedule" })).toBeInTheDocument();
     // Paid and skipped sessions have no link: the checkout would refuse them.
     const owed = storedCase(TAI_CHI).schedule!.occurrences.filter((o) => o.billing === "due" || o.billing === "upcoming");
-    expect(sheet.getAllByRole("link", { name: "Pay this session" })).toHaveLength(owed.length);
+    expect(sheet.getAllByRole("link", { name: /^Pay this session: / })).toHaveLength(owed.length);
 
-    await user.click(sheet.getAllByRole("link", { name: "Pay this session" })[0]);
+    await user.click(sheet.getAllByRole("link", { name: /^Pay this session: / })[0]);
 
     // Checkout, session mode, for the session that is due today.
     expect(here()).toBe(routes.quote(TAI_CHI, { pay: "session", date: due }));
@@ -658,7 +658,7 @@ describe("(g) the landing page's two doors and the demo guide's paths land on re
     const { user } = await renderApp({ path: routes.demo() });
 
     const card = screen.getByRole("heading", { name: title }).closest('[data-slot="panel"]') as HTMLElement;
-    await user.click(within(card).getByRole("button", { name: "Start this path" }));
+    await user.click(within(card).getByRole("button", { name: /^Start this path: / }));
 
     expect(navState.pathname, `path ${id}`).not.toBe(routes.demo());
     expectRealScreen();
@@ -689,11 +689,11 @@ describe("(g) the landing page's two doors and the demo guide's paths land on re
 
   it("the guide's scenario table jumps to real screens as well", async () => {
     const { user } = await renderApp({ path: routes.demo() });
-    const count = screen.getAllByRole("button", { name: "Jump" }).length;
+    const count = screen.getAllByRole("button", { name: /^Jump to / }).length;
     expect(count).toBe(6);
 
     for (let i = 0; i < count; i++) {
-      await user.click(screen.getAllByRole("button", { name: "Jump" })[i]);
+      await user.click(screen.getAllByRole("button", { name: /^Jump to / })[i]);
       expect(navState.pathname).not.toBe(routes.demo());
       expectRealScreen();
       navigate(routes.demo());
@@ -952,7 +952,7 @@ describe("the demo paths that cross surfaces have a control for every step", () 
     await user.clear(screen.getByLabelText("Width (ft)"));
     await user.type(screen.getByLabelText("Width (ft)"), "80");
     await user.click(screen.getByRole("button", { name: "Next" }));
-    await user.click(screen.getByRole("button", { name: "Event date" }));
+    await user.click(screen.getByRole("button", { name: /^Date\b/ }));
     await user.click(screen.getByRole("button", { name: "Go to the Next Month" }));
     await user.click(screen.getByRole("button", { name: "Go to the Next Month" }));
     await user.click(screen.getByRole("button", { name: /July 11th, 2027/ }));
@@ -1484,7 +1484,7 @@ describe("(j) Settings reach the wizard: a threshold the Clerk edits is the one 
     await user.click(screen.getByRole("button", { name: "Next" }));
     await user.click(screen.getByRole("button", { name: /^Shelter 2/ }));
     await user.click(screen.getByRole("button", { name: "Next" }));
-    await user.click(screen.getByRole("button", { name: "Event date" }));
+    await user.click(screen.getByRole("button", { name: /^Date\b/ }));
     await user.click(screen.getByRole("button", { name: "Go to the Next Month" }));
     await user.click(screen.getByRole("button", { name: /June 19th, 2027/ }));
     await user.click(screen.getByRole("button", { name: "Next" }));
@@ -1523,7 +1523,7 @@ describe("(j) the demo coach and the command palette land on real screens", () =
   it("the strip follows a path across pages and roles: path 6 from the guide, its switch to the Clerk, and its end on the applicant's board", async () => {
     const { user } = await renderApp({ path: routes.demo() });
     const card = screen.getByRole("heading", { name: "Closeout" }).closest('[data-slot="panel"]') as HTMLElement;
-    await user.click(within(card).getByRole("button", { name: "Start this path" }));
+    await user.click(within(card).getByRole("button", { name: /^Start this path: / }));
     expect(here()).toBe(routes.city.case(S6));
     expect(screen.getByText("Path 6 · Step 1 of 3")).toBeInTheDocument();
 

@@ -36,6 +36,9 @@ const CONTROLS = [
   '[role="searchbox"]',
 ].join(", ");
 
+/** What the Tab key stops on. */
+const TAB_STOPS = 'a[href], button, input:not([type="hidden"]), select, textarea, summary, [tabindex]';
+
 const INTERACTIVE = 'a[href], button, input:not([type="hidden"]), select, textarea, [role="button"], [role="link"]';
 
 function idRefs(el: Element, attribute: string): string[] {
@@ -218,6 +221,16 @@ export function auditPage(options: AuditOptions = {}): string[] {
     if (svg.closest('[role="img"]') && svg.getAttribute("role") !== "img") continue;
     const named = svg.hasAttribute("aria-label") || svg.hasAttribute("aria-labelledby") || svg.querySelector(":scope > title");
     if (!named) problems.push(`SVG neither hidden nor named: ${describeElement(svg)}`);
+  }
+
+  // Hidden from a screen reader and still a tab stop: focus lands on something that is not there.
+  for (const el of Array.from(doc.querySelectorAll<HTMLElement>(`[aria-hidden="true"] :is(${TAB_STOPS})`))) {
+    if (el.closest("[inert], [hidden]") || el.getAttribute("tabindex") === "-1" || (el as HTMLButtonElement).disabled) continue;
+    // The page behind an open dialog: Radix hides it (and marks what it hid) and traps focus in the dialog.
+    if (el.closest('[data-aria-hidden="true"]')) continue;
+    // Radix parks a native input under its checkbox, switch and select for forms: hidden, and out of the tab order.
+    if (el.matches('input[aria-hidden="true"], select[aria-hidden="true"]')) continue;
+    problems.push(`A tab stop inside aria-hidden: ${describeElement(el)}`);
   }
 
   for (const el of accessible(doc, INTERACTIVE)) {

@@ -25,6 +25,7 @@ import {
   SheetTitle,
 } from "@/components/ui/sheet"
 import { Textarea } from "@/components/ui/textarea"
+import { handleRadioGroupKeyDown, radioTabIndex } from "@/components/ui/radio-keys"
 import { fmtDateShort } from "@/lib/format"
 import { routes } from "@/lib/routes"
 import { checkCompleteTask, taskDueDate, useDemo, type Action } from "@/lib/state"
@@ -324,6 +325,8 @@ function SignoffBody({ c, task, dispatch }: BodyProps) {
   return (
     <div className="flex flex-col gap-4">
       <Progress value={done} max={total} label={`${done} of ${total} neighbors`} />
+      {/* A simulated sign-off has no toast: this is what says the count moved. */}
+      <p className="sr-only" role="status">{`${done} of ${total} neighbors have signed off.`}</p>
       <CopyButton value={link} label="Copy the neighbor sign-off link" copiedLabel="Link copied" />
       {done < total ? (
         <Button type="button" variant="secondary" onClick={() => dispatch({ type: "simulate_signoff" })}>
@@ -413,7 +416,11 @@ function SubmitApplicationBody({ c, task, onClose }: BodyProps) {
           </li>
         ))}
       </ul>
-      {error ? <InlineAlert variant="danger">{error}</InlineAlert> : null}
+      {error ? (
+        <InlineAlert variant="danger" live>
+          {error}
+        </InlineAlert>
+      ) : null}
       <Button
         type="button"
         disabled={!ready}
@@ -440,18 +447,21 @@ function FeedbackBody({ task, dispatch, onClose }: BodyProps) {
   const done = task.status === "done"
   return (
     <div className="flex flex-col gap-4">
-      <div className="flex items-center gap-1" role="radiogroup" aria-label="Rating">
-        {[1, 2, 3, 4, 5].map((n) => (
+      {/* A radio group: one tab stop, the arrow keys move through the stars, and each says how many it is. */}
+      <div className="flex items-center gap-1" role="radiogroup" aria-label="Rating" onKeyDown={handleRadioGroupKeyDown}>
+        {[1, 2, 3, 4, 5].map((n, index) => (
           <button
             key={n}
             type="button"
             role="radio"
             aria-checked={rating === n}
+            aria-label={n === 1 ? "1 star" : `${n} stars`}
+            tabIndex={radioTabIndex(rating === n, rating >= 1 && rating <= 5, index)}
             onClick={() => setRating(n)}
             disabled={done}
             className="flex size-11 shrink-0 items-center justify-center rounded-control text-2xl outline-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring disabled:opacity-60"
           >
-            {n <= rating ? "★" : "☆"}
+            <span aria-hidden="true">{n <= rating ? "★" : "☆"}</span>
           </button>
         ))}
       </div>
@@ -561,7 +571,9 @@ function CardSheetContent({ c, task, onClose }: CardSheetContentProps) {
   }
 
   return (
-    <SheetContent>
+    // A pinned request shows the reviewer's message in place of the card's description: the
+    // sheet then has none, on purpose (`undefined` tells Radix so).
+    <SheetContent {...(pinned ? { "aria-describedby": undefined } : {})}>
       <SheetHeader>
         <TaskKindLabel kind={task.kind} />
         <SheetTitle>{task.title}</SheetTitle>

@@ -8,7 +8,7 @@ import { BookingPanel } from "@/components/checkout/BookingPanel";
 import { FinalPanel } from "@/components/checkout/FinalPanel";
 import { QuotePanel } from "@/components/checkout/QuotePanel";
 import { SessionPanel } from "@/components/checkout/SessionPanel";
-import { CaseNotFound } from "@/components/shell";
+import { CaseNotFound, useDocumentTitle } from "@/components/shell";
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
 import { PageHeader } from "@/components/ui/page-header";
@@ -75,6 +75,7 @@ function CheckoutScreen() {
   const [paid, setPaid] = React.useState<{ visit: string; kind: PaidKind } | null>(null);
 
   const c = cases.find((x) => x.id === id);
+  useDocumentTitle(c ? `${c.name || "Untitled event"} · Pay` : null);
   if (!c) return <CaseNotFound id={id} backHref={routes.events()} backLabel="Back to My events" />;
   if (paid?.visit === visit) return <PaidPanel c={c} kind={paid.kind} />;
 

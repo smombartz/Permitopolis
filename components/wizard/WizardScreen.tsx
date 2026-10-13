@@ -7,7 +7,7 @@ import { PageHeader } from "@/components/ui/page-header";
 import { WizardStepper } from "@/components/ui/wizard-stepper";
 import { StickyAside } from "@/components/ui/sticky-aside";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
-import { CaseNotFound, useIsNarrow } from "@/components/shell";
+import { CaseNotFound, useDocumentTitle, useIsNarrow } from "@/components/shell";
 import { useDemo } from "@/lib/state";
 import { classify, requirements } from "@/lib/rules";
 import { routes } from "@/lib/routes";
@@ -19,6 +19,7 @@ import {
   WIZARD_STEPS,
   WIZARD_STEP_LABEL,
   buildResultPanel,
+  dateGateAnnouncement,
   furthestAnsweredStep,
   nextWizardStep,
   previousWizardStep,
@@ -28,6 +29,7 @@ import {
   wizardStepIndex,
 } from "@/lib/view/wizard";
 import { ResultPanel } from "./ResultPanel";
+import { WizardAnnouncer } from "./WizardAnnouncer";
 import { StepWhat } from "./StepWhat";
 import { StepWhere } from "./StepWhere";
 import { StepWhen } from "./StepWhen";
@@ -88,6 +90,7 @@ function WizardScreen() {
   const step: WizardStep = resolveWizardStep(stepParam, draft?.wizardStep ?? "what");
 
   const answers: EventAnswers = draft ?? pendingAnswers;
+  useDocumentTitle(answers.name ? `${answers.name} · Plan an event` : null);
   // The furthest step shown on this visit, for the draft it was shown for (a blank wizard keeps
   // its count when its first entry starts the draft; another draft starts over). With the step
   // the answers themselves reach, it is how far the stepper's edit links go: a presenter who
@@ -106,16 +109,14 @@ function WizardScreen() {
   // on the step itself.
   const previousTier = React.useRef(panel.tier);
   const [tierHighlight, setTierHighlight] = React.useState(false);
-  const [tierAnnouncement, setTierAnnouncement] = React.useState("");
   React.useEffect(() => {
     if (previousTier.current !== panel.tier) {
       previousTier.current = panel.tier;
       setTierHighlight(true);
-      setTierAnnouncement(panel.summary);
       const timeout = setTimeout(() => setTierHighlight(false), 900);
       return () => clearTimeout(timeout);
     }
-  }, [panel.tier, panel.summary]);
+  }, [panel.tier]);
 
   // A case that is no longer a Draft (S2's jump after it has been booked, say) belongs on its
   // board, not in the wizard.
@@ -246,9 +247,7 @@ function WizardScreen() {
 
   return (
     <div className={narrow ? "flex flex-col gap-6 pb-20" : "flex flex-col gap-6"}>
-      <span data-slot="wizard-tier-announcement" className="sr-only" role="status" aria-live="polite">
-        {tierAnnouncement}
-      </span>
+      <WizardAnnouncer tier={panel.tier} summary={panel.summary} gateMessage={dateGateAnnouncement(panel.dateGate, panel.leadTimeDays, draft?.flags.lateFee ?? false)} />
       <PageHeader
         eyebrow="Apply for a permit"
         title={answers.name || "New event"}

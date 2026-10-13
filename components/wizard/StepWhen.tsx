@@ -56,7 +56,7 @@ function StepWhen({ answers, onChange, onLateFee, lateFee, panel, today }: StepW
       </div>
 
       <Field label="Date" required>
-        <DatePickerPopover value={schedule?.date ?? null} onChange={handleDateChange} today={today} aria-label="Event date" />
+        <DatePickerPopover value={schedule?.date ?? null} onChange={handleDateChange} today={today} />
       </Field>
 
       {schedule ? (
@@ -106,7 +106,6 @@ function StepWhen({ answers, onChange, onLateFee, lateFee, panel, today }: StepW
                       onChange={(until) => patchSchedule({ recurrence: { ...schedule.recurrence!, until } })}
                       today={today}
                       minDate={schedule.date}
-                      aria-label="Repeat end date"
                     />
                   </Field>
                 </div>
@@ -129,7 +128,7 @@ function StepWhen({ answers, onChange, onLateFee, lateFee, panel, today }: StepW
           firstOccurrence.availability.nextOpen.length > 0 ? (
             <div className="flex flex-wrap gap-2">
               {firstOccurrence.availability.nextOpen.map((date) => (
-                <Button key={date} type="button" variant="secondary" size="sm" onClick={() => handleDateChange(date)}>
+                <Button key={date} type="button" variant="secondary" size="sm" aria-label={`Use ${fmtDate(date)} instead`} onClick={() => handleDateChange(date)}>
                   {fmtDate(date)}
                 </Button>
               ))}

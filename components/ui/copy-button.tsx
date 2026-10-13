@@ -40,10 +40,16 @@ function CopyButton({
   }
 
   return (
-    <Button type="button" variant={variant} size={size} onClick={handleClick} {...props}>
-      {copied ? <CheckIcon data-icon="inline-start" /> : <CopyIcon data-icon="inline-start" />}
-      {copied ? copiedLabel : label}
-    </Button>
+    <>
+      <Button type="button" variant={variant} size={size} onClick={handleClick} {...props}>
+        {copied ? <CheckIcon data-icon="inline-start" /> : <CopyIcon data-icon="inline-start" />}
+        {copied ? copiedLabel : label}
+      </Button>
+      {/* The label swap is silent to a screen reader: this says it, once, while the swap lasts. */}
+      <span data-slot="copy-status" role="status" className="sr-only">
+        {copied ? copiedLabel : ""}
+      </span>
+    </>
   )
 }
 

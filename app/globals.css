@@ -72,8 +72,11 @@
     @apply bg-background text-foreground;
   }
   html {
-    /* The sticky top bar is 56px: what focus scrolls into view lands clear of it (WCAG 2.4.11). */
-    scroll-padding-top: 5rem;
+    /*
+     * The sticky top bar is 56px, and below 1024px the wizard pins its plan bar to the bottom:
+     * what focus scrolls into view lands clear of both (WCAG 2.4.11).
+     */
+    scroll-padding-block: 5rem;
   }
   /*
    * The system focus ring (Rime & Ink, "Focus-visible"), for anything focusable that names no

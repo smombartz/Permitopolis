@@ -31,7 +31,7 @@ function SignatureForm({ disabled = false, disabledReason, onSign }: SignatureFo
 
   return (
     <form onSubmit={handleSubmit} className="flex flex-col gap-4">
-      <Field label="Type your full legal name to sign" hint="This typed name is your signature.">
+      <Field label="Type your full legal name to sign" required hint="This typed name is your signature.">
         <Input
           value={name}
           onChange={(e) => setName(e.target.value)}
@@ -48,12 +48,16 @@ function SignatureForm({ disabled = false, disabledReason, onSign }: SignatureFo
           disabled={disabled}
           className="mt-0.5"
         />
-        <Label htmlFor="quote-sign-consent" className="normal-case text-sm font-normal text-fg-secondary">
+        <Label htmlFor="quote-sign-consent" className="normal-case text-sm font-normal text-fg-secondary pointer-coarse:min-h-11">
           I have read and accept every condition above.
         </Label>
       </div>
       {disabled && disabledReason ? <InlineAlert variant="info">{disabledReason}</InlineAlert> : null}
-      {error ? <InlineAlert variant="danger">{error}</InlineAlert> : null}
+      {error ? (
+        <InlineAlert variant="danger" live>
+          {error}
+        </InlineAlert>
+      ) : null}
       <Button type="submit" disabled={!canSubmit} className="self-start">
         Accept and sign
       </Button>

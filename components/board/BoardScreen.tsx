@@ -12,7 +12,7 @@ import { CaseHeader } from "@/components/domain/CaseHeader"
 import { EndingBanner } from "@/components/domain/EndingBanner"
 import { PartyChip } from "@/components/domain/PartyChip"
 import { ReviewStatusDot } from "@/components/domain/ReviewStatusDot"
-import { CaseNotFound, useIsNarrow } from "@/components/shell"
+import { CaseNotFound, useDocumentTitle, useIsNarrow } from "@/components/shell"
 import { Banner } from "@/components/ui/banner"
 import { Button } from "@/components/ui/button"
 import { EmptyState } from "@/components/ui/empty-state"
@@ -99,6 +99,7 @@ function BoardScreen() {
   // Below 768px the header's stepper is markers and the one current label (see CaseHeader).
   const narrow = useIsNarrow()
   const c = cases.find((candidate) => candidate.id === id)
+  useDocumentTitle(c ? `${c.name || "Untitled event"} · Board` : null)
 
   const grouping: Grouping = searchParams.get("group") === "phase" ? "phase" : "columns"
   const cardParam = searchParams.get("card")

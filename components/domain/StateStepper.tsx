@@ -82,7 +82,10 @@ function StateStepper({ state, ending, compact = false, className }: StateSteppe
                     <EndingIcon className="size-2.5 stroke-[3px]" aria-hidden="true" />
                   ) : null}
                   {/* Every marker, compact or not, carries its own accessible name. */}
-                  <span className="sr-only">{stepName}</span>
+                  <span className="sr-only">
+                    {stepName}
+                    {done ? ", done" : ""}
+                  </span>
                 </span>
                 {!compact ? (
                   <span

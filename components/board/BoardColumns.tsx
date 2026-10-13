@@ -157,7 +157,7 @@ function BoardColumns({ c, today, grouping, activeTab, onActiveTabChange, onOpen
         {/* Two rows of two: four nowrap tabs with their counts need about 450px, and a phone has 335. */}
         <TabsList className="grid w-full grid-cols-2 gap-1 group-data-horizontal/tabs:h-auto">
           {COLUMN_ORDER.map((col) => (
-            <TabsTrigger key={col} value={col} className="h-9 gap-1.5 px-2 text-xs">
+            <TabsTrigger key={col} value={col} className="h-9 gap-1.5 px-2 text-xs pointer-coarse:h-11">
               {COLUMN_LABEL[col]}
               <CountBadge count={grouped[col].length} />
             </TabsTrigger>

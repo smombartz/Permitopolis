@@ -73,7 +73,7 @@ describe("WizardScreen: a new applicant watches the tier move (demo path 2)", ()
     await user.click(screen.getByRole("button", { name: "Next" }));
 
     // Step 3: When - Jun 19, comfortably past Instant's 10-day lead time.
-    await user.click(screen.getByRole("button", { name: "Event date" }));
+    await user.click(screen.getByRole("button", { name: /^Date\b/ }));
     await user.click(screen.getByRole("button", { name: "Go to the Next Month" }));
     await user.click(screen.getByRole("button", { name: /June 19th, 2027/ }));
     await user.click(screen.getByRole("button", { name: "Next" }));
@@ -164,7 +164,7 @@ describe("WizardScreen: availability and the lead-time gate", () => {
     await user.click(screen.getByRole("button", { name: /^Shelter 3/ }));
     await user.click(screen.getByRole("button", { name: "Next" }));
 
-    await user.click(screen.getByRole("button", { name: "Event date" }));
+    await user.click(screen.getByRole("button", { name: /^Date\b/ }));
     await user.click(dateButton(/May 22nd, 2027/));
 
     expect(screen.getAllByText("Booked").length).toBeGreaterThan(0);
@@ -182,7 +182,7 @@ describe("WizardScreen: availability and the lead-time gate", () => {
     await user.click(screen.getByRole("button", { name: /^Shelter 2/ }));
     await user.click(screen.getByRole("button", { name: "Next" }));
 
-    await user.click(screen.getByRole("button", { name: "Event date" }));
+    await user.click(screen.getByRole("button", { name: /^Date\b/ }));
     await user.click(dateButton(/May 22nd, 2027/));
     await user.click(screen.getByRole("button", { name: "Next" }));
     await user.click(screen.getByRole("switch", { name: "Amplified sound" }));
@@ -193,7 +193,11 @@ describe("WizardScreen: availability and the lead-time gate", () => {
     expect(screen.getByRole("button", { name: "Drop amplified sound" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /^Pay a \$[\d.]+ late fee$/ })).toBeInTheDocument();
     // The PRD's words: 19 days left, 30 needed. Not "19 more days".
-    expect(screen.getByText("19 days left, 30 needed. This event needs 11 more days of notice than it has.")).toBeInTheDocument();
+    const banner = within(document.querySelector<HTMLElement>('[data-slot="date-gate-banner"]')!);
+    expect(banner.getByText("19 days left, 30 needed. This event needs 11 more days of notice than it has.")).toBeInTheDocument();
+    // Said once to a screen reader, by the wizard's own status line: the banner is not a live region.
+    expect(document.querySelector('[data-slot="wizard-date-announcement"]')).toHaveTextContent("19 days left, 30 needed. This event needs 11 more days of notice than it has.");
+    expect(document.querySelector('[data-slot="date-gate-banner"]')).not.toHaveAttribute("role");
     expect(screen.queryByText(/needs 19 more/)).not.toBeInTheDocument();
   });
 
@@ -206,7 +210,7 @@ describe("WizardScreen: availability and the lead-time gate", () => {
     await user.click(screen.getByRole("button", { name: "Next" }));
     await user.click(screen.getByRole("button", { name: /^Shelter 2/ }));
     await user.click(screen.getByRole("button", { name: "Next" }));
-    await user.click(screen.getByRole("button", { name: "Event date" }));
+    await user.click(screen.getByRole("button", { name: /^Date\b/ }));
     await user.click(dateButton(/May 22nd, 2027/));
     await user.click(screen.getByRole("button", { name: "Next" }));
     await user.type(screen.getByLabelText(/Expected attendance/), "40");
@@ -222,7 +226,7 @@ describe("WizardScreen: availability and the lead-time gate", () => {
 
     expect(screen.getByRole("heading", { level: 2, name: "Your plan at a glance" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Create my to-do board" })).toBeDisabled();
-    expect(screen.getByText(/^19 days left, 30 needed\./)).toBeInTheDocument();
+    expect(within(document.querySelector<HTMLElement>('[data-slot="date-gate-banner"]')!).getByText(/^19 days left, 30 needed\./)).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Drop amplified sound" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /^Pay a \$[\d.]+ late fee$/ })).toBeInTheDocument();
 
@@ -239,7 +243,8 @@ describe("WizardScreen: availability and the lead-time gate", () => {
 
     await user.click(screen.getByRole("button", { name: /^Pay a \$[\d.]+ late fee$/ }));
     expect(storedCase(draftId()).flags.lateFee).toBe(true);
-    expect(screen.getByText(/late fee is added, so this date can stand\./)).toBeInTheDocument();
+    expect(within(document.querySelector<HTMLElement>('[data-slot="date-gate-banner"]')!).getByText(/late fee is added, so this date can stand\./)).toBeInTheDocument();
+    expect(document.querySelector('[data-slot="wizard-date-announcement"]')).toHaveTextContent(/late fee is added, so this date can stand\./);
     expect(screen.queryByRole("button", { name: /^Pay a / })).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Create my to-do board" })).toBeEnabled();
 
@@ -318,7 +323,7 @@ describe("WizardScreen: step 3's repeat follows the date", () => {
     const { user } = await renderScreen(<WizardScreen />, { scenario: "S2" });
     expect(screen.getByText(/Repeats every Sunday/)).toBeInTheDocument();
 
-    await user.click(screen.getByRole("button", { name: "Event date" }));
+    await user.click(screen.getByRole("button", { name: /^Date\b/ }));
     await user.click(dateButton(/June 12th, 2027/));
 
     expect(screen.getByText(/Repeats every Saturday/)).toBeInTheDocument();

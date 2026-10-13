@@ -44,9 +44,11 @@ function ToggleRow({
           <Label htmlFor={id} className="normal-case text-sm font-semibold text-fg tracking-normal">
             {label}
           </Label>
-          <p className="text-xs text-fg-secondary">{effect}</p>
+          <p id={`${id}-effect`} className="text-xs text-fg-secondary">
+            {effect}
+          </p>
         </div>
-        <Switch id={id} checked={checked} onCheckedChange={onCheckedChange} />
+        <Switch id={id} aria-describedby={`${id}-effect`} checked={checked} onCheckedChange={onCheckedChange} />
       </div>
       {checked && children ? <div className="flex flex-col gap-3 border-t border-line-subtle pt-3">{children}</div> : null}
     </div>
@@ -108,7 +110,7 @@ function StepSize({ answers, onChange, cfg }: StepSizeProps) {
       </Field>
 
       {warning ? (
-        <Banner variant="warning">
+        <Banner variant="warning" live>
           {warning.text}
           {warning.suggestionId ? (
             <Button

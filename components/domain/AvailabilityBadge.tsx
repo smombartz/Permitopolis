@@ -35,17 +35,23 @@ function AvailabilityBadge({ availability, className, ...props }: AvailabilityBa
       data-slot="availability-badge"
       data-status={availability.status}
       className={cn(
-        "inline-flex h-7 w-fit shrink-0 items-center gap-1.5 rounded-full border px-2.5 text-xs font-semibold whitespace-nowrap",
+        // With a reason it can be long (another event's 90-character name "has this date held"),
+        // so it wraps inside whatever holds it; with none it is the one-line pill it always was.
+        "inline-flex min-h-7 w-fit max-w-full items-center gap-1.5 border px-2.5 py-1 text-xs font-semibold",
+        availability.reason ? "rounded-panel" : "shrink-0 rounded-full whitespace-nowrap",
         AVAILABILITY_CLASS[availability.status],
         className
       )}
       {...props}
     >
       <Icon className="size-3.5 shrink-0" aria-hidden="true" />
-      {AVAILABILITY_LABEL[availability.status]}
       {availability.reason ? (
-        <span className="font-normal normal-case">· {availability.reason}</span>
-      ) : null}
+        <span className="min-w-0 break-words">
+          {AVAILABILITY_LABEL[availability.status]} <span className="font-normal normal-case">· {availability.reason}</span>
+        </span>
+      ) : (
+        AVAILABILITY_LABEL[availability.status]
+      )}
     </span>
   )
 }

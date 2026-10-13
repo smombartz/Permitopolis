@@ -11,6 +11,7 @@ import {
   furthestAnsweredStep,
   groupTasksByPhase,
   isWizardStep,
+  dateGateAnnouncement,
   lateFeeCarriesDate,
   leadTimeGapText,
   missingFields,
@@ -368,5 +369,37 @@ describe("lateFeeCarriesDate", () => {
   it("is false once the date passes on its own", () => {
     const later: EventAnswers = { ...tooClose, schedule: { ...tooClose.schedule!, date: "2027-06-19" } };
     expect(lateFeeCarriesDate(buildResultPanel(later, ctx).dateGate, true)).toBe(false);
+  });
+});
+
+describe("dateGateAnnouncement: what the wizard's status line says when the gate changes", () => {
+  const tooClose: EventAnswers = { ...baseAnswers, addOns: { ...EMPTY_ADDONS, amplifiedSound: true }, schedule: { date: "2027-05-22", start: "11:00", end: "16:00", occurrences: [] } };
+
+  it("says nothing while the gate passes", () => {
+    const panel = buildResultPanel(baseAnswers, ctx);
+    expect(panel.dateGate.ok).toBe(true);
+    expect(dateGateAnnouncement(panel.dateGate, panel.leadTimeDays, false)).toBe("");
+  });
+
+  it("a date that is too close is said in the banner's own words", () => {
+    const panel = buildResultPanel(tooClose, ctx);
+    expect(dateGateAnnouncement(panel.dateGate, panel.leadTimeDays, false)).toBe("19 days left, 30 needed. This event needs 11 more days of notice than it has.");
+  });
+
+  it("the late fee, once it carries the date, is said in place of the gap", () => {
+    const panel = buildResultPanel(tooClose, ctx, { lateFee: true });
+    expect(dateGateAnnouncement(panel.dateGate, panel.leadTimeDays, true)).toMatch(/^A \$[\d,.]+ late fee is added, so this date can stand\.$/);
+  });
+
+  it("a blacked-out date says why, and the late fee does not change that", () => {
+    const blackedOut: EventAnswers = {
+      ...baseAnswers,
+      location: { mode: "inventory", inventoryIds: ["shelter-2"], segmentIds: [], capacity: 40, label: "Shelter 2, Riverside Park" },
+      schedule: { date: "2027-05-31", start: "11:00", end: "16:00", occurrences: [] },
+    };
+    const panel = buildResultPanel(blackedOut, ctx);
+    const said = dateGateAnnouncement(panel.dateGate, panel.leadTimeDays, true);
+    expect(said).toBe(`That date isn't available: ${panel.dateGate.availability.reason}.`);
+    expect(said).not.toMatch(/\.\.$/);
   });
 });

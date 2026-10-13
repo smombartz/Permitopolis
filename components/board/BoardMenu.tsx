@@ -70,18 +70,22 @@ function BoardMenu({ c }: BoardMenuProps) {
               </Link>
             </DropdownMenuItem>
           ) : (
-            <DropdownMenuItem disabled title={amend.reason}>
-              <FilePenLineIcon data-icon="inline-start" />
-              Change your event
-            </DropdownMenuItem>
+            <>
+              <DropdownMenuItem disabled>
+                <FilePenLineIcon data-icon="inline-start" />
+                Change your event
+              </DropdownMenuItem>
+              {/* Why not, in words on the menu: a tooltip on a disabled item reaches neither a keyboard nor a phone. */}
+              <p className="max-w-56 px-2.5 pb-1.5 text-xs text-fg-secondary">{amend.reason}</p>
+            </>
           )}
           {hasPermit ? (
-            <DropdownMenuItem variant="destructive" onSelect={() => setCancelOpen(true)}>
+            <DropdownMenuItem variant="destructive" aria-label="Cancel this permit" onSelect={() => setCancelOpen(true)}>
               <OctagonXIcon data-icon="inline-start" />
               Cancel
             </DropdownMenuItem>
           ) : (
-            <DropdownMenuItem variant="destructive" onSelect={() => setWithdrawOpen(true)}>
+            <DropdownMenuItem variant="destructive" aria-label="Withdraw this application" onSelect={() => setWithdrawOpen(true)}>
               <OctagonXIcon data-icon="inline-start" />
               Withdraw
             </DropdownMenuItem>

@@ -5,7 +5,7 @@ import { useParams } from "next/navigation";
 import { FilePenLineIcon, FileQuestionIcon } from "lucide-react";
 import { PermitCard } from "@/components/permit/PermitCard";
 import { PermitPrintStyles } from "@/components/permit/PermitPrintStyles";
-import { CaseNotFound } from "@/components/shell";
+import { CaseNotFound, useDocumentTitle } from "@/components/shell";
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
 import { PageHeader } from "@/components/ui/page-header";
@@ -26,6 +26,7 @@ function PermitScreen() {
   const cfg = useDemo((s) => s.cfg);
 
   const c = cases.find((x) => x.id === id);
+  useDocumentTitle(c ? `${c.name || "Untitled event"} · Permit` : null);
   if (!c) return <CaseNotFound id={id} backHref={routes.events()} backLabel="Back to My events" />;
 
   const info = permitPageInfo(c);

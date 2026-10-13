@@ -59,7 +59,7 @@ function ResultPanel({ panel, onApplyWhatIf, highlight = false, compactFees = tr
       {panel.whatIf.length > 0 ? (
         <div className="flex flex-col gap-1.5">
           {panel.whatIf.map((w) => (
-            <Button key={w.triggerId} type="button" variant="secondary" size="sm" className="justify-start" onClick={() => onApplyWhatIf(w.triggerId)}>
+            <Button key={w.triggerId} type="button" variant="secondary" size="sm" className="h-auto min-h-9 justify-start py-2 text-left whitespace-normal" onClick={() => onApplyWhatIf(w.triggerId)}>
               {w.text}
             </Button>
           ))}

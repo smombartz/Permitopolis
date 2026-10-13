@@ -4,6 +4,7 @@ import { useParams } from "next/navigation";
 import { CircleCheckIcon, CircleXIcon } from "lucide-react";
 import { ConditionList } from "@/components/domain";
 import { PageSkeleton } from "@/components/ui/page-skeleton";
+import { useDocumentTitle } from "@/components/shell";
 import { cn } from "@/lib/utils";
 import { fmtDate, fmtNumber, fmtTimeRange } from "@/lib/format";
 import { eventDate, permittedPlan, useDemo, useHydrated } from "@/lib/state";
@@ -19,6 +20,8 @@ function VerifyScreen() {
   const id = Array.isArray(params.id) ? params.id[0] : params.id;
   const cases = useDemo((s) => s.cases);
   const today = useDemo((s) => s.demoToday);
+  // The answer is in the title too: it is what a screen reader says first, and what the tab shows.
+  useDocumentTitle(hydrated ? `${verifyStatus(cases.find((x) => x.id === id)).valid ? "Valid" : "Not valid"}: permit ${id}` : null);
 
   if (!hydrated) {
     return (

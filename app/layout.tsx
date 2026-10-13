@@ -13,8 +13,10 @@ const plexMono = IBM_Plex_Mono({
   weight: ["400", "500", "600"],
 });
 
+// Each page names itself (WCAG 2.4.2), and Next's route announcer reads the title out on every
+// client-side navigation: with one title for every route it said the same words each time.
 export const metadata: Metadata = {
-  title: "Permitopolis · City Clerk · Events Permitting",
+  title: { default: "Permitopolis · City Clerk · Events Permitting", template: "%s · Permitopolis" },
   description:
     "Plan an event in Permitopolis. Describe it once and see the permits, deadlines and fees that apply.",
 };

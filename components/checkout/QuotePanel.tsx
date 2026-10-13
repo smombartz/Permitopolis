@@ -82,6 +82,17 @@ function QuotePanel({ c, today, amendment = false, onSettled }: QuotePanelProps)
     router.push(routes.event(c.id));
   }
 
+  // Signing takes the signature form away, and paying takes the card form away, each with the
+  // button that had focus. Focus moves on to what comes next in the Pay section (the card
+  // number once signed, the way back once paid), not to the top of the page.
+  const payRef = React.useRef<HTMLDivElement>(null);
+  const before = React.useRef({ signed, paid });
+  React.useEffect(() => {
+    const moved = (signed && !before.current.signed) || (paid && !before.current.paid);
+    before.current = { signed, paid };
+    if (moved) payRef.current?.querySelector<HTMLElement>("input:not(:disabled), a[href], button:not(:disabled)")?.focus();
+  }, [signed, paid]);
+
   function toggleAccept(id: string) {
     setAcceptedIds((current) => (current.includes(id) ? current.filter((x) => x !== id) : [...current, id]));
   }
@@ -174,6 +185,7 @@ function QuotePanel({ c, today, amendment = false, onSettled }: QuotePanelProps)
       ) : null}
 
       <Section title="Pay">
+        <div ref={payRef} className="flex flex-col gap-4">
         {paid ? (
           <div className="flex flex-col gap-3">
             <InlineAlert variant="success">{amendment ? (signed ? "Nothing more to pay." : "Nothing more to pay. Sign above to put your change into effect.") : afterQuotePaymentMessage(c)}</InlineAlert>
@@ -190,6 +202,7 @@ function QuotePanel({ c, today, amendment = false, onSettled }: QuotePanelProps)
             onPay={handlePay}
           />
         )}
+        </div>
       </Section>
     </div>
   );

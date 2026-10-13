@@ -59,7 +59,7 @@ function WizardStepper({ steps, current, reached, onStepSelect, className, ...pr
                 type="button"
                 onClick={() => onStepSelect?.(index)}
                 aria-current={isCurrent ? "step" : undefined}
-                className="flex items-center gap-1.5 rounded-control outline-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring"
+                className="relative flex items-center gap-1.5 rounded-control outline-none pointer-coarse:after:absolute pointer-coarse:after:-inset-2.5 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring"
               >
                 {marker}
                 <span className="sr-only">Step {index + 1}: </span>

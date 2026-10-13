@@ -78,7 +78,11 @@ function AmendReviewStep({ diff, gateBanner, leadTimeDays, ready, error, onConfi
         </p>
       </section>
 
-      {error ? <InlineAlert variant="danger">{error}</InlineAlert> : null}
+      {error ? (
+        <InlineAlert variant="danger" live>
+          {error}
+        </InlineAlert>
+      ) : null}
 
       <Button type="button" disabled={!ready} onClick={onConfirm} className="self-start">
         {diff.material ? "Confirm change" : "Apply change"}

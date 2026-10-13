@@ -5,7 +5,7 @@ import { Money } from "@/components/domain/Money"
 import { Button } from "@/components/ui/button"
 import { SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet"
 import { Stat } from "@/components/ui/stat"
-import { plural } from "@/lib/format"
+import { fmtDateShort, plural } from "@/lib/format"
 import { useDemo } from "@/lib/state"
 import type { EventCase } from "@/lib/types"
 import { seriesSessions, seriesTotals } from "@/lib/view/board"
@@ -47,7 +47,9 @@ function SeriesScheduleSheet({ c }: { c: EventCase }) {
             </div>
             {row.payHref ? (
               <Button asChild size="sm" variant="secondary">
-                <Link href={row.payHref}>Pay this session</Link>
+                <Link href={row.payHref} aria-label={`Pay this session: ${fmtDateShort(row.date)}`}>
+                  Pay this session
+                </Link>
               </Button>
             ) : (
               <Money amount={row.amount} />

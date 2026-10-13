@@ -33,7 +33,8 @@ function Hero() {
     <section className="page-container grid grid-cols-1 items-center gap-16 pt-16 pb-10 lg:grid-cols-[0.9fr_1.1fr] lg:pt-24">
       <div className="flex flex-col items-start gap-6">
         <Eyebrow>City Clerk &middot; Events Permitting</Eyebrow>
-        <h1 className="text-hero font-bold text-balance text-fg">
+        {/* 72px needs about 300px for "Describe": below 640px the headline is 60px, and a word wraps before it pushes the page sideways. */}
+        <h1 className="text-display font-bold text-balance break-words text-fg sm:text-hero">
           Describe your event. We work out your{" "}
           <span className="relative inline-block">
             permit

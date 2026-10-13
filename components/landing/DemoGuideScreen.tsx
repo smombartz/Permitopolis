@@ -171,7 +171,7 @@ function DemoGuideScreen() {
           <ul className="flex max-w-xl flex-col gap-3">
             <li className="flex items-center justify-between gap-3 rounded-control border border-line-subtle bg-surface-2 px-4 py-3">
               <span className="text-sm text-fg-secondary">Reset to the seed, so every case starts where the script expects it.</span>
-              <Button type="button" size="sm" variant="secondary" onClick={() => setPendingReset({ andStartPath: null })}>
+              <Button type="button" size="sm" variant="secondary" aria-label="Reset to the seed" onClick={() => setPendingReset({ andStartPath: null })}>
                 Reset
               </Button>
             </li>
@@ -218,7 +218,14 @@ function DemoGuideScreen() {
                               stepDone ? "bg-success-surface text-success-fg" : "bg-surface-2 text-fg-label"
                             }`}
                           >
-                            {stepDone ? <CheckIcon className="size-3" aria-hidden="true" /> : index + 1}
+                            {stepDone ? (
+                              <>
+                                <CheckIcon className="size-3" aria-hidden="true" />
+                                <span className="sr-only">Done:</span>
+                              </>
+                            ) : (
+                              index + 1
+                            )}
                           </span>
                           <div className="flex flex-1 flex-col gap-1">
                             <PartyChip party={step.role} suffix={persona && persona.id !== "new" ? persona.name : undefined} />
@@ -229,11 +236,18 @@ function DemoGuideScreen() {
                     })}
                   </ol>
                   <div className="flex flex-wrap items-center gap-2">
-                    <Button type="button" size="sm" className="w-fit" onClick={() => (underWay && !progress.done ? continuePath(path, progress.step) : startPath(path))}>
+                    {/* Seven of each on the page: the name says which path, after the words on the button. */}
+                    <Button
+                      type="button"
+                      size="sm"
+                      className="w-fit"
+                      aria-label={`${underWay ? "Continue" : "Start this path"}: ${path.title}`}
+                      onClick={() => (underWay && !progress.done ? continuePath(path, progress.step) : startPath(path))}
+                    >
                       {underWay ? "Continue" : "Start this path"}
                     </Button>
                     {underWay ? (
-                      <Button type="button" size="sm" variant="ghost" className="w-fit" onClick={() => setPendingReset({ andStartPath: path })}>
+                      <Button type="button" size="sm" variant="ghost" className="w-fit" aria-label={`Reset and start: ${path.title}`} onClick={() => setPendingReset({ andStartPath: path })}>
                         Reset and start
                       </Button>
                     ) : null}
@@ -263,7 +277,7 @@ function DemoGuideScreen() {
                     {/* The longest of these is about 115 characters: it wraps, so Jump stays in view. */}
                     <TableCell className="py-2 whitespace-normal text-fg-secondary">{jump.state}</TableCell>
                     <TableCell className="w-px">
-                      <Button type="button" variant="ghost" size="sm" onClick={() => startScenario(jump.caseId)}>
+                      <Button type="button" variant="ghost" size="sm" aria-label={`Jump to ${jump.label}`} onClick={() => startScenario(jump.caseId)}>
                         Jump
                       </Button>
                     </TableCell>

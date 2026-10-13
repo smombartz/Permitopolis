@@ -160,7 +160,12 @@ function StepPlan({
             <ul className="flex flex-col gap-1">
               {missing.map((field) => (
                 <li key={field.key}>
-                  <button type="button" className="font-medium text-fg-accent underline-offset-4 hover:underline" onClick={() => onStepLink(field.step)}>
+                  <button
+                    type="button"
+                    className="rounded-control font-medium text-fg-accent underline underline-offset-4 pointer-coarse:inline-flex pointer-coarse:min-h-11 pointer-coarse:items-center"
+                    aria-label={`${field.label}: go to that step`}
+                    onClick={() => onStepLink(field.step)}
+                  >
                     {field.label}
                   </button>
                 </li>
@@ -180,7 +185,11 @@ function StepPlan({
         onLateFee={onLateFee}
       />
 
-      {primaryError ? <InlineAlert variant="danger">{primaryError}</InlineAlert> : null}
+      {primaryError ? (
+        <InlineAlert variant="danger" live>
+          {primaryError}
+        </InlineAlert>
+      ) : null}
 
       <Button type="button" size="lg" disabled={!ready} onClick={onPrimaryAction}>
         {primaryLabel}

@@ -9,7 +9,7 @@ import { WizardStepper } from "@/components/ui/wizard-stepper"
 import { StickyAside } from "@/components/ui/sticky-aside"
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet"
 import { EmptyState } from "@/components/ui/empty-state"
-import { CaseNotFound, useIsNarrow } from "@/components/shell"
+import { CaseNotFound, useDocumentTitle, useIsNarrow } from "@/components/shell"
 import { useDemo } from "@/lib/state"
 import { routes } from "@/lib/routes"
 import type { EventAnswers, WizardStep } from "@/lib/types"
@@ -22,6 +22,7 @@ import {
   resolveWizardStep,
   scheduleOnDate,
   wizardStepIndex,
+  dateGateAnnouncement,
 } from "@/lib/view/wizard"
 import { amendAnswersOf, amendmentGateSatisfied, buildAmendmentDiff } from "@/lib/view/amend"
 import { canAmend } from "@/lib/view/board"
@@ -29,6 +30,7 @@ import { StepWhat } from "@/components/wizard/StepWhat"
 import { StepWhere } from "@/components/wizard/StepWhere"
 import { StepWhen } from "@/components/wizard/StepWhen"
 import { StepSize } from "@/components/wizard/StepSize"
+import { WizardAnnouncer } from "@/components/wizard/WizardAnnouncer"
 import { AmendResultPanel } from "./AmendResultPanel"
 import { AmendReviewStep } from "./AmendReviewStep"
 
@@ -51,6 +53,7 @@ function AmendWizardScreen() {
   const narrow = useIsNarrow("(max-width: 1023px)")
 
   const c = cases.find((candidate) => candidate.id === id)
+  useDocumentTitle(c ? `${c.name || "Untitled event"} · Change your event` : null)
 
   // Work on a local copy of the answers, seeded from the record once on mount: nothing is
   // dispatched until the applicant confirms on the last step (brief 5A, step 1).
@@ -166,6 +169,8 @@ function AmendWizardScreen() {
 
   return (
     <div className={narrow ? "flex flex-col gap-6 pb-20" : "flex flex-col gap-6"}>
+      {/* The tier the change makes, and the date gate, read out as the ordinary wizard reads them. */}
+      <WizardAnnouncer tier={diff.tierAfter} summary={diff.summary} gateMessage={dateGateAnnouncement(diff.gate, leadTimeDays, lateFee)} />
       <PageHeader eyebrow="Change your event" title={c.name || "Untitled event"} backHref={routes.event(c.id)} backLabel="Back to your board" />
 
       <WizardStepper

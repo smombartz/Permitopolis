@@ -5,6 +5,7 @@ import { cn } from "@/lib/utils";
 import { Field } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import { handleRadioGroupKeyDown, radioTabIndex } from "@/components/ui/radio-keys";
 import { EVENT_TYPE_LABEL, type EventAnswers, type EventType } from "@/lib/types";
 import { EVENT_TYPES, addOnsForEventType } from "@/lib/view/wizard";
 import { EVENT_TYPE_BLURB, EVENT_TYPE_ICON } from "./constants";
@@ -30,8 +31,9 @@ function StepWhat({ answers, onChange }: StepWhatProps) {
         <p className="mt-1 text-sm text-fg-secondary">Pick the kind of event. It sets a few sensible defaults you can change later.</p>
       </div>
 
-      <div role="radiogroup" aria-label="Event type" className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-        {EVENT_TYPES.map((type) => {
+      {/* One tab stop, and the arrow keys move through the six kinds: a radio group's own keyboard. */}
+      <div role="radiogroup" aria-label="Event type" className="grid grid-cols-1 gap-3 sm:grid-cols-2" onKeyDown={handleRadioGroupKeyDown}>
+        {EVENT_TYPES.map((type, index) => {
           const Icon = EVENT_TYPE_ICON[type];
           const selected = answers.eventType === type;
           return (
@@ -40,6 +42,7 @@ function StepWhat({ answers, onChange }: StepWhatProps) {
               type="button"
               role="radio"
               aria-checked={selected}
+              tabIndex={radioTabIndex(selected, answers.eventType !== null, index)}
               onClick={() => selectType(type)}
               className={cn(
                 "flex items-start gap-3 rounded-panel border bg-surface-1 p-4 text-left transition-colors duration-[var(--dur-fast)] ease-frost hover:bg-surface-hover",

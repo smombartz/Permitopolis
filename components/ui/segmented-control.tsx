@@ -82,7 +82,7 @@ function SegmentedControl<T extends string>({
             onClick={() => onChange(option.value)}
             onKeyDown={(event) => handleKeyDown(event, index)}
             className={cn(
-              "inline-flex h-8 items-center gap-1.5 rounded-row px-3 text-sm font-medium whitespace-nowrap outline-none transition-all duration-[var(--dur-fast)] ease-frost focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring",
+              "inline-flex h-8 items-center gap-1.5 rounded-row px-3 text-sm font-medium whitespace-nowrap outline-none pointer-coarse:h-11 transition-all duration-[var(--dur-fast)] ease-frost focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring",
               selected
                 ? "bg-surface-strong text-fg shadow-card"
                 : "text-fg-secondary hover:text-fg"

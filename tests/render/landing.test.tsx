@@ -96,7 +96,7 @@ describe("DemoGuideScreen (/demo)", () => {
 
     const heading = screen.getByRole("heading", { name: "Answer a request" });
     const card = heading.closest('[data-slot="panel"]') as HTMLElement;
-    await user.click(within(card).getByRole("button", { name: "Start this path" }));
+    await user.click(within(card).getByRole("button", { name: /^Start this path: / }));
 
     expect(lastPush()).toBe("/events/PMT-27-0118");
     expect(useDemo.getState().role).toBe("applicant");
@@ -116,7 +116,7 @@ describe("DemoGuideScreen (/demo)", () => {
 
     const card = screen.getByRole("heading", { name: "Answer a request" }).closest('[data-slot="panel"]') as HTMLElement;
     expect(within(card).getByText("Step 2 of 5")).toBeInTheDocument();
-    await user.click(within(card).getByRole("button", { name: "Continue" }));
+    await user.click(within(card).getByRole("button", { name: /^Continue: / }));
 
     expect(lastPush()).toBe("/city/cases/PMT-27-0118");
     expect(useDemo.getState()).toMatchObject({ role: "hl", activeDemoPath: 3 });
@@ -126,7 +126,7 @@ describe("DemoGuideScreen (/demo)", () => {
     const { user } = await renderScreen(<DemoGuideScreen />, { path: routes.demo() });
 
     const row = screen.getByText("S6 · Main Street Food Truck Festival").closest("tr") as HTMLElement;
-    await user.click(within(row).getByRole("button", { name: "Jump" }));
+    await user.click(within(row).getByRole("button", { name: /^Jump to / }));
 
     expect(lastPush()).toBe("/city/cases/PMT-27-0031");
     expect(useDemo.getState()).toMatchObject({ role: "pws", personaId: "main-street-business-alliance", activeDemoPath: 6 });

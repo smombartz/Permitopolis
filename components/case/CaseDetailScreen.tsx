@@ -9,7 +9,7 @@ import { EmptyState } from "@/components/ui/empty-state"
 import { InlineAlert } from "@/components/ui/inline-alert"
 import { BackLink, PageHeader } from "@/components/ui/page-header"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { CaseNotFound } from "@/components/shell"
+import { CaseNotFound, useDocumentTitle } from "@/components/shell"
 import { applicantNameOf } from "@/lib/data/people"
 import { routes } from "@/lib/routes"
 import { availableActions, eventDate, isStalled, isVisibleToCity, nextMove, waitingOn, useDemo } from "@/lib/state"
@@ -47,6 +47,7 @@ function CaseDetailScreen() {
   const cfg = useDemo((s) => s.cfg)
 
   const c = cases.find((candidate) => candidate.id === id)
+  useDocumentTitle(c && isVisibleToCity(c) ? `${c.name} · Case` : null)
 
   // A change of state is read out once. An action taken on this screen raises a toast, and the
   // toaster reads that out; this line is for a change nothing toasted (the demo date moving a

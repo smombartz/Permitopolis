@@ -45,7 +45,9 @@ function EventRow({ item, today }: EventRowProps) {
         <div className="flex shrink-0 items-center gap-3">
           <Link
             href={item.permitHref}
-            className="inline-flex items-center gap-1.5 rounded-control text-sm font-medium text-fg-accent underline-offset-4 outline-none hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring"
+            // One per permitted event on the page: the name says whose permit, after the words on the link.
+            aria-label={`View permit for ${c.name}`}
+            className="inline-flex items-center gap-1.5 rounded-control text-sm font-medium text-fg-accent underline-offset-4 outline-none hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring pointer-coarse:min-h-11"
           >
             <TicketIcon className="size-4" aria-hidden="true" />
             View permit

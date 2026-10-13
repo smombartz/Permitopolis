@@ -27,6 +27,7 @@ function AmendResultPanel({ diff }: AmendResultPanelProps) {
           {tierChanged ? (
             <>
               <ArrowRightIcon className="size-4 text-fg-tertiary" aria-hidden="true" /> {/* guard-allow-tertiary: an arrow, not text */}
+              <span className="sr-only">becomes</span>
               <TierBadge tier={diff.tierAfter} className="h-8 text-sm" />
             </>
           ) : null}

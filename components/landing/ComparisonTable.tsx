@@ -40,7 +40,9 @@ function ComparisonTable() {
           <TableBody>
             {rows.map((row) => (
               <TableRow key={row.id}>
-                <TableCell className="sticky left-0 z-10 bg-surface-solid font-medium text-fg">{row.label}</TableCell>
+                <th scope="row" className="sticky left-0 z-10 h-11 bg-surface-solid px-3 text-left align-middle font-medium whitespace-nowrap text-fg">
+                  {row.label}
+                </th>
                 {TIERS.map((tier) => {
                   const applies = row.tier === tier;
                   return (

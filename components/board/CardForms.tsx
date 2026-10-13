@@ -42,7 +42,7 @@ function SimpleCardForm({ fields, initial, onSubmit, submitLabel = "Send", disab
       {fields.map((field) => {
         if (field.type === "checkbox") {
           return (
-            <label key={field.key} className="flex items-center gap-2.5 text-sm text-fg">
+            <label key={field.key} className="flex items-center gap-2.5 text-sm text-fg pointer-coarse:min-h-11">
               <Checkbox checked={Boolean(values[field.key])} onCheckedChange={(checked) => setValues((v) => ({ ...v, [field.key]: checked === true }))} />
               {field.label}
             </label>
@@ -106,7 +106,8 @@ function VendorListForm({ initial, vendorCount, onSubmit }: VendorListFormProps)
     >
       <div className="flex flex-col gap-3">
         {rows.map((row, index) => (
-          <div key={index} className="flex flex-col gap-2 rounded-control border border-line-subtle bg-surface-2 p-3 sm:flex-row sm:items-end">
+          // A group per vendor: "Vendor name" and "Serves" are on every row, and the group says which row.
+          <div key={index} role="group" aria-label={`Vendor ${index + 1}`} className="flex flex-col gap-2 rounded-control border border-line-subtle bg-surface-2 p-3 sm:flex-row sm:items-end">
             <Field label="Vendor name" className="w-full sm:flex-1">
               <Input value={row.name} onChange={(e) => updateRow(index, { name: e.target.value })} placeholder="Rolling Dumpling Co." />
             </Field>
@@ -120,7 +121,7 @@ function VendorListForm({ initial, vendorCount, onSubmit }: VendorListFormProps)
                 size="icon-sm"
                 className="shrink-0"
                 onClick={() => setRows((r) => r.filter((_, i) => i !== index))}
-                aria-label="Remove vendor"
+                aria-label={`Remove vendor ${index + 1}${row.name.trim() ? `, ${row.name.trim()}` : ""}`}
               >
                 <Trash2Icon />
               </Button>
@@ -163,11 +164,11 @@ function CityServicesForm({ defaults, onSubmit }: CityServicesFormProps) {
       <Field label="Barricades">
         <Input type="number" value={values.barricades} onChange={(e) => setValues((v) => ({ ...v, barricades: Number(e.target.value) }))} />
       </Field>
-      <label className="flex items-center gap-2.5 text-sm text-fg">
+      <label className="flex items-center gap-2.5 text-sm text-fg pointer-coarse:min-h-11">
         <Checkbox checked={values.trash} onCheckedChange={(checked) => setValues((v) => ({ ...v, trash: checked === true }))} />
         Trash collection
       </label>
-      <label className="flex items-center gap-2.5 text-sm text-fg">
+      <label className="flex items-center gap-2.5 text-sm text-fg pointer-coarse:min-h-11">
         <Checkbox checked={values.power} onCheckedChange={(checked) => setValues((v) => ({ ...v, power: checked === true }))} />
         Power hookup
       </label>
