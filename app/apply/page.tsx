@@ -1,10 +1,10 @@
 import { Suspense } from "react";
-import { PlaceholderScreen } from "@/components/shell/PlaceholderScreen";
+import { WizardScreen } from "@/components/wizard/WizardScreen";
 
 export default function Page() {
   return (
     <Suspense fallback={null}>
-      <PlaceholderScreen route="/apply" />
+      <WizardScreen />
     </Suspense>
   );
 }
