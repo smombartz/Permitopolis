@@ -7,31 +7,80 @@ import { routes } from "@/lib/routes";
 import { lastPush, renderScreen } from "./harness";
 
 describe("LandingScreen (/)", () => {
-  it("renders the one h1 and the live hero preview at its Instant default", async () => {
+  it("renders the one h1, the page's name, and the permit checker at its Instant default", async () => {
     await renderScreen(<LandingScreen />, { path: "/" });
 
     expect(screen.getAllByRole("heading", { level: 1 })).toHaveLength(1);
-    const hero = screen.getByRole("group", { name: /Try it/ });
-    expect(within(hero).getByText("Instant")).toBeInTheDocument();
+    expect(screen.getByRole("heading", { level: 1, name: "Event permits" })).toBeInTheDocument();
+    const checker = screen.getByRole("group", { name: "Check what your event needs" });
+    expect(within(checker).getByText("Instant")).toBeInTheDocument();
   });
 
-  it("changing the hero preview (alcohol on) moves the tier to Reviewed live", async () => {
-    const { user } = await renderScreen(<LandingScreen />, { path: "/" });
+  it("opens as a city office's page: the official-website line and the city's name in the header, no floating product panel", async () => {
+    const { container } = await renderScreen(<LandingScreen />, { path: "/" });
 
-    const hero = screen.getByRole("group", { name: /Try it/ });
-    await user.click(within(hero).getByRole("switch", { name: "Alcohol" }));
-
-    expect(within(hero).getByText("Reviewed")).toBeInTheDocument();
-    expect(within(hero).queryByText("Instant")).not.toBeInTheDocument();
+    const header = screen.getByRole("banner");
+    expect(within(header).getByText("An official website of the City of Permitopolis")).toBeInTheDocument();
+    const home = within(header).getByRole("link", { name: /City of Permitopolis/ });
+    expect(home).toHaveAttribute("href", routes.home());
+    expect(home).toHaveTextContent("Office of the City Clerk");
+    // The marketing treatments are gone: the page atmosphere, the tilted floating panel.
+    expect(container.querySelector(".page-atmosphere, .anim-idle-float")).toBeNull();
   });
 
-  it("switching the hero preview to a street moves the tier to Special", async () => {
+  it("the primary nav, the task list and the footer name each section the same way and point at it", async () => {
+    await renderScreen(<LandingScreen />, { path: "/" });
+
+    const primary = screen.getByRole("navigation", { name: "Primary" });
+    const footerNav = screen.getByRole("navigation", { name: "Footer" });
+    for (const [name, href] of [
+      ["How to apply", "#how-to-apply"],
+      ["Permit tiers", "#permit-tiers"],
+      ["Fees", "#fees"],
+      ["Questions", "#questions"],
+    ]) {
+      expect(within(primary).getByRole("link", { name })).toHaveAttribute("href", href);
+      expect(within(footerNav).getByRole("link", { name })).toHaveAttribute("href", href);
+      expect(document.getElementById(href.slice(1)), href).not.toBeNull();
+    }
+
+    const tasks = screen.getByRole("list", { name: "I want to…" });
+    expect(within(tasks).getByRole("link", { name: /Plan an event/ })).toHaveAttribute("href", routes.apply());
+    expect(within(tasks).getByRole("link", { name: /See what it costs/ })).toHaveAttribute("href", "#fees");
+    expect(within(tasks).getByRole("link", { name: /Read common questions/ })).toHaveAttribute("href", "#questions");
+    for (const link of within(tasks).getAllByRole("link")) {
+      const href = link.getAttribute("href")!;
+      if (href.startsWith("#")) expect(document.getElementById(href.slice(1)), href).not.toBeNull();
+    }
+  });
+
+  it("the footer carries the office's contact details and the staff door", async () => {
+    await renderScreen(<LandingScreen />, { path: "/" });
+
+    const footer = screen.getByRole("contentinfo");
+    expect(within(footer).getByText(/Priya Natarajan/)).toBeInTheDocument();
+    expect(within(footer).getByText("(555) 014-2200")).toBeInTheDocument();
+    expect(within(footer).getByRole("link", { name: "Open the staff workspace" })).toHaveAttribute("href", routes.city.queue());
+    expect(within(footer).getByText(/Permitopolis is a fictional city/)).toBeInTheDocument();
+  });
+
+  it("changing the permit checker (alcohol on) moves the tier to Reviewed live", async () => {
     const { user } = await renderScreen(<LandingScreen />, { path: "/" });
 
-    const hero = screen.getByRole("group", { name: /Try it/ });
-    await user.click(within(hero).getByRole("radio", { name: "A street" }));
+    const checker = screen.getByRole("group", { name: "Check what your event needs" });
+    await user.click(within(checker).getByRole("switch", { name: "Alcohol" }));
 
-    expect(within(hero).getByText("Special event")).toBeInTheDocument();
+    expect(within(checker).getByText("Reviewed")).toBeInTheDocument();
+    expect(within(checker).queryByText("Instant")).not.toBeInTheDocument();
+  });
+
+  it("switching the permit checker to a street moves the tier to Special", async () => {
+    const { user } = await renderScreen(<LandingScreen />, { path: "/" });
+
+    const checker = screen.getByRole("group", { name: "Check what your event needs" });
+    await user.click(within(checker).getByRole("radio", { name: "A street" }));
+
+    expect(within(checker).getByText("Special event")).toBeInTheDocument();
   });
 
   it("the primary nav and the footer are page landmarks beside <main>, not inside it", async () => {
@@ -48,9 +97,25 @@ describe("LandingScreen (/)", () => {
     expect(within(footer).getByRole("link", { name: /Open the demo guide/ })).toBeInTheDocument();
   });
 
-  it("the fee schedule panel shows $25 per hour for a shelter", async () => {
+  it("the fee schedule table shows $25 per hour for a shelter", async () => {
     await renderScreen(<LandingScreen />, { path: "/" });
+    const fees = screen.getByRole("table", { name: "Fee schedule" });
+    expect(within(fees).getByRole("row", { name: /Shelter/ })).toHaveTextContent("$25 per hour");
     expect(screen.getByText("$25 per hour")).toBeInTheDocument();
+  });
+
+  it("the three tiers are listed with their notice, reviewers and a typical fee", async () => {
+    await renderScreen(<LandingScreen />, { path: "/" });
+
+    const tiers = screen.getByRole("list", { name: "The three permit tiers" });
+    const rows = within(tiers).getAllByRole("listitem");
+    expect(rows).toHaveLength(3);
+    expect(within(rows[0]).getByRole("heading", { name: "Instant" })).toBeInTheDocument();
+    expect(rows[0]).toHaveTextContent("10 days");
+    expect(rows[0]).toHaveTextContent("City Clerk only");
+    expect(rows[1]).toHaveTextContent("30 days");
+    expect(rows[1]).toHaveTextContent("$715");
+    expect(rows[2]).toHaveTextContent("60 days");
   });
 
   it("opens an FAQ item", async () => {

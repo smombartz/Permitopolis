@@ -1,25 +1,25 @@
-import { cn } from "cn";
 import { CheckIcon } from "lucide-react";
-import { Panel } from "@/components/ui/panel";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { TIER_LABEL, type Tier } from "@/lib/types";
 import { blockPartyNote, comparisonRows } from "@/lib/view/landing";
+import { SECTION_ID } from "./sections";
 import { SectionHeading } from "./SectionHeading";
 
+const HEADING_ID = "what-decides-heading";
 const TIERS: Tier[] = ["instant", "reviewed", "special"];
 
-/** What sets the tier (plan 7, row 5): the comparison table, triggers against tiers. */
+/** What decides the tier: the triggers against the three tiers, as a plain table with no column singled out. */
 function ComparisonTable() {
   const rows = comparisonRows();
 
   return (
-    <section className="page-container flex flex-col gap-10 py-[var(--section-space)]">
+    <section id={SECTION_ID.whatDecides} aria-labelledby={HEADING_ID} className="page-container flex scroll-mt-6 flex-col gap-6 py-6 sm:py-8">
       <SectionHeading
-        eyebrow="What sets the tier"
-        title="Every trigger, one tier each"
-        lead="One trigger is enough to move an event up. Here's exactly what moves it, read straight off the rules engine."
+        id={HEADING_ID}
+        title="What decides the tier"
+        lead="Any one of these is enough to put an event in a tier. An event with several takes the highest."
       />
-      <Panel variant="frosted" className="overflow-hidden p-0">
+      <div className="overflow-hidden rounded-control border border-line-subtle">
         <Table aria-label="Which tier each trigger sets">
           <TableHeader>
             <TableRow>
@@ -27,11 +27,7 @@ function ComparisonTable() {
                 Trigger
               </TableHead>
               {TIERS.map((tier) => (
-                <TableHead
-                  key={tier}
-                  scope="col"
-                  className={cn("text-center", tier === "reviewed" && "bg-indigo-500/10")}
-                >
+                <TableHead key={tier} scope="col" className="text-center">
                   {TIER_LABEL[tier]}
                 </TableHead>
               ))}
@@ -46,7 +42,7 @@ function ComparisonTable() {
                 {TIERS.map((tier) => {
                   const applies = row.tier === tier;
                   return (
-                    <TableCell key={tier} className={cn("text-center", tier === "reviewed" && "bg-indigo-500/5")}>
+                    <TableCell key={tier} className="text-center">
                       {applies ? (
                         <>
                           <CheckIcon className="inline size-4 text-fg-accent" aria-hidden="true" />
@@ -67,7 +63,7 @@ function ComparisonTable() {
             ))}
           </TableBody>
         </Table>
-      </Panel>
+      </div>
       <p className="max-w-[72ch] text-sm text-fg-secondary">{blockPartyNote()}</p>
     </section>
   );

@@ -645,7 +645,7 @@ describe("(g) the landing page's two doors and the demo guide's paths land on re
     expectRealScreen();
   });
 
-  it("the staff section's own door opens the workspace too", async () => {
+  it("the footer's staff door opens the workspace too", async () => {
     const { user } = await renderApp({ path: routes.home() });
 
     await user.click(screen.getByRole("link", { name: "Open the staff workspace" }));

@@ -107,7 +107,7 @@ export function heroPreviewResult(form: HeroPreviewForm, cfg: RulesConfig = DEFA
 }
 
 /* ------------------------------------------------------------------------ */
-/* Event tiers: the three-card grid                                         */
+/* Permit tiers: the three summary rows                                     */
 /* ------------------------------------------------------------------------ */
 
 /** The seeded case that stands for each tier (plan 7): S1, S3 and S5. */
@@ -126,7 +126,7 @@ export interface TierCard {
   example: { caseId: string; title: string; applicantName: string };
 }
 
-/** The three-card grid's rows, read from the seed and the rules: nothing here is typed in. */
+/** The three tier rows, read from the seed and the rules: nothing here is typed in. */
 export function tierCards(seed: EventCase[], cfg: RulesConfig = DEFAULT_CONFIG): TierCard[] {
   return (["instant", "reviewed", "special"] as const).map((tier) => {
     const caseId = TIER_EXAMPLE_CASE_ID[tier];
@@ -239,7 +239,7 @@ export function blockPartyNote(cfg: RulesConfig = DEFAULT_CONFIG): string {
 }
 
 /* ------------------------------------------------------------------------ */
-/* Fees and cancellations: frosted panels from DEFAULT_CONFIG.fees           */
+/* Fees and cancellations: a table and a list from DEFAULT_CONFIG.fees      */
 /* ------------------------------------------------------------------------ */
 
 export interface FeeScheduleRow {
@@ -247,7 +247,7 @@ export interface FeeScheduleRow {
   amount: string;
 }
 
-/** The fee schedule panel's rows, every amount read off `cfg.fees`. */
+/** The fee schedule table's rows, every amount read off `cfg.fees`. */
 export function feeScheduleRows(cfg: RulesConfig = DEFAULT_CONFIG): FeeScheduleRow[] {
   const f = cfg.fees;
   return [
@@ -273,7 +273,7 @@ export function feeScheduleRows(cfg: RulesConfig = DEFAULT_CONFIG): FeeScheduleR
   ];
 }
 
-/** The cancellation schedule panel's rows: the config's own `label` text, never retyped. */
+/** The cancellation list's rows: the config's own `label` text, never retyped. */
 export function cancellationRows(cfg: RulesConfig = DEFAULT_CONFIG): string[] {
   return cfg.cancellation.map((band) => band.label);
 }

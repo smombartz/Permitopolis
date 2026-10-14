@@ -484,20 +484,45 @@ Seven surfaces, each built on its own and then joined. Every one is a client scr
 ### Landing page and demo guide (3A)
 
 - **Routes**: `/` and `/demo`, both without a shell.
-- **Files**: `components/landing/` (`LandingScreen`, `Nav`, `Hero`, `HeroPreviewPanel`,
-  `HowItWorks`, `EventTiers`, `ComparisonTable`, `TodoBoard`, `FeesPanels`, `StaffInterlude`,
-  `Faq`, `ClosingFooter`, `DemoGuideScreen`, `hooks.ts`).
-- **View-model**: `lib/view/landing.ts`. The hero's small form maps to real `EventAnswers` and
-  runs `classify()`, `estimateFees()` and `whatIf()`; tier cards, the comparison table, fees and
-  the cancellation schedule are read off `DEFAULT_CONFIG` and `buildSeed()`, never typed in. The
-  hero never writes to the store.
+- **What `/` is, since 2026-10-13**: the "Event permits" page of the Office of the City Clerk,
+  laid out as an official city site rather than a product page (plan:
+  `docs/plans/2026-10-13-government-landing-page.md`, layout cues from seattle.gov and
+  cityofsydney.nsw.gov.au). Top to bottom: the official-website line, the city's seal and name
+  with the two doors, the section nav on a night strip, a title band (where the page sits, the
+  `h1` "Event permits", a two-sentence lead), "I want to…" beside "Check what your event needs",
+  then How to apply, Permit tiers, What decides the tier, Fees and cancellations, Common
+  questions, and a four-column footer (contact, sections, city staff, about this site).
+- **Files**: `components/landing/` (`LandingScreen`, `SiteHeader`, `CitySeal`, `PageIntro`,
+  `QuickTasks`, `PermitChecker`, `HowToApply`, `PermitTiers`, `ComparisonTable`, `Fees`, `Faq`,
+  `SiteFooter`, `SectionHeading`, `sections.ts`, `DemoGuideScreen`, `hooks.ts`).
+  `sections.ts` names each section once (id, label, link styles); the nav, the task list and the
+  footer all read it, so one name always goes to one place.
+- **View-model**: `lib/view/landing.ts`, unchanged by the redesign. The permit checker's small
+  form maps to real `EventAnswers` and runs `classify()`, `estimateFees()` and `whatIf()` (its
+  exports are still named `hero…`, from the first design); the tier rows, the trigger table,
+  fees and the cancellation schedule are read off `DEFAULT_CONFIG` and `buildSeed()`, never
+  typed in. The checker never writes to the store.
+- **Look**: existing tokens only. Flat solid surfaces (`bg-surface-solid`, `bg-page` bands),
+  `border-line-subtle` rules, `rounded-control`, underlined `text-fg-accent` links, plain `h2`s
+  over an ink rule, sections 48 to 64px apart. No backdrop blur, card shadows, page atmosphere
+  or ambient motion. It bends Rime & Ink in three places, on purpose: **two night bands** (the
+  nav strip and the footer) where the system allows one full-bleed night section; **no eyebrow
+  pill** above section headings; and the page does not use the marketing type scale (the `h1`
+  is 48px, 36px below 640px). The seal is an inline SVG in `currentColor`, hidden from a screen
+  reader because the city's name is written beside it. The app's top bar still shows the text
+  wordmark; the seal is the landing page's only.
+- **Responsive header**: both header layouts are in the markup and switched with CSS (`md:`),
+  not with `useIsNarrow()`, so a phone gets the "Menu" button from the first paint.
+- **What went**: the to-do board showcase (now one "After you apply" paragraph), the dark "One
+  workspace, three roles" showcase (the door is "City staff" in the header and "Open the staff
+  workspace" in the footer), the closing call-to-action card, and the trail's parent pages as
+  links (they are text: those pages do not exist).
 - **Hands off** through `useDoors()` (`hooks.ts`): each door is a plain link that also sets the
   role once `useHydrated()` is true. The landing page renders in full before the stored demo is
   read; the demo guide waits for it, because Reset, the date jumps and every jump write to the store.
 - **Since Phase 5**: each path card on the demo guide shows the coach's own step for it, with
   "Continue" and "Reset and start" once a path is under way, and "Before you present" above them
-  ("The demo coach"). The "Live activity" log in the staff section is the landing page's own
-  markup on night tokens; `ActivityTimeline` is the app's.
+  ("The demo coach").
 
 ### Wizard (3B)
 
@@ -1349,16 +1374,17 @@ phone. In the order it is worth doing:
    changes in the wizard, when a field's error arrives. Whether "polite, once" is what is heard
    depends on the reader; jsdom only shows where the regions are.
 3. **A phone at 375px, applicant screens and the landing page**: that nothing scrolls sideways
-   (the landing headlines at 60 and 48px are the closest call, with `break-words` as the
-   backstop; the hero's tilted preview panel reaches, by arithmetic, about 14px past its box
-   inside a 20px gutter); that the 44px touch areas do not overlap their neighbors; that a bottom sheet's
+   (since the 2026-10-13 redesign the landing page's `h1` is 36px there and its section headings
+   24px, with `break-words` as the backstop; its trigger table scrolls inside its own box);
+   that the 44px touch areas do not overlap their neighbors; that a bottom sheet's
    content scrolls inside it; that the wizard's pinned plan bar never covers the field in focus
    (`scroll-padding-block` is the mechanism).
 4. **1280px, city screens**: the pipeline board's seven columns scroll inside their row, not
    the page; the 48rem action sheet; the month grid at its taller cells; Settings' sticky tabs.
 5. **Zoom to 200% and 400%** (WCAG 1.4.4, 1.4.10): not checked at all.
-6. **Reduced motion**: one global rule cuts every animation and transition to 0.01ms. The
-   landing page's scroll thread is removed by script. Not watched.
+6. **Reduced motion**: one global rule cuts every animation and transition to 0.01ms. (The
+   landing page's scroll thread, once removed by script, went with the 2026-10-13 redesign.)
+   Not watched.
 7. **Windows High Contrast**: a forced-colors rule gives everything focused a system outline.
    Not seen.
 8. **Print** of the permit ("Download PDF") was not part of this pass.
@@ -1368,9 +1394,10 @@ phone. In the order it is worth doing:
 - **A field's edge is 1.2:1.** `line-subtle` on `surface-strong` is the design system's field;
   WCAG 1.4.11 asks 3:1 of a control's boundary. Darkening every field is a design decision
   (question for the owner, below). Its label, its fill and its focus state do identify it.
-- **Ambient loops do not pause** (the landing page's floating preview, the live dot). WCAG 2.2.2
-  wants a way to stop motion that runs over five seconds; the only one is the system's reduced
-  motion setting.
+- **Ambient loops did not pause** (the landing page's floating preview, the live dot). WCAG 2.2.2
+  wants a way to stop motion that runs over five seconds. Both loops were removed with the
+  2026-10-13 redesign of the landing page; none is left outside `/dev/kit` and the loading
+  spinner and skeleton.
 - **A truncated name's full text is a hover away** (`Truncate` and its `title`): not on a
   phone or a keyboard. Each such name is in full on the page it links to, and a screen reader
   gets all of it.
@@ -2077,9 +2104,9 @@ Accessibility (the pass that held the prototype to WCAG 2.2 AA; "Accessibility" 
 - **Three small marks were added so that color is never alone**: a check on an active filter
   chip, a check on a chosen space or street in the location picker, and a dashed cell (not a
   faded one) for a calendar day outside the month, whose events were otherwise under 2:1.
-- **Ambient motion has no pause.** The landing page's floating preview and live dot run until
-  the system's reduced-motion setting stops them. A pause control would meet WCAG 2.2.2 for
-  everyone else; none was added.
+- **Ambient motion had no pause.** The landing page's floating preview and live dot ran until
+  the system's reduced-motion setting stopped them. Settled on 2026-10-13: both were removed
+  when the landing page became a city page.
 - **Page titles are short and generic for a route** ("My queue", "Permit"), with the record's
   name in front where there is one ("Riverfront Summer 5K · Case · Permitopolis"). The wording
   is nobody's but this pass's.

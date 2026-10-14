@@ -1,5 +1,33 @@
 # Change log
 
+## 2026-10-13 - Landing page rebuilt as an official city page
+
+**What Changed:**
+- Rebuilt `/` as the "Event permits" page of the Office of the City Clerk, laid out like an official city site (layout cues from seattle.gov and cityofsydney.nsw.gov.au) instead of a product landing page. Work is on the branch `landing-government-style`; nothing is pushed or deployed
+- New header in three bands (`SiteHeader`): "An official website of the City of Permitopolis", the city seal (`CitySeal`, inline SVG) with "City of Permitopolis / Office of the City Clerk" and the two doors, and the section nav on a solid night strip (one "Menu" button below 768px, switched with CSS)
+- New title band (`PageIntro`): where the page sits, the `h1` "Event permits", a two-sentence lead, "Plan an event"
+- New "I want to…" task list (`QuickTasks`) beside the live checker, now "Check what your event needs" (`PermitChecker`, a plain form in a bordered box; same `classify()` behind it)
+- Sections rewritten flat: five numbered steps (`HowToApply`), three tier summary rows (`PermitTiers`), the trigger table with no column singled out (`ComparisonTable`), the fee schedule as a table with the cancellation list (`Fees`), the questions (`Faq`)
+- New four-column night footer (`SiteFooter`): contact and office hours, the sections again, "Open the staff workspace", and the fictional-city line with the demo guide link
+- Removed: the floating glass nav, the 72px hero with its tilted floating panel and hand-drawn underline, eyebrow pills, the scroll thread, the three frosted tier cards and "Most common" badge, the to-do board showcase, the dark "One workspace, three roles" showcase, the closing call-to-action card, the page atmosphere, and `useReducedMotion` (its only user was the scroll thread)
+- `components/landing/sections.ts` names each section once; the nav, the task list and the footer read it
+- Tests: `tests/render/landing.test.tsx` finds the checker by its new name and gains four tests (the city header, the section links in the nav, task list and footer, the footer's contact and staff door, the three tier rows); one test in `tests/render/handoffs.test.tsx` is retitled. Gate: type-check, lint, 3,201 tests in 109 files and the production build pass
+- Docs: the plan for this change, the build plan's decision 3.1, section 7, its what-to-look-at rows and Changes, and `docs/readme.md`'s landing section and its three notes about the old page's motion and sizes
+
+**Why:**
+- The owner said the landing page looked too much like an app or startup product page and asked for an official government site, on a branch to preview before merging
+
+**Files Modified:**
+- `components/landing/LandingScreen.tsx`, `SectionHeading.tsx`, `ComparisonTable.tsx`, `Faq.tsx`, `hooks.ts`
+- `components/landing/SiteHeader.tsx`, `CitySeal.tsx`, `PageIntro.tsx`, `QuickTasks.tsx`, `sections.ts` (new)
+- `components/landing/PermitChecker.tsx` (was `HeroPreviewPanel.tsx`), `HowToApply.tsx` (was `HowItWorks.tsx`), `PermitTiers.tsx` (was `EventTiers.tsx`), `Fees.tsx` (was `FeesPanels.tsx`), `SiteFooter.tsx` (was `ClosingFooter.tsx`)
+- `components/landing/Nav.tsx`, `Hero.tsx`, `TodoBoard.tsx`, `StaffInterlude.tsx` (deleted)
+- `lib/view/landing.ts` (comments only)
+- `tests/render/landing.test.tsx`, `tests/render/handoffs.test.tsx`
+- `docs/plans/2026-10-13-government-landing-page.md` (new), `docs/plans/2026-10-12-permitopolis-prototype.md`, `docs/readme.md`
+
+---
+
 ## 2026-10-13 - Dropped the GitHub Desktop stash
 
 **What Changed:**

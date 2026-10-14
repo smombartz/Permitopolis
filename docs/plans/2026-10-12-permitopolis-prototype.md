@@ -63,7 +63,7 @@ Every workstream's requirements include this section.
 
 | Question | Decision |
 |---|---|
-| Landing page | A public, resident-facing Clerk's Office site at `/` in the full Rime & Ink marketing layout. The demo guide moves to `/demo` and the Demo menu. |
+| Landing page | A public, resident-facing Clerk's Office site at `/`. The demo guide moves to `/demo` and the Demo menu. Built first in the full Rime & Ink marketing layout; on 2026-10-13 the owner asked for it to read as an official government site instead, and it was rebuilt as a city service page (section 7; `docs/plans/2026-10-13-government-landing-page.md`). |
 | Seed data | The PRD's 13 cases plus 25 background cases, 38 in total, covering every state and off-path ending plus stress rows. |
 | Agent runner | One workflow per phase: parallel builders in isolated git worktrees, then merge and gate. |
 | How far to build | Through Phase 6 without stopping. The per-phase visual checkpoints are dropped; there is one hand-off at the end with a list of screens to look at. |
@@ -86,7 +86,7 @@ Three places where the plan bends or tightens the design system, each worth a lo
 
 - **Identity tints bend "one action color".** Teal and amber are atmosphere and rating colors in Rime & Ink. Here they also mark two parties. They never mark an action, and they appear only on avatars and dots.
 - **Tertiary text fails AA.** Measured against the page and glass surfaces, tertiary text (`#4350668f`) is 2.6 to 2.7:1 and teal as text is 2.9 to 3.2:1; secondary text is 4.9 to 5.1:1 and passes. The app therefore uses tertiary only for placeholders and decoration, and adds one token, `fg-label` (ink 650 solid, 7.3:1 or better), for form labels, table headers and metadata. A contrast test in workstream 1D checks every allowed text and surface pair.
-- **Quiet glass in the app.** The landing page gets the full treatment: grid, grain, radial atmosphere, idle float, surface sweep and the scroll thread. App screens keep the frost ground and a fainter grid. Backdrop blur is used on chrome only (top bar, sidebar, sheets, dialogs); repeated rows and cards use plain surface fills, because dozens of blurred cards on a pipeline board will stutter. App motion is limited to interaction feedback, sheet and dialog entrances, and the tier-change highlight. Reduced motion is honored everywhere.
+- **Quiet glass in the app.** The landing page got the full treatment (grid, grain, radial atmosphere, idle float, surface sweep and the scroll thread) until 2026-10-13; it is now a flat city page with none of them (section 7). App screens keep the frost ground and a fainter grid. Backdrop blur is used on chrome only (top bar, sidebar, sheets, dialogs); repeated rows and cards use plain surface fills, because dozens of blurred cards on a pipeline board will stutter. App motion is limited to interaction feedback, sheet and dialog entrances, and the tier-change highlight. Reduced motion is honored everywhere.
 
 ### 3.3 Seed-data fixes
 
@@ -468,20 +468,26 @@ Stress rows, each at least once: an event name of 90 or more characters; an orga
 
 ## 7. Landing page
 
-The landing page is a real city page, built from Rime & Ink's marketing patterns, with content rendered from `lib/rules/config.ts` so fees and lead times cannot drift from the app.
+The landing page is a real city page: the "Event permits" page of the Office of the City Clerk, inside the city site's header and footer, with content rendered from `lib/rules/config.ts` so fees and lead times cannot drift from the app.
 
-| Section | Rime & Ink pattern | Content |
+**Rebuilt on 2026-10-13** (`docs/plans/2026-10-13-government-landing-page.md`). It was first built from Rime & Ink's marketing patterns (floating glass nav, 72 px hero with a floating panel, scroll thread, three-card grid, alternating feature block, dark interlude, closing card). The owner found that it read as a startup product page and asked for an official government site, with layout cues from seattle.gov and cityofsydney.nsw.gov.au. The table below is the page as it now stands; it uses the same tokens, flat.
+
+| Section | Pattern | Content |
 |---|---|---|
-| Nav | Floating glass nav | Wordmark and "City Clerk · Events Permitting"; How it works, Event tiers, Fees, Questions; "City staff" (secondary) and "Plan an event" (primary) |
-| Hero | Two columns, 72 px headline with the hand-drawn underline, floating rotated panel | The product visual is live: a small panel running the real `classify()` on a few toggles, so the tier changes as a visitor plays with it |
-| How it works | Scroll thread with five numbered markers | The five wizard questions, each with a small mock of its step |
-| Three tiers | Three-card grid | Instant, Reviewed, Special event: lead time, who reviews, a typical fee, an example from the scenarios |
-| What sets the tier | Comparison table | Triggers against tiers, the recommended-column wash on Reviewed |
-| Your to-do board | Alternating feature block | A board mock taken from S3 |
-| Fees and cancellations | Frosted panels | Fee schedule and cancellation schedule from config |
-| For city staff | Dark interlude | A queue and Who's up mock with a mono activity log; the door to `/city/queue` |
-| Questions | Accordion | Insurance, lead times, block parties, recurring events, cancelling |
-| Close | Closing CTA card and footer | "Plan an event"; office hours; a line saying Permitopolis is fictional |
+| Official bar | Thin strip on the page ground | "An official website of the City of Permitopolis" |
+| Identity row | Seal and name on a solid surface, not sticky | The city seal, "City of Permitopolis", "Office of the City Clerk"; "City staff" (text link) and "Plan an event" (primary) |
+| Nav strip | Solid night band; one "Menu" button below 768 px | How to apply, Permit tiers, Fees, Questions |
+| Page intro | Title band | Where the page sits (text, not links), the `h1` "Event permits", a two-sentence lead, "Plan an event" |
+| I want to… | List of link rows | Plan an event; see what it costs; check how much notice to give; see what decides the tier; read common questions |
+| Check what your event needs | Plain form in a bordered box | Live: the real `classify()` on a few answers, so the tier, the fee and the notice change as a visitor answers |
+| How to apply | Numbered list | The five wizard questions, then one paragraph on the to-do board |
+| Permit tiers | Three summary rows | Instant, Reviewed, Special event: when it applies, notice, who reviews, a typical fee, an example from the scenarios |
+| What decides the tier | Table | Triggers against tiers, no column singled out |
+| Fees and cancellations | Table and list | Fee schedule and cancellation schedule from config |
+| Common questions | Accordion | Insurance, lead times, block parties, recurring events, cancelling |
+| Footer | Night band, four columns | Contact and office hours; the sections again; "Open the staff workspace"; a line saying Permitopolis is fictional, and the demo guide |
+
+Removed with the rebuild: the to-do board showcase, the dark "For city staff" showcase and the closing call-to-action card.
 
 ---
 
@@ -759,10 +765,10 @@ menu's scenario jumps (S1 to S6) set role, persona and page in one step.
 
 | URL | As | Look for |
 |---|---|---|
-| `/` | Anybody | The full Rime & Ink marketing treatment: floating glass nav, grid, grain and atmosphere, the scroll thread through "How it works". The hero's preview panel: change the event type, place and add-ons and watch the tier and the fee move (alcohol on: Reviewed; a street: Special event) |
-| `/` | Anybody | Three tier cards with a real example each, the comparison table, the to-do board block built from Jazz in the Plaza's own cards, the fee and cancellation panels, the dark "For city staff" section with its live activity log, the FAQ, the closing section and footer |
-| `/` | Anybody, at 375 px | The nav collapses; the hero stacks; nothing scrolls sideways |
-| `/` | Anybody | The two doors: "Plan an event" opens the wizard as the Applicant; "City staff" and "Open the staff workspace" open My queue as the City Clerk |
+| `/` | Anybody | It should read as a city office's page, not a product page: the official-website line, the seal with "City of Permitopolis" and "Office of the City Clerk", the dark nav strip, the title band with "Event permits". Flat surfaces and rules; no glass, grid, grain or motion |
+| `/` | Anybody | "I want to…" beside "Check what your event needs": change the event type, place and add-ons and watch the tier, the fee and the notice move (alcohol on: Reviewed; a street: Special event). Then the five numbered steps, the three tier rows with a real example each, the trigger table, the fee table and cancellation list, the questions, and the dark four-column footer |
+| `/` | Anybody, at 375 px | The doors leave the header and the nav strip shows one "Menu" button; the two columns stack; the trigger table scrolls inside its box; nothing else scrolls sideways |
+| `/` | Anybody | The two doors: "Plan an event" (header, title band, task list) opens the wizard as the Applicant; "City staff" (header) and "Open the staff workspace" (footer) open My queue as the City Clerk |
 | `/demo` | Anybody | The four roles, the three date jumps, the seven demo paths as cards (each step with its role chip), "Start this path" on each, the six-scenario table with "Jump", "What is faked", Reset behind a confirmation, and "Back to Permitopolis" |
 
 ### Wizard (3B)
@@ -1000,7 +1006,7 @@ Nothing below was seen: the pass had no browser. Put the mouse down for the firs
 | `/city/cases?view=table` | City Clerk | `j` and `k` move through the rows and the ring follows; the arrow keys scroll the page until a row has focus; `/` goes to the search field and types a slash once there; `?` does nothing while typing |
 | `/apply` | Applicant (New applicant), with a screen reader on | Choose a kind of event with the arrow keys. Turn on Alcohol on step 4: "This is a Reviewed event ..." is read once. Pick a date 19 days out: the lead-time sentence is read once. The same sentences are on screen in the panel and the banner, and are not read a second time |
 | `/events/PMT-27-0142/quote` (S2) | Applicant, Sunrise Yoga Club | Clear the card number and press Pay: focus is on the card number, with its error read as its description |
-| `/apply`, `/events/PMT-27-0118`, `/` | Applicant, at 375px on a phone | Nothing scrolls sideways. The landing headline is 60px and its section headings 48px. The board's four tabs, a 36px button, a menu item and a calendar day each take a tap 44px tall. The wizard's pinned plan bar never sits over the field in focus |
+| `/apply`, `/events/PMT-27-0118`, `/` | Applicant, at 375px on a phone | Nothing scrolls sideways. The landing page's `h1` is 36px and its section headings 24px (60px and 48px before the 2026-10-13 rebuild). The board's four tabs, a 36px button, a menu item and a calendar day each take a tap 44px tall. The wizard's pinned plan bar never sits over the field in focus |
 | `/city/active?view=calendar` | City Clerk | A day outside the month is a dashed, flat cell with its events at full strength, not a faded one. Day and event buttons are a little taller (24px). Tab to a day: it is announced as its date and how many events it has ("Tue, May 11, 2027", then the count) |
 | `/city/cases?view=table`, `/city/verifications` | A city role | A filter that is on carries a check beside its name |
 | `/city/intake`, `/city/payments`, `/city/work-orders` | Their roles, with a screen reader on | Each row's button says which row: "Record payment: Riverfront Summer 5K, ..." |
@@ -1010,6 +1016,7 @@ Nothing below was seen: the pass had no browser. Put the mouse down for the firs
 
 ## Changes
 
+- 2026-10-13: **Landing page rebuilt as an official city page, at the owner's request** (`docs/plans/2026-10-13-government-landing-page.md`), on the branch `landing-government-style` for the owner to preview before merging; not pushed, not deployed. This reverses "the full Rime & Ink marketing layout" in 3.1 and rewrites section 7. Scope chosen by the owner: a Clerk's Office service page inside city-site chrome, every link real, no invented city services. What changed: an official-website bar, a seal and "City of Permitopolis / Office of the City Clerk" header, a night nav strip, a title band with the `h1` "Event permits", an "I want to…" task list beside the live permit checker, then numbered steps, tier rows, the trigger table, a fee table, the questions and a four-column night footer. Removed: the to-do board showcase, the dark staff showcase, the closing card, eyebrow pills, the page atmosphere and every ambient animation on the page. Tokens, frozen contracts, `lib/view/landing.ts`'s code, the two doors and `app/page.tsx` are unchanged. The page bends the design system in three places (two night bands, no eyebrow pills, no marketing type scale), listed in `docs/readme.md` under "Landing page and demo guide (3A)". Gate: type-check, lint, 3,201 tests in 109 files and the production build pass. Not checked: the page in a browser.
 - 2026-10-13: **Merged and deployed, at the owner's request.** `master` was fast-forwarded to `build` (`fe690aa6`). A new Vercel project, `permitopolis` in the team Studio M, was created with the CLI and the commit deployed to production: https://permitopolis.vercel.app. Checked over HTTP: 20 routes answer 200 without a login, an unknown path answers 404, the landing page's assets load, and the error log is empty. Not checked: the deployed site in a browser. This reverses the "no deploy" decision in 3.1, which held for the build itself. There is no git remote, so later commits deploy only when `vercel deploy --prod` is run again (`docs/readme.md`, "Deployment").
 - 2026-10-13: **Build complete through Phase 6.** Final gate, run by the orchestrating session on `build` at `cda44e84`: type-check, lint, 3,197 tests in 109 files and the production build pass; all 21 routes are real pages and no route renders a placeholder. 6C's submission notes are written (`docs/readme.md`, "Presenting it") and `README.md` is current. Two usage-limit interruptions (during Phase 3's integration and Phase 5's build) were resumed from the last commit and the existing worktrees with nothing lost. Not done, as decided in 3.1: no deploy and no browser run; nothing has been seen in a browser. The work is on the `build` branch, unmerged into `master` and unpushed.
 - 2026-10-13: Final review fixes (17 findings from the final read-only review: 3 high, 6 medium, 8 low; all confirmed and fixed). Plan and what changed from it: `docs/plans/2026-10-13-final-review-fixes.md`. The three high ones are all on demo path 7 and are engine changes: (1) **a card to finish before submitting is never due in the past** (`cardDueDate()`): a board made inside its lead time is due today; (2) **`permittedPlan()` carries the plan's own fee lines**, and `refundIfCancelled()` works from it, so the permit page and `cancel` refund the permit's plan while an amendment is pending; (3) **a pending amendment lapses when the event arrives** (`lapseAmendment()`, called first thing by `applyTick()`), so the clock never closes out a tier nobody approved. From the rest: (4) **one builder of an amended record**, `amendedPlan()`, which `amend` starts from and the wizard prices its diff from; (5) **`permitCovers(c)` and `sessionPrice(c, cfg)`** read the record, not the settings, for what a permit covers and what a session of a booked series costs; (6) a quote that is out follows an amendment's fee lines; (7) the reopened payment card is "Pay fees and deposit", and `byDueDate()` sorts signing before paying among cards due the same day, on the board and in Who's up; (8) Inspections list permitted events only, and demo path 7 is two coach steps. Ten product choices the fixes made are in `docs/readme.md` under "Open questions for the owner".
