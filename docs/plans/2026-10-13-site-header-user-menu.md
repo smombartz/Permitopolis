@@ -1,6 +1,6 @@
 # One header style: the site header in the app, with a user menu
 
-**Status:** done on branch `user-menu` (2026-10-13). `pnpm check` green. Not pushed, not merged.
+**Status:** done and merged into `master` (2026-10-13, fast-forward from `user-menu`). `pnpm check` green. Not pushed.
 
 ## Context
 
