@@ -17,9 +17,10 @@ import { useDoors } from "./hooks";
 import { SECTION_LINKS, TEXT_LINK } from "./sections";
 
 /**
- * The city site's header, one row on a solid surface: the city's seal and name, then the section
- * nav, "City staff" and "Plan an event". It scrolls with the page; a city office's header is part
- * of the document, not a floating control.
+ * The city site's header: Rime & Ink's "Site header" (`docs/rime-and-ink-design-system.md`,
+ * under Layout and Links). One row on a solid band across the whole screen: the city's seal and
+ * name, then the section nav, "City staff" and "Plan an event". It scrolls with the page; a city
+ * office's header is part of the document, not a floating control.
  *
  * Below 1024px the row has no room for the anchors and the doors beside the name, so they fold
  * into one "Menu" button. The two layouts are both in the markup and switched with CSS, so a

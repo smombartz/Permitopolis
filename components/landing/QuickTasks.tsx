@@ -1,11 +1,11 @@
 "use client";
 
 import Link from "next/link";
-import { ChevronRightIcon } from "lucide-react";
+import { ArrowRightIcon } from "lucide-react";
+import { Panel } from "@/components/ui/panel";
 import { routes } from "@/lib/routes";
 import { useDoors } from "./hooks";
 import { SECTION_ID } from "./sections";
-import { SectionHeading } from "./SectionHeading";
 
 const HEADING_ID = "quick-tasks-heading";
 
@@ -19,35 +19,35 @@ const ANCHOR_TASKS = [
 
 // The link is the task's name; its `::after` covers the whole row, so the row is one target.
 const TASK_LINK =
-  "text-body-l font-semibold text-fg-accent underline underline-offset-4 outline-none after:absolute after:inset-0 group-hover:text-fg focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring";
+  "w-fit rounded-kbd text-base font-semibold text-fg outline-none after:absolute after:inset-0 after:rounded-row focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring";
 
+/** A list row (Rime & Ink "Lists and rows"): surface-2 at rest; on hover it nudges 2px right, the fill strengthens and the rim turns indigo. */
 function TaskRow({ link, detail }: { link: React.ReactNode; detail: string }) {
   return (
-    <li className="group relative flex items-center justify-between gap-4 border-b border-line-subtle py-3.5">
-      <div className="flex min-w-0 flex-col">
+    <li className="group relative flex items-center justify-between gap-4 rounded-row border border-line-subtle bg-surface-2 px-4 py-3 transition-all duration-[var(--dur-fast)] ease-frost hover:translate-x-0.5 hover:border-indigo-650/40 hover:bg-surface-strong">
+      <div className="flex min-w-0 flex-col gap-0.5">
         {link}
         <p className="text-sm text-fg-secondary">{detail}</p>
       </div>
-      <ChevronRightIcon
-        className="size-5 shrink-0 text-fg-label transition-transform duration-150 ease-nav group-hover:translate-x-1"
-        aria-hidden="true"
-      />
+      <ArrowRightIcon className="size-4 shrink-0 stroke-[2px] text-fg-accent" aria-hidden="true" />
     </li>
   );
 }
 
 /**
- * "I want to…": the page's tasks as a plain list of links, the way a city site opens a service
- * page. The first is the way into the application (a door, like the header's); the rest jump to
- * the section of this page that answers them.
+ * "I want to…": the page's tasks as a list of rows on a frosted panel, the way a city site opens
+ * a service page. The first is the way into the application (a door, like the header's); the
+ * rest jump to the section of this page that answers them.
  */
 function QuickTasks() {
   const doors = useDoors();
 
   return (
-    <section aria-labelledby={HEADING_ID} className="flex flex-col gap-4">
-      <SectionHeading id={HEADING_ID} title="I want to…" />
-      <ul aria-labelledby={HEADING_ID} className="flex flex-col">
+    <Panel variant="frosted" className="flex flex-col gap-5 self-start p-5 sm:p-6">
+      <h2 id={HEADING_ID} className="text-card font-bold text-fg">
+        I want to…
+      </h2>
+      <ul aria-labelledby={HEADING_ID} className="flex flex-col gap-2">
         <TaskRow
           link={
             <Link href={routes.apply()} onClick={doors.planAnEvent} className={TASK_LINK}>
@@ -68,7 +68,7 @@ function QuickTasks() {
           />
         ))}
       </ul>
-    </section>
+    </Panel>
   );
 }
 

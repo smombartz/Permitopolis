@@ -502,15 +502,29 @@ Seven surfaces, each built on its own and then joined. Every one is a client scr
   exports are still named `hero…`, from the first design); the tier rows, the trigger table,
   fees and the cancellation schedule are read off `DEFAULT_CONFIG` and `buildSeed()`, never
   typed in. The checker never writes to the store.
-- **Look**: existing tokens only. Flat solid surfaces (`bg-surface-solid`, `bg-page` bands),
-  `border-line-subtle` rules, `rounded-control`, underlined `text-fg-accent` links, plain `h2`s
-  over an ink rule, sections 48 to 64px apart. No backdrop blur, card shadows, page atmosphere
-  or ambient motion. The footer is the page's one night band. It bends Rime & Ink in two
-  places, on purpose: **no eyebrow pill** above section headings; and the page does not use the
-  marketing type scale (the `h1`
-  is 48px, 36px below 640px). The seal is an inline SVG in `currentColor`, hidden from a screen
-  reader because the city's name is written beside it. The app's top bar still shows the text
+- **Look**: the city-page layout in Rime & Ink's full treatment, since a second pass on
+  2026-10-13 (the first build of this layout was flat and off the style guide). The ground is
+  `.page-atmosphere` (frost, grid, grain). The header is the **site header**: a solid band
+  across the whole screen that scrolls with the page, with the seal and the city's name on the
+  left and the section links, "City staff" and "Plan an event" on the right. The owner chose it
+  over the floating glass nav, and it is now a pattern of the design system
+  (`docs/rime-and-ink-design-system.md`, "Site header"). The `h1` is at the hero scale (72px, 60px below 640px) with the hand-drawn
+  indigo underline under "permits" and an eyebrow pill above it. Every section has an eyebrow
+  pill, an `h2` at the display scale (60px, 48px below 640px), a 20px lead, and 104px above and
+  below. Content sits on frosted panels (`Panel variant="frosted"`); the permit checker is the
+  HUD panel and settles in once (`anim-material-settle`). "I want to…" rows are list rows
+  (`surface-2`, 10px radius; on hover a 2px nudge, a stronger fill and an indigo rim). "How to
+  apply" is on the scroll thread again, with markers that light as they scroll into view. The
+  footer is the page's one night section, with the teal and indigo glows, overline column
+  headings and mint links. Where the guide was **not** followed, on purpose: the checker is a
+  working form, so it is not tilted and has no idle float or surface sweep (no ambient loop is
+  back on the page); the trigger table has no indigo column wash, because no tier is
+  recommended. The seal is an inline SVG in `currentColor`, hidden from a screen reader
+  because the city's name is written beside it. The app's top bar still shows the text
   wordmark; the seal is the landing page's only.
+- **Anchors**: a section carries its own 104px of top padding, and the page scrolls an anchor
+  to 80px from the top (`scroll-padding-block`). `SECTION` in `sections.ts` sets a negative
+  scroll margin so a nav link lands with the eyebrow near the top of the screen.
 - **Responsive header**: below 1024px the nav and the two doors fold into one "Menu" button
   (the row has no room for them beside the city's name). Both layouts are in the markup and
   switched with CSS (`lg:`), not with `useIsNarrow()`, so a phone gets the "Menu" button from

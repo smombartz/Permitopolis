@@ -16,9 +16,10 @@ import { SiteFooter } from "./SiteFooter";
 
 /**
  * The public landing page at `/`: the "Event permits" page of the Office of the City Clerk,
- * inside the city site's own header and footer, with no app shell. It is laid out as a city
- * office's service page (plan `docs/plans/2026-10-13-government-landing-page.md`): flat solid
- * surfaces, a title band, a task list, then plain sections of lists and tables.
+ * inside the city site's own header and footer, with no app shell. Its layout is a city office's
+ * service page (plan `docs/plans/2026-10-13-government-landing-page.md`): a title, a task list
+ * beside the permit checker, then sections of lists and tables. Its look is Rime & Ink's full
+ * treatment (`.page-atmosphere`, the floating glass nav, eyebrow pills, frosted panels).
  *
  * Unlike a screen that shows store-backed content, nothing here depends on the stored demo
  * (`buildSeed()` below is pure and store-free, never `useDemo`), so the page renders in full
@@ -30,14 +31,14 @@ function LandingScreen() {
   const seed = React.useMemo(() => buildSeed(), []);
 
   return (
-    <div className="min-h-dvh bg-surface-solid">
+    <div className="page-atmosphere min-h-dvh">
       <SkipLink />
       {/* The header (with the primary nav) and the footer are landmarks of the page, so they sit beside <main>, not in it. */}
       <SiteHeader />
       {/* The skip link lands here. guard-allow-outline: no ring, it is the whole page, not a control. */}
       <main id={MAIN_CONTENT_ID} tabIndex={-1} className="outline-none">
         <PageIntro />
-        <div className="page-container grid grid-cols-1 gap-x-14 gap-y-10 pt-10 pb-6 sm:pt-12 sm:pb-8 lg:grid-cols-[1fr_1.1fr]">
+        <div className="page-container grid grid-cols-1 items-start gap-5 pt-14 lg:grid-cols-[1fr_1.1fr] lg:pt-16">
           <QuickTasks />
           <PermitChecker />
         </div>

@@ -114,6 +114,40 @@ tier badges use it.
 
 ## Changes
 
+- 2026-10-13: **The full-width header is back, and is now in the design system.** The owner saw
+  the floating glass nav and preferred the earlier header that goes across the whole screen.
+  `SiteHeader.tsx` is restored to that version: a solid `bg-surface-solid` band with a bottom
+  rule, in flow, the 48/56 px seal and the city's name on the left, the section links, the
+  "City staff" accent link and the 44 px "Plan an event" button on the right, one "Menu" button
+  below 1024 px. `docs/rime-and-ink-design-system.md` gains a "Site header" pattern (under
+  Layout, Links and Implementation Notes) with its measurements and when to use it instead of
+  the floating nav. The rest of the Rime & Ink restyle below stands.
+- 2026-10-13: **The layout was put back on the Rime & Ink style guide, at the owner's request**
+  ("make the landing page with its current new layout follow the established design style
+  guide"). The first build of this plan kept the tokens but not the system: it was flat, with no
+  eyebrow pills, small headings and tight sections. The "Treatment" column of the table above
+  and the "Visual rules" paragraph describe that flat build and no longer hold. What the page
+  uses now, section by section, with nothing moved or removed:
+  - Ground: `.page-atmosphere` (frost, grid, grain).
+  - Header: first restyled as the floating glass nav; the owner preferred the full-width band,
+    so it is back as it was (see the entry above).
+  - Title: eyebrow pill "Office of the City Clerk" (it replaces the three-step text trail, whose
+    last step repeated the headline), `h1` at 72 px (60 px below 640 px) with the hand-drawn
+    underline under "permits", 20 px lead.
+  - "I want to…": a frosted panel of list rows. "Check what your event needs": the HUD panel,
+    with the material-settle entrance.
+  - Sections: eyebrow pill, `h2` at 60 px (48 px below 640 px), 20 px lead, 104 px above and
+    below. Eyebrows: The application, Three tiers, The rules, Costs, Questions.
+  - "How to apply": the scroll thread and lit markers are back (`useReducedMotion` returns to
+    `hooks.ts`); "After you apply" is a plain panel.
+  - Tiers, trigger table, fees, questions: frosted panels. Tier names carry the tier's icon on a
+    tinted tile; labels are the 11 px overline; money and fees are mono.
+  - Footer: the one night section, with the teal and indigo glows, overline headings at .14em and
+    mint links.
+  - Not taken from the guide, on purpose: no tilt, idle float or surface sweep on the checker (it
+    is a working form, and the page keeps no ambient loop); no indigo column wash on the trigger
+    table (no tier is recommended).
+  - Anchors: sections take a negative scroll margin so a nav link lands near the top of the screen.
 - 2026-10-13: **The owner removed the official bar and the nav strip after seeing the page.** The
   "An official website of the City of Permitopolis" line is gone. The dark nav strip is gone and
   its four links moved into the header row, just before "City staff". With the links beside the

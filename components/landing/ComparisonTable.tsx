@@ -1,25 +1,32 @@
+import { cn } from "cn";
 import { CheckIcon } from "lucide-react";
+import { Panel } from "@/components/ui/panel";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { TIER_LABEL, type Tier } from "@/lib/types";
 import { blockPartyNote, comparisonRows } from "@/lib/view/landing";
-import { SECTION_ID } from "./sections";
+import { SECTION, SECTION_ID } from "./sections";
 import { SectionHeading } from "./SectionHeading";
 
 const HEADING_ID = "what-decides-heading";
 const TIERS: Tier[] = ["instant", "reviewed", "special"];
 
-/** What decides the tier: the triggers against the three tiers, as a plain table with no column singled out. */
+/**
+ * What decides the tier: the triggers against the three tiers, as Rime & Ink's comparison table on
+ * a frosted panel. No column carries the indigo wash: that marks a recommended column, and no
+ * tier is recommended over another.
+ */
 function ComparisonTable() {
   const rows = comparisonRows();
 
   return (
-    <section id={SECTION_ID.whatDecides} aria-labelledby={HEADING_ID} className="page-container flex scroll-mt-6 flex-col gap-6 py-6 sm:py-8">
+    <section id={SECTION_ID.whatDecides} aria-labelledby={HEADING_ID} className={cn(SECTION, "gap-12")}>
       <SectionHeading
         id={HEADING_ID}
+        eyebrow="The rules"
         title="What decides the tier"
         lead="Any one of these is enough to put an event in a tier. An event with several takes the highest."
       />
-      <div className="overflow-hidden rounded-control border border-line-subtle">
+      <Panel variant="frosted" className="overflow-hidden p-0">
         <Table aria-label="Which tier each trigger sets">
           <TableHeader>
             <TableRow>
@@ -63,7 +70,7 @@ function ComparisonTable() {
             ))}
           </TableBody>
         </Table>
-      </div>
+      </Panel>
       <p className="max-w-[72ch] text-sm text-fg-secondary">{blockPartyNote()}</p>
     </section>
   );

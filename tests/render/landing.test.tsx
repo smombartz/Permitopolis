@@ -16,7 +16,7 @@ describe("LandingScreen (/)", () => {
     expect(within(checker).getByText("Instant")).toBeInTheDocument();
   });
 
-  it("opens as a city office's page: the city's name and the section nav in one header, no floating product panel", async () => {
+  it("opens as a city office's page on the Rime & Ink ground: the city's name and the section nav in one header", async () => {
     const { container } = await renderScreen(<LandingScreen />, { path: "/" });
 
     const header = screen.getByRole("banner");
@@ -28,8 +28,9 @@ describe("LandingScreen (/)", () => {
     const home = within(header).getByRole("link", { name: /City of Permitopolis/ });
     expect(home).toHaveAttribute("href", routes.home());
     expect(home).toHaveTextContent("Office of the City Clerk");
-    // The marketing treatments are gone: the page atmosphere, the tilted floating panel.
-    expect(container.querySelector(".page-atmosphere, .anim-idle-float")).toBeNull();
+    // Rime & Ink's ground, and a working form that is not tilted and does not float.
+    expect(container.querySelector(".page-atmosphere")).not.toBeNull();
+    expect(container.querySelector(".anim-idle-float")).toBeNull();
   });
 
   it("the primary nav, the task list and the footer name each section the same way and point at it", async () => {
@@ -37,6 +38,7 @@ describe("LandingScreen (/)", () => {
 
     const primary = screen.getByRole("navigation", { name: "Primary" });
     const footerNav = screen.getByRole("navigation", { name: "Footer" });
+    expect(screen.getAllByText(/^(Office of the City Clerk|The application|Three tiers|The rules|Costs|Questions)$/, { selector: '[data-slot="eyebrow"]' })).toHaveLength(6);
     for (const [name, href] of [
       ["How to apply", "#how-to-apply"],
       ["Permit tiers", "#permit-tiers"],

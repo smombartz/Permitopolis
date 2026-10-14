@@ -44,3 +44,25 @@ export function useDoors(): Doors {
     [hydrated, router],
   );
 }
+
+/**
+ * True once `prefers-reduced-motion: reduce` matches. Starts false (the default for the first
+ * paint and for environments with no `matchMedia`, such as the render-test harness before it
+ * stubs one); an effect then reads the real value and subscribes to changes. Used only where a
+ * motion pattern needs a JS decision (the scroll thread's drawing); the CSS motion classes
+ * already collapse under the global reduced-motion rule in `app/globals.css`.
+ */
+export function useReducedMotion(): boolean {
+  const [reduced, setReduced] = React.useState(false);
+
+  React.useEffect(() => {
+    if (typeof window === "undefined" || typeof window.matchMedia !== "function") return;
+    const mql = window.matchMedia("(prefers-reduced-motion: reduce)");
+    const update = () => setReduced(mql.matches);
+    update();
+    mql.addEventListener("change", update);
+    return () => mql.removeEventListener("change", update);
+  }, []);
+
+  return reduced;
+}

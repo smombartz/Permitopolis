@@ -1,47 +1,55 @@
 "use client";
 
 import Link from "next/link";
-import { ArrowRightIcon, ChevronRightIcon } from "lucide-react";
+import { ArrowRightIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Eyebrow } from "@/components/ui/eyebrow";
 import { routes } from "@/lib/routes";
 import { useDoors } from "./hooks";
 
-/** Where this page sits in the city's site. The two parents are not pages of this prototype, so they are text, not links. */
-const TRAIL = ["City of Permitopolis", "Office of the City Clerk"];
+/** The hand-drawn indigo stroke under the headline's last word: the system's one organic gesture. */
+function HeadlineUnderline() {
+  return (
+    <svg
+      viewBox="0 0 120 14"
+      preserveAspectRatio="none"
+      aria-hidden="true"
+      className="pointer-events-none absolute -bottom-1.5 left-[18%] h-2.5 w-[64%] stroke-indigo-500 opacity-85"
+    >
+      <path d="M2 8 Q 22 2, 42 7 T 82 5 T 118 8" fill="none" strokeWidth={4} strokeLinecap="round" />
+    </svg>
+  );
+}
 
 /**
- * The page's title band: where the page sits in the city's site, the one `<h1>`, what the page
- * is for in two sentences, and the way in. A service page names the service; it does not pitch it.
+ * The page's title: the office the page belongs to as the eyebrow pill, the one `<h1>` at the
+ * hero scale with the hand-drawn underline under its last word, what the page is for in two
+ * sentences, and the way in. A service page names the service; it does not pitch it.
  */
 function PageIntro() {
   const doors = useDoors();
 
   return (
-    <section className="border-b border-line-subtle bg-page">
-      <div className="page-container flex flex-col items-start gap-5 py-8 sm:py-12">
-        <ol aria-label="You are here" className="flex flex-wrap items-center gap-x-1.5 gap-y-1 text-sm text-fg-label">
-          {TRAIL.map((name) => (
-            <li key={name} className="flex items-center gap-1.5">
-              {name}
-              <ChevronRightIcon className="size-3.5 shrink-0" aria-hidden="true" />
-            </li>
-          ))}
-          <li aria-current="page" className="font-semibold text-fg">
-            Event permits
-          </li>
-        </ol>
-        <h1 className="text-price font-bold break-words text-fg sm:text-feature">Event permits</h1>
-        <p className="max-w-[62ch] text-body-l text-pretty text-fg-secondary">
-          Apply for a permit to hold an event in a city park, plaza or street. Tell us about your event and we
-          will work out which permit it needs, what it costs and how much notice to give.
-        </p>
-        <Button asChild size="lg">
-          <Link href={routes.apply()} onClick={doors.planAnEvent}>
-            Plan an event
-            <ArrowRightIcon aria-hidden="true" />
-          </Link>
-        </Button>
-      </div>
+    <section className="page-container flex flex-col items-start gap-6 pt-16 lg:pt-24">
+      <Eyebrow>Office of the City Clerk</Eyebrow>
+      {/* 60px below 640px, where the two words stack rather than push the page sideways. */}
+      <h1 className="text-display font-bold text-balance break-words text-fg sm:text-hero">
+        Event{" "}
+        <span className="relative inline-block">
+          permits
+          <HeadlineUnderline />
+        </span>
+      </h1>
+      <p className="max-w-[52ch] text-lead text-pretty text-fg-secondary">
+        Apply for a permit to hold an event in a city park, plaza or street. Tell us about your event and we
+        will work out which permit it needs, what it costs and how much notice to give.
+      </p>
+      <Button asChild size="lg">
+        <Link href={routes.apply()} onClick={doors.planAnEvent}>
+          Plan an event
+          <ArrowRightIcon aria-hidden="true" />
+        </Link>
+      </Button>
     </section>
   );
 }

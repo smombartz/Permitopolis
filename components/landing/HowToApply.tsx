@@ -1,4 +1,10 @@
-import { SECTION_ID } from "./sections";
+"use client";
+
+import * as React from "react";
+import { cn } from "cn";
+import { Panel } from "@/components/ui/panel";
+import { useReducedMotion } from "./hooks";
+import { SECTION, SECTION_ID } from "./sections";
 import { SectionHeading } from "./SectionHeading";
 
 const HEADING_ID = "how-to-apply-heading";
@@ -28,43 +34,95 @@ const STEPS = [
 ];
 
 /**
- * How to apply: the five wizard questions as a plain numbered list, then what happens after. An
- * ordered list with square markers, the way a city office writes out a procedure.
+ * How to apply: the five wizard questions on Rime & Ink's scroll thread, then what happens after.
+ * A vertical indigo line draws itself down as the numbered markers scroll into view
+ * (IntersectionObserver, threshold 0.5); under reduced motion, or with no IntersectionObserver at
+ * all (the render-test harness), every marker is lit and the thread is not drawn.
  */
 function HowToApply() {
+  const reducedMotion = useReducedMotion();
+  const noObserver = typeof IntersectionObserver === "undefined";
+  const [observedLitCount, setObservedLitCount] = React.useState(0);
+  const markerRefs = React.useRef<(HTMLDivElement | null)[]>([]);
+
+  // Reduced motion (and the render-test harness, which has no IntersectionObserver) skips the
+  // subscription entirely and lights every marker from the first render instead of reaching
+  // that same result by setting state inside the effect.
+  const litCount = reducedMotion || noObserver ? STEPS.length : observedLitCount;
+
+  React.useEffect(() => {
+    if (reducedMotion || noObserver) return;
+    const observer = new IntersectionObserver(
+      (entries) => {
+        for (const entry of entries) {
+          if (!entry.isIntersecting) continue;
+          const index = Number((entry.target as HTMLElement).dataset.stepIndex);
+          setObservedLitCount((prev) => Math.max(prev, index + 1));
+        }
+      },
+      { threshold: 0.5 },
+    );
+    for (const el of markerRefs.current) if (el) observer.observe(el);
+    return () => observer.disconnect();
+  }, [reducedMotion, noObserver]);
+
+  const progressPct = Math.round((litCount / STEPS.length) * 100);
+
   return (
-    <section id={SECTION_ID.howToApply} aria-labelledby={HEADING_ID} className="page-container flex scroll-mt-6 flex-col gap-6 py-6 sm:py-8">
+    <section id={SECTION_ID.howToApply} aria-labelledby={HEADING_ID} className={cn(SECTION, "gap-14")}>
       <SectionHeading
         id={HEADING_ID}
+        eyebrow="The application"
         title="How to apply"
         lead="The application is five questions. The tier, the permits and the fee estimate update with each answer, so you know what the event needs before you commit to it."
       />
-      <ol className="flex max-w-[76ch] flex-col">
-        {STEPS.map((step, index) => (
-          <li key={step.title} className="flex gap-4 border-b border-line-subtle py-5 first:pt-1 sm:gap-5">
-            <span
-              aria-hidden="true"
-              className="flex size-9 shrink-0 items-center justify-center rounded-control border-2 border-ink-950 text-base font-bold text-fg"
-            >
-              {index + 1}
-            </span>
-            <div className="flex min-w-0 flex-col gap-1.5 pt-1">
-              <h3 className="text-lg font-bold text-fg">
-                <span className="sr-only">Step {index + 1}: </span>
-                {step.title}
-              </h3>
-              <p className="text-base text-fg-secondary">{step.body}</p>
-            </div>
-          </li>
-        ))}
-      </ol>
-      <div className="flex max-w-[76ch] flex-col gap-1.5 border-l-4 border-ink-950 bg-page px-5 py-4">
-        <h3 className="text-lg font-bold text-fg">After you apply</h3>
-        <p className="text-base text-fg-secondary">
+      {/* The scroll thread sits beside the list, not in it: an <ol> holds list items only. */}
+      <div className="relative">
+        {!reducedMotion ? (
+          <div className="absolute top-2 bottom-2 left-5 w-px bg-line-subtle" aria-hidden="true">
+            <div
+              className="w-full origin-top bg-gradient-to-b from-indigo-500 to-indigo-650 transition-[height] duration-500 ease-frost"
+              style={{ height: `${progressPct}%`, boxShadow: "0 0 10px 1px color-mix(in srgb, var(--indigo-500) 30%, transparent)" }}
+            />
+          </div>
+        ) : null}
+        <ol className="flex flex-col gap-12">
+          {STEPS.map((step, index) => {
+            const lit = index < litCount;
+            return (
+              <li key={step.title} className="flex gap-6">
+                <div
+                  ref={(el) => {
+                    markerRefs.current[index] = el;
+                  }}
+                  data-step-index={index}
+                  aria-hidden="true"
+                  className={cn(
+                    "relative z-10 flex size-10 shrink-0 items-center justify-center rounded-full border font-mono text-sm font-bold transition-colors duration-[var(--dur-gentle)] ease-frost",
+                    lit ? "border-indigo-650 bg-indigo-650 text-fg-on-accent shadow-step-lit" : "border-line-subtle bg-frost-050 text-fg-secondary",
+                  )}
+                >
+                  {index + 1}
+                </div>
+                <div className="flex max-w-[600px] flex-col gap-2 pt-1">
+                  <h3 className="text-h4 font-bold text-fg">
+                    <span className="sr-only">Step {index + 1}: </span>
+                    {step.title}
+                  </h3>
+                  <p className="text-base text-pretty text-fg-secondary">{step.body}</p>
+                </div>
+              </li>
+            );
+          })}
+        </ol>
+      </div>
+      <Panel variant="plain" className="flex max-w-[680px] flex-col gap-1.5 p-5 sm:p-6">
+        <h3 className="text-h4 font-bold text-fg">After you apply</h3>
+        <p className="text-base text-pretty text-fg-secondary">
           Your event gets a to-do board. Every document to upload and every action to take is a card on it, with
           the reason it is needed and the date it is due.
         </p>
-      </div>
+      </Panel>
     </section>
   );
 }

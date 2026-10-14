@@ -157,7 +157,19 @@ Only the mono face is a webfont. Everything else uses the OS font, which is a la
 - Feature blocks alternate copy and visual sides, separated by 104px
 - Three-tier pricing grid with equal columns and a ~16px gap
 - Long-form text panel capped at 72ch with 40px padding; paragraphs about 640–670px wide
-- Floating nav sits 16px from the top, centered, sized to its content (about 790px wide)
+- Floating nav sits 16px from the top, centered, sized to its content (about 790px wide). It is the nav of a product or marketing page.
+- Site header is the nav of a public, institutional page (a city office, a department): a band across the whole screen instead of a floating bar. See "Site header" below. A page has one or the other, never both.
+
+### Site header
+
+The header of a page that speaks for an institution. It is the one place in the system where an opaque surface runs edge to edge: the institution's name sits on something solid, and the page's glass starts below it.
+
+- **Band:** full viewport width, in normal flow at the top of the page. It scrolls away with the page; it is not sticky and does not float. Fill `#f8fbff` (surface-solid, opaque), a 1px subtle border along the bottom, no shadow and no blur.
+- **Row:** one row inside the 1180px container, 16px above and below (20px from 640px wide), identity on the left and navigation on the right, at least 24px between them.
+- **Identity:** the seal and the name, as one link to the page's own home. The seal is a line drawing in ink 950, 48px square (56px from 640px). To its right, 12px away (16px from 640px), two lines: the institution's name in the display stack at 18px/700 with tight leading (24px from 640px), primary ink; under it the office or department at 14px in secondary. The name is always written out; the seal never stands alone and is hidden from a screen reader.
+- **Navigation, from 1024px:** the section links, 4px apart; then 24px; then one inline accent link for the secondary destination; then 24px; then one 44px primary button. Nothing else goes in the row: no search, no icons, no second button.
+- **Under 1024px:** the links, the accent link and the button fold into one 36px secondary button labelled "Menu" with a leading menu icon. It opens a 240px menu, right-aligned: the section links, a divider, then the two destinations. The identity stays as it is.
+- **What it is not:** it carries no eyebrow, no status line and no banner above it, and no second row below it.
 
 ---
 
@@ -225,9 +237,10 @@ Sizes are 36px (compact, 12px padding), 44px (16px) and 56px (20px). The 56px pr
 ### Links
 
 - **Nav:** 14px secondary text, padding 8×12, 8px radius. On hover, the fill goes to surface-2 and the text to primary.
+- **Site header:** 14px/600 primary ink, 44px tall with 12px side padding, 8px radius. On hover the label takes an underline at a 4px offset and nothing else moves: no fill, no lift. Focus-visible is the 2px ring, drawn inside the link (offset -2px).
 - **Footer:** 14px secondary text that turns primary on hover
 - **On dark:** mint accent, 600 weight, underline on hover with 4px offset
-- **Inline accent links:** accent color with a trailing arrow
+- **Inline accent links:** accent color with a trailing arrow. In the site header the accent link is 14px/500, underlined at a 4px offset from the start, with no arrow; on hover it turns primary ink.
 
 ### Lists and rows
 
@@ -305,6 +318,7 @@ Motion behaves like material settling under glass: things arrive from slightly b
   - Frosted panel: glass-edge border, 14px radius, surface-1 fill, card shadow, `blur(28px) saturate(1.25)`
   - HUD panel: magnetic border, top white sheen plus teal and indigo radial glows over the tinted glass, HUD shadow, `blur(30px) saturate(1.35)`
 - **Page chrome:** the background, grid and grain live on `body`, `body::before` and `body::after` as fixed layers at `z-index` -2 and -1.
+- **Site header:** a `<header>` outside `<main>` holding the identity link, a `<nav>` labelled "Primary" and the two destinations. Both layouts (the row from 1024px, the "Menu" button under it) are in the markup and switched with CSS, so the right one is there on the first paint. In the Permitopolis app it is `components/landing/SiteHeader.tsx`, with the seal in `CitySeal.tsx`; `/` is the page that uses it.
 - **Featured pricing card:** gets a `1px` indigo 650 border. The "later" card uses a dashed subtle border on surface-soft with no shadow.
 - **Comparison table:**
   - 11px uppercase tertiary headers with a sticky first column

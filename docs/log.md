@@ -1,5 +1,47 @@
 # Change log
 
+## 2026-10-13 - Full-width landing header restored and added to the design system
+
+**What Changed:**
+- `components/landing/SiteHeader.tsx` is back to the header that runs across the whole screen: a solid band with a bottom rule that scrolls with the page, the seal and "City of Permitopolis / Office of the City Clerk" on the left, the section links, the "City staff" link and "Plan an event" on the right, and one "Menu" button below 1024px. The floating glass nav from the restyle is gone
+- `docs/rime-and-ink-design-system.md` gains a "Site header" pattern: when to use it instead of the floating nav, the band, the identity lockup, the link and button measurements, the under-1024px menu, and where it lives in the code
+- `components/landing/sections.ts`: the header's accent link style is back, and sections' scroll margin is set for a header that scrolls away
+- Docs brought in line: `docs/readme.md`, both plans
+
+**Why:**
+- The owner preferred the previous full-width header to the floating one and asked for it to be encoded in the design system
+
+**Files Modified:**
+- `components/landing/SiteHeader.tsx`, `components/landing/sections.ts`
+- `docs/rime-and-ink-design-system.md`
+- `docs/readme.md`, `docs/plans/2026-10-13-government-landing-page.md`, `docs/plans/2026-10-12-permitopolis-prototype.md`
+
+---
+
+## 2026-10-13 - Landing page restyled to the Rime & Ink style guide
+
+**What Changed:**
+- Kept the landing page's city-office layout and content, and put its look back on `docs/rime-and-ink-design-system.md`. The earlier rebuild used the tokens but none of the system's treatments
+- Ground: `.page-atmosphere` again (frost, grid, grain)
+- Header: now the floating glass nav, sticky 16px from the top, with nav links, a secondary "City staff" and a primary "Plan an event"
+- Title: an eyebrow pill ("Office of the City Clerk") in place of the text trail, the `h1` at the hero scale with the hand-drawn underline under "permits", a 20px lead
+- Sections: an eyebrow pill, a display-scale `h2`, a 20px lead and 104px above and below (`SectionHeading`, `SECTION` in `sections.ts`)
+- "I want to…" is a frosted panel of list rows; the permit checker is the HUD panel with a material-settle entrance; "How to apply" is back on the scroll thread with lit markers (`useReducedMotion` restored); tiers, trigger table, fees and questions sit on frosted panels
+- Footer: the page's one night section, with the system's glows, overline headings and mint links
+- Left out on purpose: tilting or floating the checker, and the trigger table's column wash
+- Nav links land under the floating header (negative scroll margin on sections)
+- `tests/render/landing.test.tsx`: expects the page atmosphere and the six eyebrow pills
+
+**Why:**
+- The owner asked for the new layout to follow the established style guide
+
+**Files Modified:**
+- `components/landing/LandingScreen.tsx`, `SiteHeader.tsx`, `PageIntro.tsx`, `QuickTasks.tsx`, `PermitChecker.tsx`, `HowToApply.tsx`, `PermitTiers.tsx`, `ComparisonTable.tsx`, `Fees.tsx`, `Faq.tsx`, `SiteFooter.tsx`, `SectionHeading.tsx`, `sections.ts`, `hooks.ts`
+- `tests/render/landing.test.tsx`
+- `docs/plans/2026-10-13-government-landing-page.md`, `docs/plans/2026-10-12-permitopolis-prototype.md`, `docs/readme.md`
+
+---
+
 ## 2026-10-13 - Landing header reduced to one row
 
 **What Changed:**
