@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { PageHeader } from "@/components/ui/page-header";
 import { WizardStepper } from "@/components/ui/wizard-stepper";
 import { StickyAside } from "@/components/ui/sticky-aside";
+import { useSettle } from "@/components/ui/use-settle";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { CaseNotFound, useDocumentTitle, useIsNarrow } from "@/components/shell";
 import { useDemo } from "@/lib/state";
@@ -117,6 +118,9 @@ function WizardScreen() {
       return () => clearTimeout(timeout);
     }
   }, [panel.tier]);
+
+  // Next, Back and the stepper swap the step in place; the new step settles in so the change reads.
+  const stepRef = useSettle<HTMLDivElement>(step);
 
   // A case that is no longer a Draft (S2's jump after it has been booked, say) belongs on its
   // board, not in the wizard.
@@ -273,7 +277,7 @@ function WizardScreen() {
 
       <div className="grid grid-cols-1 gap-8 lg:grid-cols-[1fr_320px]">
         <div className="flex flex-col gap-6">
-          {stepContent}
+          <div ref={stepRef}>{stepContent}</div>
           <div className="flex items-center justify-between gap-3 border-t border-line-subtle pt-4">
             <Button type="button" variant="secondary" disabled={!previous} onClick={() => previous && goToStep(previous)}>
               Back
@@ -304,7 +308,7 @@ function WizardScreen() {
               <span
                 data-slot="wizard-bar-tier"
                 data-highlight={tierHighlight ? "true" : undefined}
-                className={cn("inline-flex shrink-0 rounded-full transition-shadow duration-300", tierHighlight && "shadow-[0_0_0_4px_var(--pill)]")}
+                className={cn("inline-flex shrink-0 rounded-full transition-shadow duration-[var(--dur-soft)] ease-frost", tierHighlight && "shadow-[0_0_0_4px_var(--pill)]")}
               >
                 <TierBadge tier={panel.tier} />
               </span>

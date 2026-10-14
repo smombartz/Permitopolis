@@ -408,6 +408,19 @@ one in every state. Reach for these before writing markup of your own.
   an element with no outline classes at all gets the same ring from the base layer.
 - `FilterBar`'s select is a native `<select>`. Use the Radix `Select` where options need groups
   or icons.
+- `useSettle(value, { y, fromOpacity })` (`components/ui/use-settle.ts`) is the one way to show
+  that something changed in place: put the returned ref on the element that shows `value`, and
+  it arrives again (a fade and a few px of rise) each time the value changes. It never plays on
+  mount or on an element that has just appeared. It is on the wizard's step, each shell's page
+  (the applicant, or the city role, changed; a fade only), the "Who's up" list, `CountBadge`'s
+  number and the landing checker's tier and fee. Rules: use `y: 0` on anything that holds a
+  `position: fixed` or sticky child (a transform re-anchors it while it runs); do not put it on
+  a list to animate rows in; timing comes from the tokens, so pass no duration. It handles
+  reduced motion itself (a short fade, no movement), because the global CSS rule cannot reach a
+  script animation.
+- Overlays (dialog, popover, dropdown, select, tooltip) take their timing from the tokens:
+  `duration-[var(--dur-tap)]` or `--dur-fast`, with `ease-frost`. `tw-animate-css` reads both
+  from the same classes that drive a transition.
 
 ### Selectors (`@/lib/state`)
 
@@ -543,6 +556,24 @@ Seven surfaces, each built on its own and then joined. Every one is a client scr
 - **Anchors**: a section carries its own 104px of top padding, and the page scrolls an anchor
   to 80px from the top (`scroll-padding-block`). `SECTION` in `sections.ts` sets a negative
   scroll margin so a nav link lands with the eyebrow near the top of the screen.
+- **Anchor motion** (2026-10-13, plan `docs/plans/2026-10-13-motion-pass.md`):
+  - *Glide*: the page's root carries `data-anchor-glide`, and `app/globals.css` gives a page that
+    has it `scroll-behavior: smooth` (not under reduced motion). No app screen has it. `<html>`
+    carries `data-scroll-behavior="smooth"` so Next turns smooth scrolling off while it changes
+    route; without it "Plan an event" would glide to the top of the wizard (Next 16 no longer
+    does this by default).
+  - *Arrival*: `useAnchorArrival()` (in `components/landing/`) marks the section a link lands on
+    with `data-arrived` for 1.4s, from the moment its eyebrow comes into view; `SectionHeading`
+    lights the eyebrow like a step marker while it is set. One click handler on the page's root
+    hears every anchor, the phone menu's included (React clicks bubble out of a portal). A deep
+    link (`/#fees`) and back/forward mark the section too. It is a state with a transition, not
+    a keyframe, so under reduced motion the eyebrow still lights and clears.
+  - *The phone menu*: Radix hands focus back to "Menu" when the menu closes, which scrolls the
+    header back into view. After a section link, `SiteHeader` cancels that (`onCloseAutoFocus`),
+    or the page would return to the top.
+  - *Feedback*: the header's and the footer's links fade their underline in (it is always there,
+    transparent at rest). In "I want to…", an in-page row has a down arrow and "Plan an event" a
+    right arrow; each leans 2px its own way on hover or focus.
 - **Responsive header**: below 1024px the nav and the two doors fold into one "Menu" button
   (the row has no room for them beside the city's name). Both layouts are in the markup and
   switched with CSS (`lg:`), not with `useIsNarrow()`, so a phone gets the "Menu" button from
@@ -1419,12 +1450,16 @@ phone. In the order it is worth doing:
 4. **1280px, city screens**: the pipeline board's seven columns scroll inside their row, not
    the page; the 48rem action sheet; the month grid at its taller cells; Settings' sticky tabs.
 5. **Zoom to 200% and 400%** (WCAG 1.4.4, 1.4.10): not checked at all.
-6. **Reduced motion**: one global rule cuts every animation and transition to 0.01ms. (The
-   landing page's scroll thread, once removed by script, went with the 2026-10-13 redesign.)
-   Not watched.
-7. **Windows High Contrast**: a forced-colors rule gives everything focused a system outline.
+6. **Reduced motion**: one global rule cuts every animation and transition to 0.01ms. Two
+   things decide for themselves, because that rule cannot: the landing page's scroll thread
+   (`HowToApply`, not drawn, every marker lit) and `useSettle` (a short fade, no movement).
+   Anchor links jump instead of gliding, and the eyebrow they land on still lights. Not watched.
+7. **Motion added on 2026-10-13** (the anchor glide and arrival, the change settle, the phone
+   menu no longer returning to the top after a section link): reasoned from the markup, the
+   built CSS and jsdom tests. Not watched in a browser.
+8. **Windows High Contrast**: a forced-colors rule gives everything focused a system outline.
    Not seen.
-8. **Print** of the permit ("Download PDF") was not part of this pass.
+9. **Print** of the permit ("Download PDF") was not part of this pass.
 
 ### What is not met, on purpose or for want of a decision
 

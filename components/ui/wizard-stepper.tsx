@@ -19,6 +19,9 @@ interface WizardStepperProps extends React.ComponentProps<"ol"> {
   onStepSelect?: (index: number) => void
 }
 
+// A marker or a connector changing state takes a color step, so moving on reads as progress.
+const STEP_CHANGE = "transition-[color,background-color,border-color,box-shadow] duration-[var(--dur-gentle)] ease-frost"
+
 /**
  * The wizard's 1-to-5 stepper. Done steps (every step up to the furthest one reached, but the
  * one in view) are clickable to go and edit; labels collapse to numbered markers alone below
@@ -44,6 +47,7 @@ function WizardStepper({ steps, current, reached, onStepSelect, className, ...pr
             aria-hidden="true"
             className={cn(
               "flex size-6 shrink-0 items-center justify-center rounded-full border-2 text-[11px] font-bold",
+              STEP_CHANGE,
               done && "border-indigo-650 bg-indigo-650 text-fg-on-accent",
               isCurrent && "border-indigo-650 bg-surface-solid text-indigo-650 shadow-step-lit",
               !done && !isCurrent && "border-line-magnetic bg-surface-solid text-fg-label"
@@ -85,7 +89,7 @@ function WizardStepper({ steps, current, reached, onStepSelect, className, ...pr
             {index < steps.length - 1 ? (
               <span
                 aria-hidden="true"
-                className={cn("h-px flex-1 sm:w-8", index < furthest ? "bg-indigo-650" : "bg-line-subtle")}
+                className={cn("h-px flex-1 sm:w-8", STEP_CHANGE, index < furthest ? "bg-indigo-650" : "bg-line-subtle")}
               />
             ) : null}
           </li>

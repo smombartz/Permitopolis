@@ -30,13 +30,15 @@ export const SECTION_LINKS: SectionLink[] = [
  * anchor to 80px from the top (`scroll-padding-block` in globals.css); the negative scroll
  * margin takes back the section's own top padding, so a nav link lands with the eyebrow near the
  * top of the screen instead of 184px down it. The site header scrolls away, so nothing covers it.
+ * It is a named group, so its heading can show that an anchor has just landed on it
+ * (`data-arrived`, set by `useAnchorArrival`).
  */
-export const SECTION = "page-container flex -scroll-mt-28 flex-col py-[var(--section-space)]";
+export const SECTION = "group/section page-container flex -scroll-mt-28 flex-col py-[var(--section-space)]";
 
 /** An inline accent link on the page's light ground: the site header's "City staff". */
 export const TEXT_LINK =
-  "rounded-control font-medium text-fg-accent underline underline-offset-4 outline-none hover:text-fg focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring";
+  "rounded-control font-medium text-fg-accent underline underline-offset-4 outline-none transition-colors duration-[var(--dur-fast)] ease-frost hover:text-fg focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring";
 
-/** A link on the night band (Rime & Ink "Links", on dark): mint, 600, underlined on hover. The ring turns mint under `data-tone="night"`. */
+/** A link on the night band (Rime & Ink "Links", on dark): mint, 600, the underline fades in on hover. The ring turns mint under `data-tone="night"`. */
 export const NIGHT_TEXT_LINK =
-  "rounded-kbd font-semibold text-night-accent underline-offset-4 outline-none hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring";
+  "rounded-kbd font-semibold text-night-accent underline decoration-transparent underline-offset-4 outline-none transition-colors duration-[var(--dur-fast)] ease-frost hover:decoration-current focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring";

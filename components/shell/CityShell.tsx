@@ -4,6 +4,7 @@ import * as React from "react";
 import { usePathname } from "next/navigation";
 import { PageSkeleton } from "@/components/ui/page-skeleton";
 import { MAIN_CONTENT_ID, SkipLink } from "@/components/ui/skip-link";
+import { useSettle } from "@/components/ui/use-settle";
 import { TopBar } from "@/components/shell/TopBar";
 import { StorageBanner } from "@/components/shell/StorageBanner";
 import { SwitchRolePanel } from "@/components/shell/SwitchRolePanel";
@@ -53,6 +54,9 @@ function CityShell({ children }: CityShellProps) {
   const pathname = usePathname();
   const switchTo = useRoleSwitch();
   const toolOwner = cityToolOwner(pathname);
+  // Two city roles share a URL, so a switch re-deals the page in place with no other sign that
+  // it changed; the page fades back in. A fade only, so nothing fixed or sticky is re-anchored.
+  const pageRef = useSettle<HTMLDivElement>(role, { y: 0, fromOpacity: 0.4 });
 
   // The skip link lands on the page, past the sidebar; with no page beside a sidebar, on <main>.
   const besideSidebar = hydrated && isCityRole(role);
@@ -73,7 +77,7 @@ function CityShell({ children }: CityShellProps) {
               <div className="page-container flex gap-6 py-6">
                 <CitySidebar role={role} pathname={pathname} queueCount={queueFor(cases, role, demoToday).length} />
                 {/* guard-allow-outline: no ring, it is the whole page, not a control. */}
-                <div id={MAIN_CONTENT_ID} tabIndex={-1} className="min-w-0 flex-1 outline-none">
+                <div ref={pageRef} id={MAIN_CONTENT_ID} tabIndex={-1} className="min-w-0 flex-1 outline-none">
                   {toolOwner === null || toolOwner === role ? (
                     <>
                       <React.Suspense fallback={null}>

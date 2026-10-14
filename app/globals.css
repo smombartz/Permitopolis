@@ -94,6 +94,17 @@
     scroll-padding-block: calc(var(--app-header-h) + 1.5rem) 5rem;
   }
   /*
+   * Anchor glide (Rime & Ink "Motion"): on a page that asks for it (`data-anchor-glide`, the
+   * landing page), an in-page link travels to its section instead of jumping. App screens keep
+   * instant scrolling. `data-scroll-behavior="smooth"` on <html> (app/layout.tsx) has Next switch
+   * this off while it changes route.
+   */
+  @media (prefers-reduced-motion: no-preference) {
+    html:has([data-anchor-glide]) {
+      scroll-behavior: smooth;
+    }
+  }
+  /*
    * The system focus ring (Rime & Ink, "Focus-visible"), for anything focusable that names no
    * ring of its own: a bare link, a summary, a tab panel. A field opts out with `outline-none`
    * and shows its focus on its border and halo instead.

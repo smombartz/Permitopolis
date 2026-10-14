@@ -21,7 +21,7 @@ function NavRow({ link, active, badge }: { link: SidebarLink; active: boolean; b
       href={link.href}
       aria-current={active ? "page" : undefined}
       className={cn(
-        "flex items-center justify-between gap-2 rounded-row px-3 py-2 text-sm font-medium outline-none transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring",
+        "flex items-center justify-between gap-2 rounded-row px-3 py-2 text-sm font-medium outline-none transition-colors duration-[var(--dur-fast)] ease-frost focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring",
         active ? "bg-surface-strong text-fg" : "text-fg-secondary hover:bg-surface-2 hover:text-fg",
       )}
     >

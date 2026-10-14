@@ -10,6 +10,7 @@ import { SegmentedControl } from "@/components/ui/segmented-control";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Chip } from "@/components/ui/chip";
 import { InlineAlert } from "@/components/ui/inline-alert";
+import { useSettle } from "@/components/ui/use-settle";
 import { TierBadge } from "@/components/domain";
 import { Money } from "@/components/domain/Money";
 import { EVENT_TYPE_LABEL, type EventType } from "@/lib/types";
@@ -32,6 +33,8 @@ function PermitChecker() {
   const [form, setForm] = React.useState<HeroPreviewForm>(HERO_PREVIEW_DEFAULT);
   const { classification, fees, whatIfs } = heroPreviewResult(form);
   const whatIf = whatIfs[0];
+  // An answer that moves the tier or the fee is answered where it shows: the row settles.
+  const outcomeRef = useSettle<HTMLDivElement>(`${classification.tier}:${fees.total}`, { y: 4 });
 
   function patch(next: Partial<HeroPreviewForm>) {
     setForm((prev) => ({ ...prev, ...next }));
@@ -108,7 +111,7 @@ function PermitChecker() {
         aria-live="polite"
         aria-atomic="true"
       >
-        <div className="flex items-center justify-between gap-2">
+        <div ref={outcomeRef} className="flex items-center justify-between gap-2">
           <TierBadge tier={classification.tier} />
           <p className="flex items-baseline gap-2 text-sm text-fg-label">
             Estimated fee

@@ -1,5 +1,36 @@
 # Change log
 
+## 2026-10-13 - Motion pass: anchor links glide and arrive, and what changes in the app settles
+
+**What Changed:**
+- Landing page anchors glide: `app/globals.css` gives a page whose root has `data-anchor-glide` smooth scrolling (not under reduced motion), and `LandingScreen` sets it. `app/layout.tsx` puts `data-scroll-behavior="smooth"` on `<html>` so Next still opens a new route at the top at once
+- New `components/landing/useAnchorArrival.ts`: the section an in-page link lands on is marked `data-arrived` for 1.4s once its eyebrow is in view; `SectionHeading` lights the eyebrow while it is set (`SECTION` is now a named group). Works for the header, the phone menu, the task rows, the footer, a deep link and back/forward
+- `components/landing/SiteHeader.tsx`: after a section link in the phone "Menu", focus is no longer handed back to the "Menu" button, which scrolled the page back to the top
+- Link feedback: the header's and the footer's links fade their underline in (`components/ui/site-header.tsx`, `NIGHT_TEXT_LINK` and `TEXT_LINK` in `sections.ts`). In "I want to…" the four in-page rows now have a down arrow, "Plan an event" keeps the right arrow, and each leans 2px on hover or focus (`QuickTasks.tsx`)
+- New `components/ui/use-settle.ts`: `useSettle(value)` replays a short settle on an element when the value it shows changes, never on mount. Used on the wizard's step (`WizardScreen.tsx`), each shell's page when the applicant or the city role changes (`AppShell.tsx`, `CityShell.tsx`, a fade only), the "Who's up" list (`WhoIsUp.tsx`), `CountBadge`'s number and the landing checker's tier and fee (`PermitChecker.tsx`)
+- Steppers take a color step when a marker or connector changes (`wizard-stepper.tsx`, `StateStepper.tsx`); the user menu's chevron turns when the menu is open (`UserMenu.tsx`)
+- Existing motion moved onto the tokens: dialog, popover, dropdown, select and tooltip (`--dur-tap` / `--dur-fast`, `ease-frost`), the wizard's tier ring (`--dur-soft`), the sidebar's links; the command palette opens from its top edge (`command.tsx`)
+- `/dev/kit` "Motion" shows the change settle and the lit eyebrow
+- Tests: `components/ui/use-settle.test.tsx` (new), two cases added to `tests/render/landing.test.tsx`
+- Docs: `docs/rime-and-ink-design-system.md` ("Motion" patterns, "Links"), `docs/readme.md`, plan `docs/plans/2026-10-13-motion-pass.md`
+- Gate: type-check, lint and build pass. Tests: 3,241 of 3,242 pass. The one failure, `tests/render/handoffs.test.tsx` path 5 ("Width (ft)" not found), is from the "Where step always opens on Bookable spaces" change below and fails the same way without this work; it was left alone
+
+**Why:**
+- Requested: animate the landing page's anchor links and other parts of the app, subtly, so the interface is clearer. Each animation answers one of two questions: where did this link take me, or what just changed
+
+**Files Modified:**
+- `app/globals.css`, `app/layout.tsx`
+- `components/landing/useAnchorArrival.ts` (new), `LandingScreen.tsx`, `SectionHeading.tsx`, `SiteHeader.tsx`, `QuickTasks.tsx`, `PermitChecker.tsx`, `sections.ts`
+- `components/ui/use-settle.ts` (new), `use-settle.test.tsx` (new), `count-badge.tsx`, `site-header.tsx`, `wizard-stepper.tsx`, `dialog.tsx`, `popover.tsx`, `dropdown-menu.tsx`, `select.tsx`, `tooltip.tsx`, `command.tsx`
+- `components/domain/WhoIsUp.tsx`, `StateStepper.tsx`
+- `components/shell/AppShell.tsx`, `CityShell.tsx`, `CitySidebar.tsx`, `UserMenu.tsx`
+- `components/wizard/WizardScreen.tsx`, `ResultPanel.tsx`
+- `components/kit/KitScreen.tsx`
+- `tests/render/landing.test.tsx`
+- `docs/rime-and-ink-design-system.md`, `docs/readme.md`, `docs/plans/2026-10-13-motion-pass.md`
+
+---
+
 ## 2026-10-13 - Where step always opens on Bookable spaces
 
 **What Changed:**

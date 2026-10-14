@@ -1,5 +1,5 @@
-import { act, screen, within } from "@testing-library/react";
-import { describe, expect, it } from "vitest";
+import { act, screen, waitFor, within } from "@testing-library/react";
+import { afterEach, describe, expect, it } from "vitest";
 import { LandingScreen } from "@/components/landing/LandingScreen";
 import { DemoGuideScreen } from "@/components/landing/DemoGuideScreen";
 import { useDemo } from "@/lib/state";
@@ -7,6 +7,12 @@ import { routes } from "@/lib/routes";
 import { lastPush, renderScreen } from "./harness";
 
 describe("LandingScreen (/)", () => {
+  // A followed anchor leaves its hash in the URL, and the page treats a hash it opens with as a
+  // deep link (it marks that section); each test starts from the plain page.
+  afterEach(() => {
+    window.history.replaceState(null, "", window.location.pathname);
+  });
+
   it("renders the one h1, the page's name, and the permit checker at its Instant default", async () => {
     await renderScreen(<LandingScreen />, { path: "/" });
 
@@ -58,6 +64,41 @@ describe("LandingScreen (/)", () => {
       const href = link.getAttribute("href")!;
       if (href.startsWith("#")) expect(document.getElementById(href.slice(1)), href).not.toBeNull();
     }
+  });
+
+  it("an in-page link glides to its section and marks it as arrived for a moment", async () => {
+    const { container, user } = await renderScreen(<LandingScreen />, { path: "/" });
+
+    // Smooth scrolling is asked for by this page alone (globals.css keys off the attribute).
+    expect(container.querySelector("[data-anchor-glide]")).toBe(container.querySelector(".page-atmosphere"));
+    const fees = document.getElementById("fees")!;
+    const questions = document.getElementById("questions")!;
+    expect(fees).not.toHaveAttribute("data-arrived");
+
+    const primary = screen.getByRole("navigation", { name: "Primary" });
+    await user.click(within(primary).getByRole("link", { name: "Fees" }));
+    expect(fees).toHaveAttribute("data-arrived");
+
+    // Another link takes the mark with it: one section is lit at a time.
+    await user.click(within(screen.getByRole("navigation", { name: "Footer" })).getByRole("link", { name: "Questions" }));
+    expect(fees).not.toHaveAttribute("data-arrived");
+    expect(questions).toHaveAttribute("data-arrived");
+
+    // The mark is a moment, not a state the section keeps.
+    await waitFor(() => expect(questions).not.toHaveAttribute("data-arrived"), { timeout: 3000 });
+  });
+
+  it("the skip link marks no section, and a task row's arrow says whether it leaves the page", async () => {
+    const { user } = await renderScreen(<LandingScreen />, { path: "/" });
+
+    await user.click(screen.getByRole("link", { name: "Skip to main content" }));
+    expect(document.querySelector("[data-arrived]")).toBeNull();
+
+    const tasks = screen.getByRole("list", { name: "I want to…" });
+    const arrowOf = (name: RegExp) => within(tasks).getByRole("link", { name }).closest("li")!.querySelector("svg")!;
+    expect(arrowOf(/Plan an event/)).toHaveAttribute("data-goes", "away");
+    expect(arrowOf(/See what it costs/)).toHaveAttribute("data-goes", "down");
+    expect(arrowOf(/Read common questions/)).toHaveAttribute("data-goes", "down");
   });
 
   it("the footer carries the office's contact details and the staff door", async () => {

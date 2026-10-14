@@ -1,5 +1,6 @@
 "use client";
 
+import * as React from "react";
 import Link from "next/link";
 import { cn } from "cn";
 import { MenuIcon } from "lucide-react";
@@ -34,6 +35,10 @@ import { SECTION_LINKS, TEXT_LINK } from "./sections";
  */
 function SiteHeader() {
   const doors = useDoors();
+  // A section link in the menu scrolls the page away from the "Menu" button. Radix would hand
+  // focus back to the button as the menu closes, which scrolls the header back into view and
+  // undoes the jump; after an anchor, focus is left to follow the link instead.
+  const followedAnchor = React.useRef(false);
 
   return (
     <SiteHeaderBand>
@@ -57,9 +62,22 @@ function SiteHeader() {
                   Menu
                 </Button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-60">
+              <DropdownMenuContent
+                align="end"
+                className="w-60"
+                onCloseAutoFocus={(event) => {
+                  if (followedAnchor.current) event.preventDefault();
+                  followedAnchor.current = false;
+                }}
+              >
                 {SECTION_LINKS.map((link) => (
-                  <DropdownMenuItem key={link.href} asChild>
+                  <DropdownMenuItem
+                    key={link.href}
+                    asChild
+                    onSelect={() => {
+                      followedAnchor.current = true;
+                    }}
+                  >
                     <a href={link.href}>{link.label}</a>
                   </DropdownMenuItem>
                 ))}

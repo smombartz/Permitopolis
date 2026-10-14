@@ -62,13 +62,13 @@ function SiteIdentity({ href = routes.home(), truncate = false, className, ...pr
   );
 }
 
-/** A section link in the site header's row: 44px tall, underlined on hover and nothing else. */
+/** A section link in the site header's row: 44px tall; on hover its underline fades in and nothing else moves. */
 function SiteHeaderNavLink({ className, ...props }: React.ComponentProps<"a">) {
   return (
     <a
       data-slot="site-header-nav-link"
       className={cn(
-        "flex h-11 items-center rounded-control px-3 text-sm font-semibold text-fg underline-offset-4 outline-none hover:underline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-focus-ring",
+        "flex h-11 items-center rounded-control px-3 text-sm font-semibold text-fg underline decoration-transparent underline-offset-4 outline-none transition-colors duration-[var(--dur-fast)] ease-frost hover:decoration-current focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-focus-ring",
         className,
       )}
       {...props}

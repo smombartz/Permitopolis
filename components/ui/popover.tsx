@@ -30,7 +30,7 @@ function PopoverContent({
         sideOffset={sideOffset}
         className={cn(
           // guard-allow-outline: the popover is a container; focus shows on the control inside it
-          "z-50 flex w-72 origin-(--radix-popover-content-transform-origin) flex-col gap-2.5 rounded-panel border border-line-glass bg-surface-solid p-3 text-sm text-fg shadow-hud backdrop-blur-hud outline-hidden duration-100 data-[side=bottom]:slide-in-from-top-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2 data-open:animate-in data-open:fade-in-0 data-open:zoom-in-95 data-closed:animate-out data-closed:fade-out-0 data-closed:zoom-out-95",
+          "z-50 flex w-72 origin-(--radix-popover-content-transform-origin) flex-col gap-2.5 rounded-panel border border-line-glass bg-surface-solid p-3 text-sm text-fg shadow-hud backdrop-blur-hud outline-hidden duration-[var(--dur-tap)] ease-frost data-[side=bottom]:slide-in-from-top-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2 data-open:animate-in data-open:fade-in-0 data-open:zoom-in-95 data-closed:animate-out data-closed:fade-out-0 data-closed:zoom-out-95",
           className
         )}
         {...props}

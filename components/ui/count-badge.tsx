@@ -1,6 +1,9 @@
+"use client"
+
 import * as React from "react"
 import { cva, type VariantProps } from "class-variance-authority"
 import { cn } from "cn"
+import { useSettle } from "@/components/ui/use-settle"
 
 const countBadgeVariants = cva(
   "inline-flex h-5 min-w-5 shrink-0 items-center justify-center rounded-full border px-1.5 font-mono text-[11px] font-semibold tabular-nums",
@@ -22,15 +25,20 @@ interface CountBadgeProps extends React.ComponentProps<"span">, VariantProps<typ
   count: number
 }
 
-/** A small numeric pill: nav item counts, "6" next to "My queue". */
+/**
+ * A small numeric pill: nav item counts, "6" next to "My queue". When the count changes the new
+ * number settles in from just below, so a queue that got shorter is seen to change; the pill
+ * itself stays still.
+ */
 function CountBadge({ count, variant = "neutral", className, ...props }: CountBadgeProps) {
+  const numberRef = useSettle<HTMLSpanElement>(count, { y: 3 })
   return (
     <span
       data-slot="count-badge"
       className={cn(countBadgeVariants({ variant }), className)}
       {...props}
     >
-      {count}
+      <span ref={numberRef}>{count}</span>
     </span>
   )
 }

@@ -13,6 +13,7 @@ import { ComparisonTable } from "./ComparisonTable";
 import { Fees } from "./Fees";
 import { Faq } from "./Faq";
 import { SiteFooter } from "./SiteFooter";
+import { useAnchorArrival } from "./useAnchorArrival";
 
 /**
  * The public landing page at `/`: the "Event permits" page of the Office of the City Clerk,
@@ -29,9 +30,12 @@ import { SiteFooter } from "./SiteFooter";
  */
 function LandingScreen() {
   const seed = React.useMemo(() => buildSeed(), []);
+  const onAnchorClick = useAnchorArrival();
 
   return (
-    <div className="page-atmosphere min-h-dvh">
+    // data-anchor-glide: in-page links scroll smoothly here (globals.css). The click handler only
+    // listens: it marks the section a link lands on (`useAnchorArrival`), the link still navigates.
+    <div data-anchor-glide="" onClick={onAnchorClick} className="page-atmosphere min-h-dvh">
       <SkipLink />
       {/* The header (with the primary nav) and the footer are landmarks of the page, so they sit beside <main>, not in it. */}
       <SiteHeader />

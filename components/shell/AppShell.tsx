@@ -3,6 +3,7 @@
 import * as React from "react";
 import { PageSkeleton } from "@/components/ui/page-skeleton";
 import { MAIN_CONTENT_ID, SkipLink } from "@/components/ui/skip-link";
+import { useSettle } from "@/components/ui/use-settle";
 import { TopBar } from "@/components/shell/TopBar";
 import { StorageBanner } from "@/components/shell/StorageBanner";
 import { SwitchRolePanel } from "@/components/shell/SwitchRolePanel";
@@ -27,7 +28,11 @@ function AppShell({ children }: AppShellProps) {
   const hydrated = useHydrated();
   const role = useDemo((s) => s.role);
   const storageOk = useDemo((s) => s.storageOk);
+  const personaId = useDemo((s) => s.personaId);
   const switchTo = useRoleSwitch();
+  // Switching applicant re-deals the page in place; it fades back in so the change shows. A fade
+  // only: a transform here would re-anchor the wizard's fixed plan bar while it ran.
+  const pageRef = useSettle<HTMLDivElement>(personaId, { y: 0, fromOpacity: 0.4 });
 
   return (
     <div className="app-ground flex min-h-dvh flex-col">
@@ -46,7 +51,9 @@ function AppShell({ children }: AppShellProps) {
                 <React.Suspense fallback={null}>
                   <RememberPath role={role} />
                 </React.Suspense>
-                <div className="page-container py-6">{children}</div>
+                <div ref={pageRef} className="page-container py-6">
+                  {children}
+                </div>
               </>
             ) : (
               <SwitchRolePanel message="This screen is built for the Applicant." targets={["applicant"]} onSwitch={switchTo} />

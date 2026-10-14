@@ -35,7 +35,7 @@ function ResultPanel({ panel, onApplyWhatIf, highlight = false, compactFees = tr
       <div className="flex flex-col gap-2">
         <div
           className={cn(
-            "inline-flex w-fit rounded-full transition-shadow duration-300",
+            "inline-flex w-fit rounded-full transition-shadow duration-[var(--dur-soft)] ease-frost",
             highlight && "shadow-[0_0_0_4px_var(--pill)]",
           )}
           data-highlight={highlight ? "true" : undefined}

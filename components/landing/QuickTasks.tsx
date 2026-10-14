@@ -1,7 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { ArrowRightIcon } from "lucide-react";
+import { cn } from "cn";
+import { ArrowDownIcon, ArrowRightIcon } from "lucide-react";
 import { Panel } from "@/components/ui/panel";
 import { routes } from "@/lib/routes";
 import { useDoors } from "./hooks";
@@ -21,15 +22,25 @@ const ANCHOR_TASKS = [
 const TASK_LINK =
   "w-fit rounded-kbd text-base font-semibold text-fg outline-none after:absolute after:inset-0 after:rounded-row focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring";
 
-/** A list row (Rime & Ink "Lists and rows"): surface-2 at rest; on hover it nudges 2px right, the fill strengthens and the rim turns indigo. */
-function TaskRow({ link, detail }: { link: React.ReactNode; detail: string }) {
+const TASK_ARROW = "size-4 shrink-0 stroke-[2px] text-fg-accent transition-transform duration-[var(--dur-fast)] ease-frost";
+
+/**
+ * A list row (Rime & Ink "Lists and rows"): surface-2 at rest; on hover it nudges 2px right, the
+ * fill strengthens and the rim turns indigo. The arrow says where the row goes and leans that
+ * way on hover or focus: right for a door to another page, down for a section of this one.
+ */
+function TaskRow({ link, detail, goes }: { link: React.ReactNode; detail: string; goes: "away" | "down" }) {
   return (
     <li className="group relative flex items-center justify-between gap-4 rounded-row border border-line-subtle bg-surface-2 px-4 py-3 transition-all duration-[var(--dur-fast)] ease-frost hover:translate-x-0.5 hover:border-indigo-650/40 hover:bg-surface-strong">
       <div className="flex min-w-0 flex-col gap-0.5">
         {link}
         <p className="text-sm text-fg-secondary">{detail}</p>
       </div>
-      <ArrowRightIcon className="size-4 shrink-0 stroke-[2px] text-fg-accent" aria-hidden="true" />
+      {goes === "down" ? (
+        <ArrowDownIcon data-goes="down" className={cn(TASK_ARROW, "group-focus-within:translate-y-0.5 group-hover:translate-y-0.5")} aria-hidden="true" />
+      ) : (
+        <ArrowRightIcon data-goes="away" className={cn(TASK_ARROW, "group-focus-within:translate-x-0.5 group-hover:translate-x-0.5")} aria-hidden="true" />
+      )}
     </li>
   );
 }
@@ -55,6 +66,7 @@ function QuickTasks() {
             </Link>
           }
           detail="Start an application: five questions about your event."
+          goes="away"
         />
         {ANCHOR_TASKS.map((task) => (
           <TaskRow
@@ -65,6 +77,7 @@ function QuickTasks() {
               </a>
             }
             detail={task.detail}
+            goes="down"
           />
         ))}
       </ul>

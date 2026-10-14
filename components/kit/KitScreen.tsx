@@ -464,6 +464,7 @@ function KitScreen() {
   const [commandOpen, setCommandOpen] = React.useState(false);
   const [segment, setSegment] = React.useState<"list" | "board" | "map">("board");
   const [confirmOpen, setConfirmOpen] = React.useState(false);
+  const [settleCount, setSettleCount] = React.useState(3);
   const [acceptedIds, setAcceptedIds] = React.useState<string[]>(["c1"]);
   const [filterSearch, setFilterSearch] = React.useState("");
   const [filterTier, setFilterTier] = React.useState<Tier | "all">("all");
@@ -963,13 +964,22 @@ function KitScreen() {
         </KitSection>
 
         {/* ---- Motion ---- */}
-        <KitSection id="motion" title="Motion" description="Material settle, idle float, surface sweep, breathing selection, caret blink.">
+        <KitSection id="motion" title="Motion" description="Material settle, idle float, surface sweep, breathing selection, caret blink; change settle and anchor arrival.">
           <Row>
             <Panel variant="frosted" className="anim-material-settle p-4 text-sm">Material settle</Panel>
             <Panel variant="frosted" className="anim-idle-float p-4 text-sm">Idle float</Panel>
             <Panel variant="frosted" className="anim-surface-sweep p-4 text-sm">Surface sweep</Panel>
             <Panel variant="frosted" className="anim-breathing-selection p-4 text-sm">Breathing selection</Panel>
             <span className="anim-caret-blink font-mono text-lg text-fg">|</span>
+          </Row>
+          <Row>
+            {/* Change settle (`useSettle`): the number that changed arrives again; the pill stays still. */}
+            <Button variant="secondary" size="sm" onClick={() => setSettleCount((n) => n + 1)}>
+              Change settle
+              <CountBadge count={settleCount} variant="accent" />
+            </Button>
+            {/* Anchor arrival: how a section's eyebrow is lit for a moment after an in-page link lands on it. */}
+            <Eyebrow className="border-indigo-650 shadow-step-lit">Anchor arrival</Eyebrow>
           </Row>
         </KitSection>
 

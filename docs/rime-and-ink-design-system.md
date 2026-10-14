@@ -238,9 +238,9 @@ Sizes are 36px (compact, 12px padding), 44px (16px) and 56px (20px). The 56px pr
 ### Links
 
 - **Nav:** 14px secondary text, padding 8×12, 8px radius. On hover, the fill goes to surface-2 and the text to primary.
-- **Site header:** 14px/600 primary ink, 44px tall with 12px side padding, 8px radius. On hover the label takes an underline at a 4px offset and nothing else moves: no fill, no lift. Focus-visible is the 2px ring, drawn inside the link (offset -2px).
+- **Site header:** 14px/600 primary ink, 44px tall with 12px side padding, 8px radius. On hover the label takes an underline at a 4px offset, faded in over 180ms, and nothing else moves: no fill, no lift. Focus-visible is the 2px ring, drawn inside the link (offset -2px).
 - **Footer:** 14px secondary text that turns primary on hover
-- **On dark:** mint accent, 600 weight, underline on hover with 4px offset
+- **On dark:** mint accent, 600 weight, underline on hover with 4px offset, faded in over 180ms
 - **Inline accent links:** accent color with a trailing arrow. In the site header the accent link is 14px/500, underlined at a 4px offset from the start, with no arrow; on hover it turns primary ink.
 
 ### Lists and rows
@@ -297,7 +297,10 @@ Motion behaves like material settling under glass: things arrive from slightly b
   - Toast in: 300ms from `+12px`
   - Toast out: 240ms ease-in
 - **Accordion:** height expands over 220ms ease-out and collapses over 180ms
-- **Reduced motion:** all durations become 0.01ms, loops run once, and the scroll thread is removed
+- **Anchor glide and arrival:** on a page of sections, an in-page link scrolls smoothly to its section instead of jumping. As the section's eyebrow comes into view it lights like a step marker the thread has reached (indigo border and the step-lit shadow, in over 240ms), holds for 1.4s in all, and is released over 820ms. One section is lit at a time. App screens do not glide.
+- **Change settle:** a value that changes in place arrives again: opacity 0→1 and `translateY(6px)`→rest over 240ms with the settle easing (3–4px for a number or a row group). A whole page that is re-dealt (another role, another applicant) fades from 40% and does not move. It never plays when a page opens, and it is not an entrance for list rows.
+- **Direction arrows:** an arrow that trails a row leans 2px the way the row goes on hover or focus: right for another page, down for a section of this one.
+- **Reduced motion:** all durations become 0.01ms, loops run once, and the scroll thread is removed. An anchor jumps and its eyebrow still lights; a change settle keeps a 120ms fade and loses its movement.
 
 ---
 

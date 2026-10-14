@@ -1,6 +1,9 @@
+"use client"
+
 import * as React from "react"
 import { cn } from "cn"
 import { ArrowRightIcon, CheckIcon, ClockIcon, MinusIcon, type LucideIcon } from "lucide-react"
+import { useSettle } from "@/components/ui/use-settle"
 import { DueDate } from "@/components/domain/DueDate"
 import { PartyAvatar } from "@/components/domain/PartyAvatar"
 import { plural } from "@/lib/format"
@@ -60,6 +63,9 @@ function WhoIsUp({ items, today, nextMove, applicantName, onSelectTask, classNam
   const headingId = React.useId()
   // Up now first; within each group the order waitingOn() gives: applicant, clerk, pws, hl.
   const rows = [...items].sort((a, b) => Number(b.status === "up_now") - Number(a.status === "up_now"))
+  // When the turn passes (an action is taken, the date moves), the rows re-sort; the list settles
+  // so the new order reads as a change and not as the same list.
+  const listRef = useSettle<HTMLDivElement>(rows.map((item) => `${item.party}:${item.status}`).join("|"), { y: 4 })
 
   return (
     <div
@@ -73,7 +79,7 @@ function WhoIsUp({ items, today, nextMove, applicantName, onSelectTask, classNam
         </h2>
         <p className="text-xs text-fg-secondary">{upNowSummary(items)}</p>
       </div>
-      <div role="list" aria-labelledby={headingId} className="flex flex-col divide-y divide-line-subtle">
+      <div ref={listRef} role="list" aria-labelledby={headingId} className="flex flex-col divide-y divide-line-subtle">
         {rows.map((item) => {
           const StatusIcon = STATUS_ICON[item.status]
           return (
@@ -83,7 +89,7 @@ function WhoIsUp({ items, today, nextMove, applicantName, onSelectTask, classNam
               data-status={item.status}
               data-party={item.party}
               className={cn(
-                "grid grid-cols-1 gap-2 px-4 py-3.5 sm:grid-cols-[1fr_auto_1.4fr] sm:items-center sm:gap-4",
+                "grid grid-cols-1 gap-2 px-4 py-3.5 transition-colors duration-[var(--dur-gentle)] ease-frost sm:grid-cols-[1fr_auto_1.4fr] sm:items-center sm:gap-4",
                 item.status === "up_now" && "border-l-[3px] border-indigo-650 bg-pill"
               )}
             >

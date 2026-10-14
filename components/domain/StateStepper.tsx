@@ -67,7 +67,7 @@ function StateStepper({ state, ending, compact = false, className }: StateSteppe
                   aria-current={isCurrent ? "step" : undefined}
                   title={compact ? stepName : undefined}
                   className={cn(
-                    "flex shrink-0 items-center justify-center rounded-full border-2 transition-colors",
+                    "flex shrink-0 items-center justify-center rounded-full border-2 transition-[color,background-color,border-color,box-shadow] duration-[var(--dur-gentle)] ease-frost",
                     compact ? "size-2.5" : "size-4",
                     done && "border-indigo-650 bg-indigo-650 text-fg-on-accent",
                     isCurrent &&
@@ -104,7 +104,7 @@ function StateStepper({ state, ending, compact = false, className }: StateSteppe
                 <span
                   aria-hidden="true"
                   className={cn(
-                    "mt-2 h-px flex-1",
+                    "mt-2 h-px flex-1 transition-colors duration-[var(--dur-gentle)] ease-frost",
                     compact ? "mt-[5px]" : "mt-2",
                     done ? "bg-indigo-650" : "bg-line-subtle"
                   )}

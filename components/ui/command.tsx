@@ -57,7 +57,8 @@ function CommandDialog({
         className={cn(
           // The dialog's own `sm:max-w-sm` outranked a bare max-w-[640px], so the palette was 384px
           // wide on a desktop and edge to edge on a phone.
-          "top-[18vh] max-w-[calc(100%-2rem)] translate-y-0 overflow-hidden rounded-panel! p-0 sm:max-w-[640px]",
+          // origin-top: it opens from its top edge (Rime & Ink "Command palette"), not from its middle.
+          "top-[18vh] max-w-[calc(100%-2rem)] origin-top translate-y-0 overflow-hidden rounded-panel! p-0 sm:max-w-[640px]",
           className
         )}
         showCloseButton={showCloseButton}

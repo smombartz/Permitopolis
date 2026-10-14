@@ -62,7 +62,7 @@ function UserMenu({ role, personaId, personaIds, onRoleChange, onPersonaChange, 
           {!compact ? (
             <>
               <span className="max-w-40 truncate">{name}</span>
-              <ChevronDownIcon data-icon="inline-end" aria-hidden="true" />
+              <ChevronDownIcon data-icon="inline-end" aria-hidden="true" className="transition-transform duration-[var(--dur-fast)] ease-frost group-data-[state=open]/button:rotate-180" />
             </>
           ) : null}
         </Button>

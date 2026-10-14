@@ -23,7 +23,9 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
-    <html lang="en" className={`${plexMono.variable} h-full antialiased`}>
+    // data-scroll-behavior: the landing page scrolls smoothly to its anchors (globals.css); this
+    // has Next turn that off during a route change, so a new page opens at the top at once.
+    <html lang="en" data-scroll-behavior="smooth" className={`${plexMono.variable} h-full antialiased`}>
       <body className="min-h-full">
         {/*
           Every screen reads client state (the store, the URL). This boundary lets the
