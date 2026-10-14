@@ -111,8 +111,9 @@ describe("Wizard: a booked, blacked-out and impacted date, and attendance over c
     await user.click(screen.getByRole("radio", { name: /^Market or festival/ }));
     await user.type(screen.getByLabelText(/Event name/), "Midsummer market");
     await user.click(screen.getByRole("button", { name: "Next" }));
-    // A market or festival opens the map on "Draw an area" already, City Hall Plaza by default;
-    // sizing the rectangle is what chooses it (the tab itself is a no-op: it is already active).
+    // The map opens on "Bookable spaces" whatever the event type. "Draw an area" starts on
+    // City Hall Plaza; sizing the rectangle sets its width.
+    await user.click(screen.getByRole("tab", { name: "Draw an area" }));
     await user.clear(screen.getByLabelText("Width (ft)"));
     await user.type(screen.getByLabelText("Width (ft)"), "80");
     await user.click(screen.getByRole("button", { name: "Next" }));

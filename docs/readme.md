@@ -1801,8 +1801,15 @@ Things a screen builder needs to know that the type signatures do not say.
   area with no value shows a dashed starting rectangle and "No area chosen yet"; it becomes the
   value when the applicant drags or sizes it. The picker never calls `onChange` on mount, so a
   Draft that loads a moment later is not overwritten.
-- The SVGs are `aria-hidden`. Every map function is also in the list or the number inputs beside
+- The SVGs are `aria-hidden`. Every map function is also in the list or the number inputs under
   it, which is the keyboard and screen-reader path.
+- The wizard's Where step always opens on Bookable spaces: `StepWhere` does not pass `eventType`
+  to the picker. The picker still takes `eventType` to choose a starting tab (`/dev/map` uses it
+  to show each mode), and a picker with a value opens on the value's own tab.
+- In `LocationPicker` the map spans the picker's full width at every screen size and the list or
+  inputs sit under it. The lists are grids sized by the picker's own width with container
+  queries (`@container` on each tab's wrapper; two columns from `@lg`, three from `@3xl`), not by
+  the viewport, because the picker is also shown at half width on `/dev/map`.
 
 **Tooling**
 

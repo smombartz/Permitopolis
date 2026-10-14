@@ -24,7 +24,7 @@ describe("MapDevScreen", () => {
     expect(screen.getAllByText("Overlap").length).toBeGreaterThan(0);
   });
 
-  it("selects Shelter 3 through the keyboard list beside the map and shows its label and capacity", async () => {
+  it("selects Shelter 3 through the keyboard list under the map and shows its label and capacity", async () => {
     const user = userEvent.setup();
     render(<MapDevScreen />);
 

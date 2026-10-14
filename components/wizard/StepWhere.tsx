@@ -13,10 +13,10 @@ export interface StepWhereProps {
 }
 
 /**
- * Step 2: the map, with the mode `LocationPicker` opens on set by the event type. Choosing a
- * street or route puts the Street/Route closure trigger on the live result panel at once, just
- * by changing `location` (the panel recomputes classify() on every change); nothing extra is
- * needed here for that.
+ * Step 2: the map. It opens on Bookable spaces whatever the event type (the picker is not given
+ * the type), and on the value's own tab once a place is chosen. Choosing a street or route puts
+ * the Street/Route closure trigger on the live result panel at once, just by changing `location`
+ * (the panel recomputes classify() on every change); nothing extra is needed here for that.
  */
 function StepWhere({ answers, onChange, ctx, ignoreCaseId }: StepWhereProps) {
   const schedule = answers.schedule;
@@ -35,13 +35,12 @@ function StepWhere({ answers, onChange, ctx, ignoreCaseId }: StepWhereProps) {
       <div>
         <h2 className="text-h5 font-bold text-fg">Where?</h2>
         <p className="mt-1 text-sm text-fg-secondary">
-          Pick a bookable space, draw an area, choose street segments, or draw a route. A list beside the map does the same by keyboard.
+          Pick a bookable space, draw an area, choose street segments, or draw a route. A list under the map does the same by keyboard.
         </p>
       </div>
       <LocationPicker
         value={answers.location}
         onChange={(location) => onChange({ location })}
-        eventType={answers.eventType}
         availabilityOf={availabilityOf}
       />
     </div>

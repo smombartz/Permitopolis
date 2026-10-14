@@ -147,7 +147,7 @@ function AvailabilityNote({
 
 /**
  * Four ways to describe where an event happens. Every selection is available from the
- * keyboard-operable list beside the map; clicking the map shapes does the same thing.
+ * keyboard-operable list under the map; clicking the map shapes does the same thing.
  * The map itself is decorative (`aria-hidden`): the list is the accessible path.
  *
  * Controlled: what is pressed, drawn or numbered is read from `value`, so a Draft that arrives
@@ -262,8 +262,8 @@ export function LocationPicker({ value, onChange, eventType, availabilityOf, cla
 
       {/* ---------- Bookable spaces ---------- */}
       <TabsContent value="inventory" className="mt-3">
-        <div className="flex flex-col gap-4 md:flex-row">
-          <MapCanvas aria-hidden="true" className="flex-1 md:w-2/3">
+        <div className="@container flex flex-col gap-4">
+          <MapCanvas aria-hidden="true">
             {/* The drawing shows each shelter and field; these sit on top to take the click and show the choice. */}
             {bookableSpaces().map((space) => {
               const shape = spaceShape(space.id);
@@ -287,7 +287,7 @@ export function LocationPicker({ value, onChange, eventType, availabilityOf, cla
               );
             })}
           </MapCanvas>
-          <ul className="flex flex-1 flex-col gap-2 md:w-1/3" aria-label="Bookable spaces">
+          <ul className="grid grid-cols-1 gap-2 @lg:grid-cols-2 @3xl:grid-cols-3" aria-label="Bookable spaces">
             {bookableSpaces().map((space) => {
               const selected = inventoryIds.includes(space.id);
               return (
@@ -297,7 +297,7 @@ export function LocationPicker({ value, onChange, eventType, availabilityOf, cla
                     aria-pressed={selected}
                     onClick={() => selectInventory(space.id)}
                     className={cn(
-                      "w-full rounded-panel border border-line-subtle bg-surface-1 p-2 text-left text-sm hover:bg-surface-hover",
+                      "h-full w-full rounded-panel border border-line-subtle bg-surface-1 p-2 text-left text-sm hover:bg-surface-hover",
                       FOCUS_RING,
                       selected && "border-indigo-650 bg-pill",
                     )}
@@ -320,8 +320,8 @@ export function LocationPicker({ value, onChange, eventType, availabilityOf, cla
 
       {/* ---------- Draw an area ---------- */}
       <TabsContent value="area" className="mt-3">
-        <div className="flex flex-col gap-4 md:flex-row">
-          <MapCanvas ref={svgRef} aria-hidden="true" className="flex-1 touch-none md:w-2/3">
+        <div className="@container flex flex-col gap-4">
+          <MapCanvas ref={svgRef} aria-hidden="true" className="touch-none">
             {(["city-hall-plaza", "great-lawn"] as AreaId[]).map((id) => {
               const shape = DRAWABLE_AREA_RECT[id];
               const isActive = id === areaId;
@@ -355,41 +355,44 @@ export function LocationPicker({ value, onChange, eventType, availabilityOf, cla
               strokeDasharray={areaChosen ? undefined : "8 6"}
             />
           </MapCanvas>
-          <div className="flex flex-1 flex-col gap-3 md:w-1/3">
-            <div className="flex flex-col gap-1.5">
-              <Label htmlFor={`${fieldId}-area`}>Area</Label>
-              <Select value={areaId} onValueChange={(next) => handleAreaIdChange(next as AreaId)}>
-                <SelectTrigger id={`${fieldId}-area`} className="w-full">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="city-hall-plaza">{getSpace("city-hall-plaza")?.name ?? "City Hall Plaza"}</SelectItem>
-                  <SelectItem value="great-lawn">{getSpace("great-lawn")?.name ?? "Great Lawn"}</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="flex gap-3">
-              <div className="flex flex-1 flex-col gap-1.5">
-                <Label htmlFor={`${fieldId}-width`}>Width (ft)</Label>
-                <Input
-                  id={`${fieldId}-width`}
-                  type="number"
-                  min={1}
-                  max={area.w}
-                  value={areaRect.w}
-                  onChange={(event) => setAreaRect({ ...areaRect, w: Number(event.target.value) || 0 })}
-                />
+          <div className="flex flex-col gap-3">
+            {/* One row under the map where the picker is wide enough, stacked where it is not. */}
+            <div className="grid grid-cols-1 gap-3 @lg:grid-cols-2">
+              <div className="flex flex-col gap-1.5">
+                <Label htmlFor={`${fieldId}-area`}>Area</Label>
+                <Select value={areaId} onValueChange={(next) => handleAreaIdChange(next as AreaId)}>
+                  <SelectTrigger id={`${fieldId}-area`} className="w-full">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="city-hall-plaza">{getSpace("city-hall-plaza")?.name ?? "City Hall Plaza"}</SelectItem>
+                    <SelectItem value="great-lawn">{getSpace("great-lawn")?.name ?? "Great Lawn"}</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
-              <div className="flex flex-1 flex-col gap-1.5">
-                <Label htmlFor={`${fieldId}-length`}>Length (ft)</Label>
-                <Input
-                  id={`${fieldId}-length`}
-                  type="number"
-                  min={1}
-                  max={area.h}
-                  value={areaRect.h}
-                  onChange={(event) => setAreaRect({ ...areaRect, h: Number(event.target.value) || 0 })}
-                />
+              <div className="flex gap-3">
+                <div className="flex flex-1 flex-col gap-1.5">
+                  <Label htmlFor={`${fieldId}-width`}>Width (ft)</Label>
+                  <Input
+                    id={`${fieldId}-width`}
+                    type="number"
+                    min={1}
+                    max={area.w}
+                    value={areaRect.w}
+                    onChange={(event) => setAreaRect({ ...areaRect, w: Number(event.target.value) || 0 })}
+                  />
+                </div>
+                <div className="flex flex-1 flex-col gap-1.5">
+                  <Label htmlFor={`${fieldId}-length`}>Length (ft)</Label>
+                  <Input
+                    id={`${fieldId}-length`}
+                    type="number"
+                    min={1}
+                    max={area.h}
+                    value={areaRect.h}
+                    onChange={(event) => setAreaRect({ ...areaRect, h: Number(event.target.value) || 0 })}
+                  />
+                </div>
               </div>
             </div>
             {areaChosen ? (
@@ -404,8 +407,8 @@ export function LocationPicker({ value, onChange, eventType, availabilityOf, cla
 
       {/* ---------- Street segments ---------- */}
       <TabsContent value="streets" className="mt-3">
-        <div className="flex flex-col gap-4 md:flex-row">
-          <MapCanvas aria-hidden="true" className="flex-1 md:w-2/3">
+        <div className="@container flex flex-col gap-4">
+          <MapCanvas aria-hidden="true">
             {/* The drawing colors every block that can be closed; these take the click and show the choice. */}
             {SEGMENTS.map((segment) => {
               const path = segmentPath(segment.id);
@@ -426,7 +429,7 @@ export function LocationPicker({ value, onChange, eventType, availabilityOf, cla
               );
             })}
           </MapCanvas>
-          <ul className="flex flex-1 flex-col gap-1.5 md:w-1/3" aria-label="Street segments">
+          <ul className="grid grid-cols-1 gap-1.5 @lg:grid-cols-2 @3xl:grid-cols-3" aria-label="Street segments">
             {SEGMENTS.map((segment) => {
               const selected = streetIds.includes(segment.id);
               return (
@@ -436,12 +439,12 @@ export function LocationPicker({ value, onChange, eventType, availabilityOf, cla
                     aria-pressed={selected}
                     onClick={() => selectStreet(segment.id)}
                     className={cn(
-                      "flex w-full items-center justify-between gap-2 rounded-control border border-line-subtle bg-surface-1 px-2 py-1.5 text-left text-sm hover:bg-surface-hover pointer-coarse:min-h-11",
+                      "flex h-full w-full items-center justify-between gap-2 rounded-control border border-line-subtle bg-surface-1 px-2 py-1.5 text-left text-sm hover:bg-surface-hover pointer-coarse:min-h-11",
                       FOCUS_RING,
                       selected && "border-indigo-650 bg-pill",
                     )}
                   >
-                    {/* The whole name, on as many lines as it takes: the column is a third of the row. */}
+                    {/* The whole name, on as many lines as it takes: a column of the list can be narrow. */}
                     <span className="min-w-0 break-words text-fg-secondary">{segment.label}</span>
                     <span className="flex shrink-0 items-center gap-1.5">
                       {segment.kind === "residential" && <Badge variant="outline">Residential</Badge>}
@@ -457,8 +460,8 @@ export function LocationPicker({ value, onChange, eventType, availabilityOf, cla
 
       {/* ---------- Draw a route ---------- */}
       <TabsContent value="route" className="mt-3">
-        <div className="flex flex-col gap-4 md:flex-row">
-          <MapCanvas nodes aria-hidden="true" className="flex-1 md:w-2/3">
+        <div className="@container flex flex-col gap-4">
+          <MapCanvas nodes aria-hidden="true">
             {/* On the route: indigo. Can be added next: left as drawn. Cannot be added yet: washed out. */}
             {SEGMENTS.map((segment) => {
               const path = segmentPath(segment.id);
@@ -484,8 +487,8 @@ export function LocationPicker({ value, onChange, eventType, availabilityOf, cla
               );
             })}
           </MapCanvas>
-          <div className="flex flex-1 flex-col gap-2 md:w-1/3">
-            <ul aria-label="Route segments, in order" className="flex flex-col gap-1.5">
+          <div className="flex flex-col gap-2">
+            <ul aria-label="Route segments, in order" className="grid grid-cols-1 gap-1.5 @lg:grid-cols-2 @3xl:grid-cols-3">
               {SEGMENTS.map((segment) => {
                 const order = routeIds.indexOf(segment.id);
                 const included = order >= 0;
@@ -498,7 +501,7 @@ export function LocationPicker({ value, onChange, eventType, availabilityOf, cla
                       disabled={!canSelect}
                       onClick={() => (included ? undefined : selectRouteSegment(segment.id))}
                       className={cn(
-                        "flex w-full items-center gap-2 rounded-control border border-line-subtle bg-surface-1 px-2 py-1.5 text-left text-sm hover:bg-surface-hover disabled:cursor-not-allowed disabled:opacity-40 pointer-coarse:min-h-11",
+                        "flex h-full w-full items-center gap-2 rounded-control border border-line-subtle bg-surface-1 px-2 py-1.5 text-left text-sm hover:bg-surface-hover disabled:cursor-not-allowed disabled:opacity-40 pointer-coarse:min-h-11",
                         FOCUS_RING,
                         included && "border-indigo-650 bg-pill",
                       )}

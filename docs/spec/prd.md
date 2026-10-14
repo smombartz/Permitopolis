@@ -224,7 +224,7 @@ Five plain questions, a live result panel that changes with every answer, and a 
 
     - Event name and an optional one-line description.
 
-    - The type pre-fills defaults: Race or parade opens the route mode, Block party opens street mode on residential streets, Market or festival turns on food or vending, Picnic or party opens bookable spaces, Class or club meetup turns on repeat.
+    - The type pre-fills defaults: Market or festival turns on food or vending, Class or club meetup turns on repeat. The map on the next step opens on bookable spaces whatever the type.
 
 2.  **Where?**
 
@@ -238,7 +238,7 @@ Five plain questions, a live result panel that changes with every answer, and a 
 
     - Draw a route: click connected segments in order; shows miles, with Undo last segment.
 
-    - A list beside the map does the same selection by keyboard.
+    - A list under the map does the same selection by keyboard.
 
     - Choosing a street or route adds a Street closure trigger at once, unless the block-party exception applies.
 

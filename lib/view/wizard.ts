@@ -97,10 +97,9 @@ export const EVENT_TYPES: EventType[] = [
 ];
 
 /**
- * What picking an event type pre-fills besides the map mode, which `LocationPicker` already
- * starts on the right tab for from its own `eventType` prop. A market or festival turns on
- * food or vending, with one vendor to start; nothing is overwritten once the applicant has
- * set it themselves.
+ * What picking an event type pre-fills. It does not choose the map's tab: the Where step opens
+ * on Bookable spaces whatever the type. A market or festival turns on food or vending, with one
+ * vendor to start; nothing is overwritten once the applicant has set it themselves.
  */
 export function addOnsForEventType(eventType: EventType, current: AddOns): AddOns {
   if (eventType === "market_festival" && current.foodVending === null) {

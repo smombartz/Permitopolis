@@ -1,5 +1,25 @@
 # Change log
 
+## 2026-10-13 - Where step always opens on Bookable spaces
+
+**What Changed:**
+- `components/wizard/StepWhere.tsx` no longer passes the event type to `LocationPicker`, so the map opens on the Bookable spaces tab for every event type. Before, a race opened on Draw a route, a block party on Street segments, and a performance or market on Draw an area. Once a place is chosen the picker still opens on that place's own tab, so a saved draft and the amend wizard are unchanged
+- `LocationPicker` itself is unchanged and still takes `eventType`; `/dev/map` uses it to show each mode
+- `tests/render/applicant-states.test.tsx`: the City Hall Plaza test now clicks the Draw an area tab first, since a market no longer opens on it
+- `docs/spec/prd.md` and `docs/readme.md` say the Where step opens on bookable spaces whatever the type
+- The gate (`pnpm check`) was not run for this change, at the owner's request
+
+**Why:**
+- The owner asked for Bookable spaces to be the tab that is open by default on the Where step
+
+**Files Modified:**
+- `components/wizard/StepWhere.tsx` - dropped the `eventType` prop on the picker
+- `lib/view/wizard.ts` - comment only
+- `tests/render/applicant-states.test.tsx` - one test updated
+- `docs/spec/prd.md`, `docs/readme.md` - wording
+
+---
+
 ## 2026-10-13 - One header style: the site header in the app, with a user menu
 
 **What Changed:**
@@ -26,6 +46,26 @@
 - `lib/view/shell.ts`, `lib/view/shell.test.ts`, `lib/view/palette.ts`, `lib/data/people.ts`
 - `tests/render/harness.tsx`, `shell.test.tsx`, `handoffs.test.tsx`, `hydration.test.tsx`, `keyboard.test.tsx`, `a11y-overlays.test.tsx`, `live-regions.test.tsx`, `kit.test.tsx`
 - `docs/rime-and-ink-design-system.md`, `docs/readme.md`, `docs/plans/2026-10-13-site-header-user-menu.md`
+
+---
+
+## 2026-10-13 - Where step: the map fills the width, its list sits underneath
+
+**What Changed:**
+- `components/map/LocationPicker.tsx`: on all four tabs the map now spans the picker's full width at every screen size, and the keyboard list (or the area inputs, or the route list with its miles and Undo) sits under it instead of beside it from 768px up
+- The lists under the map are grids sized by the picker's own width with container queries: one column, two from `@lg`, three from `@3xl`. List buttons fill their grid cell so a row's cards are the same height. On Draw an area, the Area select and the Width/Length pair share a row where there is room
+- Wording that said the list is "beside" the map now says "under": the Where step's helper line, the picker's comments, a test title, the PRD line and two lines of the build plan
+- `docs/readme.md` notes the layout and why it uses container queries
+
+**Why:**
+- The owner found the map too small on the Where step and asked for it to fill its parent, with the right column underneath
+
+**Files Modified:**
+- `components/map/LocationPicker.tsx` - layout of the four tab panels
+- `components/wizard/StepWhere.tsx` - helper line
+- `tests/render/map.test.tsx` - test title
+- `docs/spec/prd.md`, `docs/plans/2026-10-12-permitopolis-prototype.md`, `docs/readme.md` - wording and a layout note
+- `docs/plans/2026-10-13-where-step-map-full-width.md` - the plan for this change
 
 ---
 

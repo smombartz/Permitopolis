@@ -582,7 +582,7 @@ Each workstream lists what it owns, what it reads first, its tasks and how it is
 
 **2C tasks** (done in Phase 1)
 - [x] The Permitopolis SVG: Riverside Park with four shelters and four fields, Great Lawn, City Hall Plaza, Main Street, River Road, Maple, Elm and Oak.
-- [x] `LocationPicker`: bookable spaces, draw an area (drag a rectangle; square feet and capacity at 10 sq ft a person), street segments (residential marked), draw a route (connected segments in order, miles, undo). A list beside the map does the same by keyboard.
+- [x] `LocationPicker`: bookable spaces, draw an area (drag a rectangle; square feet and capacity at 10 sq ft a person), street segments (residential marked), draw a route (connected segments in order, miles, undo). A list under the map does the same by keyboard.
 - [x] `PermitopolisMap` display mode, `MapThumbnail`, `MonthGrid`, `WeekGrid`, `DayStrip`.
 - [x] Geometry tests in `lib/view/map.ts`. `/dev/map` shows all four modes.
 
@@ -757,7 +757,7 @@ menu's scenario jumps (S1 to S6) set role, persona and page in one step.
 | URL | Look for |
 |---|---|
 | `/dev/kit` | Every primitive and domain component in every state, on the Rime & Ink tokens: buttons at each size and state; form controls; tier badges, party chips and state chips (color always with an icon and a label); the stepper; `TaskCard` locked, pinned, overdue, sent back and done; `WhoIsUp`; `FeeTable` with Actual and Difference; the stress rows (a 101-character event name, a 60-character organization, "Not provided", an ended case). Since Phase 3: `BillingBadge`, `TierLegend` and the back link, in "Domain: BillingBadge, TierLegend, and the back link". The three places section 3.2 bends the design system are worth a look here: identity tints on avatars and dots only, `fg-label` for labels, blur on chrome only |
-| `/dev/map` | The Permitopolis map in its four picking modes (bookable spaces, draw an area, street segments, draw a route), each with its keyboard list beside it; residential blocks marked; the display map with overlapping bookings and its tier legend; `MapThumbnail`; the month grid, week grid and day strip |
+| `/dev/map` | The Permitopolis map in its four picking modes (bookable spaces, draw an area, street segments, draw a route), each with its keyboard list under it; residential blocks marked; the display map with overlapping bookings and its tier legend; `MapThumbnail`; the month grid, week grid and day strip |
 
 ### Landing page and demo guide (3A)
 
