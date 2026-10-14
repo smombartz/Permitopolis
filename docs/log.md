@@ -1,5 +1,33 @@
 # Change log
 
+## 2026-10-14 - Cases pipeline board: stacked, wider cards
+
+**What Changed:**
+- Board cards on `/city/cases` read top to bottom, one fact to a line: event name (up to two
+  lines), applicant, case id; then the date over the days to go; then a wrapping row of chips
+  (tier, the ending or the state, Stalled, commission); then, under a hairline, whoever the case
+  waits on, one chip to a line (a long party name truncates). An ended case has no waiting
+  footer. Before, the title shared its row with up to three badges and the id shared its row
+  with the date.
+- The board breaks out of the 1180px page column to the window's width less the gutters
+  (new `.page-bleed` utility in `app/globals.css`) and centers once its columns reach their
+  widest. Columns are 240–320px (were at least 176px), so a card has about 200px for content,
+  up from about 134px.
+- Render tests: the waiting-on chips stack, and an ended case's card shows its ending and no
+  waiting footer.
+
+**Why:**
+- City staff found the cards hard to read: too much side by side in too little width.
+
+**Files Modified:**
+- `components/city/lists/PipelineBoard.tsx`
+- `app/globals.css`
+- `tests/render/city-lists.test.tsx`
+- `docs/readme.md`
+- `docs/plans/2026-10-14-pipeline-board-cards.md` (new)
+
+---
+
 ## 2026-10-14 - The "Reviewed" tier is now called "Standard"
 
 **What Changed:**

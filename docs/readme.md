@@ -165,6 +165,9 @@ components. Start here, then read "How the engine behaves" for the engine's fine
   directly, and never adds `page-container`, a `<main>`, or a hydration gate of its own. Until
   the stored demo has been read the top bar shows the city's seal and name and placeholders only:
   the role, the persona and the date all come from the store.
+- **Breaking out of the page column.** A block that needs more than the container's 1180px adds
+  `page-bleed` (`app/globals.css`): it widens to the window less the gutters, the same
+  `100vw - 2 * gutter` the container takes on a narrow window. The Cases pipeline board uses it.
 - **Each shell guards its area.** `AppShell` renders the screen only for the Applicant and
   `CityShell` only for a city role; any other role gets a panel offering to switch.
 - **Which city pages are whose** (the PRD's route map). My queue, Cases, a case and Active

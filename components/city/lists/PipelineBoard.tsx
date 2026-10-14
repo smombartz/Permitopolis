@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { CountBadge } from "@/components/ui/count-badge";
-import { CaseId, DateText, EventTitle, StateChip, TierBadge, WaitingOnChips } from "@/components/domain";
+import { Truncate } from "@/components/ui/truncate";
+import { CaseId, DateText, StateChip, TierBadge, WaitingOnChips } from "@/components/domain";
 import { CommissionBadge } from "@/components/domain/CommissionBadge";
 import { StalledBadge } from "@/components/domain/StalledBadge";
 import { routes } from "@/lib/routes";
@@ -10,6 +11,10 @@ import type { EventCase, ISODate } from "@/lib/types";
 import { applicantNameOf } from "@/lib/data/people";
 import { boardCardWaiting } from "@/lib/view/cityLists";
 
+/**
+ * A board card reads top to bottom, one fact to a line: the event, when it is, what kind of
+ * case it is, then (under a hairline) whose move it is. Nothing sits side by side but chips.
+ */
 function PipelineCard({ c, today, from, showStateChip }: { c: EventCase; today: ISODate; from: string; showStateChip: boolean }) {
   const date = eventDate(c, today);
   const waiting = boardCardWaiting(c, today);
@@ -17,31 +22,34 @@ function PipelineCard({ c, today, from, showStateChip }: { c: EventCase; today: 
     <li>
       <Link
         href={routes.city.case(c.id, { from })}
-        className="flex flex-col gap-2 rounded-panel border border-line-subtle bg-surface-1 p-3 outline-none transition-colors duration-[var(--dur-fast)] ease-frost hover:bg-surface-2 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring"
+        className="flex flex-col gap-3 rounded-panel border border-line-subtle bg-surface-1 p-3 outline-none transition-colors duration-[var(--dur-fast)] ease-frost hover:bg-surface-2 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring"
       >
-        <div className="flex items-start justify-between gap-2">
-          <EventTitle name={c.name} applicantName={applicantNameOf(c)} className="flex-1" />
-          <div className="flex shrink-0 items-center gap-1.5">
-            {isStalled(c, today) ? <StalledBadge /> : null}
-            {c.flags.sentToCommission ? <CommissionBadge /> : null}
-            <TierBadge tier={c.tier} />
+        <div className="flex min-w-0 flex-col gap-0.5">
+          <Truncate text={c.name} lines={2} className="text-sm font-semibold text-fg" />
+          <Truncate text={applicantNameOf(c)} className="text-xs text-fg-secondary" />
+          <CaseId id={c.id} className="text-xs" />
+        </div>
+        {date ? (
+          <div className="flex flex-col text-xs">
+            <DateText date={date} short className="text-xs" />
+            <span className="text-fg-label">{fmtDaysToGo(date, today)}</span>
           </div>
+        ) : (
+          <span className="text-xs text-fg-label">No date yet</span>
+        )}
+        <div className="flex flex-wrap items-center gap-1.5">
+          <TierBadge tier={c.tier} />
+          {/* Grouped by state, the column already says it; grouped by deadline, the card carries its own state chip. An ending always shows. */}
+          {c.ending ? <StateChip state={c.state} ending={c.ending} /> : showStateChip ? <StateChip state={c.state} /> : null}
+          {isStalled(c, today) ? <StalledBadge /> : null}
+          {c.flags.sentToCommission ? <CommissionBadge /> : null}
         </div>
-        <div className="flex flex-wrap items-center justify-between gap-x-2 gap-y-0.5 text-xs text-fg-secondary">
-          <CaseId id={c.id} />
-          {date ? (
-            <span className="flex items-center gap-1.5">
-              <DateText date={date} short className="text-xs" />
-              <span aria-hidden="true">·</span>
-              <span>{fmtDaysToGo(date, today)}</span>
-            </span>
-          ) : (
-            <span>No date yet</span>
-          )}
-        </div>
-        {/* Grouped by state, the column already says it; grouped by deadline, the card carries its own state chip. */}
-        {showStateChip && !c.ending ? <StateChip state={c.state} /> : null}
-        {c.ending ? <StateChip state={c.state} ending={c.ending} /> : <WaitingOnChips items={waiting} emptyText="Nothing waiting" />}
+        {/* A case that has ended waits on nobody. */}
+        {c.ending ? null : (
+          <div data-slot="card-waiting" className="border-t border-line-subtle pt-3">
+            <WaitingOnChips items={waiting} emptyText="Nothing waiting" className="flex-col items-start text-xs [&>[data-slot=party-chip]]:max-w-full" />
+          </div>
+        )}
       </Link>
     </li>
   );
@@ -61,11 +69,14 @@ export interface BoardColumnSpec {
  */
 function PipelineBoard({ columns, today, from, showStateChip = false }: { columns: BoardColumnSpec[]; today: ISODate; from: string; showStateChip?: boolean }) {
   return (
-    <div className="flex gap-3 overflow-x-auto pb-2">
+    // Wider than the page column: the board takes the window's width less the gutters, and
+    // centers in it once its columns reach their widest (safe: never past the scroll start).
+    <div className="page-bleed flex justify-center-safe gap-3 overflow-x-auto pb-2">
       {columns.map((column) => (
-        // Flexible, so the columns share the width of a 1280px window
-        // (cards truncate); the row still scrolls sideways when they cannot.
-        <div key={column.key} data-state={column.key} className="flex min-w-44 flex-1 basis-0 flex-col gap-2 rounded-panel border border-line-subtle bg-surface-2 p-2">
+        // Flexible, so the columns share that width, but never under 240px (a card stays
+        // readable, and the row scrolls sideways when all seven cannot fit) or over 320px (a
+        // lone column under a State filter does not stretch its cards back into long rows).
+        <div key={column.key} data-state={column.key} className="flex min-w-60 max-w-80 flex-1 basis-0 flex-col gap-2 rounded-panel border border-line-subtle bg-surface-2 p-2">
           <div className="flex items-center justify-between gap-2 px-1 pt-1">
             <h2 className="text-eyebrow font-bold tracking-[.12em] text-fg-label uppercase">{column.label}</h2>
             <CountBadge count={column.cases.length} />

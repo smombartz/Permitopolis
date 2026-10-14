@@ -232,6 +232,14 @@
 }
 
 /*
+ * Breaks a block inside .page-container out to the window's width less the gutters: the same
+ * 100vw - 2 * gutter the container itself takes below 1180px, where this adds nothing.
+ */
+.page-bleed {
+  margin-inline: min(0px, calc(50% - 50vw + var(--container-gutter)));
+}
+
+/*
  * Motion (Rime & Ink "Motion" section). Durations use the --dur-* tokens where
  * one exists; ambient loops (idle float, surface sweep, breathing selection,
  * caret) are long and don't correspond to an interaction-duration token, so

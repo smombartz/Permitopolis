@@ -155,11 +155,29 @@ describe("Cases pipeline", () => {
     }
   });
 
-  it("a board card shows the event date beside the days to go", async () => {
+  it("a board card shows the event date with the days to go", async () => {
     await renderScreen(<CasesScreen />, { role: "clerk", path: routes.city.cases({ tier: "special" }) });
     const card = screen.getByText("Riverfront Summer 5K").closest("a")!;
     expect(within(card).getByText("Sun, Jul 11")).toBeInTheDocument();
     expect(within(card).getByText(/days to go/)).toBeInTheDocument();
+  });
+
+  it("a board card stacks whoever it waits on, one to a line, under its own rule", async () => {
+    await renderScreen(<CasesScreen />, { role: "clerk", path: routes.city.cases({ tier: "special" }) });
+    const card = screen.getByText("Riverfront Summer 5K").closest("a")!;
+    const waiting = card.querySelector<HTMLElement>('[data-slot="card-waiting"]')!;
+    expect(waiting.querySelector('[data-slot="waiting-on-chips"]')!.className).toContain("flex-col");
+  });
+
+  it("an ended case's card shows its ending and waits on nobody", async () => {
+    await renderScreen(<CasesScreen />, { role: "clerk", path: routes.city.cases({ state: "off_path", involves: "0" }) });
+    // The applicant's organization has the event's name, so the name shows twice on the card.
+    const card = screen
+      .getAllByText("Redline Motorsports Expo")
+      .map((el) => el.closest("a")!)
+      .find((a) => within(a).queryByText("Denied"))!;
+    expect(card).toBeDefined();
+    expect(card.querySelector('[data-slot="card-waiting"]')).toBeNull();
   });
 
   it("the table keeps its rows, cells and column headers, and says which column it is sorted by", async () => {
