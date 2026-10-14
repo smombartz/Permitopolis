@@ -32,15 +32,15 @@ const S3 = "PMT-27-0118";
 const S5 = "PMT-27-0097";
 
 /**
- * Every live region that has something in it right now, the two that always do aside: the top
- * bar's demo date and the coach's step are on the page from the start and speak only when they
- * change.
+ * Every live region that has something in it right now, the three that always do aside: the
+ * header's demo date, who the presenter is acting as, and the coach's step are on the page from
+ * the start and speak only when they change.
  */
 function speaking(): string[] {
   return liveRegions()
     .filter((region) => !region.element.closest("[data-sonner-toaster]"))
     .map((region) => region.text)
-    .filter((text) => text && !text.startsWith("Demo today: ") && !/^Path \d/.test(text));
+    .filter((text) => text && !text.startsWith("Demo today: ") && !text.startsWith("Acting as ") && !/^Path \d/.test(text));
 }
 
 describe("a message that is on the page when it opens is not an announcement", () => {

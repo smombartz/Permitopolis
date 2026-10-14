@@ -6,9 +6,10 @@
  *
  * Owned by workstream 2B (components/shell, lib/data/demoScript.ts).
  */
+import { NEW_PERSONA_ID, PERSONA_BY_ID, PICKABLE_PERSONA_IDS, isPickablePersona } from "@/lib/data/people";
 import { homeFor, routes } from "@/lib/routes";
 import { isVisibleToCity } from "@/lib/state/selectors";
-import type { Dept, EventCase, Party } from "@/lib/types";
+import { PARTY_LABEL, type Dept, type EventCase, type Party } from "@/lib/types";
 
 const EVENT_CASE_PATH = /^\/events\/([^/?]+)(?:\/.*)?$/;
 const CITY_CASE_PATH = /^\/city\/cases\/([^/?]+)(?:\/.*)?$/;
@@ -121,6 +122,52 @@ export function pathForPersona(personaId: string, cases: EventCase[]): string {
     return routes.apply({ caseId: only.id, step: only.wizardStep });
   }
   return routes.events();
+}
+
+/** Who the header's user button names: the city role, or the applicant the presenter is acting as. */
+export function actingAsName(role: Party, personaId: string): string {
+  if (role !== "applicant") return PARTY_LABEL[role];
+  return (PERSONA_BY_ID[personaId] ?? PERSONA_BY_ID[NEW_PERSONA_ID]).name;
+}
+
+export interface ApplicantLanding {
+  personaId: string;
+  path: string;
+}
+
+/**
+ * Who a switch to the Applicant from here lands as, and where: `resolveRoleSwitch()` to the
+ * Applicant, with the last applicant used when the landing page is about no case. The user menu
+ * has no "Applicant" entry of its own, so this is the applicant whose pick stands for that
+ * switch. For the Applicant it is the current persona on the current page.
+ */
+export function applicantLanding({ fromRole, personaId, ...rest }: Omit<RoleSwitchArgs, "toRole"> & { personaId: string }): ApplicantLanding {
+  if (fromRole === "applicant") return { personaId, path: rest.pathname };
+  const landed = resolveRoleSwitch({ fromRole, toRole: "applicant", ...rest });
+  return { personaId: landed.personaId ?? personaId, path: landed.path };
+}
+
+/**
+ * The applicants the user menu offers: the six scenario organizers and "New applicant", in
+ * that order. When the landing applicant is not one of them (a filler or background case's
+ * organizer, reached by following its case), it is listed first, so it can still be picked and
+ * the current applicant always shows as the current choice.
+ */
+export function userMenuPersonaIds(landingPersonaId: string): string[] {
+  if (isPickablePersona(landingPersonaId) || !PERSONA_BY_ID[landingPersonaId]) return [...PICKABLE_PERSONA_IDS];
+  return [landingPersonaId, ...PICKABLE_PERSONA_IDS];
+}
+
+/**
+ * Where picking an applicant in the user menu lands. From a city role, the landing applicant
+ * goes where the switch to the Applicant goes when that is somewhere in particular (the case on
+ * screen, then the remembered page), so the presenter follows a case to its organizer's board.
+ * Anyone else, a landing that is only the Applicant's home, and any pick made as the Applicant
+ * start on that applicant's own page (`pathForPersona`): "New applicant" opens a blank wizard.
+ */
+export function resolvePersonaPick({ picked, fromRole, landing, cases }: { picked: string; fromRole: Party; landing: ApplicantLanding; cases: EventCase[] }): string {
+  const follows = fromRole !== "applicant" && picked === landing.personaId && landing.path !== homeFor("applicant");
+  return follows ? landing.path : pathForPersona(picked, cases);
 }
 
 export interface SidebarLink {

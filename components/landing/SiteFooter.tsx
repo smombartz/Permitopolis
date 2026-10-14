@@ -5,7 +5,7 @@ import { cn } from "cn";
 import { routes } from "@/lib/routes";
 import { CITY_STAFF_BY_DEPT } from "@/lib/data/people";
 import { PARTY_LABEL } from "@/lib/types";
-import { CitySeal } from "./CitySeal";
+import { CitySeal } from "@/components/ui/city-seal";
 import { useDoors } from "./hooks";
 import { NIGHT_TEXT_LINK, SECTION_LINKS } from "./sections";
 

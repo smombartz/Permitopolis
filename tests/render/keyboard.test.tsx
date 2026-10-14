@@ -285,7 +285,7 @@ describe('"/", j and k on a list', () => {
     expect(rows[0]).toHaveFocus();
   });
 
-  it("j and k are typed, not taken, in the search field; and are left alone with a modifier or in the role switcher", async () => {
+  it("j and k are typed, not taken, in the search field; and are left alone with a modifier or in a radio group", async () => {
     const { user } = await renderCasesTable();
     const rows = Array.from(document.querySelectorAll<HTMLElement>("[data-row-nav]"));
 
@@ -295,11 +295,11 @@ describe('"/", j and k on a list', () => {
     await user.keyboard("{Meta>}j{/Meta}");
     expect(rows[0]).toHaveFocus();
 
-    // The role switcher is a radio group: its own arrow keys, and no list shortcut inside it.
-    const clerk = screen.getByRole("radio", { name: "City Clerk" });
-    clerk.focus();
+    // The Board/Table toggle is a radio group: its own arrow keys, and no list shortcut inside it.
+    const table = screen.getByRole("radio", { name: "Table" });
+    table.focus();
     await user.keyboard("j");
-    expect(clerk).toHaveFocus();
+    expect(table).toHaveFocus();
 
     const search = screen.getByRole("searchbox", { name: "Search cases" });
     await user.click(search);

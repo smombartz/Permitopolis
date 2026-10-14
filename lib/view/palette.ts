@@ -97,7 +97,7 @@ function roleItems(current: Party): PaletteItem[] {
   }));
 }
 
-/** The persona picker's own options, minus the one already current. Applicant role only. */
+/** The user menu's own applicants, minus the one already current. Applicant role only. */
 function personaItems(ctx: PaletteContext): PaletteItem[] {
   if (ctx.role !== "applicant") return [];
   return PICKABLE_PERSONA_IDS.filter((id) => id !== ctx.personaId).map((id) => {

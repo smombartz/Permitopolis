@@ -1,79 +1,66 @@
 "use client";
 
-import Link from "next/link";
+import { usePathname } from "next/navigation";
 import { useDemo, useHydrated } from "@/lib/state";
 import { fmtDate, fmtMonthDay } from "@/lib/format";
-import { routes } from "@/lib/routes";
 import { Skeleton } from "@/components/ui/skeleton";
+import { SiteHeader, SiteIdentity } from "@/components/ui/site-header";
 import { usePersonaSwitch, useRoleSwitch } from "@/components/shell/useRoleSwitch";
 import { useIsNarrow } from "@/components/shell/useIsNarrow";
-import { RoleSwitcher } from "@/components/shell/RoleSwitcher";
-import { PersonaPicker } from "@/components/shell/PersonaPicker";
-import { MobileNavMenu } from "@/components/shell/MobileNavMenu";
+import { UserMenu } from "@/components/shell/UserMenu";
 import { DemoMenu } from "@/components/shell/DemoMenu";
 import { CommandCenter } from "@/components/shell/CommandCenter";
+import { actingAsName, applicantLanding, userMenuPersonaIds } from "@/lib/view/shell";
 
 /**
- * Glass chrome shared by AppShell and CityShell. Left: the wordmark, linking home. Center:
- * the role switcher, with the applicant's persona picker beside it; below 768px both
- * collapse into one menu button (see useIsNarrow). Right: the demo date and the Demo menu.
- * A role change goes through useRoleSwitch() and a persona pick through usePersonaSwitch(),
- * so both also take the presenter to the right page.
+ * The app's header, shared by AppShell and CityShell: the site header the landing page has
+ * (`components/ui/site-header.tsx`: the solid band, the city's seal and name linking home),
+ * pinned to the top, with the app's controls where the public page has its navigation. In
+ * order: the demo date, Search, the user menu (who the presenter is acting as: a city official
+ * or an applicant) and the Demo menu. A pick in the user menu goes through useRoleSwitch() or
+ * usePersonaSwitch(), so it also takes the presenter to the right page.
  *
- * Everything but the wordmark comes from the stored demo (the role, the persona, the date), so
- * until that has been read the bar shows placeholders in their place. The prerendered page
+ * Everything but the identity comes from the stored demo (the role, the persona, the date), so
+ * until that has been read the row shows placeholders in their place. The prerendered page
  * would otherwise show the seed's Applicant and May 3 for a moment on every reload.
  */
 function TopBar() {
   const hydrated = useHydrated();
 
   return (
-    <header className="sticky top-0 z-40 border-b border-line-subtle bg-glass-tinted backdrop-blur-hud">
-      <div className="page-container flex h-14 items-center justify-between gap-3">
-        <Link
-          href={routes.home()}
-          className="flex min-w-0 shrink-0 items-center gap-2 rounded-control outline-none pointer-coarse:min-h-11 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring"
-        >
-          <span className="truncate font-heading text-base font-bold text-fg">Permitopolis</span>
-          <span className="hidden truncate text-xs text-fg-secondary lg:inline">
-            City Clerk &middot; Events Permitting
-          </span>
-        </Link>
-
-        {hydrated ? <TopBarControls /> : <TopBarPlaceholder />}
-      </div>
-    </header>
+    <SiteHeader pinned>
+      <SiteIdentity truncate />
+      {hydrated ? <TopBarControls /> : <TopBarPlaceholder />}
+    </SiteHeader>
   );
 }
 
-/** The role switcher, the persona picker, the demo date and the Demo menu: all read from the store. */
+/** The demo date, Search, the user menu and the Demo menu: all read from the store. */
 function TopBarControls() {
   const role = useDemo((s) => s.role);
   const personaId = useDemo((s) => s.personaId);
   const demoToday = useDemo((s) => s.demoToday);
+  const cases = useDemo((s) => s.cases);
+  const lastPathByRole = useDemo((s) => s.lastPathByRole);
+  const pathname = usePathname();
   const switchRole = useRoleSwitch();
   const switchPersona = usePersonaSwitch();
-  const narrow = useIsNarrow();
-  // Below 640px there is no room for the whole chip: the day alone, with the full text for a screen reader.
-  const compactDate = useIsNarrow("(max-width: 639px)");
+  // Below 1024px the name and the controls share a tighter row: the day alone, then (below 640px)
+  // nothing to see. The full text is always there for a screen reader.
+  const compactDate = useIsNarrow("(max-width: 1023px)");
   const dateText = `Demo today: ${fmtDate(demoToday)}`;
+  // The applicant a switch to the Applicant would land as is offered even when it is not one of the seven.
+  const landing = applicantLanding({ fromRole: role, personaId, pathname, cases, lastPathByRole });
 
   return (
-    <div className="flex min-w-0 flex-1 items-center justify-end gap-2">
-      {narrow ? (
-        <MobileNavMenu role={role} onRoleChange={switchRole} personaId={personaId} onPersonaChange={switchPersona} />
-      ) : (
-        <>
-          <RoleSwitcher value={role} onChange={switchRole} />
-          {role === "applicant" ? <PersonaPicker personaId={personaId} onChange={switchPersona} /> : null}
-        </>
-      )}
-
+    <div className="flex shrink-0 items-center gap-2">
       {/* Polite: a date jump from the Demo menu or the palette is read out, once. */}
-      <span className="whitespace-nowrap font-mono text-xs text-fg-label" aria-live="polite">
+      <span className="font-mono text-xs whitespace-nowrap text-fg-label sm:mr-1" aria-live="polite">
         {compactDate ? (
           <>
-            <span aria-hidden="true">{fmtMonthDay(demoToday)}</span>
+            <span aria-hidden="true" className="max-sm:hidden">
+              {fmtMonthDay(demoToday)}
+            </span>
             <span className="sr-only">{dateText}</span>
           </>
         ) : (
@@ -81,6 +68,11 @@ function TopBarControls() {
         )}
       </span>
       <CommandCenter />
+      <UserMenu role={role} personaId={personaId} personaIds={userMenuPersonaIds(landing.personaId)} onRoleChange={switchRole} onPersonaChange={switchPersona} />
+      {/* Polite: who the presenter is acting as, read out when a pick (here or in the palette) changes it. */}
+      <span className="sr-only" aria-live="polite">
+        Acting as {actingAsName(role, personaId)}
+      </span>
       <DemoMenu />
     </div>
   );
@@ -89,9 +81,10 @@ function TopBarControls() {
 /** Stands in for the controls until the stored demo has been read. Hidden from assistive technology. */
 function TopBarPlaceholder() {
   return (
-    <div data-slot="top-bar-placeholder" aria-hidden="true" className="flex min-w-0 flex-1 items-center justify-end gap-2">
-      <Skeleton className="h-9 w-11 md:w-80" />
-      <Skeleton className="h-4 w-12 sm:w-44" />
+    <div data-slot="top-bar-placeholder" aria-hidden="true" className="flex shrink-0 items-center gap-2">
+      <Skeleton className="h-4 w-12 max-sm:hidden lg:w-44" />
+      <Skeleton className="h-9 w-9 sm:w-28" />
+      <Skeleton className="h-9 w-9 md:w-36" />
       <Skeleton className="size-9" />
     </div>
   );

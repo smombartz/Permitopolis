@@ -1,9 +1,9 @@
 /**
  * Applicants (people and organizations) and city staff. Every one of the 38 seeded cases
- * has an applicantId here, even the 32 that never appear in the persona picker: they still
+ * has an applicantId here, even the 32 that the user menu does not offer: they still
  * need a name to show in city lists.
  *
- * The persona picker offers the personas that open a scenario (`scenario` is set) plus "new".
+ * The header's user menu offers the personas that open a scenario (`scenario` is set) plus "new".
  * `PICKABLE_PERSONA_IDS` and `isPickablePersona()` below read that off the data, so the
  * `Persona` type needs no separate "pickable" flag.
  */
@@ -311,9 +311,9 @@ export function applicantNameOf(c: { applicantId: string }): string {
 export const NEW_PERSONA_ID = "new";
 
 /**
- * The applicant persona picker offers exactly these, in this order: the six scenario
+ * The user menu offers exactly these applicants, in this order: the six scenario
  * organizers (S1 to S6), then "new". Every other persona still shows up in city lists, just
- * not in the picker.
+ * not in the menu.
  */
 export const PICKABLE_PERSONA_IDS: readonly string[] = PERSONAS.filter(
   (p) => p.scenario !== undefined || p.id === NEW_PERSONA_ID,

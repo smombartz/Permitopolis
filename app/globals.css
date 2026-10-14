@@ -74,10 +74,24 @@
   }
   html {
     /*
-     * The sticky top bar is 56px, and below 1024px the wizard pins its plan bar to the bottom:
-     * what focus scrolls into view lands clear of both (WCAG 2.4.11).
+     * The app's pinned header (components/ui/site-header.tsx, `pinned`): the seal, 16px above and
+     * below it (20px from 640px) and the 1px border. Anything that sticks below it reads this.
+     */
+    --app-header-h: 81px;
+    /*
+     * Below 1024px the wizard pins its plan bar to the bottom: what focus scrolls into view lands
+     * clear of it (WCAG 2.4.11). The landing page's header scrolls away, so 5rem is enough on top.
      */
     scroll-padding-block: 5rem;
+  }
+  @media (min-width: 40rem) {
+    html {
+      --app-header-h: 97px;
+    }
+  }
+  /* Under the app's pinned header, focus and anchors land clear of it too. */
+  html:has([data-slot="site-header"][data-pinned]) {
+    scroll-padding-block: calc(var(--app-header-h) + 1.5rem) 5rem;
   }
   /*
    * The system focus ring (Rime & Ink, "Focus-visible"), for anything focusable that names no

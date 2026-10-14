@@ -11,7 +11,7 @@ const OPTIONS = [
   { value: "hl", label: "Health & Legal" },
 ];
 
-/** Controlled, as the role switcher is: the selected option follows what onChange reports. */
+/** Controlled, as a view toggle is: the selected option follows what onChange reports. */
 function Switcher({ initial = "applicant", onChange }: { initial?: string; onChange?: (value: string) => void }) {
   const [value, setValue] = React.useState(initial);
   return (

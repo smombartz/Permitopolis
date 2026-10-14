@@ -1,4 +1,5 @@
 import { render, screen, within } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { describe, expect, it } from "vitest";
 import { KitScreen } from "@/components/kit/KitScreen";
 
@@ -11,6 +12,7 @@ describe("the Phase 1 kit page", () => {
   it("shows a landmark section for every part of the system", () => {
     render(<KitScreen />);
     const sectionTitles = [
+      "Site header",
       "Button",
       "Form controls",
       "Tabs",
@@ -40,6 +42,18 @@ describe("the Phase 1 kit page", () => {
     for (const title of sectionTitles) {
       expect(screen.getByRole("heading", { level: 2, name: title })).toBeInTheDocument();
     }
+  });
+
+  it("shows the site header twice: the public page's, and the app's with a working user menu", async () => {
+    render(<KitScreen />);
+    const section = within(document.getElementById("site-header") as HTMLElement);
+
+    expect(section.getAllByRole("link", { name: /^City of Permitopolis/ })).toHaveLength(2);
+    expect(section.getByRole("navigation", { name: "Primary" })).toBeInTheDocument();
+
+    await userEvent.click(section.getByRole("button", { name: "Switch user: City Clerk" }));
+    await userEvent.click(await screen.findByRole("menuitemradio", { name: "Maya Chen" }));
+    expect(section.getByRole("button", { name: "Switch user: Maya Chen" })).toBeInTheDocument();
   });
 
   it("renders every tier badge, party chip and case state chip", () => {

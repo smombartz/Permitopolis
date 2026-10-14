@@ -5,7 +5,7 @@ import { cn } from "cn"
 export const MAIN_CONTENT_ID = "main-content"
 
 /**
- * The first tab stop on a page: past the top bar and the role switcher, straight to the page's
+ * The first tab stop on a page: past the header and its user menu, straight to the page's
  * content (WCAG 2.4.1). Pinned to the top-left corner over everything and slid up out of the
  * viewport until it has focus, so it takes no room in the layout and is still in the tab order
  * and the accessibility tree. It is a plain anchor, not a next/link: a hash on the same page

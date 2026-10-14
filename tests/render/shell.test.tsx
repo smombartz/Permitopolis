@@ -11,15 +11,20 @@ import { DEFAULT_DEMO_TODAY } from "@/lib/rules";
 import { makeCase, makeTask } from "@/lib/state/testSupport";
 import { buildSeed, queueFor, useDemo } from "@/lib/state";
 import { navState } from "./setup";
-import { lastPush, renderScreen, storedCase } from "./harness";
+import { lastPush, renderScreen, storedCase, switchUser } from "./harness";
 
 const TODAY = DEFAULT_DEMO_TODAY;
 
-/** The open persona menu's options, by accessible name: the avatar's initials are not part of it. */
-function expectPersonaOptions(names: string[]) {
+const OFFICIALS = ["City Clerk", "Public Works & Safety", "Health & Legal"];
+
+/** The open user menu's applicants, under its three city officials, by accessible name: an avatar's initials are not part of it. */
+function expectApplicantOptions(names: string[]) {
+  const all = [...OFFICIALS, ...names];
   const options = screen.getAllByRole("menuitemradio");
-  expect(options).toHaveLength(names.length);
-  names.forEach((name, index) => expect(options[index]).toHaveAccessibleName(name));
+  expect(options).toHaveLength(all.length);
+  all.forEach((name, index) => expect(options[index]).toHaveAccessibleName(name));
+  const applicants = within(screen.getByRole("group", { name: "Applicants" })).getAllByRole("menuitemradio");
+  expect(applicants).toHaveLength(names.length);
 }
 
 describe("the render harness", () => {
@@ -56,20 +61,53 @@ describe("the render harness", () => {
 
   it("returns a user-event session", async () => {
     const { user } = await renderScreen(<AppShell>content</AppShell>, { path: "/events" });
-    await user.click(screen.getByRole("radio", { name: "City Clerk" }));
+    await switchUser(user, "City Clerk");
     expect(useDemo.getState().role).toBe("clerk");
   });
 });
 
-describe("AppShell top bar", () => {
-  it("shows the four roles and today's demo date", async () => {
+describe("the app header", () => {
+  it("is the site header: the city's seal and name, linking home, with today's demo date", async () => {
     await renderScreen(<AppShell>applicant content</AppShell>, { path: "/events" });
 
-    expect(screen.getByRole("radio", { name: "Applicant" })).toBeInTheDocument();
-    expect(screen.getByRole("radio", { name: "City Clerk" })).toBeInTheDocument();
-    expect(screen.getByRole("radio", { name: "Public Works & Safety" })).toBeInTheDocument();
-    expect(screen.getByRole("radio", { name: "Health & Legal" })).toBeInTheDocument();
-    expect(screen.getByText("Demo today: Mon, May 3, 2027")).toBeInTheDocument();
+    const header = screen.getByRole("banner");
+    expect(header).toHaveAttribute("data-slot", "site-header");
+    expect(header).toHaveAttribute("data-pinned");
+    const home = within(header).getByRole("link", { name: /^City of Permitopolis\s*Office of the City Clerk$/ });
+    expect(home).toHaveAttribute("href", "/");
+    expect(within(header).getByText("Demo today: Mon, May 3, 2027")).toBeInTheDocument();
+  });
+
+  it("has no role switcher: one user button, after Search and just before the Demo menu", async () => {
+    await renderScreen(<AppShell>applicant content</AppShell>, { path: "/events" });
+
+    expect(screen.queryByRole("radiogroup", { name: "Switch role" })).not.toBeInTheDocument();
+    const buttons = within(screen.getByRole("banner")).getAllByRole("button").map((button) => button.getAttribute("aria-label"));
+    expect(buttons).toEqual(["Search", "Switch user: New applicant", "Demo menu"]);
+  });
+
+  it("the user button names who is acting: the city role, or the applicant", async () => {
+    await renderScreen(<CityShell>queue</CityShell>, { path: "/city/queue", role: "pws" });
+    const button = screen.getByRole("button", { name: "Switch user: Public Works & Safety" });
+    expect(button).toHaveTextContent("Public Works & Safety");
+
+    await switchUser(userEvent.setup(), "Maya Chen");
+    expect(screen.getByRole("button", { name: "Switch user: Maya Chen" })).toHaveTextContent("Maya Chen");
+    expect(screen.getByText("Acting as Maya Chen")).toHaveAttribute("aria-live", "polite");
+  });
+
+  it("the user menu lists the three city officials, then the applicants, with the current one checked", async () => {
+    await renderScreen(<CityShell>queue</CityShell>, { path: "/city/queue", role: "hl" });
+
+    await userEvent.click(screen.getByRole("button", { name: "Switch user: Health & Legal" }));
+
+    const officials = within(screen.getByRole("group", { name: "City officials" })).getAllByRole("menuitemradio");
+    expect(officials.map((option) => option.textContent)).toEqual(OFFICIALS);
+    expectApplicantOptions(PICKABLE_PERSONA_IDS.map((id) => PERSONA_BY_ID[id].name));
+    expect(screen.getAllByRole("menuitemradio", { checked: true })).toHaveLength(1);
+    expect(screen.getByRole("menuitemradio", { name: "Health & Legal" })).toBeChecked();
+    // My events and Plan an event are the Applicant's pages: a city official is not offered them.
+    expect(screen.queryByRole("menuitem", { name: "My events" })).not.toBeInTheDocument();
   });
 
   it("renders the page once hydrated, for the Applicant", async () => {
@@ -83,38 +121,58 @@ describe("switching role", () => {
   it("follows a seeded case from the applicant's board to the matching city role", async () => {
     await renderScreen(<AppShell>board</AppShell>, { scenario: "S3" });
 
-    await userEvent.click(screen.getByRole("radio", { name: "City Clerk" }));
+    await switchUser(userEvent.setup(), "City Clerk");
 
     expect(lastPush()).toBe("/city/cases/PMT-27-0118");
     expect(useDemo.getState().role).toBe("clerk");
   });
 
-  it("follows a case back to the applicant and takes on that case's own applicant", async () => {
+  it("follows a case back to its own applicant, whoever was picked before", async () => {
     await renderScreen(<CityShell>case detail</CityShell>, { scenario: "S6", personaId: "maya-chen" });
 
-    await userEvent.click(screen.getByRole("radio", { name: "Applicant" }));
+    await switchUser(userEvent.setup(), "Main Street Business Alliance");
 
     expect(lastPush()).toBe("/events/PMT-27-0031");
     expect(useDemo.getState()).toMatchObject({ role: "applicant", personaId: "main-street-business-alliance" });
   });
 
-  it("shows an applicant the picker does not offer, once their case has been followed", async () => {
+  it("picking another applicant from a case opens that applicant's own page, not the case", async () => {
+    await renderScreen(<CityShell>case detail</CityShell>, { scenario: "S6", personaId: "maya-chen" });
+
+    await switchUser(userEvent.setup(), "Maya Chen");
+
+    expect(lastPush()).toBe("/events");
+    expect(useDemo.getState()).toMatchObject({ role: "applicant", personaId: "maya-chen" });
+  });
+
+  it("offers the organizer of the case on screen when the menu's seven do not include them, and follows the case", async () => {
     // F1, the Downtown Art Walk: its organizer is not one of the six scenario personas.
+    await renderScreen(<CityShell>case detail</CityShell>, { path: "/city/cases/PMT-27-0121", role: "clerk" });
+
+    await userEvent.click(screen.getByRole("button", { name: "Switch user: City Clerk" }));
+    expectApplicantOptions(["Downtown Art Walk Committee", ...PICKABLE_PERSONA_IDS.map((id) => PERSONA_BY_ID[id].name)]);
+    await userEvent.click(screen.getByRole("menuitemradio", { name: "Downtown Art Walk Committee" }));
+
+    expect(lastPush()).toBe("/events/PMT-27-0121");
+    expect(useDemo.getState()).toMatchObject({ role: "applicant", personaId: "downtown-art-walk-committee" });
+  });
+
+  it("shows an applicant the menu does not offer, once their case has been followed", async () => {
     await renderScreen(<AppShell>board</AppShell>, {
       path: "/events/PMT-27-0121",
       personaId: "downtown-art-walk-committee",
     });
 
-    await userEvent.click(screen.getByRole("button", { name: /^Switch applicant: / }));
+    await userEvent.click(screen.getByRole("button", { name: "Switch user: Downtown Art Walk Committee" }));
 
-    expectPersonaOptions(["Downtown Art Walk Committee", ...PICKABLE_PERSONA_IDS.map((id) => PERSONA_BY_ID[id].name)]);
+    expectApplicantOptions(["Downtown Art Walk Committee", ...PICKABLE_PERSONA_IDS.map((id) => PERSONA_BY_ID[id].name)]);
     expect(screen.getByRole("menuitemradio", { name: "Downtown Art Walk Committee" })).toBeChecked();
   });
 
   it("keeps the URL, query string included, when switching between two city roles", async () => {
     await renderScreen(<CityShell>case detail</CityShell>, { scenario: "S5", search: { tab: "reviews" } });
 
-    await userEvent.click(screen.getByRole("radio", { name: "Public Works & Safety" }));
+    await switchUser(userEvent.setup(), "Public Works & Safety");
 
     expect(navState.pushCalls).toEqual([]); // nothing navigated: the page re-renders for the new role
     expect(useDemo.getState().role).toBe("pws");
@@ -126,7 +184,7 @@ describe("switching role", () => {
     expect(screen.getByText("intake")).toBeInTheDocument();
     expect(useDemo.getState().lastPathByRole.clerk).toBe("/city/intake?tab=reviewed");
 
-    await userEvent.click(screen.getByRole("radio", { name: "Public Works & Safety" }));
+    await switchUser(userEvent.setup(), "Public Works & Safety");
 
     expect(useDemo.getState().role).toBe("pws");
     expect(lastPush()).toBe("/city/queue");
@@ -136,7 +194,7 @@ describe("switching role", () => {
     expect(useDemo.getState().lastPathByRole).toMatchObject({ clerk: "/city/intake?tab=reviewed", pws: "/city/queue" });
 
     // Back to the Clerk from the shared queue: the URL stays, as between any two city roles there.
-    await userEvent.click(screen.getByRole("radio", { name: "City Clerk" }));
+    await switchUser(userEvent.setup(), "City Clerk");
     expect(navState.pathname).toBe("/city/queue");
     expect(navState.pushCalls).toEqual(["/city/queue"]);
   });
@@ -169,7 +227,7 @@ describe("switching role", () => {
     await renderScreen(<AppShell>board</AppShell>, { path: "/events/PMT-27-0004", personaId: "riverside-garden-society" });
     expect(storedCase("PMT-27-0004").state).toBe("draft");
 
-    await userEvent.click(screen.getByRole("radio", { name: "City Clerk" }));
+    await switchUser(userEvent.setup(), "City Clerk");
 
     expect(lastPush()).toBe("/city/queue");
   });
@@ -177,7 +235,7 @@ describe("switching role", () => {
   it("falls back to the role's home off a case page", async () => {
     await renderScreen(<AppShell>my events</AppShell>, { path: "/events", role: "applicant" });
 
-    await userEvent.click(screen.getByRole("radio", { name: "Health & Legal" }));
+    await switchUser(userEvent.setup(), "Health & Legal");
 
     expect(lastPush()).toBe("/city/queue");
   });
@@ -186,8 +244,10 @@ describe("switching role", () => {
     await renderScreen(<CityShell>pipeline</CityShell>, { path: "/city/cases", search: { tier: "special" }, role: "clerk" });
     expect(useDemo.getState().lastPathByRole.clerk).toBe("/city/cases?tier=special");
 
-    await userEvent.click(screen.getByRole("radio", { name: "Applicant" }));
-    expect(lastPush()).toBe("/events");
+    // The Applicant has no page to come back to yet: New applicant starts a blank wizard.
+    await switchUser(userEvent.setup(), "New applicant");
+    expect(lastPush()).toBe("/apply");
+    expect(useDemo.getState().role).toBe("applicant");
 
     // The mismatch panel on the city page offers the way back; it lands on the filtered list.
     await userEvent.click(screen.getByRole("button", { name: "Switch to City Clerk" }));
@@ -195,13 +255,13 @@ describe("switching role", () => {
   });
 });
 
-describe("persona picker", () => {
+describe("the user menu's applicants", () => {
   it("offers the six scenario organizers and New applicant", async () => {
     await renderScreen(<AppShell>my events</AppShell>, { path: "/events" });
 
-    await userEvent.click(screen.getByRole("button", { name: /^Switch applicant: / }));
+    await userEvent.click(screen.getByRole("button", { name: "Switch user: New applicant" }));
 
-    expectPersonaOptions([
+    expectApplicantOptions([
       "Maya Chen",
       "Sunrise Yoga Club",
       "Downtown Arts Collective",
@@ -211,6 +271,9 @@ describe("persona picker", () => {
       "New applicant",
     ]);
     expect(screen.getByRole("menuitemradio", { name: "New applicant" })).toBeChecked();
+    // The applicant area's two pages, under the applicants.
+    expect(screen.getByRole("menuitem", { name: "My events" })).toHaveAttribute("href", "/events");
+    expect(screen.getByRole("menuitem", { name: "Plan an event" })).toHaveAttribute("href", "/apply");
   });
 
   it.each([
@@ -220,8 +283,7 @@ describe("persona picker", () => {
   ])("picking %s sets the persona and opens their page", async (name, personaId, path) => {
     await renderScreen(<AppShell>board</AppShell>, { scenario: "S3" });
 
-    await userEvent.click(screen.getByRole("button", { name: /^Switch applicant: / }));
-    await userEvent.click(screen.getByRole("menuitemradio", { name }));
+    await switchUser(userEvent.setup(), name);
 
     expect(useDemo.getState().personaId).toBe(personaId);
     expect(lastPush()).toBe(path);
@@ -230,8 +292,7 @@ describe("persona picker", () => {
   it("picking New applicant opens a blank wizard", async () => {
     await renderScreen(<AppShell>board</AppShell>, { scenario: "S3" });
 
-    await userEvent.click(screen.getByRole("button", { name: /^Switch applicant: / }));
-    await userEvent.click(screen.getByRole("menuitemradio", { name: "New applicant" }));
+    await switchUser(userEvent.setup(), "New applicant");
 
     expect(useDemo.getState().personaId).toBe("new");
     expect(lastPush()).toBe("/apply");

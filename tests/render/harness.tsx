@@ -42,17 +42,20 @@
  * `renderToString()` from react-dom/server: tests/render/hydration.test.tsx does.
  *
  * `switchRole()` flips the store's role without navigating, for a test that checks what a
- * mounted screen shows to another role.
+ * mounted screen shows to another role. `switchUser()` and `switchUserToRole()` click through
+ * the header's user menu instead, as the presenter does, so the page follows.
  */
 import type { ReactElement } from "react";
-import { act, render, type RenderResult } from "@testing-library/react";
+import { act, render, screen, type RenderResult } from "@testing-library/react";
 import userEvent, { type UserEvent } from "@testing-library/user-event";
 import { SCENARIO_JUMPS, type ScenarioKey } from "@/lib/data/demoScript";
 import { STORAGE_KEY } from "@/lib/rules";
 import { hydrateDemoStore, resetDemoStoreForTests, useDemo, type DemoState } from "@/lib/state";
 import { seedFingerprint } from "@/lib/state/seed";
+import { PERSONA_BY_ID } from "@/lib/data/people";
 import { demoPathIdForScenario } from "@/lib/view/coach";
-import type { EventCase, ISODate, Party } from "@/lib/types";
+import { applicantLanding } from "@/lib/view/shell";
+import { PARTY_LABEL, type EventCase, type ISODate, type Party } from "@/lib/types";
 import { holdNavigation, navState, navigate, paramsFromPath, releaseNavigation, resetNavState } from "./setup";
 
 export interface RenderScreenOptions {
@@ -147,6 +150,25 @@ export function lastPush(): string | undefined {
 
 export function lastReplace(): string | undefined {
   return navState.replaceCalls.at(-1);
+}
+
+/** Picks a user in the header's user menu by name: a city official's role, or an applicant. */
+export async function switchUser(user: UserEvent, name: string): Promise<void> {
+  await user.click(screen.getByRole("button", { name: /^Switch user: / }));
+  await user.click(await screen.findByRole("menuitemradio", { name }));
+}
+
+/**
+ * Switches role through the user menu. The menu has no "Applicant" entry: the switch to the
+ * Applicant is a pick of the applicant it lands as (the organizer of the case on screen, then
+ * of the remembered page, then the last applicant used), which is what this picks.
+ */
+export async function switchUserToRole(user: UserEvent, role: Party): Promise<void> {
+  const state = useDemo.getState();
+  if (role !== "applicant") return switchUser(user, PARTY_LABEL[role]);
+  if (state.role === "applicant") return;
+  const landing = applicantLanding({ fromRole: state.role, personaId: state.personaId, pathname: navState.pathname, cases: state.cases, lastPathByRole: state.lastPathByRole });
+  return switchUser(user, PERSONA_BY_ID[landing.personaId].name);
 }
 
 /** Flips the store's role mid-test without navigating. */

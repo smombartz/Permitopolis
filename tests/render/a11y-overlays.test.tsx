@@ -165,10 +165,20 @@ describe("the shell's menus, popovers and dialogs", () => {
     expect(screen.getByRole("button", { name: /Monday, May 3rd, 2027/ })).toBeInTheDocument();
   });
 
-  it("the persona picker's menu", async () => {
+  it("the user menu, as an applicant", async () => {
     const { user } = await renderScreen(<AppShell>page</AppShell>, { role: "applicant", personaId: "maya-chen", path: routes.events() });
 
-    await user.click(screen.getByRole("button", { name: "Switch applicant: Maya Chen" }));
+    await user.click(screen.getByRole("button", { name: "Switch user: Maya Chen" }));
+    expect(await screen.findByRole("menu")).toHaveAccessibleName();
+    expect(screen.getByRole("group", { name: "City officials" })).toBeInTheDocument();
+    expect(screen.getByRole("group", { name: "Applicants" })).toBeInTheDocument();
+    expect(auditPage({ fragment: true })).toEqual([]);
+  });
+
+  it("the user menu, as a city official", async () => {
+    const { user } = await renderScreen(<CityShell>page</CityShell>, { role: "hl", path: routes.city.queue() });
+
+    await user.click(screen.getByRole("button", { name: "Switch user: Health & Legal" }));
     expect(await screen.findByRole("menu")).toHaveAccessibleName();
     expect(auditPage({ fragment: true })).toEqual([]);
   });

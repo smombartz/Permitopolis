@@ -131,7 +131,7 @@ function DemoGuideScreen() {
           </p>
         </Section>
 
-        <Section title="The four roles" description="One role switcher in the top bar moves between all four.">
+        <Section title="The four roles" description="The user menu in the header moves between all four.">
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
             {ROLE_ORDER.map((role) => {
               const Icon = PARTY_ICON[role];
@@ -148,7 +148,7 @@ function DemoGuideScreen() {
 
         <Section
           title="The demo date"
-          description={`Today is ${fmtDate(demoToday)}. Moving it forward doesn't undo anything; Reset does. The top bar's Demo menu offers the same jumps plus a full calendar.`}
+          description={`Today is ${fmtDate(demoToday)}. Moving it forward doesn't undo anything; Reset does. The header's Demo menu offers the same jumps plus a full calendar.`}
         >
           <div className="flex flex-wrap gap-2">
             {DEMO_DATE_JUMPS.map((jump) => (
@@ -304,7 +304,7 @@ function DemoGuideScreen() {
         open={pendingReset !== null}
         onOpenChange={(open) => !open && setPendingReset(null)}
         title="Reset the demo?"
-        body={`This restores every case, the demo date and the role switcher to the seed exactly as it was on ${fmtDate(DEFAULT_DEMO_TODAY)}. There is no undo.`}
+        body={`This restores every case, the demo date and the current user to the seed exactly as it was on ${fmtDate(DEFAULT_DEMO_TODAY)}. There is no undo.`}
         confirmLabel="Reset demo data"
         destructive
         onConfirm={handleReset}

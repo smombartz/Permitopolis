@@ -45,7 +45,7 @@ import { PARTY_LABEL, type Dept, type Party } from "@/lib/types";
 import { queueWaitingOnOthers } from "@/lib/view/cityLists";
 import { CITY_CORE_LINKS, cityToolLinks } from "@/lib/view/shell";
 import { navState } from "./setup";
-import { navigate, renderScreen, storedCase, type RenderScreenOptions } from "./harness";
+import { navigate, renderScreen, storedCase, switchUser, switchUserToRole, type RenderScreenOptions } from "./harness";
 
 /* ------------------------------------------------------------------------ */
 /* The app, by URL                                                          */
@@ -140,7 +140,7 @@ function backLink(): HTMLElement {
 type User = Awaited<ReturnType<typeof renderApp>>["user"];
 
 /**
- * Closes the open sheet. A sheet is modal, so the top bar (the role switcher included) is out
+ * Closes the open sheet. A sheet is modal, so the header (the user menu included) is out
  * of reach until it is shut, and shutting it takes its param out of the URL.
  */
 async function closePanel(user: User) {
@@ -662,7 +662,7 @@ describe("(g) the landing page's two doors and the demo guide's paths land on re
 
     expect(navState.pathname, `path ${id}`).not.toBe(routes.demo());
     expectRealScreen();
-    // The page is the role's own: the role switcher agrees with the area the path opened in.
+    // The page is the role's own: the user menu agrees with the area the path opened in.
     const role = useDemo.getState().role;
     expect(navState.pathname.startsWith("/city")).toBe(role !== "applicant");
   });
@@ -941,9 +941,7 @@ describe("the demo paths that cross surfaces have a control for every step", () 
     expect(bookings.getByRole("button", { name: /Riverfront Summer 5K/ })).toBeInTheDocument();
 
     // A new applicant starting a City Hall Plaza event on Jul 11 is warned, not blocked.
-    await switchTo(user, "applicant");
-    await user.click(screen.getByRole("button", { name: /^Switch applicant: / }));
-    await user.click(screen.getByRole("menuitemradio", { name: "New applicant" }));
+    await switchUser(user, "New applicant");
     expect(here()).toBe("/apply");
     expectRealScreen();
     await user.click(screen.getByRole("radio", { name: /^Market or festival/ }));
@@ -1086,8 +1084,9 @@ describe("(h) Book again next year", () => {
 
 const CITY_ROLES: Dept[] = ["clerk", "pws", "hl"];
 
+/** Through the header's user menu. To the Applicant, it picks the applicant that switch lands as. */
 async function switchTo(user: User, role: Party) {
-  await user.click(screen.getByRole("radio", { name: PARTY_LABEL[role] }));
+  await switchUserToRole(user, role);
   expect(useDemo.getState().role).toBe(role);
 }
 
@@ -1156,8 +1155,9 @@ describe("(i) every role switch lands on a real screen", () => {
 
     // Intake is still the Clerk's last page of its own: from the Applicant's side it comes back.
     await user.click(screen.getByRole("link", { name: "Intake" }));
+    // The last applicant used is New applicant, with no page to come back to: a blank wizard.
     await switchTo(user, "applicant");
-    expect(here()).toBe(routes.events());
+    expect(here()).toBe(routes.apply());
     await switchTo(user, "clerk");
     expect(here()).toBe(routes.city.intake());
     expectRealScreen();
@@ -1178,7 +1178,7 @@ describe("(i) every role switch lands on a real screen", () => {
       const { user, unmount } = await renderApp({ role: "applicant", personaId, path });
       expectRealScreen();
       const name = storedCase(caseId).name;
-      // A card's sheet is closed before the role switcher can be reached.
+      // A card's sheet is closed before the user menu can be reached.
       if (screen.queryByRole("dialog")) await closePanel(user);
 
       await switchTo(user, role);
@@ -1481,9 +1481,7 @@ describe("(j) Settings reach the wizard: a threshold the Clerk edits is the one 
     expect(useDemo.getState().cfg.thresholds.reviewedAttendance).toBe(30);
 
     // A new applicant plans a picnic for 40: the demo script's own Instant example.
-    await switchTo(user, "applicant");
-    await user.click(screen.getByRole("button", { name: /^Switch applicant: / }));
-    await user.click(screen.getByRole("menuitemradio", { name: "New applicant" }));
+    await switchUser(user, "New applicant");
     expect(here()).toBe("/apply");
     await user.click(screen.getByRole("radio", { name: /^Picnic or party/ }));
     await user.type(screen.getByLabelText(/Event name/), "Summer picnic");

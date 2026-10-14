@@ -137,7 +137,7 @@ function CommandPalette({ open, onOpenChange }: CommandPaletteProps) {
         open={resetOpen}
         onOpenChange={setResetOpen}
         title="Reset the demo?"
-        body={`This restores every case, the demo date and the role switcher to the seed exactly as it was on ${fmtDate(DEFAULT_DEMO_TODAY)}. There is no undo.`}
+        body={`This restores every case, the demo date and the current user to the seed exactly as it was on ${fmtDate(DEFAULT_DEMO_TODAY)}. There is no undo.`}
         confirmLabel="Reset demo data"
         destructive
         onConfirm={handleReset}

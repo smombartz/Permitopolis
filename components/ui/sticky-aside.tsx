@@ -4,12 +4,12 @@ import { Panel, type panelVariants } from "@/components/ui/panel"
 import type { VariantProps } from "class-variance-authority"
 
 interface StickyAsideProps extends React.ComponentProps<"aside">, VariantProps<typeof panelVariants> {
-  /** How far from the top of the viewport it sticks, e.g. below a fixed top bar. */
+  /** How far from the top of the viewport it sticks. Defaults to just under the app's pinned header. */
   topOffset?: string
 }
 
 /** A right-hand panel that stays in view while the page scrolls: a case's action panel. */
-function StickyAside({ topOffset = "5rem", variant = "frosted", className, children, ...props }: StickyAsideProps) {
+function StickyAside({ topOffset = "calc(var(--app-header-h) + 1.5rem)", variant = "frosted", className, children, ...props }: StickyAsideProps) {
   return (
     <aside
       data-slot="sticky-aside"

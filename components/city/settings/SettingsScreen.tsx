@@ -59,7 +59,7 @@ function SettingsScreen() {
       />
 
       <Tabs orientation="vertical" value={section} onValueChange={setSection} className="items-start">
-        <TabsList variant="line" aria-label="Settings sections" className="sticky top-20 w-56 shrink-0 self-start">
+        <TabsList variant="line" aria-label="Settings sections" className="sticky top-[calc(var(--app-header-h)+1.5rem)] w-56 shrink-0 self-start">
           {SETTINGS_SECTIONS.map((s) => (
             <TabsTrigger key={s.id} value={s.id}>
               {s.label}

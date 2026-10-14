@@ -158,7 +158,7 @@ Only the mono face is a webfont. Everything else uses the OS font, which is a la
 - Three-tier pricing grid with equal columns and a ~16px gap
 - Long-form text panel capped at 72ch with 40px padding; paragraphs about 640–670px wide
 - Floating nav sits 16px from the top, centered, sized to its content (about 790px wide). It is the nav of a product or marketing page.
-- Site header is the nav of a public, institutional page (a city office, a department): a band across the whole screen instead of a floating bar. See "Site header" below. A page has one or the other, never both.
+- Site header is the default header: the header of a page that speaks for an institution (a city office, a department), and of the app behind it. A band across the whole screen instead of a floating bar. See "Site header" below. A page has one or the other, never both.
 
 ### Site header
 
@@ -170,6 +170,7 @@ The header of a page that speaks for an institution. It is the one place in the 
 - **Navigation, from 1024px:** the section links, 4px apart; then 24px; then one inline accent link for the secondary destination; then 24px; then one 44px primary button. Nothing else goes in the row: no search, no icons, no second button.
 - **Under 1024px:** the links, the accent link and the button fold into one 36px secondary button labelled "Menu" with a leading menu icon. It opens a 240px menu, right-aligned: the section links, a divider, then the two destinations. The identity stays as it is.
 - **What it is not:** it carries no eyebrow, no status line and no banner above it, and no second row below it.
+- **In the app:** the same band, the same row and the same identity, with two differences. It is pinned to the top of the screen (sticky, above the page, still no shadow and no blur), so the controls stay in reach; anything that sticks below it starts 24px under it. And the navigation side holds the app's controls instead of links, 8px apart: a status line in 12px mono (the demo date), a 36px secondary Search button, the 36px secondary user button, then one 36px ghost icon button (the Demo menu). The user button shows who is acting, a role icon or an applicant's initials with the name beside it, and opens a 256px menu, right-aligned: the city officials, a divider, then the applicants. The name and the office are cut with an ellipsis instead of wrapping. Under 1024px the status line shortens to the day; under 768px the user button is its icon alone; under 640px the status line is for a screen reader only and Search is its icon alone.
 
 ---
 
@@ -318,7 +319,7 @@ Motion behaves like material settling under glass: things arrive from slightly b
   - Frosted panel: glass-edge border, 14px radius, surface-1 fill, card shadow, `blur(28px) saturate(1.25)`
   - HUD panel: magnetic border, top white sheen plus teal and indigo radial glows over the tinted glass, HUD shadow, `blur(30px) saturate(1.35)`
 - **Page chrome:** the background, grid and grain live on `body`, `body::before` and `body::after` as fixed layers at `z-index` -2 and -1.
-- **Site header:** a `<header>` outside `<main>` holding the identity link, a `<nav>` labelled "Primary" and the two destinations. Both layouts (the row from 1024px, the "Menu" button under it) are in the markup and switched with CSS, so the right one is there on the first paint. In the Permitopolis app it is `components/landing/SiteHeader.tsx`, with the seal in `CitySeal.tsx`; `/` is the page that uses it.
+- **Site header:** a `<header>` outside `<main>` holding the identity link, a `<nav>` labelled "Primary" and the two destinations. Both layouts (the row from 1024px, the "Menu" button under it) are in the markup and switched with CSS, so the right one is there on the first paint. In the Permitopolis app the band, the identity and the section link are `SiteHeader`, `SiteIdentity` and `SiteHeaderNavLink` in `components/ui/site-header.tsx`, with the seal in `components/ui/city-seal.tsx`. `/` uses them through `components/landing/SiteHeader.tsx`; every applicant and city screen uses them, pinned, through `components/shell/TopBar.tsx`, where the user button is `UserMenu.tsx`. `/dev/kit` shows both.
 - **Featured pricing card:** gets a `1px` indigo 650 border. The "later" card uses a dashed subtle border on surface-soft with no shadow.
 - **Comparison table:**
   - 11px uppercase tertiary headers with a sticky first column

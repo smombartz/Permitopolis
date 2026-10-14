@@ -36,7 +36,7 @@ who holds the next step, since when, and what unlocks the others.
    checks have something to catch.
 6. **Seeded by replay.** All 38 cases are histories replayed through the real rules and state
    machine, so no seeded case can disagree with the engine, and Reset is exact.
-7. **Built to survive a live demo.** A fixed demo date, one-click reset, no login, a role switcher
+7. **Built to survive a live demo.** A fixed demo date, one-click reset, no login, a user menu
    that follows the case on screen, and a coach that works out the current step of each demo path
    from the data, so it is right after a reload or an improvisation.
 
@@ -158,8 +158,8 @@ components. Start here, then read "How the engine behaves" for the engine's fine
   `useHydrated()` is true, the storage-blocked banner, the page container with `py-6`, and in the
   city the sidebar. So a screen inside a shell starts with its `PageHeader`, reads the store
   directly, and never adds `page-container`, a `<main>`, or a hydration gate of its own. Until
-  the stored demo has been read the top bar shows the wordmark and placeholders only: the role,
-  the persona and the date all come from the store.
+  the stored demo has been read the top bar shows the city's seal and name and placeholders only:
+  the role, the persona and the date all come from the store.
 - **Each shell guards its area.** `AppShell` renders the screen only for the Applicant and
   `CityShell` only for a city role; any other role gets a panel offering to switch.
 - **Which city pages are whose** (the PRD's route map). My queue, Cases, a case and Active
@@ -184,10 +184,28 @@ components. Start here, then read "How the engine behaves" for the engine's fine
   door or a jump only once `useHydrated()` is true.
 - **Unknown case id**: render `<CaseNotFound id backHref backLabel />` from `@/components/shell`.
   The id comes from `useParams()`, so it is only known on the client; `notFound()` is not needed.
-- **Below 768 px** the role switcher and persona picker collapse into one menu button. The top
-  bar picks one or the other with `useIsNarrow()` (a `matchMedia` check), not with CSS alone.
-  Do the same for any control you would otherwise render twice: the render tests run without
-  CSS, so a `hidden md:flex` pair leaves both in the DOM and every `getByRole` ambiguous.
+- **The app's header is the site header** (`components/ui/site-header.tsx`: `SiteHeader`,
+  `SiteIdentity`, `SiteHeaderNavLink`; the seal is `components/ui/city-seal.tsx`). The landing
+  page and `TopBar` are built from the same band and identity; the app's is `pinned` and holds
+  the demo date, Search, the user menu and the Demo menu where `/` has its links. Its height is
+  `--app-header-h` in `app/globals.css` (81px, 97px from 640px): `StickyAside`, the Settings
+  tabs and the app's `scroll-padding` all sit 1.5rem under it. Use the variable for anything
+  else that sticks below the header.
+- **One user menu, no role switcher** (`components/shell/UserMenu.tsx`). The button names who
+  is acting ("Switch user: City Clerk") and its menu lists the three city officials, then the
+  applicants (`userMenuPersonaIds()`). There is no "Applicant" entry: picking an applicant is
+  the switch. From a city role, the applicant that switch would land as (`applicantLanding()`:
+  the organizer of the case on screen, then of the remembered page, then the last one used)
+  goes where the switch went, so a case still follows to its organizer's board; anyone else
+  starts on their own page, and a landing that is only My events does too, so "New applicant"
+  opens a blank wizard (`resolvePersonaPick()`, all three in `lib/view/shell.ts`). An organizer
+  outside the menu's seven is listed first while their case is the one on screen. In a test,
+  use `switchUser(user, name)` or `switchUserToRole(user, role)` from the harness.
+- **Below 768 px** the user button is its icon alone; below 1024 px the demo date is the day
+  alone, and below 640 px it is for a screen reader only and Search is its icon. The top bar
+  picks one form with `useIsNarrow()` (a `matchMedia` check), not with CSS alone. Do the same
+  for any control you would otherwise render twice: the render tests run without CSS, so a
+  `hidden md:flex` pair leaves both in the DOM and every `getByRole` ambiguous.
 
 ### Switching role and persona
 
@@ -342,7 +360,7 @@ one in every state. Reach for these before writing markup of your own.
 | `Toolbar` | A row of actions above a list or table |
 | `FilterBar`, `FilterChip` | The filter row of a list: toggle chips, one select, search, result count, Clear filters. Keep the filter values in the URL |
 | `CountBadge` | A number on a nav item or tab |
-| `StickyAside` | The right-hand panel that stays in view (a case's action panel). It sticks 5 rem down, clear of the top bar |
+| `StickyAside` | The right-hand panel that stays in view (a case's action panel). It sticks 1.5 rem under the app's pinned header (`--app-header-h`) |
 | `ConfirmDialog` | Every "are you sure": withdraw, cancel, deny, reset. Never `window.confirm` |
 | `InlineAlert` | A short message inside a card or under a value. `Banner` is for page-level messages and `Field`'s `error` for a form field |
 | `Progress` | A labeled bar: sign-offs, payment schedules, checklists |
@@ -441,7 +459,7 @@ Seven surfaces, each built on its own and then joined. Every one is a client scr
 - **A sheet or dialog is modal.** While one is open, the page behind it is hidden from assistive
   technology and the top bar cannot be clicked. In a test, a query by role sees only the panel
   (pass `{ hidden: true }` to read the page behind, or read `[data-slot="back-link"]`). In the
-  app, the role switcher is reached only after the panel is shut, and shutting it takes its param
+  app, the user menu is reached only after the panel is shut, and shutting it takes its param
   (`?card=`, `?task=`) out of the URL.
 - **A page opened under the wrong role stays put.** A link opened as the wrong role shows the
   shell's "This screen is built for ..." panel. Switching from there to a role the page is built
@@ -492,7 +510,7 @@ Seven surfaces, each built on its own and then joined. Every one is a client scr
   `h1` "Event permits", a two-sentence lead), "I want to…" beside "Check what your event needs",
   then How to apply, Permit tiers, What decides the tier, Fees and cancellations, Common
   questions, and a four-column footer (contact, sections, city staff, about this site).
-- **Files**: `components/landing/` (`LandingScreen`, `SiteHeader`, `CitySeal`, `PageIntro`,
+- **Files**: `components/landing/` (`LandingScreen`, `SiteHeader`, `PageIntro`,
   `QuickTasks`, `PermitChecker`, `HowToApply`, `PermitTiers`, `ComparisonTable`, `Fees`, `Faq`,
   `SiteFooter`, `SectionHeading`, `sections.ts`, `DemoGuideScreen`, `hooks.ts`).
   `sections.ts` names each section once (id, label, link styles); the nav, the task list and the
@@ -520,8 +538,8 @@ Seven surfaces, each built on its own and then joined. Every one is a client scr
   working form, so it is not tilted and has no idle float or surface sweep (no ambient loop is
   back on the page); the trigger table has no indigo column wash, because no tier is
   recommended. The seal is an inline SVG in `currentColor`, hidden from a screen reader
-  because the city's name is written beside it. The app's top bar still shows the text
-  wordmark; the seal is the landing page's only.
+  because the city's name is written beside it. The band, the identity and the seal are shared
+  with the app's header (`components/ui/site-header.tsx`, `components/ui/city-seal.tsx`).
 - **Anchors**: a section carries its own 104px of top padding, and the page scrolls an anchor
   to 80px from the top (`scroll-padding-block`). `SECTION` in `sections.ts` sets a negative
   scroll margin so a nav link lands with the eyebrow near the top of the screen.
@@ -1732,7 +1750,7 @@ Things a screen builder needs to know that the type signatures do not say.
   screen (Phase 2)".
 - A tier is never shown by a dot alone: calendar items carry the tier icon, and the map has a
   legend and spells the tier out in its list.
-- `SegmentedControl` (the role switcher, view toggles) is a radio group to the keyboard too: one
+- `SegmentedControl` (view toggles such as Board or Table) is a radio group to the keyboard too: one
   tab stop, and Left/Right, Home and End move to an option and select it. Tests find its options
   with `getByRole("radio", { name })`.
 - `/dev/kit` and `/dev/map` show every primitive, domain component, map mode and calendar view.
@@ -1835,9 +1853,8 @@ change if you would rather have the other.
   the Clerk gave five weeks, where it used to read "of 21" from the tier's default. The other
   reading (the tier's default is the allowance, and a longer due date is the Clerk running late
   by design) would make S5 and S6 read as overdue reviews that were decided on time.
-- **The role switcher's arrow keys switch role at once.** That is how a radio group behaves, and
-  a switch between the Applicant and a city role navigates. If moving focus should not switch,
-  the control becomes a group of toggle buttons, each its own tab stop.
+- **The role switcher's arrow keys switch role at once.** Settled: the switcher is gone. The
+  header's user menu is a menu, so the arrow keys only move through it and Enter picks.
 
 Raised while the Phase 3 screens were built and joined:
 
@@ -1864,7 +1881,7 @@ Raised while the Phase 3 screens were built and joined:
   start a new event.
 - **A link opened under the wrong role stays where it is.** The Applicant on a city case link
   sees "This screen is built for a city role", and the switch it offers opens that case. Before,
-  the switch went to the role's queue or last page. The role switcher itself still follows its
+  the switch went to the role's queue or last page. The user menu itself still follows its
   rule between pages; say if a typed link should rather be left for the role's own home.
 - **The board confirms with a toast.** Sending a document, submitting, giving feedback,
   withdrawing and cancelling each show a short toast ("Sent."), as paying and the city's actions

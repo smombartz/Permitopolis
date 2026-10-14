@@ -2,8 +2,8 @@ import { cn } from "cn";
 
 /**
  * The city's seal: a ringed civic building, drawn in `currentColor` so it takes the ink of the
- * header and the light text of the footer from one source. Decoration beside the city's name,
- * which is always written out next to it, so it is hidden from a screen reader.
+ * site header and the light text of the footer from one source. Decoration beside the city's
+ * name, which is always written out next to it, so it is hidden from a screen reader.
  */
 function CitySeal({ className, ...props }: React.ComponentProps<"svg">) {
   return (

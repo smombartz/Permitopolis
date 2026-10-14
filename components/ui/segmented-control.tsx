@@ -18,7 +18,7 @@ interface SegmentedControlProps<T extends string> {
 }
 
 /**
- * The role switcher and small view toggles: a radiogroup of equal-weight options. It behaves
+ * Small view toggles (Board or Table): a radiogroup of equal-weight options. It behaves
  * as a radio group does for a keyboard: the group is one tab stop (the selected option), and
  * Left/Right (or Up/Down), Home and End move to another option and select it.
  */

@@ -10,7 +10,7 @@ import { useIsNarrow } from "@/components/shell/useIsNarrow";
 import { isPlainShortcut } from "@/lib/keyboard";
 
 /**
- * The top bar's search button, plus the two global shortcuts it stands for: Cmd+K (Ctrl+K)
+ * The header's search button, plus the two global shortcuts it stands for: Cmd+K (Ctrl+K)
  * opens the command palette from anywhere, a field included, and "?" opens the
  * keyboard-shortcuts dialog (never while a field has focus, so a literal "?" can still be
  * typed, and never with Ctrl, Cmd or Alt held or inside a menu: `isPlainShortcut()`).
@@ -41,7 +41,7 @@ function CommandCenter() {
 
   return (
     <>
-      <Button type="button" variant="secondary" size={compact ? "icon-sm" : "sm"} aria-label="Search" aria-keyshortcuts="Meta+K Control+K" onClick={() => setOpen(true)}>
+      <Button type="button" variant="secondary" size={compact ? "icon-sm" : "sm"} className="text-sm shadow-none" aria-label="Search" aria-keyshortcuts="Meta+K Control+K" onClick={() => setOpen(true)}>
         <SearchIcon data-icon="inline-start" aria-hidden="true" />
         {!compact ? (
           <>

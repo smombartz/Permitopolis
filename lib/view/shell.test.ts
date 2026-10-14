@@ -1,7 +1,22 @@
 import { describe, expect, it } from "vitest";
 import { makeCase } from "@/lib/state/testSupport";
 import { routes } from "@/lib/routes";
-import { applicantCaseIdFromHref, caseIdFromPath, cityPageIsFor, cityToolLinks, cityToolOwner, pageIsFor, pathForCase, pathForPersona, resolveRoleSwitch } from "./shell";
+import { PICKABLE_PERSONA_IDS } from "@/lib/data/people";
+import {
+  actingAsName,
+  applicantCaseIdFromHref,
+  applicantLanding,
+  caseIdFromPath,
+  cityPageIsFor,
+  cityToolLinks,
+  cityToolOwner,
+  pageIsFor,
+  pathForCase,
+  pathForPersona,
+  resolvePersonaPick,
+  resolveRoleSwitch,
+  userMenuPersonaIds,
+} from "./shell";
 
 describe("caseIdFromPath", () => {
   it("reads a case id off an applicant event page and its subpages", () => {
@@ -310,6 +325,81 @@ describe("pathForPersona", () => {
   it("opens My events for everyone else", () => {
     expect(pathForPersona("maya-chen", cases)).toBe("/events");
     expect(pathForPersona("two-events", cases)).toBe("/events");
+  });
+});
+
+describe("the user menu: who is acting, who it offers, and where a pick lands", () => {
+  const cases = [
+    makeCase({ id: "PMT-27-0097", applicantId: "riverfront-running-club", state: "quote_sent" }),
+    makeCase({ id: "PMT-27-0109", applicantId: "maya-chen", state: "permitted" }),
+    makeCase({ id: "PMT-27-0121", applicantId: "downtown-art-walk-committee", state: "in_review" }),
+    makeCase({ id: "PMT-27-0142", applicantId: "sunrise-yoga-club", state: "draft", wizardStep: "when" }),
+  ];
+
+  it("names a city role by its label and the Applicant by the persona", () => {
+    expect(actingAsName("clerk", "maya-chen")).toBe("City Clerk");
+    expect(actingAsName("pws", "new")).toBe("Public Works & Safety");
+    expect(actingAsName("applicant", "maya-chen")).toBe("Maya Chen");
+    expect(actingAsName("applicant", "new")).toBe("New applicant");
+    expect(actingAsName("applicant", "nobody-in-the-data")).toBe("New applicant");
+  });
+
+  it("the Applicant lands as itself, where it is", () => {
+    expect(applicantLanding({ fromRole: "applicant", personaId: "maya-chen", pathname: "/events/PMT-27-0109", cases, lastPathByRole: {} })).toEqual({
+      personaId: "maya-chen",
+      path: "/events/PMT-27-0109",
+    });
+  });
+
+  it("a city role on a case lands as that case's organizer, on its board", () => {
+    expect(applicantLanding({ fromRole: "clerk", personaId: "maya-chen", pathname: "/city/cases/PMT-27-0097", cases, lastPathByRole: {} })).toEqual({
+      personaId: "riverfront-running-club",
+      path: "/events/PMT-27-0097",
+    });
+  });
+
+  it("off a case, a city role lands on the remembered applicant page as its organizer, then as the last applicant used", () => {
+    expect(
+      applicantLanding({ fromRole: "hl", personaId: "new", pathname: "/city/queue", cases, lastPathByRole: { applicant: "/events/PMT-27-0109/permit" } }),
+    ).toEqual({ personaId: "maya-chen", path: "/events/PMT-27-0109/permit" });
+    expect(applicantLanding({ fromRole: "hl", personaId: "maya-chen", pathname: "/city/queue", cases, lastPathByRole: {} })).toEqual({
+      personaId: "maya-chen",
+      path: "/events",
+    });
+  });
+
+  it("offers the six scenario organizers and New applicant, with a landing applicant outside them first", () => {
+    expect(userMenuPersonaIds("maya-chen")).toEqual(PICKABLE_PERSONA_IDS);
+    expect(userMenuPersonaIds("new")).toEqual(PICKABLE_PERSONA_IDS);
+    expect(userMenuPersonaIds("downtown-art-walk-committee")).toEqual(["downtown-art-walk-committee", ...PICKABLE_PERSONA_IDS]);
+    // Someone the data does not know has no name to show: not offered.
+    expect(userMenuPersonaIds("nobody-in-the-data")).toEqual(PICKABLE_PERSONA_IDS);
+  });
+
+  it("from a city role, picking the landing applicant follows the case; picking anyone else opens their own page", () => {
+    const landing = applicantLanding({ fromRole: "clerk", personaId: "maya-chen", pathname: "/city/cases/PMT-27-0097", cases, lastPathByRole: {} });
+    expect(resolvePersonaPick({ picked: "riverfront-running-club", fromRole: "clerk", landing, cases })).toBe("/events/PMT-27-0097");
+    expect(resolvePersonaPick({ picked: "maya-chen", fromRole: "clerk", landing, cases })).toBe("/events");
+    expect(resolvePersonaPick({ picked: "sunrise-yoga-club", fromRole: "clerk", landing, cases })).toBe("/apply?case=PMT-27-0142&step=when");
+    expect(resolvePersonaPick({ picked: "new", fromRole: "clerk", landing, cases })).toBe("/apply");
+  });
+
+  it("from a city role, the landing applicant comes back to the remembered page", () => {
+    const lastPathByRole = { applicant: "/events/PMT-27-0109/permit" };
+    const landing = applicantLanding({ fromRole: "pws", personaId: "new", pathname: "/city/active", cases, lastPathByRole });
+    expect(resolvePersonaPick({ picked: "maya-chen", fromRole: "pws", landing, cases })).toBe("/events/PMT-27-0109/permit");
+  });
+
+  it("a landing that is only the Applicant's home starts on the applicant's own page: New applicant gets a blank wizard", () => {
+    const landing = applicantLanding({ fromRole: "clerk", personaId: "new", pathname: "/city/settings", cases, lastPathByRole: {} });
+    expect(landing).toEqual({ personaId: "new", path: "/events" });
+    expect(resolvePersonaPick({ picked: "new", fromRole: "clerk", landing, cases })).toBe("/apply");
+  });
+
+  it("as the Applicant, a pick always opens that applicant's own page, even their own name on a case", () => {
+    const landing = applicantLanding({ fromRole: "applicant", personaId: "maya-chen", pathname: "/events/PMT-27-0109", cases, lastPathByRole: {} });
+    expect(resolvePersonaPick({ picked: "maya-chen", fromRole: "applicant", landing, cases })).toBe("/events");
+    expect(resolvePersonaPick({ picked: "riverfront-running-club", fromRole: "applicant", landing, cases })).toBe("/events");
   });
 });
 

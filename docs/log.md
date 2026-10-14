@@ -1,5 +1,34 @@
 # Change log
 
+## 2026-10-13 - One header style: the site header in the app, with a user menu
+
+**What Changed:**
+- The landing page's header is now the default header. Its band, identity and section link moved to `components/ui/site-header.tsx` (`SiteHeader`, `SiteIdentity`, `SiteHeaderNavLink`) and the seal to `components/ui/city-seal.tsx`; `components/landing/SiteHeader.tsx` is built from them and `/` looks the same
+- The app's top bar (`components/shell/TopBar.tsx`) is that same band, pinned: the city's seal and name linking home, then the demo date, Search, a user button and the Demo menu. The glass bar and its text wordmark are gone
+- The four-segment role switcher, the separate applicant picker and the under-768px hamburger are replaced by one user menu (`components/shell/UserMenu.tsx`), just before the settings cog. The button shows who is acting (role icon or applicant initials, plus the name from 768px up); the menu lists the three city officials, then the applicants, and for the Applicant "My events" and "Plan an event"
+- Picking an applicant is now the switch to the Applicant. From a city role, the organizer of the case on screen (or of the remembered applicant page) lands where the old switch did; anyone else starts on their own page, and "New applicant" opens a blank wizard. An organizer outside the menu's seven is offered while their case is on screen. The rule is three pure functions in `lib/view/shell.ts` (`applicantLanding`, `userMenuPersonaIds`, `resolvePersonaPick`), and `usePersonaSwitch()` uses them
+- The pinned header is 97px tall (81px under 640px) instead of 56px. `--app-header-h` in `app/globals.css` holds that; `StickyAside`, the Settings tabs and the app's scroll padding sit 1.5rem under it
+- `/dev/kit` has a "Site header" section with both headers: the public one and the app's, with a working user menu
+- Wording that said "role switcher" now says "user menu" or "current user" (the reset confirmation, the demo guide, comments)
+- Tests: the render harness gained `switchUser()` and `switchUserToRole()`; the shell, handoff, hydration, keyboard, overlay, live-region and kit tests use the user menu; new view-model tests cover the three functions
+- `docs/rime-and-ink-design-system.md` describes the app variant of the site header; `docs/readme.md` covers the shared header, the user menu and the height variable
+
+**Why:**
+- The owner asked for a user icon before the settings cog that switches between the city officials and the applicants, with the roles out of the top menu, and then for the landing page's new header to be the header style everywhere, shown on the kit page
+
+**Files Modified:**
+- `components/ui/site-header.tsx`, `components/ui/city-seal.tsx` (moved from `components/landing/CitySeal.tsx`), `components/shell/UserMenu.tsx` - new
+- `components/shell/RoleSwitcher.tsx`, `components/shell/PersonaPicker.tsx`, `components/shell/MobileNavMenu.tsx` - deleted
+- `components/shell/TopBar.tsx`, `components/shell/useRoleSwitch.ts`, `components/shell/CommandCenter.tsx`, `components/shell/DemoMenu.tsx`, `components/shell/CommandPalette.tsx`, `components/shell/useIsNarrow.ts`
+- `components/landing/SiteHeader.tsx`, `components/landing/SiteFooter.tsx`, `components/landing/DemoGuideScreen.tsx`
+- `components/kit/KitScreen.tsx`
+- `components/ui/sticky-aside.tsx`, `components/ui/skip-link.tsx`, `components/ui/segmented-control.tsx`, `components/ui/segmented-control.test.tsx`, `components/city/settings/SettingsScreen.tsx`, `app/globals.css`
+- `lib/view/shell.ts`, `lib/view/shell.test.ts`, `lib/view/palette.ts`, `lib/data/people.ts`
+- `tests/render/harness.tsx`, `shell.test.tsx`, `handoffs.test.tsx`, `hydration.test.tsx`, `keyboard.test.tsx`, `a11y-overlays.test.tsx`, `live-regions.test.tsx`, `kit.test.tsx`
+- `docs/rime-and-ink-design-system.md`, `docs/readme.md`, `docs/plans/2026-10-13-site-header-user-menu.md`
+
+---
+
 ## 2026-10-13 - Full-width landing header restored and added to the design system
 
 **What Changed:**

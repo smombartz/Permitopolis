@@ -6,6 +6,7 @@ import {
   BellIcon,
   FileQuestionIcon,
   InboxIcon,
+  MenuIcon,
   PaletteIcon,
   PlusIcon,
   SearchIcon,
@@ -110,6 +111,8 @@ import { InlineAlert } from "@/components/ui/inline-alert"
 import { StickyAside } from "@/components/ui/sticky-aside"
 import { Truncate } from "@/components/ui/truncate"
 import { CopyButton } from "@/components/ui/copy-button"
+import { SiteHeader, SiteHeaderNavLink, SiteIdentity } from "@/components/ui/site-header"
+import { UserMenu } from "@/components/shell/UserMenu"
 
 import {
   ActivityTimeline,
@@ -166,6 +169,7 @@ import {
   type TaskKind,
   type Tier,
 } from "@/lib/types"
+import { PICKABLE_PERSONA_IDS } from "@/lib/data/people"
 import type { PartyStatus } from "@/lib/state/types"
 
 // The kit runs outside app/layout.tsx when mounted by the render test, so it
@@ -429,6 +433,13 @@ function KitSection({
   );
 }
 
+/** The caption over a full-width specimen, in the page container. */
+function SpecimenLabel({ children }: { children: React.ReactNode }) {
+  return <p className="page-container text-[11px] font-bold tracking-[.12em] text-fg-label uppercase">{children}</p>;
+}
+
+const KIT_HEADER_LINKS = ["How to apply", "Permit tiers", "Fees", "Questions"];
+
 function Row({ children, className }: { children: React.ReactNode; className?: string }) {
   return <div className={`flex flex-wrap items-center gap-3 ${className ?? ""}`}>{children}</div>;
 }
@@ -457,6 +468,8 @@ function KitScreen() {
   const [filterSearch, setFilterSearch] = React.useState("");
   const [filterTier, setFilterTier] = React.useState<Tier | "all">("all");
   const [activeChip, setActiveChip] = React.useState(false);
+  const [actingRole, setActingRole] = React.useState<Party>("clerk");
+  const [actingPersona, setActingPersona] = React.useState("maya-chen");
 
   function toggleAccept(id: string) {
     setAcceptedIds((current) => (current.includes(id) ? current.filter((x) => x !== id) : [...current, id]));
@@ -498,6 +511,89 @@ function KitScreen() {
             </Row>
           </div>
         </div>
+
+        {/* ---- Site header: the default header, public and in the app ---- */}
+        <section id="site-header" className="flex flex-col gap-5 py-10">
+          <div className="page-container">
+            <div className="flex flex-col gap-1.5 border-b border-line-subtle pb-4">
+              <h2 className="text-h4 font-bold text-fg">Site header</h2>
+              <p className="max-w-2xl text-sm text-fg-secondary">
+                The default header: one row on a solid band across the whole screen, the city&rsquo;s seal and name on the
+                left. A public page puts its navigation on the right and scrolls the band away. The app pins it and puts
+                the demo date, Search, the user menu and the Demo menu there instead.
+              </p>
+            </div>
+          </div>
+
+          <SpecimenLabel>Public page: section links, one accent link, one primary button</SpecimenLabel>
+          <SiteHeader className="border-t">
+            <SiteIdentity href="#site-header" />
+            <div className="flex shrink-0 items-center gap-6">
+              <nav aria-label="Primary">
+                <ul className="hidden items-center gap-1 lg:flex">
+                  {KIT_HEADER_LINKS.map((label) => (
+                    <li key={label}>
+                      <SiteHeaderNavLink href="#site-header">{label}</SiteHeaderNavLink>
+                    </li>
+                  ))}
+                </ul>
+                <div className="lg:hidden">
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button variant="secondary" size="sm" className="text-sm shadow-none">
+                        <MenuIcon aria-hidden="true" />
+                        Menu
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end" className="w-60">
+                      {KIT_HEADER_LINKS.map((label) => (
+                        <DropdownMenuItem key={label} asChild>
+                          <a href="#site-header">{label}</a>
+                        </DropdownMenuItem>
+                      ))}
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                </div>
+              </nav>
+              <div className="hidden items-center gap-6 lg:flex">
+                {/* The header's inline accent link: 14px/500, underlined from the start, no arrow. */}
+                <a
+                  href="#site-header"
+                  className="rounded-control text-sm font-medium text-fg-accent underline underline-offset-4 outline-none hover:text-fg focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring"
+                >
+                  City staff
+                </a>
+                <Button onClick={() => toast("Plan an event")}>Plan an event</Button>
+              </div>
+            </div>
+          </SiteHeader>
+
+          <SpecimenLabel>App: the demo date, Search, the user menu, the Demo menu (pinned in the app, not here)</SpecimenLabel>
+          <SiteHeader className="border-t">
+            <SiteIdentity href="#site-header" truncate />
+            <div className="flex shrink-0 items-center gap-2">
+              <span className="font-mono text-xs whitespace-nowrap text-fg-label max-lg:hidden sm:mr-1">Demo today: Mon, May 3, 2027</span>
+              <Button variant="secondary" size="sm" className="text-sm shadow-none" onClick={() => toast("Search")}>
+                <SearchIcon data-icon="inline-start" aria-hidden="true" />
+                <span>Search</span>
+                <Kbd className="ml-1">⌘K</Kbd>
+              </Button>
+              <UserMenu
+                role={actingRole}
+                personaId={actingPersona}
+                personaIds={[...PICKABLE_PERSONA_IDS]}
+                onRoleChange={setActingRole}
+                onPersonaChange={(id) => {
+                  setActingRole("applicant");
+                  setActingPersona(id);
+                }}
+              />
+              <Button variant="ghost" size="icon-sm" aria-label="Demo menu (sample)" onClick={() => toast("Demo menu")}>
+                <SettingsIcon aria-hidden="true" />
+              </Button>
+            </div>
+          </SiteHeader>
+        </section>
 
         {/* ---- Buttons ---- */}
         <KitSection

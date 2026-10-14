@@ -72,7 +72,7 @@ describe("a reload with a demo in storage", () => {
     expect(html).toContain('data-slot="page-skeleton"');
     expect(html).not.toContain("May 3");
     expect(html).not.toContain("Demo today");
-    expect(html).not.toContain('role="radio"');
+    expect(html).not.toContain("Switch user");
     expect(html).not.toContain("Applicant");
     expect(html).not.toContain("New applicant");
   });
@@ -89,8 +89,7 @@ describe("a reload with a demo in storage", () => {
     await flushHydration();
 
     expect(error).not.toHaveBeenCalled();
-    expect(screen.getByRole("radio", { name: "City Clerk" })).toBeChecked();
-    expect(screen.getByRole("radio", { name: "Applicant" })).not.toBeChecked();
+    expect(screen.getByRole("button", { name: "Switch user: City Clerk" })).toBeInTheDocument();
     expect(screen.getByText("Demo today: Fri, Jun 18, 2027")).toBeInTheDocument();
     expect(screen.queryByText(/May 3/)).not.toBeInTheDocument();
     expect(screen.getByText("queue")).toBeInTheDocument();
@@ -110,7 +109,7 @@ describe("a reload with a demo in storage", () => {
 
     // Its very first render has the page and the controls.
     expect(screen.getByText("queue")).toBeInTheDocument();
-    expect(screen.getByRole("radio", { name: "City Clerk" })).toBeChecked();
+    expect(screen.getByRole("button", { name: "Switch user: City Clerk" })).toBeInTheDocument();
     expect(document.querySelector('[data-slot="page-skeleton"]')).toBeNull();
     expect(document.querySelector('[data-slot="top-bar-placeholder"]')).toBeNull();
     expect(getItem.mock.calls.filter(([key]) => key === STORAGE_KEY)).toHaveLength(1);

@@ -25,7 +25,7 @@ import { homeFor, routes } from "@/lib/routes";
 import { DEFAULT_DEMO_TODAY } from "@/lib/rules/config";
 import type { ISODate } from "@/lib/types";
 
-/** The top bar's Demo menu: reset, set demo date, scenario jumps, hints, and the demo guide. */
+/** The header's Demo menu: reset, set demo date, scenario jumps, hints, and the demo guide. */
 function DemoMenu() {
   const router = useRouter();
   const demoToday = useDemo((s) => s.demoToday);
@@ -45,7 +45,7 @@ function DemoMenu() {
   const triggerRef = React.useRef<HTMLButtonElement>(null);
 
   /**
-   * Reset puts the role switcher back on the Applicant, so the page has to follow: a city
+   * Reset puts the user menu back on the Applicant, so the page has to follow: a city
    * page would otherwise show its "built for a city role" panel, and an event made during
    * the demo no longer exists.
    */
@@ -129,7 +129,7 @@ function DemoMenu() {
         open={resetOpen}
         onOpenChange={setResetOpen}
         title="Reset the demo?"
-        body={`This restores every case, the demo date and the role switcher to the seed exactly as it was on ${fmtDate(DEFAULT_DEMO_TODAY)}. There is no undo.`}
+        body={`This restores every case, the demo date and the current user to the seed exactly as it was on ${fmtDate(DEFAULT_DEMO_TODAY)}. There is no undo.`}
         confirmLabel="Reset demo data"
         destructive
         onConfirm={handleReset}
