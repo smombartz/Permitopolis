@@ -48,7 +48,8 @@ blackout calendar and templates in Settings (they are shown, not edited). Browse
 tests and a deploy.
 
 **What it is made of.** 21 routes, 383 source files and 3,197 tests in 109 files (type-check,
-lint, tests and the production build are the gate, `pnpm check`). It was built with Claude Code in
+lint, tests and the production build are the gate, `pnpm check`; since Oct 14, 2026 agents run
+only type-check and lint unless asked, see "Testing for now" in `CLAUDE.md`). It was built with Claude Code in
 seven phases: shared contracts first, then parallel builders in separate git worktrees for each
 phase, an integrator that merged them and made the screens meet, read-only reviewers that walked
 the demo paths click by click, and a fixer for what they found.

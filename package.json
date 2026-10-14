@@ -10,6 +10,8 @@
     "typecheck": "next typegen && tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
+    "test:unit": "vitest run --project unit",
+    "test:render": "vitest run --project render",
     "map:sync": "node scripts/sync-map.mjs",
     "check": "pnpm typecheck && pnpm lint && pnpm test && pnpm build"
   },

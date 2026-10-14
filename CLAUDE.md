@@ -91,8 +91,8 @@ to 375 px. Keyboard reachable, visible focus, status changes announced with `ari
 - Stay inside the paths your brief gives you. Add no dependency; report it if you need one.
 - Do not edit `docs/log.md`, `docs/readme.md`, `CLAUDE.md` or the plan. Return your log entry in
   your result; the integrator writes them. This overrides the logging workflow below for builders.
-- Before you finish: `pnpm typecheck`, `pnpm lint` and `pnpm test` must pass, then commit your work
-  on your branch.
+- Before you finish: `pnpm typecheck` and `pnpm lint` must pass (tests only if the brief asks;
+  see "Testing for now"), then commit your work on your branch.
 
 ---
 
@@ -128,10 +128,26 @@ This keeps plans versioned, reviewable, and accessible across sessions.
 **Visual/UI verification is the user's job — don't do it.** Do not start a
 preview/dev server, drive a browser, or take screenshots to check how something
 looks. The user runs their own dev server and verifies the UI themselves.
-Functional/logic verification you *should* still do (type-check, lint, build,
-and exercising behavior via `curl`/scripts against the running server is fine).
+Functional/logic verification you *should* still do (type-check and lint, and
+exercising behavior via `curl`/scripts against the running server is fine).
 When a change is visually observable, finish your logic checks and hand it to
 the user to look at rather than asking which browser to use.
+
+### Testing for now (temporary)
+
+The full suite takes about two minutes, which slows small changes, so for now:
+
+- Check your work with `pnpm typecheck` and `pnpm lint` only (~15 s).
+- Do **not** run `pnpm test`, `pnpm check` or `pnpm build` unless the user asks, including
+  before a commit or merge.
+- When the user does ask, run the narrowest thing that answers it: one file
+  (`pnpm vitest run path/to/file.test.ts`), one test (`-t "name"`), `pnpm test:unit` (~13 s) or
+  `pnpm test:render` (~90 s). The whole suite only when they ask for it.
+- Keep tests in step with the code: if you change behavior a test describes, update that test,
+  but don't run the suite to confirm it.
+
+This lasts until the user says to turn the tests back on; then remove this section and restore
+`pnpm test` in the worktree rule above.
 
 ---
 
@@ -247,6 +263,9 @@ See the phase checkboxes in `docs/plans/2026-10-12-permitopolis-prototype.md`.
 ### Commands
 
 - `pnpm dev` runs the app (the user does this; agents do not)
-- `pnpm check` is the gate: type-check, lint, tests, build
+- `pnpm typecheck` and `pnpm lint` are what agents run after a change (see "Testing for now")
+- `pnpm check` is the full gate: type-check, lint, tests, build; run it only when the user asks
+- `pnpm test:unit` (~13 s, logic in `lib/`) and `pnpm test:render` (~90 s, pages in jsdom) run
+  half the suite each; `pnpm test` runs all of it
 - `pnpm map:sync` regenerates the map's layers and coordinates from
   `design/map/permitopolis-map.svg`; never edit the `*.generated.*` files by hand

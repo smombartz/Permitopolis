@@ -1,5 +1,23 @@
 # Change log
 
+## 2026-10-14 - Tests run on request only; agents check with type-check and lint
+
+**What Changed:**
+- `CLAUDE.md`: new "Testing for now (temporary)" section under Verification: agents run `pnpm typecheck` and `pnpm lint` only, and `pnpm test`, `pnpm check` and `pnpm build` only when the user asks (then the narrowest run). The worktree rule and the Commands list say the same
+- `package.json`: `test:unit` (the node project, ~13s) and `test:render` (the jsdom project, ~90s) scripts, for narrow runs. The tests, `vitest.config.mts`, `test` and `check` are unchanged
+- `docs/readme.md`: one note where `pnpm check` is described as the gate
+
+**Why:**
+- The full suite takes about two minutes and slowed small changes with Claude. Temporary, until the user turns the tests back on
+
+**Files Modified:**
+- `CLAUDE.md`
+- `package.json`
+- `docs/readme.md`
+- `docs/plans/2026-10-14-tests-on-request.md` (new)
+
+---
+
 ## 2026-10-14 - Wizard: no food vendor default for markets, an "Other" type, and a "Your event" recap in the preview
 
 **What Changed:**
