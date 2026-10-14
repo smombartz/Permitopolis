@@ -31,7 +31,6 @@ function PageIntro() {
 
   return (
     <section className="page-container flex flex-col items-start gap-6 pt-16 lg:pt-24">
-      <Eyebrow>Office of the City Clerk</Eyebrow>
       {/* 60px below 640px, where the two words stack rather than push the page sideways. */}
       <h1 className="text-display font-bold text-balance break-words text-fg sm:text-hero">
         Event{" "}
