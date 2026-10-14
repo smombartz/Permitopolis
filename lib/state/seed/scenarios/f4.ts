@@ -1,5 +1,5 @@
 /**
- * F4 · Oak Avenue block party. Reviewed by exception, Quote sent: every sign-off and review is
+ * F4 · Oak Avenue block party. Standard through the block-party exception, Quote sent: every sign-off and review is
  * in; the applicant has not paid, so it sits in the Clerk's payments list.
  */
 import type { EventAnswers } from "@/lib/types";

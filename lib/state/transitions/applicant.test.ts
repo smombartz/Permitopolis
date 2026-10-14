@@ -167,7 +167,7 @@ describe("book_and_pay", () => {
     expect(result).toEqual({ ok: false, reason: "Shelter 3 is booked by the 40th birthday picnic on May 22." });
   });
 
-  it("fails for a Reviewed or Special tier", () => {
+  it("fails for a Standard or Special tier", () => {
     const c = makeCase({ state: "draft", tier: "reviewed", location, schedule });
     const result = transition(c, { type: "book_and_pay", method: "card" }, "applicant", makeCtx());
     expect(result.ok).toBe(false);
@@ -517,7 +517,7 @@ describe("submit", () => {
 
   it("fails inside the tier's lead time, unless the applicant took the late fee", () => {
     const submitApp = makeTask({ id: "PMT-27-0001:submit_application", catalogId: "submit_application", status: "todo" });
-    // May 22 is 19 days from May 3; a Reviewed event needs 30.
+    // May 22 is 19 days from May 3; a Standard event needs 30.
     const schedule = { date: "2027-05-22", start: "11:00", end: "16:00", occurrences: [{ date: "2027-05-22", availability: { status: "open" as const }, billing: "upcoming" as const }] };
     const c = makeCase({ state: "draft", tier: "reviewed", schedule, tasks: [submitApp] });
     expect(transition(c, { type: "submit" }, "applicant", makeCtx())).toEqual({ ok: false, reason: "Needs 30 days of notice; pick a later date or add the late fee." });
@@ -726,7 +726,7 @@ describe("submit_feedback and book_again", () => {
 
 describe("amend: the cards it adds", () => {
   it("are dated from the amendment, so they have been the applicant's since then and not since the booking", () => {
-    const reviewedCls: Classification = { ...instantCls, tier: "reviewed", leadTimeDays: 30, summary: "This is a Reviewed event" };
+    const reviewedCls: Classification = { ...instantCls, tier: "reviewed", leadTimeDays: 30, summary: "This is a Standard event" };
     vi.mocked(classify).mockReturnValue(reviewedCls);
     vi.mocked(requirements).mockReturnValue([makeTask({ id: "PMT-27-0001:sound_details", catalogId: "sound_details", kind: "form", history: [] })]);
     const schedule = { date: "2027-07-22", start: "11:00", end: "16:00", occurrences: [{ date: "2027-07-22", availability: { status: "open" as const }, billing: "paid" as const }] };
@@ -743,7 +743,7 @@ describe("amend: the cards it adds", () => {
 
 describe("amend", () => {
   it("adds new amendment-tagged cards and keeps the permit valid for the original plan", () => {
-    vi.mocked(classify).mockReturnValue({ ...instantCls, tier: "reviewed", summary: "This is a Reviewed event" });
+    vi.mocked(classify).mockReturnValue({ ...instantCls, tier: "reviewed", summary: "This is a Standard event" });
     const djCard = makeTask({ id: "PMT-27-0001:sound_details", catalogId: "sound_details", reviewer: "pws" });
     vi.mocked(requirements).mockReturnValue([djCard]);
     const c = makeCase({
@@ -790,7 +790,7 @@ describe("amend", () => {
   });
 
   it("refuses a second amendment while one is already pending", () => {
-    vi.mocked(classify).mockReturnValue({ ...instantCls, tier: "reviewed", summary: "This is a Reviewed event" });
+    vi.mocked(classify).mockReturnValue({ ...instantCls, tier: "reviewed", summary: "This is a Standard event" });
     vi.mocked(requirements).mockReturnValue([makeTask({ id: "PMT-27-0001:sound_details", catalogId: "sound_details", kind: "form", reviewer: "pws" })]);
     const c = makeCase({ state: "permitted", permit: { issuedOn: "2027-05-01", signature: null }, flags: { sentToCommission: false, lateFee: false, signed: false, acceptedComplete: false, amendmentPending: true } });
     const result = transition(c, { type: "amend", answers: c }, "applicant", makeCtx());
@@ -800,7 +800,7 @@ describe("amend", () => {
 
 describe("amend: completing and deciding it", () => {
   function materialCaseAndAnswers() {
-    vi.mocked(classify).mockReturnValue({ ...instantCls, tier: "reviewed", summary: "This is a Reviewed event" });
+    vi.mocked(classify).mockReturnValue({ ...instantCls, tier: "reviewed", summary: "This is a Standard event" });
     const soundCard = makeTask({ id: "PMT-27-0001:sound_details", catalogId: "sound_details", kind: "form", reviewer: "pws", history: [] });
     const submitCard = makeTask({ id: "PMT-27-0001:submit_application", catalogId: "submit_application", kind: "action", reviewer: "clerk", status: "locked", unlocksOn: "presubmit_done", history: [] });
     vi.mocked(requirements).mockReturnValue([soundCard, submitCard]);

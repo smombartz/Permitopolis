@@ -83,7 +83,7 @@ export function nextActionFor(c: EventCase, today: ISODate): { text: string; due
 
 /**
  * True while a Draft is still only wizard answers: no plan has been confirmed, so it has no
- * cards and no board. An Instant draft stays this way until it is booked; a Reviewed or Special
+ * cards and no board. An Instant draft stays this way until it is booked; a Standard or Special
  * one gets its board at the wizard's last step and stays a Draft until it is submitted.
  */
 export function isUnplannedDraft(c: EventCase): boolean {

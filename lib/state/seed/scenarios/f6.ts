@@ -1,5 +1,5 @@
 /**
- * F6 · Little League Opening Day. Instant, Permitted. 90 people keeps it under the Reviewed
+ * F6 · Little League Opening Day. Instant, Permitted. 90 people keeps it under the Standard
  * threshold (plan 3.3 fix).
  */
 import type { EventAnswers } from "@/lib/types";

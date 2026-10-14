@@ -60,7 +60,7 @@ describe("WizardScreen: S2 (scenario S2)", () => {
 });
 
 describe("WizardScreen: a new applicant watches the tier move (demo path 2)", () => {
-  it("Shelter 2 for 40 is Instant; alcohol makes it Reviewed and the what-if brings it back; two Main Street blocks make it Special; 1,200 people with no street is still Special", async () => {
+  it("Shelter 2 for 40 is Instant; alcohol makes it Standard and the what-if brings it back; two Main Street blocks make it Special; 1,200 people with no street is still Special", async () => {
     const { user } = await renderScreen(<WizardScreen />, { path: "/apply", personaId: "new" });
 
     // Step 1: What.
@@ -82,9 +82,9 @@ describe("WizardScreen: a new applicant watches the tier move (demo path 2)", ()
     await user.type(screen.getByLabelText(/Expected attendance/), "40");
     expect(panel().getByText("Instant")).toBeInTheDocument();
 
-    // Turn on alcohol: Reviewed, and the what-if chip offers the way back.
+    // Turn on alcohol: Standard, and the what-if chip offers the way back.
     await user.click(screen.getByRole("switch", { name: "Alcohol" }));
-    expect(panel().getByText("Reviewed")).toBeInTheDocument();
+    expect(panel().getByText("Standard")).toBeInTheDocument();
     const whatIfButton = panel().getByRole("button", { name: "Remove alcohol: Instant, book today" });
     await user.click(whatIfButton);
     expect(panel().getByText("Instant")).toBeInTheDocument();
@@ -173,11 +173,11 @@ describe("WizardScreen: availability and the lead-time gate", () => {
     expect(screen.getAllByRole("button", { name: /\d{4}$/ }).length).toBeGreaterThan(0);
   });
 
-  it("a date 19 days out for a Reviewed event shows all three fixes", async () => {
+  it("a date 19 days out for a Standard event shows all three fixes", async () => {
     const { user } = await renderScreen(<WizardScreen />, { path: "/apply", personaId: "new" });
 
     await user.click(screen.getByRole("radio", { name: /^Picnic or party/ }));
-    await user.type(screen.getByLabelText(/Event name/), "Neighborhood jam"); // amplified sound needs a reason to be Reviewed
+    await user.type(screen.getByLabelText(/Event name/), "Neighborhood jam"); // amplified sound needs a reason to be Standard
     await user.click(screen.getByRole("button", { name: "Next" }));
     await user.click(screen.getByRole("button", { name: /^Shelter 2/ }));
     await user.click(screen.getByRole("button", { name: "Next" }));
@@ -201,7 +201,7 @@ describe("WizardScreen: availability and the lead-time gate", () => {
     expect(screen.queryByText(/needs 19 more/)).not.toBeInTheDocument();
   });
 
-  /** A Reviewed event 19 days out, left on step 4 where the gate was tripped. */
+  /** A Standard event 19 days out, left on step 4 where the gate was tripped. */
   async function tooCloseOnStepSize() {
     const view = await renderScreen(<WizardScreen />, { path: "/apply", personaId: "new" });
     const { user } = view;
@@ -353,7 +353,7 @@ describe("WizardScreen below 1024px: the tier change reaches a phone", () => {
 
     await user.click(screen.getByRole("switch", { name: "Amplified sound" }));
 
-    expect(announcement).toHaveTextContent(/Reviewed event/);
+    expect(announcement).toHaveTextContent(/Standard event/);
     expect(document.querySelector('[data-slot="wizard-bar-tier"]')).toHaveAttribute("data-highlight", "true");
   });
 });

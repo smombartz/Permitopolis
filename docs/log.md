@@ -1,5 +1,25 @@
 # Change log
 
+## 2026-10-14 - The "Reviewed" tier is now called "Standard"
+
+**What Changed:**
+- `lib/types.ts` `TIER_LABEL.reviewed`, `lib/view/cityLists.ts` `INTAKE_TAB_LABEL.reviewed` and `TIER_LABEL_SHORT` in `components/city/settings/TierRulesSection.tsx` read "Standard". The settings field is "Standard at"
+- Copy that named the tier now says Standard: landing fees and FAQ, settings errors and preview lines, the kit, demo script steps, seed notes, the insurance card's reason ("Every Standard and Special event needs proof of liability insurance", `lib/rules/catalog.ts`). "Reviewed by the block-party exception" became "Standard through the block-party exception"
+- Comments, test names and test expectations updated to match (about 35 test files)
+- Sources of truth renamed too: `docs/spec/prd.md`, `docs/spec/flows.md`, `docs/spec/scenarios.json`, the build plan, `CLAUDE.md`'s overview; a note under Decisions in `docs/readme.md`
+- Not changed: the `"reviewed"` `Tier` key and every field named after it, "Reviewed by" headers, lowercase "reviewed by …"
+
+**Why:**
+- "Reviewed" sounds like a completed action, but the tier means "needs review", and it read like a status beside "In review" and "Needs info". Instant / Standard / Special event reads as a size scale. Plan: `docs/plans/2026-10-14-standard-tier-name.md`
+
+**Files Modified:**
+- `lib/types.ts`, `lib/rules/catalog.ts`, `lib/rules/classify.ts`, `lib/view/{cityLists,landing,settings,amend,board,clerkTools}.ts`, `lib/data/demoScript.ts`, seed files under `lib/state/seed/`
+- `components/city/settings/TierRulesSection.tsx`, `components/kit/KitScreen.tsx`, comments in `components/domain/TierBadge.tsx`, `components/wizard/DateGateBanner.tsx`, `components/city/lists/IntakeScreen.tsx`
+- Tests under `tests/` and `lib/**/*.test.ts`
+- `docs/spec/prd.md`, `docs/spec/flows.md`, `docs/spec/scenarios.json`, `docs/plans/2026-10-12-permitopolis-prototype.md`, `docs/plans/2026-10-14-standard-tier-name.md`, `docs/readme.md`, `CLAUDE.md`
+
+---
+
 ## 2026-10-14 - Tests run on request only; agents check with type-check and lint
 
 **What Changed:**

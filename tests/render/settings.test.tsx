@@ -25,19 +25,19 @@ describe("Settings: Tier rules (default section)", () => {
 
     expect(screen.getByRole("heading", { level: 1, name: "Settings" })).toBeInTheDocument();
     expect(screen.getByRole("tab", { name: "Tier rules", selected: true })).toBeInTheDocument();
-    expect(within(tierRulesPanel()).getByText("Jazz in the Plaza: Reviewed, unchanged")).toBeInTheDocument();
+    expect(within(tierRulesPanel()).getByText("Jazz in the Plaza: Standard, unchanged")).toBeInTheDocument();
   });
 
-  it("editing the Reviewed threshold updates the store's cfg and the scenario preview", async () => {
+  it("editing the Standard threshold updates the store's cfg and the scenario preview", async () => {
     const { user } = await renderScreen(<SettingsScreen />, { path: routes.city.settings(), role: "clerk" });
 
-    const input = screen.getByRole("spinbutton", { name: "Reviewed at" });
+    const input = screen.getByRole("spinbutton", { name: "Standard at" });
     await user.clear(input);
     await user.type(input, "40");
 
     expect(useDemo.getState().cfg.thresholds.reviewedAttendance).toBe(40);
-    // S1, Maya Chen's 40th birthday picnic, is 45 people with no other trigger: Instant moves to Reviewed.
-    expect(within(tierRulesPanel()).getByText("Maya Chen's 40th birthday picnic: Instant → Reviewed")).toBeInTheDocument();
+    // S1, Maya Chen's 40th birthday picnic, is 45 people with no other trigger: Instant moves to Standard.
+    expect(within(tierRulesPanel()).getByText("Maya Chen's 40th birthday picnic: Instant → Standard")).toBeInTheDocument();
     expect(within(tierRulesPanel()).getByText(/1 scenario would change tier/)).toBeInTheDocument();
   });
 
@@ -45,7 +45,7 @@ describe("Settings: Tier rules (default section)", () => {
     const draft = makeCase({ id: "PMT-27-0001", name: "A 45-guest picnic draft", state: "draft", attendance: 45, location: null, addOns: EMPTY_ADDONS });
     const { user } = await renderScreen(<SettingsScreen />, { path: routes.city.settings(), role: "clerk", cases: [draft] });
 
-    const input = screen.getByRole("spinbutton", { name: "Reviewed at" });
+    const input = screen.getByRole("spinbutton", { name: "Standard at" });
     await user.clear(input);
     await user.type(input, "40");
 
@@ -54,14 +54,14 @@ describe("Settings: Tier rules (default section)", () => {
     const row = within(tierRulesPanel()).getByText("A 45-guest picnic draft").closest("li") as HTMLElement;
     expect(within(row).getByText(draft.id)).toBeInTheDocument();
     expect(within(tierRulesPanel()).queryByRole("link")).not.toBeInTheDocument();
-    // The Draft itself has moved in the store, not only in this panel: its board and wizard read Reviewed too.
+    // The Draft itself has moved in the store, not only in this panel: its board and wizard read Standard too.
     expect(storedCase(draft.id).tier).toBe("reviewed");
   });
 
   it("an invalid threshold shows its error and is never saved", async () => {
     const { user } = await renderScreen(<SettingsScreen />, { path: routes.city.settings(), role: "clerk" });
 
-    const input = screen.getByRole("spinbutton", { name: "Reviewed at" });
+    const input = screen.getByRole("spinbutton", { name: "Standard at" });
     await user.clear(input);
     await user.type(input, "1000"); // at the Special threshold: invalid
 
@@ -72,7 +72,7 @@ describe("Settings: Tier rules (default section)", () => {
   it("Restore defaults asks, then restores the thresholds and lead times", async () => {
     const { user } = await renderScreen(<SettingsScreen />, { path: routes.city.settings(), role: "clerk" });
 
-    const input = screen.getByRole("spinbutton", { name: "Reviewed at" });
+    const input = screen.getByRole("spinbutton", { name: "Standard at" });
     await user.clear(input);
     await user.type(input, "40");
     expect(useDemo.getState().cfg.thresholds.reviewedAttendance).toBe(40);
@@ -83,7 +83,7 @@ describe("Settings: Tier rules (default section)", () => {
     await user.click(within(dialog).getByRole("button", { name: "Restore defaults" }));
 
     expect(useDemo.getState().cfg.thresholds.reviewedAttendance).toBe(100);
-    expect(screen.getByRole("spinbutton", { name: "Reviewed at" })).toHaveValue(100);
+    expect(screen.getByRole("spinbutton", { name: "Standard at" })).toHaveValue(100);
   });
 });
 

@@ -23,7 +23,7 @@ export interface DateGateBannerProps {
 /**
  * The date gate and its three fixes: a new date, dropping an add-on, or the late fee. Shown on
  * step 3, where the date is chosen, and on step 5 above the primary button, because the gate is
- * usually tripped on step 4 (turning on sound makes the event Reviewed, which needs 30 days).
+ * usually tripped on step 4 (turning on sound makes the event Standard, which needs 30 days).
  * Once the late fee is chosen and it lets the date stand, the banner says so and offers the
  * way back. Renders nothing while the gate passes. It is not a live region: `WizardAnnouncer`
  * reads the gate out, once, wherever on the wizard the change was made.

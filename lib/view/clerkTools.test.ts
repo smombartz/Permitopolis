@@ -209,7 +209,7 @@ describe("the quote's fee-line rows and totals", () => {
 /* ---------------------------------------------------------------------------------------- */
 
 describe("routing defaults", () => {
-  it("S4 (Reviewed): today plus the tier's review days, never a weekend", () => {
+  it("S4 (Standard): today plus the tier's review days, never a weekend", () => {
     const cases = buildSeed();
     const s4 = caseById(cases, "PMT-27-0126");
     const due = defaultReviewDueDate(s4, CFG, TODAY);

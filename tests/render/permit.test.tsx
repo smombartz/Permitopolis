@@ -56,7 +56,7 @@ describe("PermitScreen", () => {
     expect(screen.queryByText("$125")).not.toBeInTheDocument();
   });
 
-  it("a permit keeps what it was issued for when the Clerk moves a threshold in Settings: Maya's Instant permit for 45 people does not gain an insurance check when \"Reviewed at\" drops to 30", async () => {
+  it("a permit keeps what it was issued for when the Clerk moves a threshold in Settings: Maya's Instant permit for 45 people does not gain an insurance check when \"Standard at\" drops to 30", async () => {
     await renderScreen(<PermitScreen />, { scenario: "S1", path: routes.permit(S1) });
     const covers = () => within(screen.getByText("This permit covers").parentElement!).getAllByRole("listitem").map((item) => item.textContent);
     expect(storedCase(S1)).toMatchObject({ tier: "instant", attendance: 45 });

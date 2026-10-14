@@ -21,7 +21,7 @@ const TODAY = DEFAULT_DEMO_TODAY;
 const CFG = DEFAULT_CONFIG;
 const S1 = "PMT-27-0109"; // Maya Chen's picnic: Instant, permitted, $125 paid, Shelter 3, May 22, 11 am to 4 pm
 const S2 = "PMT-27-0142"; // Sunrise Yoga Club: an Instant series, a Draft until it is booked
-const S3 = "PMT-27-0118"; // Jazz in the Plaza: Reviewed, in review (Needs info), nothing paid yet
+const S3 = "PMT-27-0118"; // Jazz in the Plaza: Standard, in review (Needs info), nothing paid yet
 const ULTRA = "PMT-27-0030"; // Four Bridges Ultra: Special, permitted, $8,700 paid, three open work orders
 
 const seed = buildSeed();
@@ -413,7 +413,7 @@ describe("an amendment still pending when the event arrives lapses: the event is
     const eventDay = tick(paid, EVENT_DAY);
     expect(eventDay).toMatchObject({ state: "event_day", tier: "reviewed", addOns: { amplifiedSound: true } });
     expect(eventDay.activity.some((a) => a.text.includes("lapsed"))).toBe(false);
-    // A Reviewed event goes through Closeout, as it should.
+    // A Standard event goes through Closeout, as it should.
     expect(tick(paid, JUN_18)).toMatchObject({ state: "closeout", tier: "reviewed" });
   });
 });

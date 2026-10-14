@@ -106,7 +106,7 @@ export const CARD_CATALOG: CardSpec[] = [
     id: "insurance_certificate",
     kind: "document",
     title: "Certificate of insurance",
-    why: "Every reviewed event needs proof of liability insurance",
+    why: "Every Standard and Special event needs proof of liability insurance",
     reviewer: "hl",
     phase: "before_submitting",
     stage: "plan",

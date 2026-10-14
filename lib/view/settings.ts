@@ -64,7 +64,7 @@ export interface TierRulesErrors {
 }
 
 /**
- * The guard rails: Reviewed below Special, every threshold and lead time zero or more, and the
+ * The guard rails: Standard below Special, every threshold and lead time zero or more, and the
  * lead times ordered Instant through Special. An invalid value is reported here and the screen
  * never calls `setConfig()` with it.
  */
@@ -90,7 +90,7 @@ export function validateTierRules(edits: TierRulesEdits): TierRulesErrors {
     leadErrors.reviewed = "Must be at least the Instant lead time.";
   }
   if (!leadErrors.reviewed && !leadErrors.special && reviewed > special) {
-    leadErrors.special = "Must be at least the Reviewed lead time.";
+    leadErrors.special = "Must be at least the Standard lead time.";
   }
   if (Object.keys(leadErrors).length > 0) errors.leadTimeDays = leadErrors;
 
@@ -146,7 +146,7 @@ export function scenarioTierPreviews(cases: EventCase[], currentCfg: RulesConfig
   });
 }
 
-/** "Jazz in the Plaza: Reviewed, unchanged" or "Jazz in the Plaza: Reviewed → Special". */
+/** "Jazz in the Plaza: Standard, unchanged" or "Jazz in the Plaza: Standard → Special". */
 export function scenarioPreviewLine(row: ScenarioPreviewRow): string {
   if (row.before === row.after) return `${row.name}: ${TIER_LABEL[row.before]}, unchanged`;
   return `${row.name}: ${TIER_LABEL[row.before]} → ${TIER_LABEL[row.after]}`;

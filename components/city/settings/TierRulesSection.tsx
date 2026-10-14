@@ -83,7 +83,7 @@ function TierRulesSection({ cfg, cases, setConfig }: TierRulesSectionProps) {
   return (
     <Section
       title="Tier rules"
-      description="The thresholds that decide Instant, Reviewed or Special, and how much notice each tier needs. Editing one re-classifies every open Draft live."
+      description="The thresholds that decide Instant, Standard or Special, and how much notice each tier needs. Editing one re-classifies every open Draft live."
       actions={
         <Button type="button" variant="secondary" onClick={() => setConfirmOpen(true)}>
           Restore defaults
@@ -93,7 +93,7 @@ function TierRulesSection({ cfg, cases, setConfig }: TierRulesSectionProps) {
       <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_22rem] lg:items-start">
         <div className="flex flex-col gap-6">
           <div className="grid gap-4 sm:grid-cols-2">
-            <Field label="Reviewed at" hint="This many people or more makes an event Reviewed, not Instant." error={errors.reviewedAttendance}>
+            <Field label="Standard at" hint="This many people or more makes an event Standard, not Instant." error={errors.reviewedAttendance}>
               <Input type="number" min={0} value={edits.reviewedAttendance} onChange={(e) => commit({ ...edits, reviewedAttendance: Number(e.target.value) })} />
             </Field>
             <Field label="Special at" hint="This many people or more makes an event a Special event." error={errors.specialAttendance}>
@@ -144,7 +144,7 @@ function TierRulesSection({ cfg, cases, setConfig }: TierRulesSectionProps) {
   );
 }
 
-const TIER_LABEL_SHORT: Record<Tier, string> = { instant: "Instant", reviewed: "Reviewed", special: "Special" };
+const TIER_LABEL_SHORT: Record<Tier, string> = { instant: "Instant", reviewed: "Standard", special: "Special" };
 
 interface WhatThisChangesPanelProps {
   draftChanges: TierChangeRow[];

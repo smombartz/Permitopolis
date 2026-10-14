@@ -41,7 +41,7 @@ export const routes = {
   events: () => "/events",
   event: (id: string, options: { card?: string } = {}) => withQuery(`/events/${id}`, { card: options.card }),
   /**
-   * The one place an applicant pays. With no option it is the quote for a Reviewed or Special
+   * The one place an applicant pays. With no option it is the quote for a Standard or Special
    * event and the booking for an Instant one. `pay: "session"` pays a series session (with its
    * date) and `pay: "final"` pays the final bill after closeout.
    */

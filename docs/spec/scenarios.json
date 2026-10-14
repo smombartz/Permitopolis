@@ -36,7 +36,7 @@
     {
       "id": "S3",
       "scenario": "Jazz in the Plaza",
-      "tier": "Reviewed",
+      "tier": "Standard",
       "recurring": false,
       "location": "City Hall Plaza",
       "eventDate": "2027-06-18",
@@ -52,7 +52,7 @@
     {
       "id": "S4",
       "scenario": "Maple Street block party",
-      "tier": "Reviewed (block party exception)",
+      "tier": "Standard (block party exception)",
       "recurring": false,
       "location": "400 block of Maple Street",
       "eventDate": "2027-06-26",
@@ -101,7 +101,7 @@
   "decisions": [
     {
       "question": "Block parties",
-      "decision": "Exception: one residential block, no vendors, under 250 people → Reviewed, with neighbor sign-off required",
+      "decision": "Exception: one residential block, no vendors, under 250 people → Standard, with neighbor sign-off required",
       "status": "Decided"
     },
     {

@@ -111,13 +111,13 @@ describe("LandingScreen (/)", () => {
     expect(within(footer).getByText(/Permitopolis is a fictional city/)).toBeInTheDocument();
   });
 
-  it("changing the permit checker (alcohol on) moves the tier to Reviewed live", async () => {
+  it("changing the permit checker (alcohol on) moves the tier to Standard live", async () => {
     const { user } = await renderScreen(<LandingScreen />, { path: "/" });
 
     const checker = screen.getByRole("group", { name: "Check what your event needs" });
     await user.click(within(checker).getByRole("switch", { name: "Alcohol" }));
 
-    expect(within(checker).getByText("Reviewed")).toBeInTheDocument();
+    expect(within(checker).getByText("Standard")).toBeInTheDocument();
     expect(within(checker).queryByText("Instant")).not.toBeInTheDocument();
   });
 

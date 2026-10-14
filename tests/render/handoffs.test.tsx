@@ -157,8 +157,8 @@ function linkTo(href: string): HTMLElement {
 
 const S1 = "PMT-27-0109"; // Maya Chen's 40th birthday picnic: Instant, Permitted
 const S2 = "PMT-27-0142"; // Sunrise Yoga Club weekly class: Instant series, a Draft
-const S3 = "PMT-27-0118"; // Jazz in the Plaza: Reviewed, Needs info
-const S4 = "PMT-27-0126"; // Maple Street block party: Reviewed, Submitted
+const S3 = "PMT-27-0118"; // Jazz in the Plaza: Standard, Needs info
+const S4 = "PMT-27-0126"; // Maple Street block party: Standard, Submitted
 const S5 = "PMT-27-0097"; // Riverfront Summer 5K: Special, Quote sent
 const S6 = "PMT-27-0031"; // Main Street Food Truck Festival: Special, Closeout
 const F1 = "PMT-27-0121"; // Downtown Art Walk: Special, Submitted
@@ -209,11 +209,11 @@ describe("(a) the wizard's last step, for an Instant event", () => {
   });
 });
 
-describe("(b) the wizard's last step, for a Reviewed event", () => {
+describe("(b) the wizard's last step, for a Standard event", () => {
   it("creates the board, and the board shows its cards; My events and the menu know it is still a Draft", async () => {
     const { user } = await renderApp({ path: routes.apply(), personaId: "new" });
 
-    // A picnic at Shelter 2 for 40 with alcohol: Reviewed, on a date well past its 30 days.
+    // A picnic at Shelter 2 for 40 with alcohol: Standard, on a date well past its 30 days.
     await user.click(screen.getByRole("radio", { name: /^Picnic or party/ }));
     await user.type(screen.getByLabelText(/Event name/), "Summer picnic");
     await user.click(screen.getByRole("button", { name: "Next" }));
@@ -815,7 +815,7 @@ describe("the demo paths that cross surfaces have a control for every step", () 
     await switchTo(user, "clerk");
     expect(here()).toBe(routes.city.case(S4));
     await user.click(screen.getByRole("link", { name: "Intake" }));
-    await user.click(screen.getByRole("tab", { name: /^Reviewed/ }));
+    await user.click(screen.getByRole("tab", { name: /^Standard/ }));
     const row = within(screen.getByText("Maple Street block party").closest("tr")!);
     expect(row.getByText("20 days")).toBeInTheDocument();
     await user.click(row.getByRole("button", { name: /^Accept as complete: / }));
@@ -1462,12 +1462,12 @@ describe("(j) every new list opens the case, and the case comes back to that lis
 
   it("Settings names the open Drafts an edit would move without linking to them: the city has no page for a Draft", async () => {
     const { user } = await renderApp({ role: "clerk", path: routes.city.settings() });
-    const reviewedAt = screen.getByRole("spinbutton", { name: "Reviewed at" });
+    const reviewedAt = screen.getByRole("spinbutton", { name: "Standard at" });
     await user.clear(reviewedAt);
     await user.type(reviewedAt, "15");
 
     const panel = within(screen.getByRole("heading", { name: "What this changes" }).closest("aside") as HTMLElement);
-    // Sunrise Yoga Club's draft is 20 people: Reviewed from 15.
+    // Sunrise Yoga Club's draft is 20 people: Standard from 15.
     expect(panel.getByText("Sunrise Yoga Club weekly class")).toBeInTheDocument();
     expect(panel.getByText(S2)).toBeInTheDocument();
     expect(panel.queryByRole("link")).not.toBeInTheDocument();
@@ -1475,9 +1475,9 @@ describe("(j) every new list opens the case, and the case comes back to that lis
 });
 
 describe("(j) Settings reach the wizard: a threshold the Clerk edits is the one a new draft is classified with", () => {
-  it("with Reviewed moved down to 30 people, a new applicant's picnic for 40 reads Reviewed in the live panel, and Instant again after Restore defaults", async () => {
+  it("with Standard moved down to 30 people, a new applicant's picnic for 40 reads Standard in the live panel, and Instant again after Restore defaults", async () => {
     const { user } = await renderApp({ role: "clerk", path: routes.city.settings() });
-    const reviewedAt = screen.getByRole("spinbutton", { name: "Reviewed at" });
+    const reviewedAt = screen.getByRole("spinbutton", { name: "Standard at" });
     await user.clear(reviewedAt);
     await user.type(reviewedAt, "30");
     expect(useDemo.getState().cfg.thresholds.reviewedAttendance).toBe(30);
@@ -1497,7 +1497,7 @@ describe("(j) Settings reach the wizard: a threshold the Clerk edits is the one 
     await user.type(screen.getByLabelText(/Expected attendance/), "40");
 
     const livePanel = () => within(document.querySelector('[data-slot="wizard-result-panel"]') as HTMLElement);
-    expect(livePanel().getByText(/This is a Reviewed event/)).toBeInTheDocument();
+    expect(livePanel().getByText(/This is a Standard event/)).toBeInTheDocument();
     expect(livePanel().getByText("40 people")).toBeInTheDocument();
     const draftId = navState.search.get("case")!;
     expect(storedCase(draftId)).toMatchObject({ state: "draft", tier: "reviewed" });
@@ -1618,7 +1618,7 @@ describe("(j) demo path 7, clicked from first step to last, and then on through 
     await user.click(screen.getByRole("button", { name: "Next" })); // when -> size
     await user.click(screen.getByRole("switch", { name: "Amplified sound" }));
     const diff = () => within(document.querySelector('[data-slot="amend-result-panel"]') as HTMLElement);
-    expect(diff().getByText(/This change makes your event Reviewed\. Everything you entered is kept; 4 new cards will be added\./)).toBeInTheDocument();
+    expect(diff().getByText(/This change makes your event Standard\. Everything you entered is kept; 4 new cards will be added\./)).toBeInTheDocument();
     // Nothing has been sent yet: the record is as it was, and so is the coach.
     expect(storedCase(S1)).toMatchObject({ tier: "instant", flags: { amendmentPending: false } });
     expect(screen.getByText("Path 7 · Step 1 of 2")).toBeInTheDocument();
@@ -1656,7 +1656,7 @@ describe("(j) demo path 7, clicked from first step to last, and then on through 
     expect(permit().getByText("An amendment is pending. This permit covers the original plan until it’s approved.")).toBeInTheDocument();
     // The original plan, to the letter: Instant, with no sound approval on it.
     expect(permit().getByText("Instant")).toBeInTheDocument();
-    expect(permit().queryByText("Reviewed")).not.toBeInTheDocument();
+    expect(permit().queryByText("Standard")).not.toBeInTheDocument();
     expect(permit().queryByText(/Amplified sound approval/)).not.toBeInTheDocument();
     expect(screen.queryByRole("link", { name: "Change your event" })).not.toBeInTheDocument();
     await user.click(permit().getByRole("link", { name: "Open the verification page" }));
@@ -1682,7 +1682,7 @@ describe("(j) demo path 7, clicked from first step to last, and then on through 
     expect(here()).toBe(routes.city.case(S1));
     expectRealScreen();
     const caseBanner = () => document.querySelector('[data-slot="amendment-pending"]') as HTMLElement;
-    expect(caseBanner()).toHaveTextContent("Amendment pending: Instant to Reviewed, 4 new cards. Health & Legal and Public Works & Safety are checking its cards, then the City Clerk decides.");
+    expect(caseBanner()).toHaveTextContent("Amendment pending: Instant to Standard, 4 new cards. Health & Legal and Public Works & Safety are checking its cards, then the City Clerk decides.");
     const whoIsUp = () => [...screen.getByRole("list", { name: "Who's up" }).querySelectorAll('[data-status="up_now"]')].map((row) => row.getAttribute("data-party"));
     expect(whoIsUp()).toEqual(["pws", "hl"]);
     const clerkActions = () => within(screen.getByRole("complementary", { name: "Your actions" }));
@@ -1767,7 +1767,7 @@ describe("(j) demo path 7, clicked from first step to last, and then on through 
     expectRealScreen();
     expect(document.querySelector('[data-slot="amendment-pending"]')).toBeNull();
     await user.click(screen.getByRole("link", { name: /View permit/ }));
-    expect(permit().getByText("Reviewed")).toBeInTheDocument();
+    expect(permit().getByText("Standard")).toBeInTheDocument();
     expect(permit().getByText(/Amplified sound approval/)).toBeInTheDocument();
     expect(permit().queryByText(/An amendment is pending/)).not.toBeInTheDocument();
     // And it can be changed again.

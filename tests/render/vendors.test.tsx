@@ -9,7 +9,7 @@ import { renderScreen, storedCase } from "./harness";
 
 const NEW = "PMT-27-0900";
 
-const S3 = "PMT-27-0118"; // Jazz in the Plaza: Reviewed, one vendor, not yet uploaded
+const S3 = "PMT-27-0118"; // Jazz in the Plaza: Standard, one vendor, not yet uploaded
 const S6 = "PMT-27-0031"; // Main Street Food Truck Festival: Special, Closeout, 25 vendors, all verified
 
 describe("Documents tab: the Vendors group", () => {
@@ -72,7 +72,7 @@ describe("Documents tab: the Vendors group", () => {
     expect(vendors.queryByRole("button", { name: "Issue food permits" })).not.toBeInTheDocument();
   });
 
-  it("S3 reads 0 of 1 until the vendor's health permit is verified, and has no Issue food permits section (Reviewed, not Special)", async () => {
+  it("S3 reads 0 of 1 until the vendor's health permit is verified, and has no Issue food permits section (Standard, not Special)", async () => {
     await renderScreen(<CaseDetailScreen />, { path: routes.city.case(S3, { tab: "documents" }), role: "hl" });
     const vendors = within(screen.getByRole("heading", { name: "Vendors" }).closest("section")!);
     expect(vendors.getByText("0 of 1 verified")).toBeInTheDocument();

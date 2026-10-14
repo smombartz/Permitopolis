@@ -24,7 +24,7 @@ function isIntakeTab(value: string | null): value is IntakeTab {
   return value === "special" || value === "reviewed" || value === "instant";
 }
 
-/** /city/intake, the City Clerk's tool: Special, Reviewed and Instant exceptions. */
+/** /city/intake, the City Clerk's tool: Special, Standard and Instant exceptions. */
 function IntakeScreen() {
   const cases = useDemo((s) => s.cases);
   const today = useDemo((s) => s.demoToday);

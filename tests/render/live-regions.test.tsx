@@ -99,7 +99,7 @@ describe("a message that is on the page when it opens is not an announcement", (
 describe("a field's error", () => {
   function Form({ error }: { error?: string }) {
     return (
-      <Field label="Reviewed at" hint="People." error={error}>
+      <Field label="Standard at" hint="People." error={error}>
         <Input defaultValue="100" />
       </Field>
     );
@@ -111,14 +111,14 @@ describe("a field's error", () => {
     expect(region).toHaveAttribute("aria-live", "polite");
     expect(region).toBeEmptyDOMElement();
 
-    rerender(<Form error="Reviewed has to be below Special." />);
+    rerender(<Form error="Standard has to be below Special." />);
 
     // The same element, now with the error in it: an insertion into a live region, read once.
     expect(document.querySelector('[data-slot="field-error"]')).toBe(region);
-    expect(region).toHaveTextContent("Reviewed has to be below Special.");
-    const field = screen.getByRole("textbox", { name: "Reviewed at" });
+    expect(region).toHaveTextContent("Standard has to be below Special.");
+    const field = screen.getByRole("textbox", { name: "Standard at" });
     expect(field).toHaveAttribute("aria-invalid", "true");
-    expect(field).toHaveAccessibleDescription("Reviewed has to be below Special.");
+    expect(field).toHaveAccessibleDescription("Standard has to be below Special.");
     expect(screen.queryByRole("alert")).not.toBeInTheDocument();
   });
 
@@ -141,7 +141,7 @@ describe("the wizard", () => {
 
     const said = speaking().filter((text) => text !== "Saved");
     expect(said).toHaveLength(1);
-    expect(said[0]).toMatch(/Reviewed event/);
+    expect(said[0]).toMatch(/Standard event/);
     // The live panel shows the tier too, and it is plain content.
     const panel = document.querySelector('[data-slot="wizard-result-panel"]')!;
     expect(panel.closest('[role="status"], [aria-live]')).toBeNull();

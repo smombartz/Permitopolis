@@ -249,7 +249,7 @@ describe("Path 1 · Instant in two minutes (S2)", () => {
 });
 
 describe("Path 2 · Watch the tier move (New applicant)", () => {
-  it("Shelter 2 for 40 is Instant; alcohol makes it Reviewed; two Main Street blocks make it Special; 1,200 people with no street is still Special", () => {
+  it("Shelter 2 for 40 is Instant; alcohol makes it Standard; two Main Street blocks make it Special; 1,200 people with no street is still Special", () => {
     const queuesBefore = queueSizes();
 
     as("applicant", "new");
@@ -276,7 +276,7 @@ describe("Path 2 · Watch the tier move (New applicant)", () => {
     expect(capacityWarning(get(id))).toMatchObject({ capacity: 40, over: 1, suggestionId: "shelter-3" });
     store().updateDraft(id, { attendance: 40 });
 
-    // Turn on alcohol: Reviewed, and the what-if chip offers the way back.
+    // Turn on alcohol: Standard, and the what-if chip offers the way back.
     store().updateDraft(id, { addOns: { ...EMPTY_ADDONS, alcohol: true } });
     expect(coach(2)).toBe("Step 3 of 4: two-main-blocks");
     expect(livePanel(id)).toEqual({
@@ -342,7 +342,7 @@ describe("Path 2 · Watch the tier move (New applicant)", () => {
     store().updateDraft(id, { location: GREAT_LAWN });
     expect(livePanel(id)).toMatchObject({ tier: "special", triggers: ["plaza_open_area", "attendance_1000", "alcohol"], total: 1550 });
     store().updateDraft(id, { location: SHELTER_2 });
-    // One fewer than the threshold, and the same event is Reviewed.
+    // One fewer than the threshold, and the same event is Standard.
     store().updateDraft(id, { attendance: 999 });
     expect(get(id).tier).toBe("reviewed");
     store().updateDraft(id, { attendance: 1200 });
@@ -779,7 +779,7 @@ describe("Path 6 · Closeout (S6)", () => {
 });
 
 describe("Path 7 · Amend up a tier (S1, P1)", () => {
-  it("Maya adds a DJ: Reviewed, the gate fires at 19 days of 30, she takes the late fee, the new cards carry the amendment tag and the permit stays", () => {
+  it("Maya adds a DJ: Standard, the gate fires at 19 days of 30, she takes the late fee, the new cards carry the amendment tag and the permit stays", () => {
     const queuesBefore = queueSizes();
 
     as("applicant", "maya-chen");
@@ -799,7 +799,7 @@ describe("Path 7 · Amend up a tier (S1, P1)", () => {
       addOns: { ...original.addOns, amplifiedSound: true },
     };
 
-    // The event becomes Reviewed and the date gate fires: 19 days left, 30 needed.
+    // The event becomes Standard and the date gate fires: 19 days left, 30 needed.
     const cls = classify(withDj, store().cfg);
     expect(cls).toMatchObject({ tier: "reviewed", leadTimeDays: 30 });
     expect(cls.reviewers.map((r) => r.dept)).toEqual(["pws", "hl"]);
@@ -925,7 +925,7 @@ describe("Path 7 · Amend up a tier (S1, P1)", () => {
 
     // As the City Clerk, she approves it: the amendment's quote. Nothing is charged; what the
     // amended plan costs beyond the $125 already paid is Maya's to pay, with the signature a
-    // Reviewed event needs and her Instant one never had.
+    // Standard event needs and her Instant one never had.
     as("clerk");
     act(S1, { type: "decide_amendment", decision: "approve" });
     const approved = get(S1);
@@ -970,7 +970,7 @@ describe("Path 7 · Amend up a tier (S1, P1)", () => {
     expect(amendmentStage(inEffect)).toBeNull();
     expect(permittedPlan(inEffect)).toBe(inEffect);
     expect(task(inEffect, "pay_fees")).toMatchObject({ status: "done", payload: { amount: 518.75 } });
-    // Done, it is the Reviewed plan's payment card, for everything paid.
+    // Done, it is the Standard plan's payment card, for everything paid.
     expect(task(inEffect, "pay_fees")).toMatchObject({ title: "Pay fees and deposit", why: "Payment holds your date and lets the City Clerk issue your permit" });
     expect(caseTotals(inEffect)).toEqual({ fees: 268.75, deposit: 250, total: 518.75, paid: 518.75, due: 0 });
     expect(inEffect).toMatchObject({ state: "permitted", tier: "reviewed", permit: original.permit, schedule: original.schedule });

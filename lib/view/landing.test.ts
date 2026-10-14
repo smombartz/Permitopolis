@@ -23,7 +23,7 @@ describe("heroPreviewResult", () => {
     expect(classification.tier).toBe("instant");
   });
 
-  it("turning alcohol on makes it Reviewed", () => {
+  it("turning alcohol on makes it Standard", () => {
     const { classification } = heroPreviewResult({ ...HERO_PREVIEW_DEFAULT, alcohol: true });
     expect(classification.tier).toBe("reviewed");
   });
@@ -33,7 +33,7 @@ describe("heroPreviewResult", () => {
     expect(classification.tier).toBe("special");
   });
 
-  it("amplified sound alone makes it Reviewed, and a what-if offers the way back", () => {
+  it("amplified sound alone makes it Standard, and a what-if offers the way back", () => {
     const { classification, whatIfs } = heroPreviewResult({ ...HERO_PREVIEW_DEFAULT, amplifiedSound: true });
     expect(classification.tier).toBe("reviewed");
     expect(whatIfs.some((w) => w.triggerId === "amplified_sound" && w.tier === "instant")).toBe(true);
@@ -78,7 +78,7 @@ describe("tierCards", () => {
     expect(row.reviewerText).toBe("City Clerk only");
   });
 
-  it("S3's Jazz in the Plaza is the Reviewed example at $715, reviewed by PWS and HL", () => {
+  it("S3's Jazz in the Plaza is the Standard example at $715, reviewed by PWS and HL", () => {
     const row = cards.find((c) => c.tier === "reviewed")!;
     expect(row.example.caseId).toBe("PMT-27-0118");
     expect(row.example.title).toBe("Jazz in the Plaza");
@@ -112,7 +112,7 @@ describe("comparisonRows", () => {
     expect(rows.find((r) => r.id === "route")?.tier).toBe("special");
   });
 
-  it("raises amplified sound and alcohol to Reviewed", () => {
+  it("raises amplified sound and alcohol to Standard", () => {
     expect(rows.find((r) => r.id === "amplified_sound")?.tier).toBe("reviewed");
     expect(rows.find((r) => r.id === "alcohol")?.tier).toBe("reviewed");
   });

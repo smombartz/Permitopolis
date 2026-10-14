@@ -51,7 +51,7 @@ describe("Phase 1 review fix: tier is never a dot alone", () => {
     render(<MapDevScreen />);
     const legend = screen.getByRole("list", { name: "Map legend: tiers" });
     expect(legend).toHaveTextContent("Instant");
-    expect(legend).toHaveTextContent("Reviewed");
+    expect(legend).toHaveTextContent("Standard");
     expect(legend).toHaveTextContent("Special event");
   });
 

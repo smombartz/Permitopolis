@@ -23,7 +23,7 @@ function withDj(c: EventCase): EventAnswers {
 }
 
 describe("buildAmendmentDiff", () => {
-  it("a tier rise (the PRD's example, Maya adds a DJ): Reviewed, 3 new cards, the gate fails on lead time, a late fee of $53.75", () => {
+  it("a tier rise (the PRD's example, Maya adds a DJ): Standard, 3 new cards, the gate fails on lead time, a late fee of $53.75", () => {
     const diff = buildAmendmentDiff(MAYA, withDj(MAYA), ctx);
     expect(diff.material).toBe(true);
     expect(diff.tierBefore).toBe("instant");
@@ -47,12 +47,12 @@ describe("buildAmendmentDiff", () => {
     // The new plan's total, deposit included, is the same $518.75 the engine will charge.
     expect(diff.feeAfter).toBe(518.75);
     expect(diff.feeDiff).toBe(393.75);
-    // The PRD's example line says "3 new cards": the real plan for a Reviewed picnic adds a
-    // fourth, "Accept conditions and sign" (every Reviewed or Special plan has one, picnic or
+    // The PRD's example line says "3 new cards": the real plan for a Standard picnic adds a
+    // fourth, "Accept conditions and sign" (every Standard or Special plan has one, picnic or
     // not). The banner counts the real plan, not the PRD's illustrative number (see the readme
     // on "classify()'s summary phrases" for the same kind of fixed-copy vs. real-number gap).
     expect(diff.cardsAdded.map((c) => c.catalogId).sort()).toEqual(["accept_and_sign", "insurance_certificate", "sound_details", "submit_application"].sort());
-    expect(tierRiseBannerText(diff)).toBe("This change makes your event Reviewed. Everything you entered is kept; 4 new cards will be added.");
+    expect(tierRiseBannerText(diff)).toBe("This change makes your event Standard. Everything you entered is kept; 4 new cards will be added.");
     // The amendment's Submit card is listed under the name the board will give it.
     expect(diff.cardsAdded.map((c) => c.title)).toEqual(["Certificate of insurance", "Sound details", "Submit amendment", "Accept conditions and sign"]);
   });
@@ -75,7 +75,7 @@ describe("buildAmendmentDiff", () => {
   });
 
   it("dropping a trigger that lowers the tier removes the cards it alone required", () => {
-    // S3 (Jazz in the Plaza) is Reviewed for amplified sound; dropping it should no longer call
+    // S3 (Jazz in the Plaza) is Standard for amplified sound; dropping it should no longer call
     // for the sound details card (what it adds back is a different workstream's board rebuild,
     // not this diff's job).
     const jazz = caseById("PMT-27-0118");

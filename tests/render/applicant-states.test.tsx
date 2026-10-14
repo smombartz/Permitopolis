@@ -20,7 +20,7 @@ import { lastReplace, renderScreen, storedCase } from "./harness";
 // wording" and "Open items" for why each one is in the state it is.
 const S1 = "PMT-27-0109"; // Maya Chen, picnic, Instant, permitted
 const S2 = "PMT-27-0142"; // Sunrise Yoga Club, Instant series, Draft (only answers, no board)
-const S3 = "PMT-27-0118"; // Downtown Arts Collective, Reviewed, needs_info, three locked cards
+const S3 = "PMT-27-0118"; // Downtown Arts Collective, Standard, needs_info, three locked cards
 const S5 = "PMT-27-0097"; // Riverfront Running Club, Special, quote_sent, insurance under HL review
 const B08 = "PMT-27-0018"; // Westside Youth Soccer League, needs_info, a request overdue since Apr 1
 const B22 = "PMT-27-0046"; // Redline Motorsports Expo: Denied

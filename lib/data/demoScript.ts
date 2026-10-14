@@ -186,7 +186,7 @@ export const DEMO_PATHS: DemoPath[] = [
         page: routes.apply(),
         text: "Pick Picnic or party at Shelter 2 for 40 people: Instant.",
       },
-      { id: "turn-on-alcohol", role: "applicant", persona: "new", page: routes.apply(), text: "Turn on alcohol: Reviewed, and the what-if chip offers the way back." },
+      { id: "turn-on-alcohol", role: "applicant", persona: "new", page: routes.apply(), text: "Turn on alcohol: Standard, and the what-if chip offers the way back." },
       { id: "two-main-blocks", role: "applicant", persona: "new", page: routes.apply(), text: "Switch the location to two Main Street blocks: Special event." },
       { id: "set-attendance-1200", role: "applicant", persona: "new", page: routes.apply(), text: "Set attendance to 1,200 with no street: still Special." },
     ],
@@ -292,7 +292,7 @@ export const DEMO_PATHS: DemoPath[] = [
         // Adding the DJ and choosing the late fee are one step: the wizard works on its own copy
         // of the answers, so nothing the coach can read changes until the change is confirmed.
         page: routes.amend(S1),
-        text: "Add a DJ. The event becomes Reviewed and the date gate fires: 19 days left, 30 needed. Choose the late fee and confirm.",
+        text: "Add a DJ. The event becomes Standard and the date gate fires: 19 days left, 30 needed. Choose the late fee and confirm.",
       },
       {
         id: "amendment-cards",

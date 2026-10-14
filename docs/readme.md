@@ -116,6 +116,10 @@ look for, and the last section of this file lists the product questions each bui
   tiers get identity tints on small avatars, dots and outline badges, always with icon and label.
 - **Tertiary text is decoration only.** It measures 2.6:1 on the page. `fg-label` (ink 650, 7.3:1)
   was added for labels, table headers and metadata.
+- **The middle tier is "Standard" in copy, `reviewed` in code.** It was called "Reviewed",
+  which read as a finished action next to the "In review" state. Only `TIER_LABEL`, the other
+  label maps and the copy changed; the `Tier` key, `reviewedAttendance`, `fees.*.reviewed`,
+  `lead.reviewed` and the `reviewed` intake tab keep their names. "Reviewed by" (who reviews) stays.
 - **Quiet glass in the app.** Full atmosphere on the landing page; in the app, blur is for chrome.
 - **Fixed demo date.** Nothing reads the real clock; lint rejects `new Date()` and `Date.now()`.
 - **Next.js 16 with Cache Components.** A client component that reads the URL must sit under
@@ -491,7 +495,7 @@ Seven surfaces, each built on its own and then joined. Every one is a client scr
 | Landing footer, Demo menu | Demo guide | `routes.demo()`; the guide's back link returns to `/` |
 | Demo guide "Start this path", "Jump" | The path's or scenario's first screen | Sets role and persona, then `demoPathJump()` or the `SCENARIO_JUMPS` page |
 | Wizard step 5, Instant | Checkout, booking mode | `routes.quote(id)`; nothing is dispatched |
-| Wizard step 5, Reviewed or Special | Board | Dispatches `create_board`, then `routes.event(id)` |
+| Wizard step 5, Standard or Special | Board | Dispatches `create_board`, then `routes.event(id)` |
 | Wizard "Save and finish later" | My events | `routes.events()`; every edit is already saved |
 | My events row | Wizard or board | The wizard while the Draft has no cards (`isUnplannedDraft()`), its board after |
 | My events, board "View permit" | Permit | `permitHrefFor()`: only while the permit is live |
@@ -1118,7 +1122,7 @@ Maya Chen adding a DJ to her permitted Instant picnic (S1).
    while `canAmend()` allows it (not a Draft, not ended or closed, before the last session, no
    amendment already pending; otherwise the menu item is off with the reason). The wizard opens
    filled in. On every change the panel shows the tier before and after, "This change makes your
-   event Reviewed. Everything you entered is kept; 4 new cards will be added.", the cards, the
+   event Standard. Everything you entered is kept; 4 new cards will be added.", the cards, the
    fee difference and the date gate with its three fixes. The last step ("What changes", "What
    stays", "What happens next") dispatches `amend`. **The money on the panel is the engine's
    own**: `buildAmendmentDiff()` prices the record `amend` itself would build (`amendedPlan()`),
@@ -1193,7 +1197,7 @@ Where each side reads it:
 
 | Stage (`amendmentStage(c)`) | The applicant's board | The city's case |
 |---|---|---|
-| `proposed` | Banner: "An amendment is pending. Finish the new cards below, then submit it ...". The new cards in Do now with the Amendment chip. Reviewers row: "Checks your amendment", "Decides your amendment" | Banner: "Amendment pending: Instant to Reviewed, 4 new cards. Waiting on the applicant to finish its cards and submit it." |
+| `proposed` | Banner: "An amendment is pending. Finish the new cards below, then submit it ...". The new cards in Do now with the Amendment chip. Reviewers row: "Checks your amendment", "Decides your amendment" | Banner: "Amendment pending: Instant to Standard, 4 new cards. Waiting on the applicant to finish its cards and submit it." |
 | `submitted` | Banner names who is checking, then that it is with the Clerk. Each card "With the city" with the department that has it and that department's date | The departments up in Who's up, each with its verify task; the Clerk waiting, then up with the decision in its queue ("The amendment's cards are checked"). "Decide amendment" under Your actions |
 | `approved` | Banner: "The City Clerk approved your amendment. Accept and sign, then pay $393.75, to put it into effect ...". The two cards link to the quote | Banner: "Approved. Waiting on the applicant to sign and pay $393.75." The balance on the Clerk's Payments page, Due tab, as "Amendment balance" |
 
@@ -1245,8 +1249,8 @@ payment" on a case that never had a quote.
 Every edit calls `setConfig()`, which is a shallow merge (pass a whole `thresholds`, `fees` or
 `sla`), and the config is part of the stored demo.
 
-- **Tier rules.** The attendance thresholds for Reviewed and Special, the block-party limit, the
-  heavy-resources barricade count, and the three lead times. An invalid value (Reviewed at or
+- **Tier rules.** The attendance thresholds for Standard and Special, the block-party limit, the
+  heavy-resources barricade count, and the three lead times. An invalid value (Standard at or
   above Special, lead times out of order) shows its error and is not saved. **Every open Draft is
   re-classified at once** in the store: its tier, triggers and sessions follow the rules as they
   are now, so its wizard's live panel and its board read the new tier without being touched. A
@@ -1261,7 +1265,7 @@ Every edit calls `setConfig()`, which is a shallow merge (pass a whole `threshol
 - **A permit keeps what it was issued for.** "This permit covers" on the permit, "What the
   permit covers" on the case's Overview and the list in Issue permit are `permitCovers(c)`: the
   record's stored triggers (and the plan the permit is for, while an amendment is pending),
-  never the tier rules re-read. Lowering "Reviewed at" to 30 does not add an insurance check to
+  never the tier rules re-read. Lowering "Standard at" to 30 does not add an insurance check to
   Maya's Instant permit for 45 people.
 - **Reset** puts the config back to `DEFAULT_CONFIG` with everything else. "Restore defaults" on
   the page resets the tier rules alone.
@@ -1514,7 +1518,7 @@ Things a screen builder needs to know that the type signatures do not say.
   one line finds it by label; `cancellationRefund()` does so for the application fee.
 - **A series is billed per session.** `estimateFees()` returns `perSession`, `sessions`,
   `perSessionLabels` (which lines are billed once per session) and `dueNow` (the first session,
-  plus the one-off lines for a Reviewed or Special series, plus a late fee); the fee line itself
+  plus the one-off lines for a Standard or Special series, plus a late fee); the fee line itself
   carries the whole series. `perSession` is the fee schedule's price today. A case that has been
   priced is read with `sessionPrice(c, cfg)` instead (`lib/state/core.ts`): its own per-session
   lines divided by its sessions, which is what `dueAtQuote()`, `amendmentBalance()` and every
@@ -2064,7 +2068,7 @@ Amendment:
   for "needs the City Clerk" is "adds a card". So a Special event can move its date, its hours or
   its route, or drop its police, and the change is in effect on confirming, with the refund paid
   (the Four Bridges Ultra drops its six officers and gets $2,040 back with nobody at the city
-  having seen it). The date gate still runs. Should every change to a Reviewed or Special permit
+  having seen it). The date gate still runs. Should every change to a Standard or Special permit
   go to the Clerk, or every change to the date, place or city services?
 - **The Clerk alone approves an amendment.** The departments verify the cards it adds, one by
   one; there is no routing, no review with conditions and no consolidation, so an amendment that
@@ -2162,7 +2166,7 @@ Settings:
 - **Only the tier rules have guard rails and a Restore.** Fees and service levels take any
   number that is not negative. "What this changes" starts over when the Clerk leaves the section.
 - **No attendance threshold moves the 5K.** Its route and its police make it Special whatever
-  the numbers say; the brief's example of it dropping to Reviewed does not happen.
+  the numbers say; the brief's example of it dropping to Standard does not happen.
 
 From the final review fixes (2026-10-13):
 
@@ -2181,7 +2185,7 @@ From the final review fixes (2026-10-13):
   the board and at checkout). The conditions the quote was sent with stay as they are (the 5K
   keeps "Finish-line sound off by 11 am" with no sound left), and the Clerk is not asked again.
   Should any amendment on a case whose quote is out go back to the Clerk to re-issue the quote?
-- **A card made inside its lead time is due today.** A Reviewed event 17 days out, taken with the
+- **A card made inside its lead time is due today.** A Standard event 17 days out, taken with the
   late fee, has its insurance and its Submit card due the day the board is made, where they
   used to read "Overdue by 13 days". The other choice was a few days' grace
   (`sla.requestResponseDays`).

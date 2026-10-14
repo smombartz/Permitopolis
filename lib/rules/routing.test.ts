@@ -38,7 +38,7 @@ describe("routing", () => {
     expect(routing(special, cls).map((x) => x.dept)).not.toContain("clerk");
   });
 
-  it("every Reviewed and Special event routes Health & Legal for insurance even with no other add-on", () => {
+  it("every Standard and Special event routes Health & Legal for insurance even with no other add-on", () => {
     const a = answers({ location: areaLocation("great-lawn"), attendance: 150 });
     const cls = classify(a);
     const hl = routing(a, cls).find((x) => x.dept === "hl");

@@ -48,7 +48,7 @@ export type TriggerId =
   | "attendance_1000"
   | "fireworks_drones"
   | "heavy_resources"
-  // raise to Reviewed
+  // raise to Standard
   | "plaza_open_area"
   | "attendance_100"
   | "amplified_sound"
@@ -402,7 +402,7 @@ export interface EventCase extends EventAnswers {
 
 export const TIER_LABEL: Record<Tier, string> = {
   instant: "Instant",
-  reviewed: "Reviewed",
+  reviewed: "Standard",
   special: "Special event",
 };
 

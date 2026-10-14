@@ -249,7 +249,7 @@ describe("Cases pipeline", () => {
 describe("Intake queue", () => {
   it("Accept is disabled with its reason for the Maple Street block party", async () => {
     const { user } = await renderScreen(<IntakeScreen />, { role: "clerk", path: routes.city.intake() });
-    await user.click(screen.getByRole("tab", { name: /Reviewed/ }));
+    await user.click(screen.getByRole("tab", { name: /Standard/ }));
     const row = within(screen.getByText("Maple Street block party").closest("tr")!);
     // A block party's count is its neighbor sign-offs, and the column says so.
     expect(row.getByText("9 of 12 sign-offs")).toBeInTheDocument();
@@ -285,7 +285,7 @@ describe("Intake queue", () => {
 
   it("the Plaza wedding photos row names Jazz in the Plaza as complete first", async () => {
     const { user } = await renderScreen(<IntakeScreen />, { role: "clerk", path: routes.city.intake() });
-    await user.click(screen.getByRole("tab", { name: /Reviewed/ }));
+    await user.click(screen.getByRole("tab", { name: /Standard/ }));
     const row = within(screen.getByText("Plaza wedding photos").closest("tr")!);
     expect(row.getAllByText(/Jazz in the Plaza/).length).toBeGreaterThan(0);
     expect(row.getByText(/complete first/)).toBeInTheDocument();

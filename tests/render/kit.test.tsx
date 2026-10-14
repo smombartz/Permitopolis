@@ -59,7 +59,7 @@ describe("the Phase 1 kit page", () => {
   it("renders every tier badge, party chip and case state chip", () => {
     render(<KitScreen />);
     expect(screen.getAllByText("Instant").length).toBeGreaterThan(0);
-    expect(screen.getAllByText("Reviewed").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("Standard").length).toBeGreaterThan(0);
     expect(screen.getAllByText("Special event").length).toBeGreaterThan(0);
     expect(screen.getAllByText("Health & Legal").length).toBeGreaterThan(0);
     expect(screen.getAllByText("Needs info").length).toBeGreaterThan(0);

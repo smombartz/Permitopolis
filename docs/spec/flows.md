@@ -8,13 +8,13 @@ Applicants never choose a lane: they describe their event and Permitopolis works
 
 - **Instant:** space comes from bookable inventory, attendance within capacity, no add-ons. Book, pay, done.
 
-- **Reviewed:** a few add-ons such as sound, alcohol, vendors or tents. The City Clerk handles it and pulls in one or both reviewing groups.
+- **Standard:** a few add-ons such as sound, alcohol, vendors or tents. The City Clerk handles it and pulls in one or both reviewing groups.
 
 - **Special event:** 1,000 or more attendees, street closures, a route, fireworks, or heavy city resources. Full multi-department review, 60-day lead time, a quote, and post-event reconciliation.
 
 The middle tier exists because of a common case: a 150-person park concert with a food truck and a speaker is too much for instant booking and too little for full special-events review.
 
-While the applicant answers, a live banner shows the result, for example "This is a Reviewed event: about 3 weeks, \$X estimated." They can see the effect of each choice, such as removing the beer garden dropping the event a tier.
+While the applicant answers, a live banner shows the result, for example "This is a Standard event: about 3 weeks, \$X estimated." They can see the effect of each choice, such as removing the beer garden dropping the event a tier.
 
 ## Stakeholders
 
@@ -40,10 +40,10 @@ Every tier then passes the same lead-time and availability gate before the appli
 | Tier | Triggers (any one) | Lead time | Review |
 |----|----|----|----|
 | Special event | Street or route; 1,000+ attendees; fireworks; heavy city resources | 60 days | City Clerk + Public Works & Safety + Health & Legal |
-| Reviewed | Plaza or open area; 100+ attendees; amplified sound; alcohol; vendors; tents or stages | 30 days | City Clerk + whichever group the add-ons trigger |
+| Standard | Plaza or open area; 100+ attendees; amplified sound; alcohol; vendors; tents or stages | 30 days | City Clerk + whichever group the add-ons trigger |
 | Instant | Bookable inventory space within capacity, no add-ons | 10 days | City Clerk, exceptions only |
 
-Block party exception: one residential block, no vendors and under 250 people is a Reviewed event, not a Special event, with neighbor sign-off as a required step.
+Block party exception: one residential block, no vendors and under 250 people is a Standard event, not a Special event, with neighbor sign-off as a required step.
 
 ## Applicant flow
 
@@ -73,7 +73,7 @@ One wizard serves every tier; Instant events skip from step 5 to step 9.
 
 8.  **Track and respond.** A status page shows each reviewer's progress. The applicant answers requests for information there; the review clock pauses meanwhile. Special events also get a community-notification task; block parties need neighbor sign-off before the application counts as complete.
 
-9.  **Accept and pay.** Instant events pay at booking. Reviewed and Special events receive a quote with conditions, accept with a signature, and pay fees and any deposit. The permit is issued as a QR-coded PDF.
+9.  **Accept and pay.** Instant events pay at booking. Standard and Special events receive a quote with conditions, accept with a signature, and pay fees and any deposit. The permit is issued as a QR-coded PDF.
 
 10. **Before and on the day.** Special events get a coordination meeting, a walkthrough, and per-vendor permits. Every tier carries its permit on a phone and has a day-of contact.
 
@@ -89,7 +89,7 @@ The City Clerk moves each case from intake to closeout; Public Works & Safety an
 
 swimlane · 4 stakeholders across 6 stages
 
-An Instant booking uses only the Applicant lane, with the Clerk stepping in for exceptions; a Reviewed event adds the Clerk and whichever reviewing group its add-ons trigger; a Special event uses all four.
+An Instant booking uses only the Applicant lane, with the Clerk stepping in for exceptions; a Standard event adds the Clerk and whichever reviewing group its add-ons trigger; a Special event uses all four.
 
 1.  **Intake (City Clerk).** Submissions arrive sorted by tier. Instant bookings skip this queue; only exceptions such as damage or disputes appear. The Clerk checks completeness, including neighbor sign-off for block parties, then accepts (which places the date hold) or sends a request for information. The first complete application for a space and date wins.
 
@@ -109,7 +109,7 @@ An Instant booking uses only the Applicant lane, with the Clerk stepping in for 
 
     - food or vending → Health & Legal
 
-    - every Reviewed and Special event → Health & Legal (insurance), plus the accessibility plan for Special events
+    - every Standard and Special event → Health & Legal (insurance), plus the accessibility plan for Special events
 
 4.  **Review (Public Works & Safety; Health & Legal).** Each group sees only its section and can approve, approve with conditions, request information, or deny, adding fee line items.
 
@@ -133,7 +133,7 @@ One state model connects both sides: the applicant's status page and the admin q
 
 application states · 8 on the main path, 1 side state
 
-Instant bookings jump from Draft straight to Permitted; Reviewed and Special events pass through review and a quote.
+Instant bookings jump from Draft straight to Permitted; Standard and Special events pass through review and a quote.
 
 ## Demo scenarios
 
@@ -143,8 +143,8 @@ Six scenarios, two per tier, populate the four screens. Each sits at a different
 |----|----|----|----|----|----|
 | Maya Chen's 40th birthday picnic | Instant | Shelter 3, Riverside Park; Sat May 22, 2027, 11 am–4 pm | 45 guests, no add-ons | None | Permitted: booked and paid; the Applicant sees the permit and the cancellation schedule |
 | Sunrise Yoga Club weekly class | Instant, recurring | Field 4, Riverside Park; Sundays Jun 6–Aug 29, 2027, 8–9 am (13 sessions) | 20 participants, no add-ons | None | Draft: the Applicant is in the wizard and has just turned on the repeat option |
-| Jazz in the Plaza | Reviewed | City Hall Plaza; Fri Jun 18, 2027, 6–9 pm | 150 attendees, amplified sound, one food truck | Public Works & Safety (sound); Health & Legal (food truck, insurance) | Needs info: Public Works & Safety approved with sound-hour conditions; Health & Legal asked for the food truck's health permit |
-| Maple Street block party | Reviewed (block party exception) | 400 block of Maple Street; Sat Jun 26, 2027, 2–8 pm | 120 neighbors, one-block closure, no vendors | Public Works & Safety (closure, barricades); Health & Legal (insurance) | Submitted: waiting on 3 of 12 neighbor sign-offs, so no date hold yet |
+| Jazz in the Plaza | Standard | City Hall Plaza; Fri Jun 18, 2027, 6–9 pm | 150 attendees, amplified sound, one food truck | Public Works & Safety (sound); Health & Legal (food truck, insurance) | Needs info: Public Works & Safety approved with sound-hour conditions; Health & Legal asked for the food truck's health permit |
+| Maple Street block party | Standard (block party exception) | 400 block of Maple Street; Sat Jun 26, 2027, 2–8 pm | 120 neighbors, one-block closure, no vendors | Public Works & Safety (closure, barricades); Health & Legal (insurance) | Submitted: waiting on 3 of 12 neighbor sign-offs, so no date hold yet |
 | Riverfront Summer 5K | Special event | Downtown loop from City Hall Plaza along Main Street and River Road; Sun Jul 11, 2027, 7–11 am | 1,200 runners, street closures, amplified sound at the finish, water stations | Public Works & Safety (route, traffic control, police); Health & Legal (insurance, accessibility) | Quote sent: conditions merged by the Clerk; the Applicant must accept, sign and pay |
 | Main Street Food Truck Festival | Special event | Main Street, 1st to 4th Avenue; Sat Apr 24, 2027, noon–9 pm | 3,000 attendees, 25 food trucks, beer garden, stage | City Clerk (alcohol license); Public Works & Safety (closure, police, fire); Health & Legal (vendor permits, insurance, accessibility) | Closeout: Public Works & Safety logs actual hours after the cleanup check; the Clerk reconciles costs before the final invoice |
 
@@ -154,7 +154,7 @@ All five open questions are settled for the prototype; only the length of a date
 
 | Question | Decision |
 |----|----|
-| Block parties | Exception: one residential block, no vendors, under 250 people → Reviewed, with neighbor sign-off required |
+| Block parties | Exception: one residential block, no vendors, under 250 people → Standard, with neighbor sign-off required |
 | Date holds | The first complete application wins the hold; Instant bookings hold the date on payment |
 | Recurring events | Supported: one series permit, one review, each occurrence billed separately |
 | Denials | Final; no appeal step in the prototype |

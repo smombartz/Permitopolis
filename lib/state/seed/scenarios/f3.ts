@@ -1,5 +1,5 @@
 /**
- * F3 · Movie Night on the Lawn. Reviewed, In review: Health & Legal still has the insurance
+ * F3 · Movie Night on the Lawn. Standard, In review: Health & Legal still has the insurance
  * verification open. Shares the Great Lawn with F2 but at a non-overlapping time (plan 3.3).
  * Routed Tue, Apr 27 with the usual 14 days: Health & Legal's review is due Tue, May 11.
  */

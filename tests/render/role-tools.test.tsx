@@ -21,10 +21,10 @@ import type { Dept } from "@/lib/types";
 import { issuePermitChecklist } from "@/lib/view/clerkTools";
 import { lastReplace, navigate, renderScreen, storedCase, switchRole } from "./harness";
 
-const S3 = "PMT-27-0118"; // Jazz in the Plaza: Reviewed, Needs info (Health & Legal asked for a health permit)
+const S3 = "PMT-27-0118"; // Jazz in the Plaza: Standard, Needs info (Health & Legal asked for a health permit)
 const S5 = "PMT-27-0097"; // Riverfront Summer 5K: Special, Quote sent
 const S6 = "PMT-27-0031"; // Main Street Food Truck Festival: Special, Closeout, hours not logged
-const FARMERS_MARKET = "PMT-27-0070"; // Riverside Farmers Market: Reviewed series, In review, nothing decided
+const FARMERS_MARKET = "PMT-27-0070"; // Riverside Farmers Market: Standard series, In review, nothing decided
 const PERMIT_FILE = { name: "health-permit.pdf", size: 120_000, type: "application/pdf" };
 
 const sheet = () => within(screen.getByRole("dialog"));

@@ -1,5 +1,5 @@
 /**
- * S4 · Maple Street block party. Reviewed by exception, Submitted, no date hold: 9 of 12
+ * S4 · Maple Street block party. Standard through the block-party exception, Submitted, no date hold: 9 of 12
  * neighbor sign-offs are in, which is not enough for accept_complete yet.
  */
 import type { EventAnswers } from "@/lib/types";

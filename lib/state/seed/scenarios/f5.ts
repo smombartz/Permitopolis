@@ -1,5 +1,5 @@
 /**
- * F5 · Plaza wedding photos. Reviewed, Submitted: the only pre-submit card a plain Reviewed
+ * F5 · Plaza wedding photos. Standard, Submitted: the only pre-submit card a plain Standard
  * event needs is the insurance certificate, and here it is a clearly wrong file, never
  * accepted by anyone. It competes with S3 for City Hall Plaza on Jun 18, which was complete
  * first (plan 3.3). Submitted Sat, May 1, so its intake check is due Tue, May 4.

@@ -39,7 +39,7 @@ describe("classify: section 6.1 scenarios", () => {
     expect(routing(a, cls)).toEqual([]);
   });
 
-  it("S3 performance at City Hall Plaza is Reviewed with Public Works & Safety and Health & Legal, 30-day lead time", () => {
+  it("S3 performance at City Hall Plaza is Standard with Public Works & Safety and Health & Legal, 30-day lead time", () => {
     const cls = classify(
       answers({
         eventType: "performance_rally",
@@ -55,7 +55,7 @@ describe("classify: section 6.1 scenarios", () => {
     expect(cls.summary).toContain("$715");
   });
 
-  it("S4 block party on Maple 400 is Reviewed by the block-party exception, not Special", () => {
+  it("S4 block party on Maple 400 is Standard through the block-party exception, not Special", () => {
     const cls = classify(
       answers({
         eventType: "block_party",
@@ -113,17 +113,17 @@ describe("classify: section 6.1 scenarios", () => {
 describe("classify: boundaries", () => {
   const at = (attendance: number) => classify(answers({ location: inventoryLocation(["field-1"]), attendance })).tier;
 
-  it("99 is Instant, 100 is Reviewed", () => {
+  it("99 is Instant, 100 is Standard", () => {
     expect(at(99)).toBe("instant");
     expect(at(100)).toBe("reviewed");
   });
 
-  it("999 is Reviewed, 1,000 is Special", () => {
+  it("999 is Standard, 1,000 is Special", () => {
     expect(at(999)).toBe("reviewed");
     expect(at(1000)).toBe("special");
   });
 
-  it("249 at a block party is Reviewed by the exception; 250 is Special (the exception no longer applies)", () => {
+  it("249 at a block party is Standard through the exception; 250 is Special (the exception no longer applies)", () => {
     const base = {
       eventType: "block_party" as const,
       location: streetsLocation(["maple-400"]),
@@ -189,7 +189,7 @@ describe("classify: who approves a space reservation", () => {
     expect(reservation(picnic)).toBe("City Clerk (automatic for Instant)");
   });
 
-  it("on a Reviewed or Special plan the Clerk approves it like the rest: the picnic once alcohol is on, a gala for 1,200", () => {
+  it("on a Standard or Special plan the Clerk approves it like the rest: the picnic once alcohol is on, a gala for 1,200", () => {
     const withAlcohol = answers({ location: inventoryLocation(["shelter-2"]), attendance: 40, addOns: addOns({ alcohol: true }) });
     expect(classify(withAlcohol).tier).toBe("reviewed");
     expect(reservation(withAlcohol)).toBe("City Clerk");
@@ -213,7 +213,7 @@ describe("classify: partial answers", () => {
 });
 
 describe("whatIf", () => {
-  it("demo path 2: Shelter 2 with 40 is Instant; alcohol makes it Reviewed and whatIf offers the way back", () => {
+  it("demo path 2: Shelter 2 with 40 is Instant; alcohol makes it Standard and whatIf offers the way back", () => {
     const base = answers({ location: inventoryLocation(["shelter-2"]), attendance: 40 });
     expect(classify(base).tier).toBe("instant");
 

@@ -77,7 +77,7 @@ describe("issue_permit", () => {
     expect(checkCompleteCityTask(permitted, `${ID}:issue_food_permits`, "hl", TODAY)).toEqual({ ok: false, reason: "1 of 2 vendor health permits still needs to be verified." });
   });
 
-  it("creates no such task for an event with no food permits to issue (Reviewed, or no vendors)", () => {
+  it("creates no such task for an event with no food permits to issue (Standard, or no vendors)", () => {
     const reviewed = quoted(["done"], { tier: "reviewed" });
     const withoutCard = { ...reviewed, tasks: reviewed.tasks.filter((t) => t.catalogId !== "vendor_food_permits") };
     expect(task(apply(withoutCard, { type: "issue_permit" }, "clerk"), "issue_food_permits")).toBeUndefined();

@@ -14,7 +14,7 @@ describe("dateGate", () => {
     expect(gate.fixes).toEqual([]);
   });
 
-  it("S1 with amplified sound on May 3: Reviewed needs 30 days, only 19 are left, so new date, drop sound or a late fee", () => {
+  it("S1 with amplified sound on May 3: Standard needs 30 days, only 19 are left, so new date, drop sound or a late fee", () => {
     const a = answers({
       location: inventoryLocation(["shelter-3"]),
       schedule: schedule({ date: "2027-05-22", start: "11:00", end: "16:00" }),
@@ -45,7 +45,7 @@ describe("dateGate", () => {
       eventCase({ id: "PMT-27-0900", name: "Another picnic", state: "permitted", location: shelter3, schedule: schedule({ date, start: "11:00", end: "16:00" }) });
 
     it("none when the gate passes, even with an add-on that could be dropped", () => {
-      // Sat, Jun 19 is 47 days out: a Reviewed event needs 30.
+      // Sat, Jun 19 is 47 days out: a Standard event needs 30.
       const a = withSound("2027-06-19");
       const gate = dateGate(a, classify(a), ctx({ today: "2027-05-03" }));
       expect(gate).toMatchObject({ ok: true, leadTimeOk: true, fixes: [], droppable: [] });
@@ -71,7 +71,7 @@ describe("dateGate", () => {
       expect(gate).toMatchObject({ ok: false, leadTimeOk: false, fixes: ["new_date"] });
     });
 
-    it("a new date or the late fee when no add-on can be dropped (a plaza is Reviewed by its location)", () => {
+    it("a new date or the late fee when no add-on can be dropped (a plaza is Standard because of its location)", () => {
       const a = answers({ location: areaLocation("city-hall-plaza"), schedule: schedule({ date: "2027-05-22", start: "11:00", end: "16:00" }), attendance: 45 });
       const gate = dateGate(a, classify(a), ctx({ today: "2027-05-03" }));
       expect(gate).toMatchObject({ ok: false, leadTimeOk: false, fixes: ["new_date", "late_fee"], droppable: [] });

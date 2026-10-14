@@ -3,7 +3,7 @@
 ## Project Overview
 
 A clickable, front-end-only prototype of the Permitopolis City Clerk's event permitting site. An
-applicant describes an event in a five-step wizard and gets a tier (Instant, Reviewed or Special
+applicant describes an event in a five-step wizard and gets a tier (Instant, Standard or Special
 event), the permits it needs and a board of to-do cards. The City Clerk, Public Works & Safety and
 Health & Legal each see every case's state, whose move it is, and the active permits. There is no
 backend: all state lives in one Zustand store in the browser, seeded with 38 cases on a fixed demo

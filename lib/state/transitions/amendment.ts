@@ -69,7 +69,7 @@ export interface AmendedPlan {
   cls: Classification;
   /** The new plan's own estimate, with the late fee when this amendment is charged one. */
   estimate: FeeEstimate;
-  /** "This is a Reviewed event: about 3 weeks, $518.75 with the $53.75 late fee": the tier's line, for the estimate as charged. */
+  /** "This is a Standard event: about 3 weeks, $518.75 with the $53.75 late fee": the tier's line, for the estimate as charged. */
   summary: string;
   /** The cards the new plan calls for that the record does not have yet. */
   newCards: Task[];

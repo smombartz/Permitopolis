@@ -55,7 +55,7 @@ export interface CancellationBand {
 
 export interface RulesConfig {
   thresholds: {
-    /** At or above: Reviewed. */
+    /** At or above: Standard. */
     reviewedAttendance: number;
     /** At or above: Special event. */
     specialAttendance: number;
@@ -133,7 +133,7 @@ export interface Classification {
   leadTimeDays: number;
   reviewers: RoutingSuggestion[];
   components: PermitComponent[];
-  /** e.g. "This is a Reviewed event: about 3 weeks, $715 estimated". */
+  /** e.g. "This is a Standard event: about 3 weeks, $715 estimated". */
   summary: string;
 }
 

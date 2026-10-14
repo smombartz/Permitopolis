@@ -182,7 +182,7 @@ describe("setConfig", () => {
     expect(draftOf(picnic)).toMatchObject({ tier: "instant", triggers: [] });
     expect(draftOf(rally).tier).toBe("reviewed");
 
-    // Reviewed from 30 people, Special from 500: both drafts move without being touched.
+    // Standard from 30 people, Special from 500: both drafts move without being touched.
     useDemo.getState().setConfig({ thresholds: { ...DEFAULT_CONFIG.thresholds, reviewedAttendance: 30, specialAttendance: 500 } });
     expect(draftOf(picnic).tier).toBe("reviewed");
     expect(draftOf(picnic).triggers.map((t) => t.id)).toEqual(["attendance_100"]);

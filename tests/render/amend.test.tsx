@@ -50,8 +50,8 @@ describe("AmendWizardScreen: Maya adds a DJ (the PRD's example)", () => {
 
     await user.click(screen.getByRole("switch", { name: "Amplified sound" }));
 
-    expect(panel().getByText(/This is a Reviewed event/)).toBeInTheDocument();
-    expect(panel().getByText(/makes your event Reviewed/)).toBeInTheDocument();
+    expect(panel().getByText(/This is a Standard event/)).toBeInTheDocument();
+    expect(panel().getByText(/makes your event Standard/)).toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: "Next" })); // size -> plan (review)
     expect(screen.getByRole("heading", { level: 2, name: "Review your change" })).toBeInTheDocument();
@@ -195,16 +195,16 @@ describe("AmendWizardScreen: the fee difference is what the engine then settles"
     const { user } = await renderScreen(<AmendWizardScreen />, { scenario: "S1", path: routes.amend(S1) });
     for (let i = 0; i < 3; i++) await user.click(screen.getByRole("button", { name: "Next" }));
     await user.click(screen.getByRole("switch", { name: "Amplified sound" }));
-    expect(panel().getByText("This is a Reviewed event: about 3 weeks, $465 estimated")).toBeInTheDocument();
+    expect(panel().getByText("This is a Standard event: about 3 weeks, $465 estimated")).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "Next" }));
     expect(screen.getByText(/Your current permit stays valid for the original plan until this is settled\./)).toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: /Pay a \$53\.75 late fee/ }));
     // The headline and the total under it are one figure.
-    expect(panel().getByText("This is a Reviewed event: about 3 weeks, $518.75 with the $53.75 late fee")).toBeInTheDocument();
+    expect(panel().getByText("This is a Standard event: about 3 weeks, $518.75 with the $53.75 late fee")).toBeInTheDocument();
     expect(document.querySelector('[data-slot="amend-fees"]')).toHaveTextContent("FeesNew total$518.75Already paid$125To pay$393.75Includes a $53.75 late fee.");
 
     await user.click(screen.getByRole("button", { name: "Confirm change" }));
-    expect(storedCase(S1).activity.at(-1)?.text).toBe("Amended the plan: This is a Reviewed event: about 3 weeks, $518.75 with the $53.75 late fee.");
+    expect(storedCase(S1).activity.at(-1)?.text).toBe("Amended the plan: This is a Standard event: about 3 weeks, $518.75 with the $53.75 late fee.");
   });
 });

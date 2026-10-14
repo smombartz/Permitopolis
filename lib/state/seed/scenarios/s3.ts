@@ -1,5 +1,5 @@
 /**
- * S3 · Jazz in the Plaza. Reviewed, Needs info. Submitted Apr 16; hold placed Apr 19; Health &
+ * S3 · Jazz in the Plaza. Standard, Needs info. Submitted Apr 16; hold placed Apr 19; Health &
  * Legal verifies insurance Apr 21; Public Works & Safety approves with three conditions Apr 28;
  * Health & Legal verifies the vendor list and asks for the vendor's health permit Apr 30, due
  * May 5, with its clock paused since then.

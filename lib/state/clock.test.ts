@@ -139,7 +139,7 @@ describe("applyTick: event day and returning to Permitted", () => {
 });
 
 describe("applyTick: Closeout and Instant closing itself", () => {
-  it("Reviewed/Special events move to Closeout with cleanup, hours and reconcile tasks", () => {
+  it("Standard/Special events move to Closeout with cleanup, hours and reconcile tasks", () => {
     const c = makeCase({
       state: "event_day",
       tier: "special",
@@ -205,7 +205,7 @@ describe("applyTick: Closeout and Instant closing itself", () => {
     expect(result.case.tasks.find((t) => t.catalogId === "instant_exception")).toBeDefined();
   });
 
-  it("an amendment still pending when the event arrives lapses: the Instant plan the permit covers closes itself, it does not go to Closeout as the Reviewed plan nobody approved", () => {
+  it("an amendment still pending when the event arrives lapses: the Instant plan the permit covers closes itself, it does not go to Closeout as the Standard plan nobody approved", () => {
     const occurrences = [{ date: "2027-05-22", availability: { status: "open" as const }, billing: "paid" as const }];
     const schedule = { date: "2027-05-22", start: "11:00", end: "16:00", occurrences };
     const shelter = { id: "PMT-27-0001:fee:1", dept: "clerk" as const, label: "Shelter reservation", qty: 5, unit: "hour", unitPrice: 25, estimate: 125, actual: null, kind: "fee" as const };

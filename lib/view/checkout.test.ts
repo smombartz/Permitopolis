@@ -83,7 +83,7 @@ describe("checkoutDecision", () => {
     expect(decision.mode).toBe("not_ready");
   });
 
-  it("a Reviewed Draft (before create_board) is not ready, and points at the wizard", () => {
+  it("a Standard Draft (before create_board) is not ready, and points at the wizard", () => {
     const draft: EventCase = { ...caseById(cases, "PMT-27-0142"), tier: "reviewed" };
     const decision = checkoutDecision(draft, {});
     expect(decision.mode).toBe("not_ready");

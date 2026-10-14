@@ -109,10 +109,10 @@ describe("EMPTY: an empty pipeline column", () => {
 });
 
 describe("EMPTY: an empty Intake tab", () => {
-  it("every tab (Special, Reviewed, Instant exceptions) has its own empty message", async () => {
+  it("every tab (Special, Standard, Instant exceptions) has its own empty message", async () => {
     const { user } = await renderScreen(<IntakeScreen />, { role: "clerk", path: routes.city.intake(), cases: [] });
     expect(screen.getByText("Nothing waiting")).toBeInTheDocument();
-    await user.click(screen.getByRole("tab", { name: /Reviewed/ }));
+    await user.click(screen.getByRole("tab", { name: /Standard/ }));
     expect(screen.getByText("Nothing waiting")).toBeInTheDocument();
     await user.click(screen.getByRole("tab", { name: /Instant exceptions/ }));
     expect(screen.getByText("Nothing to resolve")).toBeInTheDocument();
@@ -440,7 +440,7 @@ describe("EDGE: a series of 20 or more sessions, collapsed with a count", () => 
 describe("EDGE: two applications competing for one space and date", () => {
   it("names both: the later row names the one that is complete first", async () => {
     const { user } = await renderScreen(<IntakeScreen />, { role: "clerk", path: routes.city.intake() });
-    await user.click(screen.getByRole("tab", { name: /Reviewed/ }));
+    await user.click(screen.getByRole("tab", { name: /Standard/ }));
     const row = within(screen.getByText("Plaza wedding photos").closest("tr")!);
     expect(row.getAllByText(/Jazz in the Plaza/).length).toBeGreaterThan(0);
     expect(row.getByText(/complete first/)).toBeInTheDocument();

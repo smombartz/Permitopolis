@@ -13,7 +13,7 @@ describe("planTimeline", () => {
     expect(steps[0].date).toBe("2027-05-22");
   });
 
-  it("Reviewed returns submit_by, reviews_done_by, quote_paid_by and event_day, in order", () => {
+  it("Standard returns submit_by, reviews_done_by, quote_paid_by and event_day, in order", () => {
     const a = answers({ location: areaLocation("city-hall-plaza"), schedule: schedule({ date: "2027-06-18", start: "18:00", end: "21:00" }), attendance: 150 });
     const cls = classify(a);
     const steps = planTimeline(a, cls, "2027-04-01");

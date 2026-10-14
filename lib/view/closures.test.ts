@@ -19,8 +19,8 @@ import {
 
 const TODAY = DEFAULT_DEMO_TODAY; // Mon, May 3, 2027
 const S5 = "PMT-27-0097"; // Riverfront Summer 5K: Special, Quote sent, holding its date, Jul 11
-const F5 = "PMT-27-0115"; // Plaza wedding photos: Reviewed, Submitted, never accepted, Jun 18
-const S3 = "PMT-27-0118"; // Jazz in the Plaza: Reviewed, Needs info (accepted, routed), Jun 18
+const F5 = "PMT-27-0115"; // Plaza wedding photos: Standard, Submitted, never accepted, Jun 18
+const S3 = "PMT-27-0118"; // Jazz in the Plaza: Standard, Needs info (accepted, routed), Jun 18
 
 function getCase(cases: EventCase[], id: string): EventCase {
   const found = cases.find((c) => c.id === id);

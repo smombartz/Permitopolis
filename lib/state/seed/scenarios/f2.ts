@@ -1,5 +1,5 @@
 /**
- * F2 · Riverside Farmers Market. Reviewed series, In review: Public Works & Safety (tents) and
+ * F2 · Riverside Farmers Market. Standard series, In review: Public Works & Safety (tents) and
  * Health & Legal (vendor list) both have the review routed but not yet decided. Routed Mon,
  * Apr 26 with the usual 14 days, so both reviews are due Mon, May 10: in the coming week.
  *

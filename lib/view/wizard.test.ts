@@ -44,8 +44,8 @@ function S2Booked(): EventCase {
   return { ...caseById("PMT-27-0142"), state: "permitted", permit: { issuedOn: TODAY, signature: null } };
 }
 
-const S3 = caseById("PMT-27-0118"); // Jazz in the Plaza: Reviewed
-const S4 = caseById("PMT-27-0126"); // Maple Street block party: Reviewed by exception
+const S3 = caseById("PMT-27-0118"); // Jazz in the Plaza: Standard
+const S4 = caseById("PMT-27-0126"); // Maple Street block party: Standard through exception
 const S5 = caseById("PMT-27-0097"); // Riverfront Summer 5K: Special
 
 const baseAnswers: EventAnswers = {
@@ -125,7 +125,7 @@ describe("eventRecap", () => {
 });
 
 describe("buildResultPanel, against the PRD's acceptance rows", () => {
-  it("S3: Reviewed, 30-day lead time, Public Works & Safety and Health & Legal, $715 including the deposit", () => {
+  it("S3: Standard, 30-day lead time, Public Works & Safety and Health & Legal, $715 including the deposit", () => {
     const panel = buildResultPanel(S3, ctx, { ignoreCaseId: S3.id });
     expect(panel.tier).toBe("reviewed");
     expect(panel.leadTimeDays).toBe(30);
@@ -140,7 +140,7 @@ describe("buildResultPanel, against the PRD's acceptance rows", () => {
     expect(panel.reviewers.map((r) => r.dept)).toEqual(["clerk", "pws", "hl"]);
   });
 
-  it("a 40-person picnic at a shelter with alcohol is Reviewed; turning alcohol off is Instant", () => {
+  it("a 40-person picnic at a shelter with alcohol is Standard; turning alcohol off is Instant", () => {
     const withAlcohol: EventAnswers = { ...baseAnswers, addOns: { ...EMPTY_ADDONS, alcohol: true } };
     const panel = buildResultPanel(withAlcohol, ctx);
     expect(panel.tier).toBe("reviewed");
@@ -150,7 +150,7 @@ describe("buildResultPanel, against the PRD's acceptance rows", () => {
     expect(buildResultPanel({ ...withAlcohol, addOns: without }, ctx).tier).toBe("instant");
   });
 
-  it("S4's exact answers give Reviewed by the block-party exception", () => {
+  it("S4's exact answers give Standard through the block-party exception", () => {
     const panel = buildResultPanel(S4, ctx, { ignoreCaseId: S4.id });
     expect(panel.tier).toBe("reviewed");
   });
@@ -257,7 +257,7 @@ describe("missingFields and primaryButtonReady", () => {
 
 describe("buildResultPanel and the late fee flag", () => {
   it("adds the late-fee line only while the date is really inside the lead time", () => {
-    // S1's answers, 19 days out with amplified sound added: Reviewed needs 30.
+    // S1's answers, 19 days out with amplified sound added: Standard needs 30.
     const tooClose: EventAnswers = {
       ...baseAnswers,
       addOns: { ...EMPTY_ADDONS, amplifiedSound: true },
@@ -274,7 +274,7 @@ describe("buildResultPanel and the late fee flag", () => {
 });
 
 describe("dateGateSatisfied", () => {
-  // S1's answers, 19 days out with amplified sound added: Reviewed needs 30 (same case
+  // S1's answers, 19 days out with amplified sound added: Standard needs 30 (same case
   // lateFeeCarriesDate uses below), so the gate really does offer the late fee as a fix.
   const tooClose: EventAnswers = {
     ...baseAnswers,
@@ -340,7 +340,7 @@ describe("leadTimeGapText", () => {
     expect(leadTimeGapText(1, 10)).toBe("1 day left, 10 needed. This event needs 9 more days of notice than it has.");
   });
 
-  it("a Reviewed event 19 days out really is 19 days away with 30 needed", () => {
+  it("a Standard event 19 days out really is 19 days away with 30 needed", () => {
     const answers: EventAnswers = { ...baseAnswers, addOns: { ...EMPTY_ADDONS, amplifiedSound: true }, schedule: { date: "2027-05-22", start: "11:00", end: "16:00", occurrences: [] } };
     const panel = buildResultPanel(answers, ctx);
     expect(panel.dateGate.daysUntil).toBe(19);

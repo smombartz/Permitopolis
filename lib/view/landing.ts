@@ -235,7 +235,7 @@ export function comparisonRows(cfg: RulesConfig = DEFAULT_CONFIG): ComparisonRow
 
 /** The block-party exception, as a note under the table: the threshold comes from the config. */
 export function blockPartyNote(cfg: RulesConfig = DEFAULT_CONFIG): string {
-  return `A block party on one residential block, with no food or vending and fewer than ${fmtNumber(cfg.thresholds.blockPartyMaxAttendance)} people, is Reviewed — not Special — with a neighbor sign-off card.`;
+  return `A block party on one residential block, with no food or vending and fewer than ${fmtNumber(cfg.thresholds.blockPartyMaxAttendance)} people, is Standard — not Special — with a neighbor sign-off card.`;
 }
 
 /* ------------------------------------------------------------------------ */
@@ -252,7 +252,7 @@ export function feeScheduleRows(cfg: RulesConfig = DEFAULT_CONFIG): FeeScheduleR
   const f = cfg.fees;
   return [
     { label: "Application fee — Instant", amount: fmtMoney(f.applicationFee.instant) },
-    { label: "Application fee — Reviewed", amount: fmtMoney(f.applicationFee.reviewed) },
+    { label: "Application fee — Standard", amount: fmtMoney(f.applicationFee.reviewed) },
     { label: "Application fee — Special event", amount: fmtMoney(f.applicationFee.special) },
     { label: "Shelter", amount: `${fmtMoney(f.shelterPerHour)} per hour` },
     { label: "Field", amount: `${fmtMoney(f.fieldPerHour)} per hour` },
@@ -267,7 +267,7 @@ export function feeScheduleRows(cfg: RulesConfig = DEFAULT_CONFIG): FeeScheduleR
     { label: "Police officer", amount: `${fmtMoney(f.policePerOfficerHour)} per officer-hour` },
     { label: "Barricade", amount: `${fmtMoney(f.barricadeEachPerDay)} each per day` },
     { label: "Cleanup crew (actuals only)", amount: `${fmtMoney(f.cleanupCrewPerWorkerHour)} per worker-hour` },
-    { label: "Refundable cleanup deposit — Reviewed", amount: fmtMoney(f.deposit.reviewed) },
+    { label: "Refundable cleanup deposit — Standard", amount: fmtMoney(f.deposit.reviewed) },
     { label: "Refundable cleanup deposit — Special event", amount: fmtMoney(f.deposit.special) },
     { label: "Late fee", amount: `${Math.round(cfg.lateFee.rate * 100)}% of fees, excluding the deposit` },
   ];
@@ -293,11 +293,11 @@ export function faqItems(cfg: RulesConfig = DEFAULT_CONFIG): FaqItem[] {
     {
       question: "Do I need insurance?",
       answer:
-        "Every Reviewed and Special event uploads a certificate of insurance before submitting, and Health & Legal checks it before the permit issues. An Instant booking doesn't need one.",
+        "Every Standard and Special event uploads a certificate of insurance before submitting, and Health & Legal checks it before the permit issues. An Instant booking doesn't need one.",
     },
     {
       question: "How far ahead must I apply?",
-      answer: `At least ${lead.instant} days for an Instant booking, ${lead.reviewed} days for a Reviewed event, and ${lead.special} days for a Special event. The wizard enforces this: a date inside the lead time offers a later date, dropping an add-on, or a late fee.`,
+      answer: `At least ${lead.instant} days for an Instant booking, ${lead.reviewed} days for a Standard event, and ${lead.special} days for a Special event. The wizard enforces this: a date inside the lead time offers a later date, dropping an add-on, or a late fee.`,
     },
     {
       question: "What about a block party?",

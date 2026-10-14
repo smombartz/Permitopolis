@@ -46,7 +46,7 @@ describe("issueFoodPermitsStatus", () => {
     expect(status.task).toMatchObject({ owner: "hl", status: "done" });
   });
 
-  it("S3 is Reviewed, not Special: there are no food permits to issue, so there is no task and nothing to show", () => {
+  it("S3 is Standard, not Special: there are no food permits to issue, so there is no task and nothing to show", () => {
     const status = issueFoodPermitsStatus(caseById("PMT-27-0118"), TODAY);
     expect(status.task).toBeNull();
     expect(status.disabledReason).toBeNull();

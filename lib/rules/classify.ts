@@ -80,7 +80,7 @@ function durationPhrase(t: Tier): string {
 }
 
 /**
- * The one-line result: "This is a Reviewed event: about 3 weeks, $465 estimated". `total` is
+ * The one-line result: "This is a Standard event: about 3 weeks, $465 estimated". `total` is
  * null before a place is chosen. A total that carries a late fee says so, with the fee
  * ("$518.75 with the $53.75 late fee"), so the line cannot disagree with the total printed under it.
  */

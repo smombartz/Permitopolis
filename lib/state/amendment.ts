@@ -121,7 +121,7 @@ export function permittedPlan(c: EventCase): EventCase {
 /**
  * What the permit covers, read off the record: the plan the permit is for (`permittedPlan()`)
  * and the triggers stored with it, never the tier rules as Settings has them today. A case past
- * Draft keeps the tier it was submitted under, so its permit keeps its list: lowering "Reviewed
+ * Draft keeps the tier it was submitted under, so its permit keeps its list: lowering "Standard
  * at" does not add an insurance check to an Instant permit that is already issued. The block
  * party exception is on the record as its trigger.
  */

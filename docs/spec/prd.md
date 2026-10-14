@@ -172,7 +172,7 @@ Everyone uses one app with no login. A persistent top bar switches between the A
 
 - Each party has a color used on every chip and avatar: Applicant slate, City Clerk blue, Public Works & Safety amber, Health & Legal teal. Color always comes with an icon and a label.
 
-- Tier badges: Instant green, Reviewed blue, Special event purple, each with its name spelled out.
+- Tier badges: Instant green, Standard blue, Special event purple, each with its name spelled out.
 
 - WCAG 2.2 AA: keyboard reachable, visible focus, status changes announced through aria-live.
 
@@ -208,7 +208,7 @@ Five plain questions, a live result panel that changes with every answer, and a 
 
 - Step content on the left, the live result panel on the right; on mobile the panel is a bottom sheet with a one-line summary.
 
-- The panel shows the tier and a one-line summary ("This is a Reviewed event: about 3 weeks, \$715 estimated"), the triggers as chips, the lead time and earliest possible date, the permits included, the reviewers and the fee estimate.
+- The panel shows the tier and a one-line summary ("This is a Standard event: about 3 weeks, \$715 estimated"), the triggers as chips, the lead time and earliest possible date, the permits included, the reviewers and the fee estimate.
 
 - What-if: any trigger chip that alone holds the tier shows what removing it would do ("Remove the beer garden: Instant, book today"). Compute it by re-running classify() without that trigger.
 
@@ -278,17 +278,17 @@ Five plain questions, a live result panel that changes with every answer, and a 
 
     - Account: "Create your account", prefilled from the persona, one click.
 
-    - Primary button: Instant shows "Book and pay \$125", which opens payment and then the permit. Reviewed and Special show "Create my to-do board".
+    - Primary button: Instant shows "Book and pay \$125", which opens payment and then the permit. Standard and Special show "Create my to-do board".
 
 **Acceptance**
 
-- S3's answers give Reviewed, a 30-day lead time, Public Works & Safety and Health & Legal as reviewers, and \$715 including the deposit.
+- S3's answers give Standard, a 30-day lead time, Public Works & Safety and Health & Legal as reviewers, and \$715 including the deposit.
 
 - S5's answers give Special event, a 60-day lead time and all three city groups.
 
-- A 40-person picnic at a shelter with alcohol shows Reviewed; turning alcohol off shows Instant.
+- A 40-person picnic at a shelter with alcohol shows Standard; turning alcohol off shows Instant.
 
-- S4's answers trigger the block-party exception: Reviewed, not Special, with a neighbor sign-off card.
+- S4's answers trigger the block-party exception: Standard, not Special, with a neighbor sign-off card.
 
 ## Applicant to-do board
 
@@ -349,7 +349,7 @@ A toggle groups cards into phase swimlanes: Before submitting, Review, Permit, B
 
 | Card | Kind | Created when | Reviewed by | Due by default |
 |----|----|----|----|----|
-| Certificate of insurance | Document | Every Reviewed and Special event | Health & Legal | Before submitting |
+| Certificate of insurance | Document | Every Standard and Special event | Health & Legal | Before submitting |
 | Sound details | Form | Amplified sound | Public Works & Safety | Before submitting |
 | Alcohol details and liquor liability insurance | Form and document | Alcohol | City Clerk (license), Public Works & Safety (police) | Before submitting |
 | Vendor list | Form | Food or vending | Health & Legal | Before submitting |
@@ -365,7 +365,7 @@ A toggle groups cards into phase swimlanes: Before submitting, Review, Permit, B
 | Accessibility plan | Form | Special event | Health & Legal | Before submitting |
 | Cleanup plan | Form | Special event | Public Works & Safety | Before submitting |
 | Neighbor sign-off | Sign-off | Block party | City Clerk | Before the Clerk can accept |
-| Submit application | Action | Reviewed and Special events | City Clerk | Event date minus the lead time |
+| Submit application | Action | Standard and Special events | City Clerk | Event date minus the lead time |
 | Pre-application meeting | Meeting | Special event, after acceptance | City Clerk with both groups | 7 days after acceptance |
 | Community notification | Action | Special event | City Clerk | 30 days before the event |
 | Respond to a request | Action | A reviewer asks for information | That reviewer | 5 days after the request |
@@ -387,7 +387,7 @@ On May 3, S3's board shows one pinned request in Do now, nothing with the city, 
 
 ## Quote, permit, amend and cancel
 
-Reviewed and Special events end review with a quote to accept, sign and pay. The permit issues only after payment and Health & Legal's insurance check, and every later change happens on the same record.
+Standard and Special events end review with a quote to accept, sign and pay. The permit issues only after payment and Health & Legal's insurance check, and every later change happens on the same record.
 
 **Quote (/events/\[id\]/quote, P0)**
 
@@ -413,9 +413,9 @@ Reviewed and Special events end review with a quote to accept, sign and pay. The
 
 - Reopens the wizard on the same record with every answer filled in, and re-runs classify() on each change.
 
-- If the tier rises, a banner says so and keeps everything: "This change makes your event Reviewed. Everything you entered is kept; 3 new cards will be added."
+- If the tier rises, a banner says so and keeps everything: "This change makes your event Standard. Everything you entered is kept; 3 new cards will be added."
 
-- The lead-time gate runs again. Example: Maya (S1) adds a DJ, which makes her picnic Reviewed, but May 22 is 19 days away and Reviewed needs 30. She picks a new date, drops the DJ, or pays the late fee.
+- The lead-time gate runs again. Example: Maya (S1) adds a DJ, which makes her picnic Standard, but May 22 is 19 days away and Standard needs 30. She picks a new date, drops the DJ, or pays the late fee.
 
 - The current permit stays valid for the original plan until the amendment is approved. New cards carry an "Amendment" tag on the board.
 
@@ -491,7 +491,7 @@ The Clerk owns every case from intake to closeout, so the Clerk's tools cover th
 
 | Tool | What the Clerk does | Demo with | Priority |
 |----|----|----|----|
-| Intake queue (/city/intake) | Tabs for Special, Reviewed and Instant exceptions. Each row shows a completeness summary ("7 of 8 items"), any competing application for the same space and date (and which was complete first), and lead-time status. Actions: Accept as complete, which places the date hold, or Request info, which picks items, adds a message and creates an applicant card | S4 (Accept disabled until neighbors sign) and a filler Special event | P0 |
+| Intake queue (/city/intake) | Tabs for Special, Standard and Instant exceptions. Each row shows a completeness summary ("7 of 8 items"), any competing application for the same space and date (and which was complete first), and lead-time status. Actions: Accept as complete, which places the date hold, or Request info, which picks items, adds a message and creates an applicant card | S4 (Accept disabled until neighbors sign) and a filler Special event | P0 |
 | Routing (case detail, after Accept) | Suggested reviewers from the triggers, each with its reason ("Amplified sound: Public Works & Safety"). The Clerk adds or removes reviewers, sets a due date for each, and confirms, which moves the case to In review | S4 after sign-offs | P0 |
 | Consultation | For Special events: schedule the pre-application meeting and invite both groups; it appears on all three calendars | Filler Special event | P1 |
 | Licenses | The Clerk reviews alcohol and vending licenses as its own review section, like any department | S6 history | P1 |
@@ -523,7 +523,7 @@ Health & Legal verifies documents and runs food and accessibility checks, so its
 
 | Tool | What Health & Legal does | Demo with | Priority |
 |----|----|----|----|
-| Review queue (My queue) | Cases routed for insurance (every Reviewed and Special event), food or vending, and accessibility (Special events) | S3, S5 | P0 |
+| Review queue (My queue) | Cases routed for insurance (every Standard and Special event), food or vending, and accessibility (Special events) | S3, S5 | P0 |
 | Review panel (case detail) | Only its sections. Same four decisions as other reviewers, plus fee lines (vendor permits at \$75 each) | S3 | P0 |
 | Verifications (/city/verifications) | One queue of documents across cases. Each opens a mock preview and a checklist. Insurance: named insured matches the applicant, City of Permitopolis is an additional insured, at least \$1M per occurrence, dates cover setup through teardown. Health permit: vendor name, permit number, valid past the event date. Accessibility plan: accessible route, accessible restrooms, viewing area. Actions: Verify, or Reject with a reason, which sends the card back to the applicant as "Changes requested" | S3 food truck permit, S5 insurance | P0 in case detail, P1 as its own page |
 | Vendor permits | Per event: each vendor, its health permit status, and an Issue food permit action (pre-event for Special events) | S6 history | P1 |
@@ -537,9 +537,9 @@ One classify() call over the record returns the tier, triggers, reviewers, cards
 
 1.  Special event if any: a street segment or route (unless the block-party exception applies), 1,000 or more people, fireworks or drones, or heavy city resources (police staffing or more than 20 barricades, a placeholder threshold).
 
-2.  Block-party exception: type Block party, exactly one residential block, no food or vending, and fewer than 250 people. Result: Reviewed, plus a neighbor sign-off card.
+2.  Block-party exception: type Block party, exactly one residential block, no food or vending, and fewer than 250 people. Result: Standard, plus a neighbor sign-off card.
 
-3.  Reviewed if any: a plaza or open-area location, 100 or more people, or any add-on.
+3.  Standard if any: a plaza or open-area location, 100 or more people, or any add-on.
 
 4.  Otherwise Instant: a bookable space with attendance within its capacity.
 
@@ -548,7 +548,7 @@ One classify() call over the record returns the tier, triggers, reviewers, cards
 | Tier | Triggers (any one) | Lead time | Review |
 |----|----|----|----|
 | Special event | Street or route; 1,000+ people; fireworks; heavy city resources | 60 days | City Clerk, Public Works & Safety, Health & Legal |
-| Reviewed | Plaza or open area; 100+ people; amplified sound; alcohol; vendors; tents or stages; any other add-on | 30 days | City Clerk plus whichever group the add-ons trigger |
+| Standard | Plaza or open area; 100+ people; amplified sound; alcohol; vendors; tents or stages; any other add-on | 30 days | City Clerk plus whichever group the add-ons trigger |
 | Instant | Bookable space within capacity, no add-ons | 10 days | City Clerk, exceptions only |
 
 **Routing (suggested reviewers; the Clerk can adjust)**
@@ -561,7 +561,7 @@ One classify() call over the record returns the tier, triggers, reviewers, cards
 | Amplified sound | Public Works & Safety |
 | Alcohol | City Clerk (license) and Public Works & Safety (police) |
 | Food or vending | Health & Legal |
-| Every Reviewed and Special event | Health & Legal (insurance); Special events add the accessibility plan |
+| Every Standard and Special event | Health & Legal (insurance); Special events add the accessibility plan |
 
 **Permit components (what "one permit covers" lists)**
 
@@ -575,13 +575,13 @@ One classify() call over the record returns the tier, triggers, reviewers, cards
 | Temporary food and vendor permits | Food or vending | Health & Legal |
 | Structure and fire approval | Tents, stages, cooking, generators, fireworks, drones | Public Works & Safety |
 | Block party approval | Block-party exception | City Clerk, Public Works & Safety |
-| Insurance verification | Every Reviewed and Special event | Health & Legal |
+| Insurance verification | Every Standard and Special event | Health & Legal |
 
 **Fees (placeholders)**
 
 | Item                        | Amount                                    |
 |-----------------------------|-------------------------------------------|
-| Application fee             | \$0 Instant, \$50 Reviewed, \$250 Special |
+| Application fee             | \$0 Instant, \$50 Standard, \$250 Special |
 | Shelter                     | \$25 per hour                             |
 | Field                       | \$20 per hour                             |
 | City Hall Plaza             | \$300 per day                             |
@@ -595,7 +595,7 @@ One classify() call over the record returns the tier, triggers, reviewers, cards
 | Police officer              | \$85 per officer-hour                     |
 | Barricade                   | \$15 each per day                         |
 | Cleanup crew (actuals only) | \$60 per worker-hour                      |
-| Refundable cleanup deposit  | \$250 Reviewed, \$1,000 Special           |
+| Refundable cleanup deposit  | \$250 Standard, \$1,000 Special           |
 | Late fee                    | 25% of fees, excluding the deposit        |
 
 **Cancellation schedule (placeholder)**
@@ -637,8 +637,8 @@ Each scenario loads in a different state on Mon, May 3, 2027, so every role open
 |----|----|----|----|----|----|
 | S1 | Maya Chen's 40th birthday picnic; Maya Chen. Shelter 3, Sat May 22, 11 am to 4 pm, 45 guests | Instant, Permitted | Nobody; permit active | Done: Pay and book, \$125. Coming up: Carry your permit. Permit page shows a \$62.50 refund if cancelled today | Active permits list and calendar; no tasks |
 | S2 | Sunrise Yoga Club weekly class; Sunrise Yoga Club. Field 4, Sundays Jun 6 to Aug 29, 8 to 9 am, 20 people | Instant (13-session series), Draft | Applicant, in the wizard | Persona opens the wizard at step 3 with repeat just turned on. Panel: Instant, \$20 a session, \$260 in all; the Jul 11 session carries an Impacted warning | Not visible until paid; then 13 sessions on the Active permits calendar |
-| S3 | Jazz in the Plaza; Downtown Arts Collective. City Hall Plaza, Fri Jun 18, 6 to 9 pm, 150 people, amplified sound, one food truck (Rolling Dumpling Co.) | Reviewed, Needs info | Applicant: upload the food truck's health permit, due Wed, May 5 | Do now (pinned): Health & Legal's request. Done: insurance, sound details, vendor list. Coming up: accept and sign, pay \$715, carry permit | Public Works & Safety approved with conditions on Apr 28 (sound ends 9 pm; speakers face away from Elm Street; 85 dB at 50 ft). Health & Legal asked on Apr 30; review clock paused since then. Date held since Apr 19 |
-| S4 | Maple Street block party; Maple Street block captain. 400 block of Maple Street, Sat Jun 26, 2 to 8 pm, 120 neighbors, one-block closure, 4 barricades | Reviewed (block-party exception), Submitted | Applicant: 3 of 12 neighbor sign-offs | Do now: Neighbor sign-off, 9 of 12. With the city: insurance, city services request. Coming up: accept and sign, pay \$510. Strip: "No date hold yet" | Clerk intake lists it with one blocker; Accept disabled. Routing pre-suggests Public Works & Safety (closure, barricades) and Health & Legal (insurance) |
+| S3 | Jazz in the Plaza; Downtown Arts Collective. City Hall Plaza, Fri Jun 18, 6 to 9 pm, 150 people, amplified sound, one food truck (Rolling Dumpling Co.) | Standard, Needs info | Applicant: upload the food truck's health permit, due Wed, May 5 | Do now (pinned): Health & Legal's request. Done: insurance, sound details, vendor list. Coming up: accept and sign, pay \$715, carry permit | Public Works & Safety approved with conditions on Apr 28 (sound ends 9 pm; speakers face away from Elm Street; 85 dB at 50 ft). Health & Legal asked on Apr 30; review clock paused since then. Date held since Apr 19 |
+| S4 | Maple Street block party; Maple Street block captain. 400 block of Maple Street, Sat Jun 26, 2 to 8 pm, 120 neighbors, one-block closure, 4 barricades | Standard (block-party exception), Submitted | Applicant: 3 of 12 neighbor sign-offs | Do now: Neighbor sign-off, 9 of 12. With the city: insurance, city services request. Coming up: accept and sign, pay \$510. Strip: "No date hold yet" | Clerk intake lists it with one blocker; Accept disabled. Routing pre-suggests Public Works & Safety (closure, barricades) and Health & Legal (insurance) |
 | S5 | Riverfront Summer 5K; Riverfront Running Club. Loop from City Hall Plaza along Main Street and River Road, Sun Jul 11, 7 to 11 am, 1,200 runners, amplified sound at the finish, water stations | Special event, Quote sent | Applicant: accept, sign and pay \$6,530 by Fri, May 14. Health & Legal: verify the race-day insurance certificate uploaded Apr 30 | Do now: Accept conditions and sign; Pay fees and deposit. With the city: certificate of insurance. Done: all special-event plans, pre-application meeting, community notice. Coming up: coordination meeting Mon, Jun 21; walkthrough Fri, Jul 2 | Clerk: Issue permit disabled until paid and verified. Public Works & Safety approved with conditions (route closed 6 to 11:30 am; 8 officers; 40 barricades; finish sound off by 11 am). Health & Legal: accessibility approved, insurance check in its queue |
 | S6 | Main Street Food Truck Festival; Main Street Business Alliance. Main Street, 1st to 4th Avenue, Sat Apr 24, noon to 9 pm, 3,000 people, 25 food trucks, beer garden, stage | Special event, Closeout (9 days after) | Public Works & Safety: cleanup check and actual hours, due Fri, May 7. Then the Clerk reconciles | Coming up: final bill or refund, feedback. Everything else Done | Public Works & Safety closeout tasks in its queue. Clerk's reconciliation locked until hours are logged |
 
@@ -660,10 +660,10 @@ Six hero cases make thin queues: on May 3 the Clerk has nothing it can act on, b
 | Case | Tier and state | Gives work to |
 |----|----|----|
 | Downtown Art Walk; Main Street, 2nd to 5th Avenue, Fri Jul 23 | Special, Submitted and complete | Clerk: accept, route, schedule consultation |
-| Riverside Farmers Market; Great Lawn, Saturdays Jun 5 to Sep 25 | Reviewed series, In review | Public Works & Safety: tents; Health & Legal: vendor list |
-| Movie Night on the Lawn; Great Lawn, Sat Jun 12 | Reviewed, In review | Health & Legal: verify insurance |
-| Oak Avenue block party; Sat Jun 5 | Reviewed (block party), Quote sent | Applicant: pay; Clerk payments list |
-| Plaza wedding photos; City Hall Plaza, Fri Jun 18 | Reviewed, Submitted, missing insurance | Clerk: date conflict with S3, which was complete first |
+| Riverside Farmers Market; Great Lawn, Saturdays Jun 5 to Sep 25 | Standard series, In review | Public Works & Safety: tents; Health & Legal: vendor list |
+| Movie Night on the Lawn; Great Lawn, Sat Jun 12 | Standard, In review | Health & Legal: verify insurance |
+| Oak Avenue block party; Sat Jun 5 | Standard (block party), Quote sent | Applicant: pay; Clerk payments list |
+| Plaza wedding photos; City Hall Plaza, Fri Jun 18 | Standard, Submitted, missing insurance | Clerk: date conflict with S3, which was complete first |
 | Little League Opening Day; Fields 1 and 2, Sat May 15 | Instant, Permitted | Active permits list |
 | Company picnic; Shelter 4, Sat Apr 17 | Instant, Closeout with a damage report | Clerk: Instant exceptions tab |
 
@@ -673,7 +673,7 @@ These paths are the acceptance tests. Each must run from a fresh seed with no de
 
 1.  **Instant in two minutes (S2).** As Sunrise Yoga Club, finish the wizard from step 3. The plan shows Instant, 13 sessions at \$20. Pay the first session; the series permit appears with its QR code. Switch to City Clerk: Active permits shows 13 Sundays on Field 4.
 
-2.  **Watch the tier move (New applicant).** Pick Picnic or party at Shelter 2 for 40 people: Instant. Turn on alcohol: Reviewed, and the what-if chip offers the way back. Switch the location to two Main Street blocks: Special event. Set attendance to 1,200 with no street: still Special. Each change updates the panel, the reviewers and the fee estimate.
+2.  **Watch the tier move (New applicant).** Pick Picnic or party at Shelter 2 for 40 people: Instant. Turn on alcohol: Standard, and the what-if chip offers the way back. Switch the location to two Main Street blocks: Special event. Set attendance to 1,200 with no street: still Special. Each change updates the panel, the reviewers and the fee estimate.
 
 3.  **Answer a request (S3).** As Downtown Arts Collective, open the pinned card, use the sample file, send. The card moves to With the city. As Health & Legal, verify it and approve the section. As City Clerk, consolidate (Public Works & Safety's conditions carry over), approve and send the \$715 quote. As the applicant, accept, sign and pay. Insurance was already verified, so the Clerk issues the permit and it appears in Active permits.
 
@@ -683,7 +683,7 @@ These paths are the acceptance tests. Each must run from a fresh seed with no de
 
 6.  **Closeout (S6).** As Public Works & Safety, pass the cleanup check and log 72 officer-hours and 4 crew-hours. As City Clerk, reconciliation shows \$750 over the estimate; issue the \$250 deposit refund and close. As the applicant, the board shows the refund, the feedback form and "Book again next year", which drafts Sat, Apr 22, 2028.
 
-7.  **Amend up a tier (S1, P1).** As Maya, add a DJ. The event becomes Reviewed and the date gate fires: 19 days left, 30 needed. Choose the late fee. New cards tagged Amendment appear, and the current permit stays valid for the original plan.
+7.  **Amend up a tier (S1, P1).** As Maya, add a DJ. The event becomes Standard and the date gate fires: 19 days left, 30 needed. Choose the late fee. New cards tagged Amendment appear, and the current permit stays valid for the original plan.
 
 After every path, Reset returns the seed exactly, checked by a Vitest snapshot of the store.
 
@@ -753,7 +753,7 @@ Nine calls here go beyond the flows doc and the scenarios sheet. Push back on an
 
 5.  A sixth event type, Class or club meetup, because a weekly yoga class (S2) fits none of the five.
 
-6.  Any add-on makes an event at least Reviewed, following the decision-tree diagram. Cooking, admission and city services count as add-ons even though the tier table doesn't list them.
+6.  Any add-on makes an event at least Standard, following the decision-tree diagram. Cooking, admission and city services count as add-ons even though the tier table doesn't list them.
 
 7.  S5 gets a second party up: Health & Legal verifying a race-day insurance certificate uploaded Apr 30. The sheet doesn't say this; it gives Health & Legal day-one work and shows two parties up at once.
 

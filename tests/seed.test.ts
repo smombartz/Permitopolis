@@ -510,7 +510,7 @@ describe("PRD seed table: the six scenarios", () => {
   describe("S3 · Jazz in the Plaza", () => {
     const s3 = seeded("S3");
 
-    it("Reviewed, Needs info: City Hall Plaza, Fri, Jun 18, 6 to 9 pm, 150 people, sound, one food truck", () => {
+    it("Standard, Needs info: City Hall Plaza, Fri, Jun 18, 6 to 9 pm, 150 people, sound, one food truck", () => {
       expect(s3).toMatchObject({ applicantId: "downtown-arts-collective", tier: "reviewed", state: "needs_info", attendance: 150 });
       expect(s3.location).toMatchObject({ mode: "area", areaId: "city-hall-plaza" });
       expect(s3.schedule).toMatchObject({ date: "2027-06-18", start: "18:00", end: "21:00" });
@@ -603,7 +603,7 @@ describe("PRD seed table: the six scenarios", () => {
   describe("S4 · Maple Street block party", () => {
     const s4 = seeded("S4");
 
-    it("Reviewed by the block-party exception, Submitted: 400 block of Maple Street, Sat, Jun 26, 2 to 8 pm, 120 neighbors, 4 barricades", () => {
+    it("Standard through the block-party exception, Submitted: 400 block of Maple Street, Sat, Jun 26, 2 to 8 pm, 120 neighbors, 4 barricades", () => {
       expect(s4).toMatchObject({ applicantId: "maple-street-block-captain", tier: "reviewed", state: "submitted", attendance: 120 });
       expect(classify(s4)).toMatchObject({ tier: "reviewed", blockPartyException: true, leadTimeDays: 30 });
       expect(s4.location?.segmentIds).toEqual(["maple-400"]);
@@ -974,7 +974,7 @@ describe("PRD filler cases", () => {
     expect(routing(f1, classify(f1)).map((r) => r.dept)).toEqual(["pws", "hl"]);
   });
 
-  it("Riverside Farmers Market: Great Lawn, Saturdays Jun 5 to Sep 25. A Reviewed series, In review: tents for Public Works & Safety, the vendor list for Health & Legal", () => {
+  it("Riverside Farmers Market: Great Lawn, Saturdays Jun 5 to Sep 25. A Standard series, In review: tents for Public Works & Safety, the vendor list for Health & Legal", () => {
     const f2 = seeded("F2");
     expect(f2).toMatchObject({ name: "Riverside Farmers Market", tier: "reviewed", state: "in_review" });
     expect(f2.location?.areaId).toBe("great-lawn");
@@ -989,7 +989,7 @@ describe("PRD filler cases", () => {
     expect(card(f2, "vendor_list").status).toBe("submitted");
   });
 
-  it("Movie Night on the Lawn: Great Lawn, Sat, Jun 12. Reviewed, In review, with Health & Legal to verify insurance", () => {
+  it("Movie Night on the Lawn: Great Lawn, Sat, Jun 12. Standard, In review, with Health & Legal to verify insurance", () => {
     const f3 = seeded("F3");
     expect(f3).toMatchObject({ name: "Movie Night on the Lawn", tier: "reviewed", state: "in_review" });
     expect(f3.location?.areaId).toBe("great-lawn");
@@ -1012,7 +1012,7 @@ describe("PRD filler cases", () => {
     expect(availability(movie.location!, { date: "2027-06-12", start: "12:00", end: "22:30" }, ctx, movie.id)).toMatchObject({ status: "booked", reason: "Riverside Farmers Market has this date held" });
   });
 
-  it("Oak Avenue block party: Sat, Jun 5. Reviewed as a block party, Quote sent: the applicant pays, and it is on the Clerk's payments list", () => {
+  it("Oak Avenue block party: Sat, Jun 5. Standard as a block party, Quote sent: the applicant pays, and it is on the Clerk's payments list", () => {
     const f4 = seeded("F4");
     expect(f4).toMatchObject({ name: "Oak Avenue block party", tier: "reviewed", state: "quote_sent" });
     expect(classify(f4).blockPartyException).toBe(true);
@@ -1025,7 +1025,7 @@ describe("PRD filler cases", () => {
     expect(card(f4, "neighbor_signoff")).toMatchObject({ status: "done", payload: { progress: { done: 8, total: 8 } } });
   });
 
-  it("Plaza wedding photos: City Hall Plaza, Fri, Jun 18. Reviewed, Submitted, missing insurance, and refused the date S3 holds", () => {
+  it("Plaza wedding photos: City Hall Plaza, Fri, Jun 18. Standard, Submitted, missing insurance, and refused the date S3 holds", () => {
     const f5 = seeded("F5");
     const s3 = seeded("S3");
     expect(f5).toMatchObject({ name: "Plaza wedding photos", tier: "reviewed", state: "submitted" });
@@ -1093,7 +1093,7 @@ describe("background cases (plan 6.2)", () => {
     expect(b02.state).toBe("draft");
     expect(b02.location && b02.schedule && b02.attendance && b02.eventType).toBeTruthy();
     const gate = dateGate(b02, classify(b02), ctx, b02.id);
-    // Thu, May 13 is 10 days away; a Reviewed event (amplified sound) needs 30.
+    // Thu, May 13 is 10 days away; a Standard event (amplified sound) needs 30.
     expect(gate).toMatchObject({ ok: false, leadTimeOk: false, daysUntil: 10, fixes: ["new_date", "drop_addon", "late_fee"], droppable: ["amplified_sound"] });
     expect(gate.availability.status).toBe("open");
   });

@@ -32,14 +32,14 @@ import {
 const TODAY = DEFAULT_DEMO_TODAY;
 const S1 = "PMT-27-0109"; // Maya Chen, picnic, Instant, permitted
 const S2 = "PMT-27-0142"; // Sunrise Yoga Club, Instant series, draft
-const S3 = "PMT-27-0118"; // Downtown Arts Collective, Reviewed, needs_info (one pinned health permit)
-const S4 = "PMT-27-0126"; // Maple Street block captain, Reviewed, submitted (9 of 12 sign-offs)
+const S3 = "PMT-27-0118"; // Downtown Arts Collective, Standard, needs_info (one pinned health permit)
+const S4 = "PMT-27-0126"; // Maple Street block captain, Standard, submitted (9 of 12 sign-offs)
 const S5 = "PMT-27-0097"; // Riverfront Running Club, Special, quote_sent
 const S6 = "PMT-27-0031"; // Main Street Business Alliance, Special, closeout
 const WITHDRAWN_B23 = "PMT-27-0048"; // Sunnyvale Block Association, withdrawn before a permit
-const B02 = "PMT-27-0004"; // Riverside Garden Society, Reviewed, a Draft with no board yet
+const B02 = "PMT-27-0004"; // Riverside Garden Society, Standard, a Draft with no board yet
 const B16 = "PMT-27-0034"; // Riverside Tai Chi Circle, Instant series, Event day today
-const F2 = "PMT-27-0070"; // Riverside Farmers Market, Reviewed series, In review
+const F2 = "PMT-27-0070"; // Riverside Farmers Market, Standard series, In review
 
 function find(id: string) {
   const c = buildSeed().find((c) => c.id === id);
@@ -63,7 +63,7 @@ describe("myEvents", () => {
   });
 
   it("sends a Draft that already has its board to the board: its cards are what it needs next", () => {
-    // What the wizard's last step leaves behind for a Reviewed event: still a Draft, with cards.
+    // What the wizard's last step leaves behind for a Standard event: still a Draft, with cards.
     const cases = buildSeed().map((c) =>
       c.id === B02 ? { ...c, tasks: [makeTask({ id: `${B02}:insurance_certificate`, catalogId: "insurance_certificate" })] } : c,
     );

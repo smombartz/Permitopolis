@@ -511,7 +511,7 @@ export const INTAKE_TABS: IntakeTab[] = ["special", "reviewed", "instant"];
 
 export const INTAKE_TAB_LABEL: Record<IntakeTab, string> = {
   special: "Special",
-  reviewed: "Reviewed",
+  reviewed: "Standard",
   instant: "Instant exceptions",
 };
 
@@ -595,7 +595,7 @@ export interface IntakeRow {
 const DISABLED_ACCEPT: ActionAvailability = { type: "accept_complete", label: "Accept as complete", enabled: false, reason: "Not available for this case." };
 const DISABLED_REQUEST: ActionAvailability = { type: "request_info", label: "Request information", enabled: false };
 
-/** The Special and Reviewed tabs' rows, oldest submission first. */
+/** The Special and Standard tabs' rows, oldest submission first. */
 export function intakeRows(cases: EventCase[], tab: Exclude<IntakeTab, "instant">, today: ISODate, cfg: RulesConfig): IntakeRow[] {
   const ctx: RulesCtx = { today, cases, cfg };
   return intakeCasesFor(cases, tab)

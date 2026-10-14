@@ -120,7 +120,7 @@ export function permitComponents(a: EventAnswers, triggers: Trigger[], blockPart
   const tierIsReviewedOrSpecial = triggers.length > 0;
 
   if (a.location?.mode === "inventory") {
-    // Booking a space is automatic only when nothing raises the tier; on a Reviewed or Special plan the Clerk approves it with the rest.
+    // Booking a space is automatic only when nothing raises the tier; on a Standard or Special plan the Clerk approves it with the rest.
     components.push({ id: "space_reservation", label: "Space reservation", approvedBy: tierIsReviewedOrSpecial ? "City Clerk" : "City Clerk (automatic for Instant)" });
   }
   if (a.location?.mode === "area") {

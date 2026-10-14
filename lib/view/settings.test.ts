@@ -51,7 +51,7 @@ describe("validateTierRules", () => {
     expect(tierRulesAreValid(errors)).toBe(true);
   });
 
-  it("rejects Reviewed at or above Special", () => {
+  it("rejects Standard at or above Special", () => {
     const errors = validateTierRules({ ...valid, reviewedAttendance: 1000, specialAttendance: 1000 });
     expect(errors.reviewedAttendance).toMatch(/below the Special/);
     expect(tierRulesAreValid(errors)).toBe(false);
@@ -74,28 +74,28 @@ describe("validateTierRules", () => {
 });
 
 describe("scenarioTierPreviews, against the real seed", () => {
-  it("S3 Jazz in the Plaza stays Reviewed when the Reviewed threshold drops to 40 (its own plaza trigger holds it there)", () => {
+  it("S3 Jazz in the Plaza stays Standard when the Standard threshold drops to 40 (its own plaza trigger holds it there)", () => {
     const edited = applyTierRules(DEFAULT_CONFIG, { ...tierRulesFromConfig(DEFAULT_CONFIG), reviewedAttendance: 40 });
     const rows = scenarioTierPreviews(cases, DEFAULT_CONFIG, edited);
     const s3 = rows.find((r) => r.id === "S3")!;
     expect(s3.name).toBe("Jazz in the Plaza");
     expect(s3.before).toBe("reviewed");
     expect(s3.after).toBe("reviewed");
-    expect(scenarioPreviewLine(s3)).toBe("Jazz in the Plaza: Reviewed, unchanged");
+    expect(scenarioPreviewLine(s3)).toBe("Jazz in the Plaza: Standard, unchanged");
   });
 
-  it("S1 Maya Chen's 45-guest picnic moves from Instant to Reviewed when the Reviewed threshold drops to 40", () => {
+  it("S1 Maya Chen's 45-guest picnic moves from Instant to Standard when the Standard threshold drops to 40", () => {
     const edited = applyTierRules(DEFAULT_CONFIG, { ...tierRulesFromConfig(DEFAULT_CONFIG), reviewedAttendance: 40 });
     const rows = scenarioTierPreviews(cases, DEFAULT_CONFIG, edited);
     const s1 = rows.find((r) => r.id === "S1")!;
     expect(s1.name).toBe("Maya Chen's 40th birthday picnic");
     expect(s1.before).toBe("instant");
     expect(s1.after).toBe("reviewed");
-    expect(scenarioPreviewLine(s1)).toBe("Maya Chen's 40th birthday picnic: Instant → Reviewed");
+    expect(scenarioPreviewLine(s1)).toBe("Maya Chen's 40th birthday picnic: Instant → Standard");
   });
 
   // The brief for this workstream also expects "raising Special to 1,500 moves the 5K preview
-  // to Reviewed" (S5, Riverfront Summer 5K). Against the real seed this does not happen: S5's
+  // to Standard" (S5, Riverfront Summer 5K). Against the real seed this does not happen: S5's
   // answers carry a route (always a Special trigger) and police staffing (always a
   // heavy-resources trigger), so it stays Special however high the attendance threshold goes.
   // Recorded here so the panel's real behavior is pinned down, and the mechanism itself is
@@ -121,7 +121,7 @@ describe("openDraftTierChanges", () => {
     expect(openDraftTierChanges(cases, DEFAULT_CONFIG, DEFAULT_CONFIG)).toEqual([]);
   });
 
-  it("moves a 45-person open Draft from Instant to Reviewed when the Reviewed threshold drops to 40", () => {
+  it("moves a 45-person open Draft from Instant to Standard when the Standard threshold drops to 40", () => {
     const draft = makeCase({ id: "PMT-27-TEST1", name: "A 45-guest picnic draft", state: "draft", attendance: 45, location: null, addOns: EMPTY_ADDONS });
     const edited = applyTierRules(DEFAULT_CONFIG, { ...tierRulesFromConfig(DEFAULT_CONFIG), reviewedAttendance: 40 });
     const rows = openDraftTierChanges([draft], DEFAULT_CONFIG, edited);
@@ -130,8 +130,8 @@ describe("openDraftTierChanges", () => {
 
   // Isolates the mechanism the brief's "5K" example describes: a crowd of 1,200 with no street,
   // route or other Special trigger is Special on attendance alone, so raising the Special
-  // threshold past it drops the draft to Reviewed.
-  it("moves a 1,200-person open Draft with no other trigger from Special to Reviewed when the Special threshold rises to 1,500", () => {
+  // threshold past it drops the draft to Standard.
+  it("moves a 1,200-person open Draft with no other trigger from Special to Standard when the Special threshold rises to 1,500", () => {
     const draft = makeCase({ id: "PMT-27-TEST2", name: "A 1,200-runner 5K draft", state: "draft", attendance: 1200, location: null, addOns: EMPTY_ADDONS });
     const edited = applyTierRules(DEFAULT_CONFIG, { ...tierRulesFromConfig(DEFAULT_CONFIG), specialAttendance: 1500 });
     const rows = openDraftTierChanges([draft], DEFAULT_CONFIG, edited);
@@ -173,8 +173,8 @@ describe("fees: feeFieldsByGroup / updateFeeField", () => {
 
   it("names a tiered field for its fee kind and tier, so Instant reads differently under each", () => {
     const groups = feeFieldsByGroup();
-    expect(groups.application.map((f) => f.label)).toEqual(["Application fee: Instant", "Application fee: Reviewed", "Application fee: Special event"]);
-    expect(groups.deposits.map((f) => f.label)).toEqual(["Deposit: Instant", "Deposit: Reviewed", "Deposit: Special event"]);
+    expect(groups.application.map((f) => f.label)).toEqual(["Application fee: Instant", "Application fee: Standard", "Application fee: Special event"]);
+    expect(groups.deposits.map((f) => f.label)).toEqual(["Deposit: Instant", "Deposit: Standard", "Deposit: Special event"]);
   });
 
   it("clamps a negative or non-finite entry to 0", () => {

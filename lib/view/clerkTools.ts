@@ -331,7 +331,7 @@ export interface PermitChecklistItem {
 /**
  * The day this task started being owed. A card that was created locked carries a "todo" entry
  * for the day it unlocked (applyUnlockEvent appends one); a card open from the start of the
- * plan (insurance, for every Reviewed or Special event) carries no entry until something
+ * plan (insurance, for every Standard or Special event) carries no entry until something
  * happens to it, so its earliest entry — however it reads — is the earliest evidence there is.
  * Falls back to when the case was submitted, for a card untouched since the plan was built.
  */

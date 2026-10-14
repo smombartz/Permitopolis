@@ -431,7 +431,7 @@ describe("seeded cases, taken further through both engines", () => {
   });
 });
 
-describe("a Reviewed series (F2): quote, verification and permit", () => {
+describe("a Standard series (F2): quote, verification and permit", () => {
   const quoted = () => {
     let f2 = seeded("F2");
     f2 = run(f2, APPROVE, "pws", TODAY);
@@ -535,12 +535,12 @@ describe("amend: Maya adds a DJ to her permitted picnic on May 3 (demo path 7)",
   const withDj: EventAnswers = { ...S1.answers, addOns: { ...S1.answers.addOns, amplifiedSound: true } };
   const cards = (c: EventCase) => c.tasks.map((t) => [t.catalogId, t.status, t.tags.join()]);
 
-  it("the date gate runs again: 19 days left of the 30 a Reviewed event needs, so the amendment waits for a fix", () => {
+  it("the date gate runs again: 19 days left of the 30 a Standard event needs, so the amendment waits for a fix", () => {
     const s1 = seeded("S1");
     expect(reasonFor(s1, { type: "amend", answers: withDj }, "applicant", TODAY, othersOf(s1))).toBe("Needs 30 days of notice; pick a later date or add the late fee.");
   });
 
-  it("with the late fee it goes through: Reviewed, new cards tagged, the new plan's fees, and the permit as it was", () => {
+  it("with the late fee it goes through: Standard, new cards tagged, the new plan's fees, and the permit as it was", () => {
     const s1 = seeded("S1");
     const amended = run(s1, { type: "amend", answers: withDj, lateFee: true }, "applicant", TODAY, othersOf(s1));
 
@@ -565,7 +565,7 @@ describe("amend: Maya adds a DJ to her permitted picnic on May 3 (demo path 7)",
     expect(new Set(amended.feeLines.map((line) => line.id)).size).toBe(5);
     // What she paid for the original plan stays paid; the rest comes with the amendment's quote.
     expect(caseTotals(amended)).toMatchObject({ total: 518.75, paid: 125, due: 393.75 });
-    expect(amended.activity.at(-1)?.text).toBe("Amended the plan: This is a Reviewed event: about 3 weeks, $518.75 with the $53.75 late fee.");
+    expect(amended.activity.at(-1)?.text).toBe("Amended the plan: This is a Standard event: about 3 weeks, $518.75 with the $53.75 late fee.");
     // The slot is still hers.
     expect(availability(S1.answers.location!, SHELTER_3_WINDOW, ctx(TODAY, [amended])).status).toBe("booked");
   });
@@ -615,7 +615,7 @@ describe("amend: Maya adds a DJ to her permitted picnic on May 3 (demo path 7)",
 });
 
 describe("a board built before the last edit", () => {
-  // Shelter 3 on Sat, Jun 19: far enough out for a Reviewed event.
+  // Shelter 3 on Sat, Jun 19: far enough out for a Standard event.
   const withSound: EventAnswers = {
     ...S1.answers,
     name: "Picnic with a DJ",
@@ -623,7 +623,7 @@ describe("a board built before the last edit", () => {
     addOns: { ...S1.answers.addOns, amplifiedSound: true },
   };
 
-  it("dropping the add-on that made it Reviewed books as Instant, with Instant cards and fees only", () => {
+  it("dropping the add-on that made it Standard books as Instant, with Instant cards and fees only", () => {
     let c = run(draft("PMT-27-0160", withSound, TODAY), { type: "create_board" }, "applicant", TODAY);
     expect(c.tier).toBe("reviewed");
     expect(caseTotals(c).total).toBe(465);

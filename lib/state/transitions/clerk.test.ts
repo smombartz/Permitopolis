@@ -282,7 +282,7 @@ describe("confirm_routing: the list the Clerk confirms", () => {
   });
 
   it("the review clock's allowance is the days the Clerk gave: from routing to the due date", () => {
-    // Routed on Mon, May 3. The config would allow a Reviewed event 14 days; the Clerk gives 21 and 10.
+    // Routed on Mon, May 3. The config would allow a Standard event 14 days; the Clerk gives 21 and 10.
     const reviewers = [
       { dept: "pws" as const, sections: ["Sound details"], dueDate: "2027-05-24" },
       { dept: "hl" as const, sections: ["Certificate of insurance"], dueDate: "2027-05-13" },

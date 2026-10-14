@@ -112,7 +112,7 @@ describe("requirements: pay_fees", () => {
     expect(pay.payload.amount).toBe(125);
   });
 
-  it("a Reviewed or Special event's pay_fees stays locked until the quote is sent, with the total due", () => {
+  it("a Standard or Special event's pay_fees stays locked until the quote is sent, with the total due", () => {
     const a = answers({ location: areaLocation("city-hall-plaza"), schedule: { date: "2027-06-18", start: "18:00", end: "21:00", occurrences: [] }, attendance: 150 });
     const cls = classify(a);
     const tasks = requirements(a, cls, { caseId: "PMT-27-0118", today: "2027-04-16" });
@@ -166,7 +166,7 @@ describe("requirements: the Security and medical plan follows the configured Spe
     expect(cards(999, DEFAULT_CONFIG)).not.toContain("security_medical_plan");
   });
 
-  it("raising the threshold to 2,000 leaves a crowd of 1,200 Reviewed, with no card", () => {
+  it("raising the threshold to 2,000 leaves a crowd of 1,200 Standard, with no card", () => {
     const cfg = withThreshold(2000);
     expect(classify(crowdOf(1200), cfg).tier).toBe("reviewed");
     expect(cards(1200, cfg)).not.toContain("security_medical_plan");
@@ -198,7 +198,7 @@ describe("requirements: a card to finish before submitting is never due in the p
     expect(dueOf("2027-06-18", "2027-05-03")).toMatchObject({ insurance_certificate: "2027-05-19", sound_details: "2027-05-19", submit_application: "2027-05-19" });
   });
 
-  it("inside the lead time (a Reviewed event 17 days out, or a change taken with the late fee) it is due today, not three weeks ago", () => {
+  it("inside the lead time (a Standard event 17 days out, or a change taken with the late fee) it is due today, not three weeks ago", () => {
     // May 20 less 30 days is Apr 20: before the day the card was made.
     expect(dueOf("2027-05-20", "2027-05-03")).toMatchObject({ insurance_certificate: "2027-05-03", sound_details: "2027-05-03", submit_application: "2027-05-03" });
   });

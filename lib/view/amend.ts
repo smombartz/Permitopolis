@@ -142,7 +142,7 @@ function round2(n: number): number {
   return Math.round(n * 100) / 100;
 }
 
-/** "This change makes your event Reviewed. Everything you entered is kept; 3 new cards will be added." */
+/** "This change makes your event Standard. Everything you entered is kept; 3 new cards will be added." */
 export function tierRiseBannerText(diff: AmendmentDiff): string {
   const n = diff.cardsAdded.length;
   return `This change makes your event ${diff.tierLabelAfter}. Everything you entered is kept; ${n} new card${n === 1 ? "" : "s"} will be added.`;
@@ -288,7 +288,7 @@ export function amendmentReview(c: EventCase, cfg: RulesConfig): AmendmentReview
   };
 }
 
-/** "Instant to Reviewed, 4 new cards" (or "Reviewed, 1 new card" when the tier holds): the banner's first words. */
+/** "Instant to Standard, 4 new cards" (or "Standard, 1 new card" when the tier holds): the banner's first words. */
 export function amendmentHeadline(review: AmendmentReview): string {
   const tier = review.tierBefore === review.tierAfter ? TIER_LABEL[review.tierAfter] : `${TIER_LABEL[review.tierBefore]} to ${TIER_LABEL[review.tierAfter]}`;
   return `${tier}, ${plural(review.cards.length, "new card")}`;

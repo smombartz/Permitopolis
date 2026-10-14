@@ -12,7 +12,7 @@ interface TierBadgeProps extends React.ComponentProps<"span"> {
   tier: Tier
 }
 
-/** Outline micro-badge, name spelled out: Instant / Reviewed / Special event. */
+/** Outline micro-badge, name spelled out: Instant / Standard / Special event. */
 function TierBadge({ tier, className, ...props }: TierBadgeProps) {
   const Icon = TIER_ICON[tier]
   return (

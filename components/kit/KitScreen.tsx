@@ -205,7 +205,7 @@ function sampleTask(overrides: Partial<Task> = {}): Task {
     owner: "applicant",
     kind: "document",
     title: "Upload certificate of insurance",
-    why: "Every Reviewed and Special event needs this.",
+    why: "Every Standard and Special event needs this.",
     reviewer: "hl",
     dueDate: "2027-05-05",
     status: "todo",
@@ -272,7 +272,7 @@ const SAMPLE_TASKS: Task[] = [
   sampleTask({
     id: "t-done-dated",
     title: "Certificate of insurance",
-    why: "Every reviewed event needs proof of liability insurance",
+    why: "Every Standard and Special event needs proof of liability insurance",
     reviewer: "hl",
     status: "done",
     history: [
@@ -846,7 +846,7 @@ function KitScreen() {
             <Accordion type="single" collapsible>
               <AccordionItem value="a">
                 <AccordionTrigger>Do I need insurance?</AccordionTrigger>
-                <AccordionContent>Most Reviewed and Special events do. Instant bookings don&apos;t.</AccordionContent>
+                <AccordionContent>Most Standard and Special events do. Instant bookings don&apos;t.</AccordionContent>
               </AccordionItem>
               <AccordionItem value="b">
                 <AccordionTrigger>How far ahead should I apply?</AccordionTrigger>
@@ -1176,7 +1176,7 @@ function KitScreen() {
             selectOptions={[
               { value: "all", label: "All tiers" },
               { value: "instant", label: "Instant" },
-              { value: "reviewed", label: "Reviewed" },
+              { value: "reviewed", label: "Standard" },
               { value: "special", label: "Special event" },
             ]}
             onSelectChange={(value) => setFilterTier(value as Tier | "all")}
