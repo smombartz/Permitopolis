@@ -1,5 +1,22 @@
 # Change log
 
+## 2026-10-13 - Merged into master and deployed to Vercel
+
+**What Changed:**
+- Fast-forwarded `master` to `build` (commit `fe690aa6`); the two branches are the same commit
+- Created the Vercel project `permitopolis` in the team Studio M and deployed `master` to production: https://permitopolis.vercel.app
+- Added a "Deployment" section to `docs/readme.md` (URL, project, how to redeploy, what was checked) and the live URL to `README.md`; updated the plan's deploy decision and Changes
+
+**Why:**
+- The owner asked for the build branch to be merged and the prototype deployed, so reviewers have a live link
+
+**Files Modified:**
+- `docs/readme.md`
+- `README.md`
+- `docs/plans/2026-10-12-permitopolis-prototype.md`
+
+---
+
 ## 2026-10-13 - Submission notes and the final gate
 
 **What Changed:**

@@ -5,6 +5,8 @@ an applicant wizard and to-do board, and queue, pipeline and case views for thre
 Clerk, Public Works & Safety, Health & Legal). All state lives in the browser and resets to a seed of
 38 cases on a fixed demo date, Mon, May 3, 2027.
 
+Live at https://permitopolis.vercel.app (each visitor gets their own copy of the demo data).
+
 ## Run it
 
 ```bash

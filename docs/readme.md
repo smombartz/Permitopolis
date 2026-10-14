@@ -59,6 +59,24 @@ reader or held on a phone while it was built; that was left to the owner by desi
 markup and covered by jsdom tests only. Section 12 of the plan lists every screen with what to
 look for, and the last section of this file lists the product questions each built one way.
 
+## Deployment
+
+- **Live**: https://permitopolis.vercel.app (also https://permitopolis-mombartz.vercel.app). Public:
+  no login is needed to open it.
+- **Vercel project**: `permitopolis` in the team Studio M (`mombartz`). Framework preset Next.js,
+  build command `next build`, no environment variables.
+- **How it is deployed**: from this folder with the Vercel CLI (`vercel deploy --prod --scope
+  mombartz`). The repo has no git remote, so nothing deploys on its own; a new commit reaches the
+  site only when that command is run again. `.vercel/` and the `.env.local` that `vercel link`
+  wrote are ignored by git, and the app reads no environment variable.
+- **First deploy**: 2026-10-13, commit `fe690aa6` on `master`. Every route answered 200 on the
+  public URL, an unknown path 404, the landing page's 23 scripts and stylesheets loaded, and the
+  deployment's error log was empty. That is a check of what the server sends; nobody has yet
+  clicked through the deployed site in a browser.
+- **Each visitor has their own demo.** State lives in the visitor's browser (localStorage), so
+  two people on the same URL never see each other's changes, and Reset in the Demo menu restores
+  the seed for that browser only.
+
 ## Stack (versions installed on 2026-10-12)
 
 | Package | Version | Notes |
