@@ -16,11 +16,15 @@ describe("LandingScreen (/)", () => {
     expect(within(checker).getByText("Instant")).toBeInTheDocument();
   });
 
-  it("opens as a city office's page: the official-website line and the city's name in the header, no floating product panel", async () => {
+  it("opens as a city office's page: the city's name and the section nav in one header, no floating product panel", async () => {
     const { container } = await renderScreen(<LandingScreen />, { path: "/" });
 
     const header = screen.getByRole("banner");
-    expect(within(header).getByText("An official website of the City of Permitopolis")).toBeInTheDocument();
+    // One row: the nav sits in the header, before the "City staff" door.
+    const primary = within(header).getByRole("navigation", { name: "Primary" });
+    const cityStaff = within(header).getByRole("link", { name: "City staff" });
+    expect(primary.compareDocumentPosition(cityStaff) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(screen.queryByText(/An official website/)).not.toBeInTheDocument();
     const home = within(header).getByRole("link", { name: /City of Permitopolis/ });
     expect(home).toHaveAttribute("href", routes.home());
     expect(home).toHaveTextContent("Office of the City Clerk");

@@ -24,9 +24,7 @@ Decisions made with the owner on 2026-10-13:
 
 | Band | Content | Treatment |
 |---|---|---|
-| Official bar | Landmark icon, "An official website of the City of Permitopolis" | Thin `bg-page` strip, `text-fg-label`, bottom rule |
-| Identity row | City seal, "City of Permitopolis", "Office of the City Clerk"; right: "City staff" link, "Plan an event" button | Near-white (`bg-surface-solid`), not sticky |
-| Nav strip | `nav aria-label="Primary"`: How to apply, Permit tiers, Fees, Questions | Solid `bg-night` band with `data-tone="night"`; below 768 px one "Menu" dropdown holding the anchors and both doors (switched with CSS; see Changes) |
+| Header | City seal, "City of Permitopolis", "Office of the City Clerk"; right: `nav aria-label="Primary"` (How to apply, Permit tiers, Fees, Questions), then "City staff" link and "Plan an event" button | One row, near-white (`bg-surface-solid`), bottom rule, not sticky; below 1024 px one "Menu" dropdown holding the anchors and both doors (switched with CSS; see Changes) |
 | Page intro | Trail "City of Permitopolis › Office of the City Clerk › Event permits" (plain text: the parent pages do not exist), `h1` "Event permits", two-sentence lead, "Plan an event" button | `bg-page` band; `h1` at `text-feature`, 36 px below 640 px |
 | Tasks and checker | Left: `h2` "I want to…" with bordered link rows (Plan an event, See what it costs, Check how much notice to give, See what decides the tier, Read common questions). Right: `h2` "Check what your event needs", the live checker as a plain form | Two columns from `lg`, stacked below; flat bordered box, no tilt, float or mock window dots |
 | How to apply | The five wizard questions as a plain numbered `ol`, then one paragraph on the to-do list an event gets after applying | No scroll thread, no step mocks |
@@ -71,7 +69,7 @@ tier badges use it.
 2. [x] **Tests first** (they fail until step 3).
    - `tests/render/landing.test.tsx`: the checker is found by its new name ("Check what your event
      needs") in the three checker tests. New assertions: the `h1` is "Event permits"; the header
-     shows "An official website of the City of Permitopolis"; the nav, the "I want to…" list and
+     holds the city's name and the Primary nav before "City staff"; the nav, the "I want to…" list and
      the footer link to sections that exist; the footer holds the contact details and "Open the
      staff workspace"; the three tier rows show their notice, reviewers and fee; no element
      carries `page-atmosphere` or `anim-idle-float`.
@@ -79,7 +77,7 @@ tier badges use it.
      the assertion is unchanged.
    - `a11y`, `keyboard`, `smoke`, `hydration` and `guards` tests are not edited; they must pass.
 3. [x] **Build the page** in `components/landing/`.
-   - New: `SiteHeader.tsx` (official bar, identity row, nav strip), `CitySeal.tsx` (inline SVG
+   - New: `SiteHeader.tsx` (seal and name, nav, the two doors), `CitySeal.tsx` (inline SVG
      seal), `sections.ts` (the one list of section anchors and labels), `PageIntro.tsx`,
      `QuickTasks.tsx`, `SiteFooter.tsx`.
    - Renamed and rewritten: `HeroPreviewPanel.tsx` → `PermitChecker.tsx`, `HowItWorks.tsx` →
@@ -116,6 +114,12 @@ tier badges use it.
 
 ## Changes
 
+- 2026-10-13: **The owner removed the official bar and the nav strip after seeing the page.** The
+  "An official website of the City of Permitopolis" line is gone. The dark nav strip is gone and
+  its four links moved into the header row, just before "City staff". With the links beside the
+  city's name the row needs about 1000 px, so the "Menu" fallback now starts below 1024 px, not
+  768 px. The footer is the only night band left, which is what the design system allows. The
+  table above shows the page as it now stands.
 - 2026-10-13: **The header switches layouts with CSS, not `useIsNarrow()`.** Both layouts are in
   the markup (`hidden md:flex` and `md:hidden`). With the hook, the server-rendered page is the
   wide layout and a phone would show it for a moment, overflowing, before the script swapped it.

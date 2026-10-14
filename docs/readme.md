@@ -487,8 +487,8 @@ Seven surfaces, each built on its own and then joined. Every one is a client scr
 - **What `/` is, since 2026-10-13**: the "Event permits" page of the Office of the City Clerk,
   laid out as an official city site rather than a product page (plan:
   `docs/plans/2026-10-13-government-landing-page.md`, layout cues from seattle.gov and
-  cityofsydney.nsw.gov.au). Top to bottom: the official-website line, the city's seal and name
-  with the two doors, the section nav on a night strip, a title band (where the page sits, the
+  cityofsydney.nsw.gov.au). Top to bottom: a one-row header (the city's seal and name, then the
+  section nav, "City staff" and "Plan an event"), a title band (where the page sits, the
   `h1` "Event permits", a two-sentence lead), "I want to…" beside "Check what your event needs",
   then How to apply, Permit tiers, What decides the tier, Fees and cancellations, Common
   questions, and a four-column footer (contact, sections, city staff, about this site).
@@ -505,14 +505,19 @@ Seven surfaces, each built on its own and then joined. Every one is a client scr
 - **Look**: existing tokens only. Flat solid surfaces (`bg-surface-solid`, `bg-page` bands),
   `border-line-subtle` rules, `rounded-control`, underlined `text-fg-accent` links, plain `h2`s
   over an ink rule, sections 48 to 64px apart. No backdrop blur, card shadows, page atmosphere
-  or ambient motion. It bends Rime & Ink in three places, on purpose: **two night bands** (the
-  nav strip and the footer) where the system allows one full-bleed night section; **no eyebrow
-  pill** above section headings; and the page does not use the marketing type scale (the `h1`
+  or ambient motion. The footer is the page's one night band. It bends Rime & Ink in two
+  places, on purpose: **no eyebrow pill** above section headings; and the page does not use the
+  marketing type scale (the `h1`
   is 48px, 36px below 640px). The seal is an inline SVG in `currentColor`, hidden from a screen
   reader because the city's name is written beside it. The app's top bar still shows the text
   wordmark; the seal is the landing page's only.
-- **Responsive header**: both header layouts are in the markup and switched with CSS (`md:`),
-  not with `useIsNarrow()`, so a phone gets the "Menu" button from the first paint.
+- **Responsive header**: below 1024px the nav and the two doors fold into one "Menu" button
+  (the row has no room for them beside the city's name). Both layouts are in the markup and
+  switched with CSS (`lg:`), not with `useIsNarrow()`, so a phone gets the "Menu" button from
+  the first paint.
+- **Dropped at the owner's request, 2026-10-13**: the "An official website of the City of
+  Permitopolis" bar above the header, and the separate dark nav strip below it (its links moved
+  into the header row, before "City staff").
 - **What went**: the to-do board showcase (now one "After you apply" paragraph), the dark "One
   workspace, three roles" showcase (the door is "City staff" in the header and "Open the staff
   workspace" in the footer), the closing call-to-action card, and the trail's parent pages as

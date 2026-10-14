@@ -1,5 +1,26 @@
 # Change log
 
+## 2026-10-13 - Landing header reduced to one row
+
+**What Changed:**
+- Removed the "An official website of the City of Permitopolis" bar above the landing page's header
+- Removed the separate dark nav strip; its four links (How to apply, Permit tiers, Fees, Questions) now sit in the header row, just before "City staff" and "Plan an event"
+- The "Menu" fallback (the section links and both doors in one dropdown) now starts below 1024px instead of 768px, because the links share the row with the city's name; its button is the light secondary button, not the dark one
+- The header has a bottom rule; the footer is now the page's only night band
+- `tests/render/landing.test.tsx`: the header test now checks that the Primary nav is inside the header, before "City staff", and that the official-website line is gone
+- Docs brought in line: the change's plan, the build plan's section 7 and what-to-look-at rows, `docs/readme.md`
+
+**Why:**
+- The owner asked for both after previewing the branch `landing-government-style`
+
+**Files Modified:**
+- `components/landing/SiteHeader.tsx`
+- `components/landing/sections.ts` (comments only)
+- `tests/render/landing.test.tsx`
+- `docs/plans/2026-10-13-government-landing-page.md`, `docs/plans/2026-10-12-permitopolis-prototype.md`, `docs/readme.md`
+
+---
+
 ## 2026-10-13 - Landing page rebuilt as an official city page
 
 **What Changed:**
