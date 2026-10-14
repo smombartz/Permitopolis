@@ -1265,7 +1265,7 @@ describe("(i) every role switch lands on a real screen", () => {
 const ULTRA = "PMT-27-0030"; // Four Bridges Ultra: Special, Permitted, three open work orders
 const PARISH = "PMT-27-0012"; // St. Agnes Parish's festival: In review, food vendors, May 13
 
-/** Each role's own tools, as the sidebar names them, and the `<h1>` the page opens with. */
+/** Each role's own tools, as the city tabs name them, and the `<h1>` the page opens with. */
 const TOOL_PAGES: [role: Dept, label: string, href: string, title: string][] = [
   ["clerk", "Intake", routes.city.intake(), "Intake queue"],
   ["clerk", "Payments", routes.city.payments(), "Payments"],
@@ -1277,22 +1277,22 @@ const TOOL_PAGES: [role: Dept, label: string, href: string, title: string][] = [
 ];
 
 describe("(j) no page is a placeholder any more: every tool link reaches a built page, for the role it belongs to", () => {
-  it("the sidebar offers each role exactly its own tools", () => {
+  it("the city tabs offer each role exactly its own tools", () => {
     for (const role of CITY_ROLES) {
       expect(cityToolLinks(role).map((link) => [link.label, link.href])).toEqual(TOOL_PAGES.filter(([owner]) => owner === role).map(([, label, href]) => [label, href]));
     }
   });
 
-  it.each(TOOL_PAGES)("%s: the sidebar's %s link opens the page", async (role, label, href, title) => {
+  it.each(TOOL_PAGES)("%s: the city tabs' %s link opens the page", async (role, label, href, title) => {
     const { user } = await renderApp({ role, path: routes.city.queue() });
-    const sidebar = within(screen.getByRole("navigation", { name: "City" }));
+    const tabs = within(screen.getByRole("navigation", { name: "City" }));
 
-    await user.click(sidebar.getByRole("link", { name: label }));
+    await user.click(tabs.getByRole("link", { name: label }));
 
     expect(here()).toBe(href);
     expectRealScreen();
     expect(h1()).toBe(title);
-    expect(sidebar.getByRole("link", { name: label })).toHaveAttribute("aria-current", "page");
+    expect(tabs.getByRole("link", { name: label })).toHaveAttribute("aria-current", "page");
   });
 
   it.each(TOOL_PAGES)("%s's %s, typed in by another city role, offers the switch and then opens", async (role, _label, href, title) => {

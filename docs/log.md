@@ -1,5 +1,24 @@
 # Change log
 
+## 2026-10-14 - City navigation moves from a left sidebar to tabs below the header
+
+**What Changed:**
+- `components/shell/CitySidebar.tsx` is now `components/shell/CityNav.tsx`: the same links (My queue with its count, Cases, Active permits, a rule, then the role's own tools) as a horizontal row of tabs on a `bg-surface-1` band right below the site header, the current one underlined in indigo like the line tabs. It scrolls away with the page (only the header is pinned) and scrolls sideways if a window cannot fit it
+- `components/shell/CityShell.tsx`: the tabs render between the top bar and `<main>`, so the page now takes the full container width; the skip link lands on `<main>` again, past the tabs
+- Wording only: "sidebar" comments and test names in `PipelineBoard.tsx`, `lib/view/{shell,cityLists,caseDetail}.ts` and `tests/render/{shell,handoffs,keyboard}.test.tsx`
+
+**Why:**
+- Requested: the city roles' secondary menu should be a horizontal menu right below the header
+
+**Files Modified:**
+- `components/shell/CityNav.tsx` (renamed from `CitySidebar.tsx`)
+- `components/shell/CityShell.tsx`
+- `components/city/lists/PipelineBoard.tsx`
+- `lib/view/shell.ts`, `lib/view/cityLists.ts`, `lib/view/caseDetail.ts`
+- `tests/render/shell.test.tsx`, `tests/render/handoffs.test.tsx`, `tests/render/keyboard.test.tsx`
+
+---
+
 ## 2026-10-13 - Motion pass: anchor links glide and arrive, and what changes in the app settles
 
 **What Changed:**

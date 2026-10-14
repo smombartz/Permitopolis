@@ -9,7 +9,7 @@ import { TopBar } from "@/components/shell/TopBar";
 import { StorageBanner } from "@/components/shell/StorageBanner";
 import { SwitchRolePanel } from "@/components/shell/SwitchRolePanel";
 import { CoachStrip } from "@/components/shell/CoachStrip";
-import { CitySidebar } from "@/components/shell/CitySidebar";
+import { CityNav } from "@/components/shell/CityNav";
 import { RememberPath } from "@/components/shell/RememberPath";
 import { useRoleSwitch } from "@/components/shell/useRoleSwitch";
 import { queueFor, useDemo, useHydrated } from "@/lib/state";
@@ -34,15 +34,15 @@ interface CityShellProps {
 }
 
 /**
- * The frame for every city screen (app/city/layout.tsx): AppShell's skip link and top bar plus
- * a left sidebar (My queue, Cases, Active permits, then the role's own tools), with the page
- * beside it, both inside the page container and the `<main>` landmark. The skip link lands on
- * the page itself, past the sidebar. A screen starts with its PageHeader and never adds
- * `page-container` of its own. If the Applicant is current, the sidebar and page are swapped
- * for a panel offering to switch to a city role.
+ * The frame for every city screen (app/city/layout.tsx): AppShell's skip link and top bar, then
+ * a row of section tabs right below the header (My queue, Cases, Active permits, then the role's
+ * own tools), then the `<main>` landmark with the page inside the page container. The tabs sit
+ * outside `<main>`, so the skip link lands past them, on the page. A screen starts with its
+ * PageHeader and never adds `page-container` of its own. If the Applicant is current, there are
+ * no tabs and the page is swapped for a panel offering to switch to a city role.
  *
  * A role's own tools are that role's alone (the PRD's route map). A city role on another
- * role's tool page (a typed-in URL) keeps its sidebar and gets the panel in place of the page,
+ * role's tool page (a typed-in URL) keeps its tabs and gets the panel in place of the page,
  * and the page is not remembered as its last.
  */
 function CityShell({ children }: CityShellProps) {
@@ -58,15 +58,13 @@ function CityShell({ children }: CityShellProps) {
   // it changed; the page fades back in. A fade only, so nothing fixed or sticky is re-anchored.
   const pageRef = useSettle<HTMLDivElement>(role, { y: 0, fromOpacity: 0.4 });
 
-  // The skip link lands on the page, past the sidebar; with no page beside a sidebar, on <main>.
-  const besideSidebar = hydrated && isCityRole(role);
-
   return (
     <div className="app-ground flex min-h-dvh flex-col">
       <SkipLink />
       <TopBar />
-      {/* guard-allow-outline: no ring, it is the whole page, not a control. */}
-      <main id={besideSidebar ? undefined : MAIN_CONTENT_ID} tabIndex={besideSidebar ? undefined : -1} aria-busy={!hydrated} className="flex-1 outline-none">
+      {hydrated && isCityRole(role) ? <CityNav role={role} pathname={pathname} queueCount={queueFor(cases, role, demoToday).length} /> : null}
+      {/* The skip link lands here, past the tabs. guard-allow-outline: no ring, it is the whole page, not a control. */}
+      <main id={MAIN_CONTENT_ID} tabIndex={-1} aria-busy={!hydrated} className="flex-1 outline-none">
         {!hydrated ? (
           <PageSkeleton />
         ) : (
@@ -74,10 +72,8 @@ function CityShell({ children }: CityShellProps) {
             {!storageOk ? <StorageBanner /> : null}
             <CoachStrip />
             {isCityRole(role) ? (
-              <div className="page-container flex gap-6 py-6">
-                <CitySidebar role={role} pathname={pathname} queueCount={queueFor(cases, role, demoToday).length} />
-                {/* guard-allow-outline: no ring, it is the whole page, not a control. */}
-                <div ref={pageRef} id={MAIN_CONTENT_ID} tabIndex={-1} className="min-w-0 flex-1 outline-none">
+              <div className="page-container py-6">
+                <div ref={pageRef}>
                   {toolOwner === null || toolOwner === role ? (
                     <>
                       <React.Suspense fallback={null}>

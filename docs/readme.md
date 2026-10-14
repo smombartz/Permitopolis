@@ -156,7 +156,7 @@ components. Start here, then read "How the engine behaves" for the engine's fine
   their own `<main className="page-container ...">` (their placeholders pass `standalone`).
 - **What a shell gives a screen**: the top bar, the `<main>` landmark, a skeleton until
   `useHydrated()` is true, the storage-blocked banner, the page container with `py-6`, and in the
-  city the sidebar. So a screen inside a shell starts with its `PageHeader`, reads the store
+  city the row of section tabs below the header (`CityNav`). So a screen inside a shell starts with its `PageHeader`, reads the store
   directly, and never adds `page-container`, a `<main>`, or a hydration gate of its own. Until
   the stored demo has been read the top bar shows the city's seal and name and placeholders only:
   the role, the persona and the date all come from the store.
@@ -1332,7 +1332,7 @@ fixed (`docs/plans/2026-10-13-final-review-fixes.md`). What a builder now has to
 |---|---|
 | `tests/tool-pages.test.ts` | Each tool page to the case it lists, on the seed and after demo paths 5, 6 and 7: work orders and Public Works & Safety's queue; meetings on the calendar, on the work orders tab and on the card; closures and `permitSessions()`; the verification queue and the Documents tab; inspections and the vendor cards; Payments' Due, Received and Refunds and the engine's figures; an amendment's banner and panel, stage by stage |
 | `tests/demo-paths.test.ts` | The coach's step after every step of all seven paths; path 7 through the checks, the decision, the signature and the payment, a decline, and the date moved to Jun 18 with the amendment still pending |
-| `tests/render/handoffs.test.tsx`, "(j)" | Every sidebar tool link reaches a built page; every new list opens the case and the case returns to it; Settings reach the wizard's live panel; each coach step's page is a built page for its role; the palette reaches every page of each role; demo path 7 clicked from the permit to the amended permit |
+| `tests/render/handoffs.test.tsx`, "(j)" | Every city tab tool link reaches a built page; every new list opens the case and the case returns to it; Settings reach the wizard's live panel; each coach step's page is a built page for its role; the palette reaches every page of each role; demo path 7 clicked from the permit to the amended permit |
 | `tests/both-sides.test.ts` | An amendment's cards "With the city": the department that has each, and its date |
 | `tests/guards.test.ts` | No page under `app/` renders `PlaceholderScreen` |
 | `lib/state/transitions/amendment.test.ts`, `foodPermits.test.ts` | The two engine additions against the real rules and seed: an amendment at every stage when the event arrives, cancelled while pending, at Quote sent, and on a series with a session paid |
@@ -1375,7 +1375,7 @@ is in `docs/plans/2026-10-13-accessibility-responsive-pass.md`.
 |---|---|
 | Every route, for every role that can reach it, against the seed and inside its shell (505 pages, the applicant's a second time as a 375px phone draws them): one `h1`, one `main`, headings that do not skip a level, no button, link or form control without an accessible name, no duplicate id, no `aria-labelledby` or `aria-describedby` pointing at nothing, every table named and with header cells, every image hidden or named, labelled navigation and side panels, no control inside a control, no tab stop inside `aria-hidden`, no two links with one name going to two places, no assertive live region | `tests/render/a11y.test.tsx`, with the checks in `tests/render/a11yAudit.ts` |
 | The same for every action panel a city role can open on a case, in every state (221), every kind of card sheet on the board in every status (58), and the shell's menus, popovers and dialogs; each dialog has a name and a Close button | `tests/render/a11y-overlays.test.tsx` |
-| A skip link is the first tab stop in both shells and on the landing page, and lands on the page's content (past the sidebar, in the city) | `tests/render/keyboard.test.tsx` |
+| A skip link is the first tab stop in both shells and on the landing page, and lands on the page's content (past the section tabs, in the city) | `tests/render/keyboard.test.tsx` |
 | A card's sheet, a case's action panel, the palette, the shortcuts list and the Demo menu's date picker take focus when they open, keep Tab inside, close on Esc, and hand focus back to what opened them | `tests/render/keyboard.test.tsx` |
 | `/`, `?`, `j` and `k` never fire while a field has focus, with Ctrl, Cmd or Alt held, inside a menu or a radio group, or under an open sheet; the arrow keys move through a list only once a row has focus; Cmd+K works from inside a field | `tests/render/keyboard.test.tsx`, `lib/keyboard.ts` |
 | What is announced, and once: a tier change and a date gate change in the wizard, a field's error, an action's result (its toast), a case's change of state that nothing toasted, a filter's result count, the demo date, the coach's step, "Copied". A banner or note that is on the page when it opens is not live | `tests/render/live-regions.test.tsx` |

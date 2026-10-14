@@ -51,7 +51,7 @@ export function isCaseTab(value: string | null): value is CaseTab {
 
 /**
  * The lists a case is opened from, and what its back link calls each of them: the four shared
- * lists, then each role's own tool pages, named as the sidebar names them.
+ * lists, then each role's own tool pages, named as the city tabs name them.
  */
 const BACK_LABEL: [path: string, label: string][] = [
   [routes.city.queue(), "Back to My queue"],

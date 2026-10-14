@@ -1,6 +1,6 @@
 /**
  * Pure view-model for the app shell: where a role switch or a persona pick lands, and what
- * the city sidebar's own-tools section offers. No React, no store: AppShell and CityShell
+ * the city tabs' own-tools section offers. No React, no store: AppShell and CityShell
  * read the pieces of store state this needs and act on what it returns. Covered by
  * lib/view/shell.test.ts.
  *
@@ -175,7 +175,7 @@ export interface SidebarLink {
   href: string;
 }
 
-/** My queue, Cases, Active permits: every city role's shared sidebar links, in order. */
+/** My queue, Cases, Active permits: every city role's shared tabs, in order. */
 export const CITY_CORE_LINKS: SidebarLink[] = [
   { label: "My queue", href: routes.city.queue() },
   { label: "Cases", href: routes.city.cases() },
@@ -198,7 +198,7 @@ const CITY_TOOL_LINKS: Record<Exclude<Party, "applicant">, SidebarLink[]> = {
   ],
 };
 
-/** A city role's own tools, under the shared sidebar links. */
+/** A city role's own tools, after the shared tabs. */
 export function cityToolLinks(role: Exclude<Party, "applicant">): SidebarLink[] {
   return CITY_TOOL_LINKS[role];
 }

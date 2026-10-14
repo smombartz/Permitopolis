@@ -50,7 +50,7 @@ describe("the skip link", () => {
     expect(target).toHaveAttribute("tabindex", "-1");
   });
 
-  it("in the city's shell it lands past the sidebar, on the page", async () => {
+  it("in the city's shell it lands past the tabs, on the page", async () => {
     await renderScreen(<CityShell>page</CityShell>, { path: routes.city.queue(), role: "clerk" });
 
     const target = document.getElementById(MAIN_CONTENT_ID)!;

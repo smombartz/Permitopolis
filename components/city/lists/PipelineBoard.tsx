@@ -63,7 +63,7 @@ function PipelineBoard({ columns, today, from, showStateChip = false }: { column
   return (
     <div className="flex gap-3 overflow-x-auto pb-2">
       {columns.map((column) => (
-        // Flexible, so the columns share the width a 1280px window leaves beside the sidebar
+        // Flexible, so the columns share the width of a 1280px window
         // (cards truncate); the row still scrolls sideways when they cannot.
         <div key={column.key} data-state={column.key} className="flex min-w-44 flex-1 basis-0 flex-col gap-2 rounded-panel border border-line-subtle bg-surface-2 p-2">
           <div className="flex items-center justify-between gap-2 px-1 pt-1">

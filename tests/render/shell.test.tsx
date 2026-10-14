@@ -204,7 +204,7 @@ describe("switching role", () => {
 
     expect(screen.getByText("This screen is built for Public Works & Safety.")).toBeInTheDocument();
     expect(screen.queryByText("work orders")).not.toBeInTheDocument();
-    // The role keeps its own sidebar, with nothing marked current.
+    // The role keeps its own tabs, with nothing marked current.
     expect(screen.getByRole("link", { name: "Verifications" })).toBeInTheDocument();
     expect(document.querySelector('[aria-current="page"]')).toBeNull();
     expect(useDemo.getState().lastPathByRole).toEqual({});
@@ -412,7 +412,7 @@ describe("Demo menu", () => {
   });
 });
 
-describe("CityShell sidebar", () => {
+describe("CityShell tabs", () => {
   it.each(["clerk", "pws", "hl"] as const)("shows %s's own queue count from the seed on My queue", async (role) => {
     const count = queueFor(buildSeed(), role, TODAY).length;
     expect(count).toBeGreaterThan(0);
