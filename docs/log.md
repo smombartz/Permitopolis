@@ -1,5 +1,23 @@
 # Change log
 
+## 2026-10-14 - The landing page's phone menu takes over the whole screen
+
+**What Changed:**
+- `components/landing/SiteHeader.tsx`: under 1024px "Menu" now opens a full-screen dialog instead of a 240px dropdown. It repeats the header row (identity on the left, a "Close" button where "Menu" was), stacks the four section links large (24px display type, 64px rows), and puts "City staff" and a full-width "Plan an event" at the foot of the screen. A section link closes the menu and still glides to its section; focus is not handed back to the trigger after an anchor, so the page stays where it landed. The menu closes itself if the window widens past 1024px
+- `components/ui/dialog.tsx`: `DialogContent` takes `fullScreen`, its own class set (opaque `bg-surface-solid`, no frame or padding, 180ms in from -8px and 98.5%), since merging over the centered dialog's custom tokens did not override them reliably
+- `docs/rime-and-ink-design-system.md`: the site header's "Under 1024px" rule and the mobile-menu motion line describe the full-screen menu
+
+**Why:**
+- Requested: the landing page's mobile menu should take over the whole screen
+
+**Files Modified:**
+- `components/landing/SiteHeader.tsx`
+- `components/ui/dialog.tsx`
+- `docs/rime-and-ink-design-system.md`
+- `docs/plans/2026-10-14-landing-fullscreen-menu.md`
+
+---
+
 ## 2026-10-14 - City navigation moves from a left sidebar to tabs below the header
 
 **What Changed:**

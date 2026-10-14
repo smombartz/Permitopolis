@@ -168,7 +168,7 @@ The header of a page that speaks for an institution. It is the one place in the 
 - **Row:** one row inside the 1180px container, 16px above and below (20px from 640px wide), identity on the left and navigation on the right, at least 24px between them.
 - **Identity:** the seal and the name, as one link to the page's own home. The seal is a line drawing in ink 950, 48px square (56px from 640px). To its right, 12px away (16px from 640px), two lines: the institution's name in the display stack at 18px/700 with tight leading (24px from 640px), primary ink; under it the office or department at 14px in secondary. The name is always written out; the seal never stands alone and is hidden from a screen reader.
 - **Navigation, from 1024px:** the section links, 4px apart; then 24px; then one inline accent link for the secondary destination; then 24px; then one 44px primary button. Nothing else goes in the row: no search, no icons, no second button.
-- **Under 1024px:** the links, the accent link and the button fold into one 36px secondary button labelled "Menu" with a leading menu icon. It opens a 240px menu, right-aligned: the section links, a divider, then the two destinations. The identity stays as it is.
+- **Under 1024px:** the links, the accent link and the button fold into one 36px secondary button labelled "Menu" with a leading menu icon. It opens a menu over the whole screen, on the band's opaque fill: first the header's own row again, the identity on the left and a 36px secondary "Close" button (leading close icon) where "Menu" was; then the section links stacked in the display stack at 24px/700, one per 64px row with a subtle rule under each; then, at the foot of the screen, the accent link and the primary button at full width. The identity stays as it is.
 - **What it is not:** it carries no eyebrow, no status line and no banner above it, and no second row below it.
 - **In the app:** the same band, the same row and the same identity, with two differences. It is pinned to the top of the screen (sticky, above the page, still no shadow and no blur), so the controls stay in reach; anything that sticks below it starts 24px under it. And the navigation side holds the app's controls instead of links, 8px apart: a status line in 12px mono (the demo date), a 36px secondary Search button, the 36px secondary user button, then one 36px ghost icon button (the Demo menu). The user button shows who is acting, a role icon or an applicant's initials with the name beside it, and opens a 256px menu, right-aligned: the city officials, a divider, then the applicants. The name and the office are cut with an ellipsis instead of wrapping. Under 1024px the status line shortens to the day; under 768px the user button is its icon alone; under 640px the status line is for a screen reader only and Search is its icon alone.
 
@@ -293,7 +293,7 @@ Motion behaves like material settling under glass: things arrive from slightly b
 - **Page transition:** a full-screen frost wipe (frost 000→100→200 gradient with a diagonal glass highlight and a faint indigo bottom edge), anchored to the bottom
 - **Command palette:** the backdrop frosts in (62% frost with 8px blur) and the panel opens 18vh from the top, 640px wide, from a top-center origin
 - **Menus and toasts:**
-  - Mobile menu: 180ms in from `-8px, scale(.985)`
+  - Mobile menu (full screen): 180ms in from `-8px, scale(.985)`, out as a 180ms fade
   - Toast in: 300ms from `+12px`
   - Toast out: 240ms ease-in
 - **Accordion:** height expands over 220ms ease-out and collapses over 180ms

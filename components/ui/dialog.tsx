@@ -52,10 +52,16 @@ function DialogContent({
   className,
   children,
   showCloseButton = true,
+  fullScreen = false,
   onCloseAutoFocus,
   ...props
 }: React.ComponentProps<typeof DialogPrimitive.Content> & {
   showCloseButton?: boolean
+  /**
+   * Covers the whole screen on the site header's solid fill, with no frame and no padding: the
+   * landing page's phone menu. It drops in 8px and settles from 98.5% (Rime & Ink "Mobile menu").
+   */
+  fullScreen?: boolean
 }) {
   // Focus goes back to whatever opened the dialog: see components/ui/return-focus.tsx.
   const returnFocus = useReturnFocus(onCloseAutoFocus)
@@ -64,8 +70,11 @@ function DialogContent({
       <DialogOverlay />
       <DialogPrimitive.Content
         data-slot="dialog-content"
+        data-full-screen={fullScreen ? "" : undefined}
         className={cn(
-          "fixed top-1/2 left-1/2 z-50 grid w-full max-w-[calc(100%-2rem)] -translate-x-1/2 -translate-y-1/2 gap-4 rounded-panel border border-line-magnetic bg-glass-tinted p-5 text-sm text-fg shadow-hud backdrop-blur-hud duration-[var(--dur-fast)] ease-frost sm:max-w-sm data-open:animate-in data-open:fade-in-0 data-open:zoom-in-95 data-closed:animate-out data-closed:fade-out-0 data-closed:zoom-out-95",
+          fullScreen
+            ? "fixed inset-0 z-50 flex h-dvh flex-col overflow-y-auto overscroll-contain bg-surface-solid text-sm text-fg duration-[var(--dur-fast)] ease-frost data-open:animate-in data-open:fade-in-0 data-open:slide-in-from-top-2 data-open:zoom-in-[.985] data-closed:animate-out data-closed:fade-out-0"
+            : "fixed top-1/2 left-1/2 z-50 grid w-full max-w-[calc(100%-2rem)] -translate-x-1/2 -translate-y-1/2 gap-4 rounded-panel border border-line-magnetic bg-glass-tinted p-5 text-sm text-fg shadow-hud backdrop-blur-hud duration-[var(--dur-fast)] ease-frost sm:max-w-sm data-open:animate-in data-open:fade-in-0 data-open:zoom-in-95 data-closed:animate-out data-closed:fade-out-0 data-closed:zoom-out-95",
           className
         )}
         {...props}
