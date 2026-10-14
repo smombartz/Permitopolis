@@ -1,5 +1,41 @@
 # Change log
 
+## 2026-10-14 - Wizard: no food vendor default for markets, an "Other" type, and a "Your event" recap in the preview
+
+**What Changed:**
+- Picking Market or festival on step 1 no longer turns on food or vending with one vendor. `addOnsForEventType()` is gone from `lib/view/wizard.ts`, and `StepWhat` sends only the type. Food vendors are chosen on step 4 like every other add-on, so a market's preview now reads like any other type's
+- New event type "Other" (`"other"` in `EventType` and `EVENT_TYPE_LABEL`, the last card in `EVENT_TYPES`, with its own icon and blurb). When it is picked, the description hint asks what kind of event it is. The landing page's permit checker lists it automatically
+- The result panel opens with a "Your event" section on every step: a type chip with its icon, the name ("Untitled event" until one is typed), the description, and then Place, Date and hours, Sessions (series only), Attendance and Add-ons (`KeyValueList`). This comes from the new pure `eventRecap()` in `lib/view/wizard.ts`
+- `seriesSummary`, `setupTeardownText` and `addOnsSummary` moved from `lib/view/caseDetail.ts` to the new `lib/view/eventSummary.ts` and now take `EventAnswers`, so the wizard's recap and the case Overview describe an event in the same words. `caseDetail.ts` re-exports `seriesSummary`
+- The Market or festival blurb no longer says "usually with food or vendors"
+- PRD step 1 updated to match. Note: `lib/types.ts` is a frozen contract; this change was made directly at the user's request
+
+**Why:**
+- User request: the market type showed "1 food vendor" in the preview before the applicant had chosen any vendors. The user also asked for an Other option and for a preview that carries everything entered so far through the wizard
+
+**Files Modified:**
+- `lib/types.ts`
+- `lib/view/wizard.ts`, `lib/view/wizard.test.ts`
+- `lib/view/eventSummary.ts` (new), `lib/view/caseDetail.ts`
+- `components/wizard/StepWhat.tsx`, `components/wizard/ResultPanel.tsx`, `components/wizard/WizardScreen.tsx`, `components/wizard/constants.ts`
+- `docs/spec/prd.md`, `docs/plans/2026-10-14-wizard-preview-recap.md`
+
+---
+
+## 2026-10-14 - Path 5 handoff test opens "Draw an area" before sizing the plaza
+
+**What Changed:**
+- `tests/render/handoffs.test.tsx`, path 5: the new applicant now clicks the Where step's "Draw an area" tab before setting "Width (ft)", as `applicant-states.test.tsx` already does
+
+**Why:**
+- Bug fix (stale test): since the Where step always opens on "Bookable spaces" (2026-10-13), the width field is not on screen until "Draw an area" is picked, so path 5 failed with "Unable to find a label with the text of: Width (ft)". No app change
+
+**Files Modified:**
+- `tests/render/handoffs.test.tsx`
+- `docs/plans/2026-10-14-fix-path-5-handoff-test.md` (new)
+
+---
+
 ## 2026-10-14 - The landing page's phone menu takes over the whole screen
 
 **What Changed:**

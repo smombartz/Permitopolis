@@ -5,9 +5,10 @@ import { EMPTY_ADDONS, type EventAnswers, type EventCase } from "@/lib/types";
 import {
   WIZARD_STEPS,
   addOnEffectText,
-  addOnsForEventType,
   buildResultPanel,
   dateGateSatisfied,
+  eventRecap,
+  EVENT_TYPES,
   furthestAnsweredStep,
   groupTasksByPhase,
   isWizardStep,
@@ -77,21 +78,49 @@ describe("step order", () => {
 });
 
 describe("step 1: event type defaults", () => {
-  it("a market or festival turns on food or vending, once, without overwriting a later edit", () => {
-    const on = addOnsForEventType("market_festival", EMPTY_ADDONS);
-    expect(on.foodVending).toEqual({ vendors: 1, vendorNames: [] });
-    const untouched = addOnsForEventType("market_festival", { ...EMPTY_ADDONS, foodVending: { vendors: 3 } });
-    expect(untouched.foodVending).toEqual({ vendors: 3 });
+  it("offers Other as the last type", () => {
+    expect(EVENT_TYPES.at(-1)).toBe("other");
   });
 
-  it("every other type leaves add-ons alone", () => {
-    expect(addOnsForEventType("picnic_party", EMPTY_ADDONS)).toBe(EMPTY_ADDONS);
+  it("a market or festival with no add-ons yet reads like any other type: no food vendor, no Health & Legal", () => {
+    const market = buildResultPanel({ ...baseAnswers, eventType: "market_festival" }, ctx);
+    const picnic = buildResultPanel(baseAnswers, ctx);
+    expect(market.triggers.map((t) => t.id)).not.toContain("food_vending");
+    expect(market.tier).toBe(picnic.tier);
+    expect(market.reviewers).toEqual(picnic.reviewers);
   });
 
   it("only a class or club meetup repeats by default", () => {
     expect(repeatsByDefault("class_meetup")).toBe(true);
     expect(repeatsByDefault("picnic_party")).toBe(false);
     expect(repeatsByDefault(null)).toBe(false);
+  });
+});
+
+describe("eventRecap", () => {
+  it("a blank wizard has no type, no name and nothing answered", () => {
+    const recap = eventRecap({ eventType: null, name: "  ", location: null, schedule: null, attendance: null, addOns: EMPTY_ADDONS });
+    expect(recap).toMatchObject({ eventType: null, name: null, description: null });
+    expect(recap.rows.map((r) => r.label)).toEqual(["Place", "Date and hours", "Attendance", "Add-ons"]);
+    expect(recap.rows.every((r) => r.value === null)).toBe(true);
+  });
+
+  it("carries step 1's type, name and description, and each later answer", () => {
+    const recap = eventRecap({ ...baseAnswers, eventType: "other", description: " A book swap " });
+    expect(recap).toMatchObject({ eventType: "other", name: "Smith family reunion", description: "A book swap" });
+    expect(Object.fromEntries(recap.rows.map((r) => [r.label, r.value]))).toEqual({
+      Place: "Shelter 2, Riverside Park",
+      "Date and hours": "Sat, Jun 19, 2027, 11 am to 4 pm",
+      Attendance: "40",
+      "Add-ons": "None",
+    });
+  });
+
+  it("lists a series' sessions and the add-ons chosen on step 4", () => {
+    const recap = eventRecap(S2Booked());
+    expect(recap.rows.map((r) => r.label)).toContain("Sessions");
+    const withVendors = eventRecap({ ...baseAnswers, addOns: { ...EMPTY_ADDONS, foodVending: { vendors: 3 } } });
+    expect(withVendors.rows.find((r) => r.label === "Add-ons")?.value).toBe("3 food vendors");
   });
 });
 

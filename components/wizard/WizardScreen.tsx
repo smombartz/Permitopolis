@@ -292,7 +292,7 @@ function WizardScreen() {
 
         {!narrow ? (
           <StickyAside aria-label="Your plan so far">
-            <ResultPanel panel={panel} onApplyWhatIf={applyWhatIf} highlight={tierHighlight} />
+            <ResultPanel panel={panel} answers={answers} onApplyWhatIf={applyWhatIf} highlight={tierHighlight} />
           </StickyAside>
         ) : null}
       </div>
@@ -322,7 +322,7 @@ function WizardScreen() {
                 <SheetTitle>Your plan</SheetTitle>
               </SheetHeader>
               <div className="flex-1 overflow-y-auto px-5 pb-5">
-                <ResultPanel panel={panel} onApplyWhatIf={applyWhatIf} highlight={tierHighlight} />
+                <ResultPanel panel={panel} answers={answers} onApplyWhatIf={applyWhatIf} highlight={tierHighlight} />
               </div>
             </SheetContent>
           </Sheet>

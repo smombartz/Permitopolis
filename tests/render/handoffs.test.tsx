@@ -947,6 +947,8 @@ describe("the demo paths that cross surfaces have a control for every step", () 
     await user.click(screen.getByRole("radio", { name: /^Market or festival/ }));
     await user.type(screen.getByLabelText(/Event name/), "Plaza brass band");
     await user.click(screen.getByRole("button", { name: "Next" }));
+    // The map opens on "Bookable spaces" whatever the event type; "Draw an area" starts on City Hall Plaza.
+    await user.click(screen.getByRole("tab", { name: "Draw an area" }));
     await user.clear(screen.getByLabelText("Width (ft)"));
     await user.type(screen.getByLabelText("Width (ft)"), "80");
     await user.click(screen.getByRole("button", { name: "Next" }));

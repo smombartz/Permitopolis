@@ -4,8 +4,10 @@
  * into what steps 1 to 5 show. Tested against the real seed in wizard.test.ts.
  */
 import { addDaysISO, weekdayOf } from "@/lib/dates";
-import { fmtMoney, plural } from "@/lib/format";
+import { fmtDate, fmtMoney, fmtNumber, fmtTimeRange, plural } from "@/lib/format";
 import { getSpace } from "@/lib/data/inventory";
+import { addOnsSummary, seriesSummary } from "@/lib/view/eventSummary";
+import type { KeyValueItem } from "@/components/ui/key-value";
 import {
   capacityWarning,
   classify,
@@ -94,23 +96,50 @@ export const EVENT_TYPES: EventType[] = [
   "race_parade",
   "block_party",
   "class_meetup",
+  "other",
 ];
 
 /**
- * What picking an event type pre-fills. It does not choose the map's tab: the Where step opens
- * on Bookable spaces whatever the type. A market or festival turns on food or vending, with one
- * vendor to start; nothing is overwritten once the applicant has set it themselves.
+ * Picking an event type pre-fills no add-ons: food or vending, tents and the rest are chosen on
+ * step 4, whatever the type. Nor does it choose the map's tab: the Where step opens on Bookable
+ * spaces. The one default a type sets is Repeat, for a class or club meetup.
  */
-export function addOnsForEventType(eventType: EventType, current: AddOns): AddOns {
-  if (eventType === "market_festival" && current.foodVending === null) {
-    return { ...current, foodVending: defaultFoodVending() };
-  }
-  return current;
-}
-
-/** A class or club meetup turns on Repeat by default, before the applicant has touched it. */
 export function repeatsByDefault(eventType: EventType | null): boolean {
   return eventType === "class_meetup";
+}
+
+/* ---------- the "Your event" recap, at the top of the result panel ---------- */
+
+export interface EventRecap {
+  eventType: EventType | null;
+  /** Trimmed; null while the name is still blank. */
+  name: string | null;
+  description: string | null;
+  /** Place, date, sessions, attendance and add-ons; a step not answered yet reads "Not provided". */
+  rows: KeyValueItem[];
+}
+
+/**
+ * What the applicant has told the wizard so far, carried from step to step in the result panel:
+ * the type, name and description from step 1, then each later step's answer as it comes in.
+ */
+export function eventRecap(answers: EventAnswers): EventRecap {
+  const sched = answers.schedule;
+  const series = seriesSummary(answers);
+  return {
+    eventType: answers.eventType,
+    name: answers.name.trim() || null,
+    description: answers.description?.trim() || null,
+    rows: [
+      { label: "Place", value: answers.location?.label ?? null },
+      { label: "Date and hours", value: sched ? `${fmtDate(sched.date)}, ${fmtTimeRange(sched.start, sched.end)}` : null },
+      // A single event has no sessions to list: the row is left out, not shown as "Not provided".
+      ...(series ? [{ label: "Sessions", value: series }] : []),
+      { label: "Attendance", value: answers.attendance !== null ? fmtNumber(answers.attendance) : null },
+      // Add-ons are answered on step 4, with the attendance: none chosen by then is "None".
+      { label: "Add-ons", value: addOnsSummary(answers) ?? (answers.attendance !== null ? "None" : null) },
+    ],
+  };
 }
 
 /* ---------- add-on defaults, for a toggle just switched on ---------- */

@@ -36,7 +36,8 @@ export type EventType =
   | "market_festival"
   | "race_parade"
   | "block_party"
-  | "class_meetup";
+  | "class_meetup"
+  | "other";
 
 export type WizardStep = "what" | "where" | "when" | "size" | "plan";
 
@@ -438,6 +439,7 @@ export const EVENT_TYPE_LABEL: Record<EventType, string> = {
   race_parade: "Race or parade",
   block_party: "Block party",
   class_meetup: "Class or club meetup",
+  other: "Other",
 };
 
 /** A card's phase, as the board's swimlanes and the wizard's plan both name it. */

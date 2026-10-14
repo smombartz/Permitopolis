@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { handleRadioGroupKeyDown, radioTabIndex } from "@/components/ui/radio-keys";
 import { EVENT_TYPE_LABEL, type EventAnswers, type EventType } from "@/lib/types";
-import { EVENT_TYPES, addOnsForEventType } from "@/lib/view/wizard";
+import { EVENT_TYPES } from "@/lib/view/wizard";
 import { EVENT_TYPE_BLURB, EVENT_TYPE_ICON } from "./constants";
 
 const FOCUS_RING =
@@ -21,7 +21,7 @@ export interface StepWhatProps {
 /** Step 1: the event type cards, the event name and an optional one-line description. */
 function StepWhat({ answers, onChange }: StepWhatProps) {
   function selectType(type: EventType) {
-    onChange({ eventType: type, addOns: addOnsForEventType(type, answers.addOns) });
+    onChange({ eventType: type });
   }
 
   return (
@@ -31,7 +31,7 @@ function StepWhat({ answers, onChange }: StepWhatProps) {
         <p className="mt-1 text-sm text-fg-secondary">Pick the kind of event. It sets a few sensible defaults you can change later.</p>
       </div>
 
-      {/* One tab stop, and the arrow keys move through the six kinds: a radio group's own keyboard. */}
+      {/* One tab stop, and the arrow keys move through the kinds: a radio group's own keyboard. */}
       <div role="radiogroup" aria-label="Event type" className="grid grid-cols-1 gap-3 sm:grid-cols-2" onKeyDown={handleRadioGroupKeyDown}>
         {EVENT_TYPES.map((type, index) => {
           const Icon = EVENT_TYPE_ICON[type];
@@ -75,10 +75,10 @@ function StepWhat({ answers, onChange }: StepWhatProps) {
         />
       </Field>
 
-      <Field label="Description" hint="Optional, one line.">
+      <Field label="Description" hint={answers.eventType === "other" ? "Tell us what kind of event this is." : "Optional, one line."}>
         <Textarea
           value={answers.description ?? ""}
-          placeholder="A short description"
+          placeholder={answers.eventType === "other" ? "A book swap and story hour for kids" : "A short description"}
           rows={2}
           onChange={(event) => onChange({ description: event.target.value })}
         />

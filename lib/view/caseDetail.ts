@@ -12,7 +12,8 @@ import { ACTION_TYPES, type ActionType } from "@/lib/state/actions";
 import type { CaseTab } from "@/lib/routes";
 import { routes } from "@/lib/routes";
 import { cityPageIsFor } from "@/lib/view/shell";
-import { fmtDate, fmtNumber, fmtTime, fmtTimeRange, plural } from "@/lib/format";
+import { addOnsSummary, seriesSummary, setupTeardownText } from "@/lib/view/eventSummary";
+import { fmtDate, fmtNumber, fmtTimeRange } from "@/lib/format";
 import {
   DEPTS,
   EVENT_TYPE_LABEL,
@@ -112,45 +113,8 @@ export function isHoldExpiringTomorrow(hold: DateHold, today: ISODate): boolean 
 
 /* ---------- overview tab ---------- */
 
-/** "Weekly, 13 sessions, Sun, Jun 6, 2027 to Sun, Aug 29, 2027", or null for a single event. */
-export function seriesSummary(c: EventCase): string | null {
-  if (!c.schedule?.recurrence) return null;
-  const held = c.schedule.occurrences.filter((o) => o.billing !== "skipped");
-  const count = held.length > 0 ? held.length : null;
-  const freq = c.schedule.recurrence.frequency === "weekly" ? "Weekly" : "Biweekly";
-  const countText = count !== null ? plural(count, "session") : "sessions";
-  return `${freq}, ${countText}, ${fmtDate(c.schedule.date)} to ${fmtDate(c.schedule.recurrence.until)}`;
-}
-
-function setupTeardownText(c: EventCase): string | null {
-  const sched = c.schedule;
-  if (!sched || (!sched.setupStart && !sched.teardownEnd)) return null;
-  const setup = sched.setupStart ? fmtTime(sched.setupStart) : "the start";
-  const teardown = sched.teardownEnd ? fmtTime(sched.teardownEnd) : "the end";
-  return `${setup} to ${teardown}`;
-}
-
-function addOnsSummary(c: EventCase): string | null {
-  const items: string[] = [];
-  const a = c.addOns;
-  if (a.amplifiedSound) items.push("Amplified sound");
-  if (a.alcohol) items.push("Alcohol");
-  if (a.foodVending) items.push(plural(a.foodVending.vendors, "food vendor"));
-  if (a.tentsStages) items.push(plural(a.tentsStages.count, "tent or stage", "tents or stages"));
-  if (a.cookingGenerators) items.push("Cooking or generators");
-  if (a.fireworksDrones) items.push("Fireworks or drones");
-  if (a.admission) items.push("Admission charged");
-  if (a.cityServices) {
-    const svc = a.cityServices;
-    const parts: string[] = [];
-    if (svc.barricades > 0) parts.push(plural(svc.barricades, "barricade"));
-    if (svc.policeOfficers > 0 && svc.policeHours > 0) parts.push(`${svc.policeOfficers} officers × ${svc.policeHours}h`);
-    if (svc.trash) parts.push("trash removal");
-    if (svc.power) parts.push("power");
-    items.push(`City services${parts.length > 0 ? `: ${parts.join(", ")}` : ""}`);
-  }
-  return items.length > 0 ? items.join(" · ") : null;
-}
+// Shared with the wizard's recap; re-exported so the Overview tab's callers keep their import.
+export { seriesSummary };
 
 function mapHighlightFor(c: EventCase): MapHighlight | null {
   if (!c.location) return null;

@@ -220,11 +220,13 @@ Five plain questions, a live result panel that changes with every answer, and a 
 
 1.  **What are you planning?**
 
-    - Event type cards: Picnic or party, Performance or rally, Market or festival, Race or parade, Block party, and Class or club meetup (added so S2 has a home).
+    - Event type cards: Picnic or party, Performance or rally, Market or festival, Race or parade, Block party, Class or club meetup (added so S2 has a home), and Other (the description says what it is).
 
     - Event name and an optional one-line description.
 
-    - The type pre-fills defaults: Market or festival turns on food or vending, Class or club meetup turns on repeat. The map on the next step opens on bookable spaces whatever the type.
+    - The type pre-fills one default: Class or club meetup turns on repeat. No type turns on an add-on; food or vending (and the vendor count) is chosen on step 4 like every other add-on. The map on the next step opens on bookable spaces whatever the type.
+
+    - The live result panel opens with a "Your event" recap on every step: the type, name and description, then the place, date and hours, sessions, attendance and add-ons as each step answers them.
 
 2.  **Where?**
 

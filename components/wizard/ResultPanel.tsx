@@ -4,12 +4,17 @@ import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Chip, ChipDot } from "@/components/ui/chip";
 import { Banner } from "@/components/ui/banner";
+import { KeyValueList } from "@/components/ui/key-value";
 import { fmtDate, fmtMoney, plural } from "@/lib/format";
 import { FeeTable, TierBadge, DEPT_ICON } from "@/components/domain";
-import type { ResultPanel as ResultPanelData } from "@/lib/view/wizard";
+import { EVENT_TYPE_LABEL, type EventAnswers } from "@/lib/types";
+import { eventRecap, type ResultPanel as ResultPanelData } from "@/lib/view/wizard";
+import { EVENT_TYPE_ICON } from "./constants";
 
 export interface ResultPanelProps {
   panel: ResultPanelData;
+  /** The answers so far, recapped at the top so the applicant's event travels with them. */
+  answers: EventAnswers;
   /** Clicking a what-if line's button applies that removal. */
   onApplyWhatIf: (triggerId: ResultPanelData["whatIf"][number]["triggerId"]) => void;
   /** The tier just changed: ring the badge. WizardScreen owns the flag, since it is always mounted. */
@@ -20,18 +25,37 @@ export interface ResultPanelProps {
 }
 
 /**
- * The wizard's live result panel: everything classify(), whatIf(), estimateFees() and
- * dateGate() say about the plan right now. Shown in a `StickyAside` on wide screens and in a
+ * The wizard's live result panel: a recap of the event as the applicant has described it so far,
+ * then everything classify(), whatIf(), estimateFees() and dateGate() say about the plan right now. Shown in a `StickyAside` on wide screens and in a
  * bottom sheet below 1024px (the wrapper decides which; this is only the content, so it reads
  * the same in both). A tier change is announced and timed by WizardScreen, which is mounted
  * when this is not (the sheet closed on a phone); `highlight` is its flag.
  */
-function ResultPanel({ panel, onApplyWhatIf, highlight = false, compactFees = true, className }: ResultPanelProps) {
+function ResultPanel({ panel, answers, onApplyWhatIf, highlight = false, compactFees = true, className }: ResultPanelProps) {
   const fees = panel.fees;
   const isSeries = fees.sessions !== undefined;
+  const recap = eventRecap(answers);
+  const TypeIcon = recap.eventType ? EVENT_TYPE_ICON[recap.eventType] : null;
 
   return (
     <div data-slot="wizard-result-panel" className={cn("flex flex-col gap-5", className)}>
+      <section aria-label="Your event" className="flex flex-col gap-3 border-b border-line-subtle pb-5">
+        <p className="text-eyebrow font-bold tracking-[.12em] text-fg-label uppercase">Your event</p>
+        {recap.eventType && TypeIcon ? (
+          <Chip variant="pill">
+            <TypeIcon className="size-3.5" aria-hidden="true" />
+            {EVENT_TYPE_LABEL[recap.eventType]}
+          </Chip>
+        ) : (
+          <Chip variant="outline">No type picked yet</Chip>
+        )}
+        <div className="flex flex-col gap-1">
+          <p className={cn("text-base font-semibold break-words", recap.name ? "text-fg" : "text-fg-label")}>{recap.name ?? "Untitled event"}</p>
+          {recap.description ? <p className="text-sm break-words text-fg-secondary">{recap.description}</p> : null}
+        </div>
+        <KeyValueList items={recap.rows} className="gap-y-3" />
+      </section>
+
       <div className="flex flex-col gap-2">
         <div
           className={cn(
