@@ -5,7 +5,7 @@
  *
  * Owned by workstream 2C (`components/map`, `components/calendar`).
  */
-import { DRAWABLE_AREA_RECT, SCALE_FT_PER_UNIT, type Rect } from "@/lib/data/mapGeometry";
+import { DRAWABLE_AREA_RECT, SCALE_FT_PER_UNIT, VIEWBOX, segmentPath, spaceShape, type Rect } from "@/lib/data/mapGeometry";
 import { getSpace, type Space } from "@/lib/data/inventory";
 import { areConnected, getSegment, milesOf, type StreetSegment } from "@/lib/data/streets";
 import { DEFAULT_CONFIG } from "@/lib/rules/config";
@@ -42,6 +42,64 @@ export function clampRectToArea(rect: Rect, area: Rect): Rect {
   const x = Math.min(Math.max(x0, area.x), area.x + area.w - w);
   const y = Math.min(Math.max(y0, area.y), area.y + area.h - h);
   return { x, y, w, h };
+}
+
+/* ---------- thumbnail framing ---------- */
+
+/** Room left around the place, in viewBox units, so its neighbours show. */
+const FRAME_PADDING = 40;
+/** The closest a thumbnail zooms: about one block across. */
+const FRAME_MIN_WIDTH = 320;
+/** Past this width a thumbnail's street and place names are too small to read, so they are left off. */
+const FRAME_MAX_WIDTH_WITH_LABELS = 480;
+
+export interface MapFrame {
+  /** The part of the city to show, in viewBox units, always in the map's own proportions. */
+  box: Rect;
+  showLabels: boolean;
+}
+
+const WHOLE_CITY: Rect = { x: VIEWBOX.x, y: VIEWBOX.y, w: VIEWBOX.width, h: VIEWBOX.height };
+
+/** The box around everything a Location occupies on the map, or undefined when it occupies nothing known. */
+function locationBox(location: Location): Rect | undefined {
+  const boxes: (Rect | undefined)[] =
+    location.mode === "inventory"
+      ? location.inventoryIds.map((id) => spaceShape(id))
+      : location.mode === "area"
+        ? [location.areaRect ?? (location.areaId ? spaceShape(location.areaId) : undefined)]
+        : location.segmentIds.map((id) => segmentPath(id)?.box);
+  const known = boxes.filter((box): box is Rect => box !== undefined);
+  if (known.length === 0) return undefined;
+  const left = Math.min(...known.map((box) => box.x));
+  const top = Math.min(...known.map((box) => box.y));
+  const right = Math.max(...known.map((box) => box.x + box.w));
+  const bottom = Math.max(...known.map((box) => box.y + box.h));
+  return { x: left, y: top, w: right - left, h: bottom - top };
+}
+
+/**
+ * The part of the map a thumbnail shows for a Location: the place with some room around it,
+ * never closer than about a block, in the map's proportions, and never past the map's edge.
+ * A place that fills most of the city gets the whole city.
+ */
+export function thumbnailFrame(location: Location): MapFrame {
+  const place = locationBox(location);
+  if (!place) return { box: WHOLE_CITY, showLabels: false };
+
+  const aspect = VIEWBOX.width / VIEWBOX.height;
+  let w = Math.max(place.w + 2 * FRAME_PADDING, FRAME_MIN_WIDTH);
+  let h = Math.max(place.h + 2 * FRAME_PADDING, FRAME_MIN_WIDTH / aspect);
+  if (w / h < aspect) w = h * aspect;
+  else h = w / aspect;
+  if (w >= VIEWBOX.width) return { box: WHOLE_CITY, showLabels: false };
+
+  const centerX = place.x + place.w / 2;
+  const centerY = place.y + place.h / 2;
+  const x = Math.min(Math.max(centerX - w / 2, VIEWBOX.x), VIEWBOX.x + VIEWBOX.width - w);
+  const y = Math.min(Math.max(centerY - h / 2, VIEWBOX.y), VIEWBOX.y + VIEWBOX.height - h);
+  const round = (value: number) => Math.round(value * 10) / 10;
+  return { box: { x: round(x), y: round(y), w: round(w), h: round(h) }, showLabels: w <= FRAME_MAX_WIDTH_WITH_LABELS };
 }
 
 /* ---------- routes ---------- */

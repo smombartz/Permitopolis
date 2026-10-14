@@ -5,9 +5,9 @@ import { cn } from "@/lib/utils";
 import { TIER_LABEL } from "@/lib/types";
 import { TIER_ICON } from "@/components/domain/icons";
 import { TierLegend } from "@/components/domain/TierLegend";
-import { VIEWBOX } from "@/lib/data/mapGeometry";
-import { CityBackground } from "./CityBackground";
-import { lineMidpoint, occupiedIds, rectCenter, resolveLocationShapes } from "./geometry";
+import { MapCanvas } from "./MapCanvas";
+import { MapKey } from "./MapKey";
+import { labelAnchor, occupiedIds, resolveLocationShapes } from "./geometry";
 import type { MapHighlight } from "./types";
 
 const FOCUS_RING =
@@ -28,11 +28,14 @@ const STATUS_LABEL: Record<MapHighlight["status"], string> = {
   pending: "Pending review",
 };
 
-/** Solid for a confirmed permit, dashed while pending; held is solid but thinner. */
-const STATUS_LINE: Record<MapHighlight["status"], { dash?: string; width: number }> = {
-  held: { width: 4 },
-  permitted: { width: 5 },
-  pending: { dash: "7 5", width: 4 },
+/**
+ * Solid for a confirmed permit, dashed while pending; held is solid but thinner. `width` is a
+ * rectangle's outline; a street is drawn at `street`, wide enough to read on the road under it.
+ */
+const STATUS_LINE: Record<MapHighlight["status"], { dash?: string; width: number; street: number }> = {
+  held: { width: 4, street: 8 },
+  permitted: { width: 5, street: 10 },
+  pending: { dash: "12 8", width: 4, street: 8 },
 };
 
 const TIER_FILL: Record<MapHighlight["tier"], string> = {
@@ -52,8 +55,8 @@ const TIER_STROKE: Record<MapHighlight["tier"], string> = {
 };
 
 /**
- * Display mode: draws booked spaces, closures and routes for a set of highlights,
- * colored by tier with status as line weight/dash, overlaps called out, every shape
+ * Display mode: draws booked spaces, closures and routes for a set of highlights over the
+ * city, colored by tier with status as line weight/dash, overlaps called out, every booking
  * labeled. No map library, no tiles.
  */
 export function PermitopolisMap({ highlights, selectedId, onSelect, className }: PermitopolisMapProps) {
@@ -77,18 +80,36 @@ export function PermitopolisMap({ highlights, selectedId, onSelect, className }:
   return (
     <div className={cn("flex flex-col gap-3", className)}>
       <TierLegend aria-label="Map legend: tiers" />
-      <svg
-        viewBox={`${VIEWBOX.x} ${VIEWBOX.y} ${VIEWBOX.width} ${VIEWBOX.height}`}
+      <MapCanvas
         role="img"
         aria-label="Map of Permitopolis with booked spaces, closures and routes"
-        className="w-full rounded-panel border border-line-subtle bg-surface-1"
+        above={highlights.map((highlight) => {
+          const first = resolveLocationShapes(highlight.location)[0];
+          if (!first) return null;
+          const point = labelAnchor(first);
+          return (
+            // A booking's name goes over the street names, with a halo so it reads on any ground.
+            <text
+              key={highlight.id}
+              x={point.x}
+              y={point.y}
+              textAnchor="middle"
+              paintOrder="stroke"
+              strokeWidth={4}
+              strokeLinejoin="round"
+              className="pointer-events-none fill-fg stroke-surface-solid text-[16px] font-semibold"
+            >
+              {highlight.label}
+            </text>
+          );
+        })}
       >
-        <CityBackground />
         {highlights.map((highlight) => {
           const shapes = resolveLocationShapes(highlight.location);
           const isSelected = highlight.id === selectedId;
           const isOverlapping = overlappingHighlightIds.has(highlight.id);
           const line = STATUS_LINE[highlight.status];
+          const emphasis = isSelected || isOverlapping ? 3 : 0;
           return (
             <g key={highlight.id}>
               <title>
@@ -96,15 +117,28 @@ export function PermitopolisMap({ highlights, selectedId, onSelect, className }:
                   isOverlapping ? " · Overlaps another booking" : ""
                 }`}
               </title>
+              {/* A light casing first, so the tier color reads on a park, a street or a rooftop alike. */}
+              {shapes.map((shape, index) =>
+                shape.kind === "path" ? (
+                  <path
+                    key={`casing-${shape.id}-${index}`}
+                    d={shape.path.d}
+                    strokeLinecap="round"
+                    className="pointer-events-none fill-none stroke-surface-solid"
+                    strokeWidth={line.street + emphasis + 6}
+                  />
+                ) : null,
+              )}
               {shapes.map((shape, index) =>
                 shape.kind === "rect" ? (
                   <rect
                     key={`${shape.id}-${index}`}
+                    data-shape={shape.id}
                     x={shape.rect.x}
                     y={shape.rect.y}
                     width={shape.rect.w}
                     height={shape.rect.h}
-                    rx={4}
+                    rx={2}
                     className={cn(
                       TIER_FILL[highlight.tier],
                       TIER_STROKE[highlight.tier],
@@ -112,48 +146,35 @@ export function PermitopolisMap({ highlights, selectedId, onSelect, className }:
                       isSelected && "stroke-indigo-650",
                       isOverlapping && "stroke-danger",
                     )}
-                    strokeWidth={isSelected || isOverlapping ? line.width + 2 : line.width}
+                    fillOpacity={0.8}
+                    strokeWidth={line.width + emphasis}
                     strokeDasharray={line.dash}
                     onClick={() => onSelect?.(highlight.id)}
                   />
                 ) : (
-                  <line
+                  <path
                     key={`${shape.id}-${index}`}
-                    x1={shape.line.x1}
-                    y1={shape.line.y1}
-                    x2={shape.line.x2}
-                    y2={shape.line.y2}
-                    strokeLinecap="round"
+                    data-shape={shape.id}
+                    d={shape.path.d}
+                    strokeLinecap={line.dash ? "butt" : "round"}
                     className={cn(
+                      "fill-none",
                       TIER_STROKE[highlight.tier],
                       "cursor-pointer",
                       isSelected && "stroke-indigo-650",
                       isOverlapping && "stroke-danger",
                     )}
-                    strokeWidth={isSelected || isOverlapping ? line.width + 2 : line.width}
+                    strokeWidth={line.street + emphasis}
                     strokeDasharray={line.dash}
                     onClick={() => onSelect?.(highlight.id)}
                   />
                 ),
               )}
-              {shapes[0] &&
-                (() => {
-                  const point = shapes[0].kind === "rect" ? rectCenter(shapes[0].rect) : lineMidpoint(shapes[0].line);
-                  return (
-                    <text
-                      x={point.x}
-                      y={point.y - 8}
-                      textAnchor="middle"
-                      className="fill-fg-label pointer-events-none text-[10px] font-medium"
-                    >
-                      {highlight.label}
-                    </text>
-                  );
-                })()}
             </g>
           );
         })}
-      </svg>
+      </MapCanvas>
+      <MapKey />
 
       <ul className="flex flex-col gap-1" aria-label="Highlighted bookings and closures">
         {highlights.map((highlight) => {

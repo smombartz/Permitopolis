@@ -1,0 +1,359 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 1000" width="1600" height="1000" role="img" aria-labelledby="map-title map-desc">
+  <title id="map-title">Map of Permitopolis</title>
+  <desc id="map-desc">Schematic city map, not to scale. Downtown runs along Main Street from 1st to 6th Avenue, with City Hall Plaza at 1st Avenue. River Road loops south along the river past Riverside Park and the boathouse. Maple Street, Elm Street and Oak Avenue are residential. The Great Lawn sits at the west end of Elm Street.</desc>
+
+  <!-- 1. GROUND -->
+  <g id="layer-ground">
+    <rect id="ground" x="0" y="0" width="1600" height="1000" fill="#eceae3"/>
+  </g>
+
+  <!-- 2. LAND-USE ZONES: one group per use, one shape per block -->
+  <g id="layer-zones" stroke="none">
+    <g id="zone-open-land" data-kind="open-land" fill="#dfe6cf">
+      <path id="open-land-far-bank" d="M1499,-10 L1610,-10 L1610,1010 L-10,1010 L-10,930 L200,905 L560,915 L800,912 L1080,917 L1250,900 L1358,849 L1427,765 L1468,658 L1492,540 L1503,393 L1497,250 L1491,107 Z"/>
+    </g>
+    <g id="zone-residential" data-kind="residential" fill="#f7efc0">
+      <rect id="res-north-2" x="476" y="-10" width="208" height="154"/>
+      <rect id="res-maple-300-north" x="696" y="-10" width="208" height="154"/>
+      <rect id="res-maple-400-north" x="916" y="-10" width="208" height="154"/>
+      <rect id="res-maple-500-north" x="1136" y="-10" width="208" height="154"/>
+      <rect id="res-elm-100-north" x="256" y="156" width="208" height="153"/>
+      <rect id="res-elm-200-north" x="476" y="156" width="208" height="153"/>
+      <rect id="res-maple-300-south" x="696" y="156" width="208" height="153"/>
+      <rect id="res-maple-400-south" x="916" y="156" width="208" height="153"/>
+      <rect id="res-maple-500-south" x="1136" y="156" width="208" height="153"/>
+      <rect id="res-oak-100-west" x="-10" y="496" width="122" height="138"/>
+      <rect id="res-oak-100-east" x="124" y="496" width="117" height="138"/>
+      <rect id="res-oak-200-west" x="-10" y="646" width="122" height="144"/>
+      <rect id="res-oak-200-east" x="124" y="646" width="150" height="144"/>
+    </g>
+    <g id="zone-downtown" data-kind="downtown" data-zone="downtown" fill="#f4cbc3">
+      <rect id="downtown-north-2" x="476" y="321" width="208" height="159"/>
+      <rect id="downtown-north-3" x="696" y="321" width="208" height="159"/>
+      <rect id="downtown-north-4" x="916" y="321" width="208" height="159"/>
+      <rect id="downtown-north-5" x="1136" y="321" width="208" height="159"/>
+      <path id="downtown-south-1" d="M259,500 H464 V657 C390,655 262,652 259,566 Z"/>
+      <rect id="downtown-south-2" x="476" y="500" width="208" height="151"/>
+      <rect id="downtown-south-3" x="696" y="500" width="208" height="150"/>
+      <path id="downtown-south-4" d="M916,500 H1124 V667 L916,655 Z"/>
+      <path id="downtown-south-5" d="M1136,500 H1344 V598 Q1340,660 1272,671 L1136,670 Z"/>
+    </g>
+    <g id="zone-civic" data-kind="civic" fill="#d8cdee">
+      <rect id="civic-center" data-zone="downtown" x="256" y="321" width="208" height="159"/>
+      <rect id="civic-school" x="256" y="-10" width="208" height="154"/>
+      <rect id="civic-medical" x="-10" y="-10" width="254" height="154"/>
+    </g>
+    <g id="zone-public-works" data-kind="public-works" fill="#d3d6da">
+      <rect id="public-works-yard" x="290" y="692" width="164" height="106"/>
+    </g>
+  </g>
+
+  <!-- 3. PARKS AND OPEN SPACE -->
+  <g id="layer-parks" stroke="none">
+    <g id="zone-parks" data-kind="park" fill="#bfdfae">
+      <path id="zone-riverside-park" data-zone="riverside-park" d="M604,676 C700,668 820,668 930,676 C1040,676 1160,702 1272,694 Q1352,690 1362,602 L1440,602 L1468,658 L1427,765 L1358,849 L1250,900 L1080,917 L800,912 L604,915 Z"/>
+      <rect id="zone-great-lawn" data-zone="great-lawn" x="-10" y="156" width="254" height="328"/>
+      <rect id="park-greenway-east" x="1360" y="-10" width="140" height="612"/>
+      <path id="park-greenway-west" d="M-10,802 H460 V684 L604,676 V915 L560,915 L200,905 L-10,930 Z"/>
+    </g>
+    <g id="park-details" fill="#a5d19c">
+      <path id="park-woods-riverside" d="M628,800 C640,770 700,772 740,782 C790,770 850,778 880,800 C905,822 880,850 830,852 C760,862 680,858 640,846 C618,838 618,815 628,800 Z"/>
+      <rect id="park-school-field" x="400" y="30" width="52" height="90"/>
+    </g>
+    <g id="park-trees" fill="#8cc487">
+      <g id="trees-great-lawn">
+        <circle cx="30" cy="186" r="8"/><circle cx="62" cy="186" r="8"/><circle cx="94" cy="186" r="8"/><circle cx="126" cy="186" r="8"/><circle cx="158" cy="186" r="8"/><circle cx="190" cy="186" r="8"/><circle cx="222" cy="186" r="8"/>
+        <circle cx="233" cy="232" r="7"/><circle cx="233" cy="266" r="7"/><circle cx="233" cy="364" r="7"/><circle cx="233" cy="398" r="7"/>
+        <circle cx="30" cy="455" r="8"/><circle cx="62" cy="455" r="8"/><circle cx="94" cy="455" r="8"/><circle cx="126" cy="455" r="8"/><circle cx="158" cy="455" r="8"/>
+      </g>
+      <g id="trees-riverside-park">
+        <circle cx="622" cy="728" r="8"/><circle cx="620" cy="760" r="8"/>
+        <circle cx="1290" cy="720" r="8"/><circle cx="1310" cy="738" r="8"/><circle cx="1293" cy="752" r="8"/>
+      </g>
+      <g id="trees-greenway-east">
+        <circle cx="1390" cy="40" r="8"/><circle cx="1408" cy="95" r="8"/><circle cx="1390" cy="150" r="8"/><circle cx="1408" cy="350" r="8"/><circle cx="1390" cy="400" r="8"/><circle cx="1408" cy="445" r="8"/><circle cx="1390" cy="545" r="8"/><circle cx="1408" cy="585" r="8"/>
+      </g>
+      <g id="trees-greenway-west">
+        <circle cx="40" cy="838" r="8"/><circle cx="110" cy="832" r="8"/><circle cx="180" cy="838" r="8"/><circle cx="250" cy="832" r="8"/><circle cx="320" cy="838" r="8"/><circle cx="390" cy="832" r="8"/><circle cx="440" cy="842" r="8"/>
+      </g>
+      <g id="trees-civic-center">
+        <circle cx="272" cy="346" r="7"/><circle cx="448" cy="346" r="7"/>
+      </g>
+      <g id="trees-far-bank" fill="#c3d6ae">
+        <circle cx="120" cy="972" r="10"/><circle cx="420" cy="962" r="10"/><circle cx="700" cy="968" r="10"/><circle cx="980" cy="972" r="10"/><circle cx="1562" cy="200" r="10"/><circle cx="1570" cy="620" r="10"/>
+      </g>
+    </g>
+  </g>
+
+  <!-- 4. WATER -->
+  <g id="layer-water">
+    <path id="river-bank" d="M1500,-40 C1470,160 1525,340 1492,540 C1466,700 1425,860 1250,900 C1080,938 800,900 560,915 C380,926 200,885 -40,930" fill="none" stroke="#e3dfc6" stroke-width="72"/>
+    <path id="river" data-kind="water" d="M1500,-40 C1470,160 1525,340 1492,540 C1466,700 1425,860 1250,900 C1080,938 800,900 560,915 C380,926 200,885 -40,930" fill="none" stroke="#9fcdee" stroke-width="64"/>
+    <path id="boat-basin" data-kind="water" d="M486,892 C480,820 478,762 500,748 C530,730 575,736 585,770 C595,810 590,860 596,892 Z" fill="#9fcdee"/>
+  </g>
+
+  <!-- 5. STREET NETWORK (context streets that are not permit segments) -->
+  <g id="layer-streets-base" fill="none" stroke="#ffffff" stroke-width="12" stroke-linecap="round">
+    <g id="streets-avenues">
+      <path id="st-1st-avenue" data-street="1st Avenue" d="M250,-10 V490"/>
+      <path id="st-2nd-avenue" data-street="2nd Avenue" d="M470,-10 V668"/>
+      <path id="st-3rd-avenue" data-street="3rd Avenue" d="M690,-10 V660"/>
+      <path id="st-4th-avenue" data-street="4th Avenue" d="M910,-10 V664"/>
+      <path id="st-5th-avenue" data-street="5th Avenue" d="M1130,-10 V680"/>
+      <path id="st-6th-avenue" data-street="6th Avenue" d="M1350,-10 V490"/>
+    </g>
+    <g id="streets-cross">
+      <path id="st-maple-street" data-street="Maple Street" d="M-10,150 H1350"/>
+      <path id="st-elm-street" data-street="Elm Street" d="M250,315 H1350"/>
+      <path id="st-main-street-west" data-street="Main Street" stroke-width="14" d="M-10,490 H250"/>
+      <path id="st-main-street-east" data-street="Main Street" stroke-width="14" d="M1350,490 H1610"/>
+    </g>
+    <g id="streets-local">
+      <path id="st-local-sw-1" d="M-10,640 H280"/>
+      <path id="st-local-sw-2" d="M-10,796 H280"/>
+      <path id="st-local-sw-3" d="M280,638 V796"/>
+    </g>
+  </g>
+
+  <!-- 6. PERMIT STREET SEGMENTS: ids match lib/data/streets.ts -->
+  <g id="layer-permit-streets" fill="none">
+    <g id="segments-arterial" data-kind="arterial" stroke="#f6cf6a" stroke-linecap="round">
+      <g id="street-main" data-street="Main Street" stroke-width="20">
+        <path id="main-1-2" data-nodes="m1 m2" data-miles="0.1" d="M250,490 H470"/>
+        <path id="main-2-3" data-nodes="m2 m3" data-miles="0.1" d="M470,490 H690"/>
+        <path id="main-3-4" data-nodes="m3 m4" data-miles="0.1" d="M690,490 H910"/>
+        <path id="main-4-5" data-nodes="m4 m5" data-miles="0.1" d="M910,490 H1130"/>
+        <path id="main-5-6" data-nodes="m5 m6" data-miles="0.1" d="M1130,490 H1350"/>
+      </g>
+      <g id="street-river-road" data-street="River Road" stroke-width="18">
+        <path id="river-a" data-nodes="m6 r1" data-miles="0.6" d="M1350,490 L1350,600 Q1350,678 1270,683"/>
+        <path id="river-b" data-nodes="r1 r2" data-miles="0.8" d="M1270,683 C1160,691 1040,665 930,665"/>
+        <path id="river-c" data-nodes="r2 r3" data-miles="0.7" d="M930,665 C810,657 680,657 560,665"/>
+        <path id="river-d" data-nodes="r3 m1" data-miles="0.5" d="M560,665 C430,677 250,685 250,570 L250,490"/>
+      </g>
+    </g>
+    <g id="segments-residential" data-kind="residential" stroke="#a8dcd4" stroke-width="12" stroke-linecap="butt">
+      <g id="street-maple" data-street="Maple Street">
+        <path id="maple-300" data-nodes="p3 p4" data-households="10" d="M696,150 H904"/>
+        <path id="maple-400" data-nodes="p4 p5" data-households="12" d="M916,150 H1124"/>
+        <path id="maple-500" data-nodes="p5 p6" data-households="14" d="M1136,150 H1344"/>
+      </g>
+      <g id="street-elm" data-street="Elm Street">
+        <path id="elm-100" data-nodes="e1 e2" data-households="9" d="M256,315 H464"/>
+        <path id="elm-200" data-nodes="e2 e3" data-households="11" d="M476,315 H684"/>
+      </g>
+      <g id="street-oak" data-street="Oak Avenue">
+        <path id="oak-100" data-nodes="o1 o2" data-households="8" d="M118,497 V634"/>
+        <path id="oak-200" data-nodes="o2 o3" data-households="10" d="M118,646 V790"/>
+      </g>
+    </g>
+  </g>
+
+  <!-- 7. PATHS AND TRAILS -->
+  <g id="layer-paths" fill="none" stroke="#9b8560" stroke-width="2.5" stroke-dasharray="6 4">
+    <path id="path-riverfront-trail" d="M612,868 C800,858 1010,872 1235,850 C1300,842 1345,800 1376,745 C1402,700 1420,640 1432,560 C1440,470 1445,300 1432,100 L1428,-10"/>
+    <path id="path-park-main" d="M930,676 V862"/>
+    <path id="path-shelter-walk" d="M630,702 H930"/>
+    <path id="path-great-lawn-gate" d="M244,315 H222"/>
+  </g>
+
+  <!-- 8. BUILDINGS -->
+  <g id="layer-buildings">
+    <g id="landmarks" fill="#b5a4dc" stroke="#8672c4" stroke-width="1">
+      <rect id="landmark-city-hall" data-name="City Hall, Clerk's Office" x="290" y="326" width="140" height="40" rx="2"/>
+      <rect id="landmark-police" data-name="Police" x="285" y="512" width="80" height="44" rx="2"/>
+      <rect id="landmark-fire-station" data-name="Fire Station" x="720" y="512" width="80" height="44" rx="2"/>
+      <rect id="landmark-library" data-name="Library" x="520" y="404" width="120" height="56" rx="2"/>
+      <rect id="landmark-transit-center" data-name="Transit Center" x="496" y="512" width="100" height="40" rx="2"/>
+      <rect id="landmark-school" data-name="School" x="290" y="40" width="100" height="60" rx="2"/>
+      <rect id="landmark-medical-center" data-name="Medical Center" x="40" y="30" width="110" height="70" rx="2"/>
+      <rect id="landmark-public-works" data-name="Public Works yard" x="310" y="715" width="70" height="45" rx="2" fill="#aeb4bc" stroke="#8b929b"/>
+      <rect id="landmark-boathouse" data-name="Boathouse" x="505" y="700" width="60" height="30" rx="2" fill="#d2b48a" stroke="#9a7b55"/>
+      <rect id="landmark-boathouse-dock" x="528" y="730" width="8" height="36" fill="#b08d6a" stroke="none"/>
+    </g>
+    <!-- One house per household that signs off on a block party -->
+    <g id="households" fill="#e6d27f" stroke="#b9a34f" stroke-width="0.75">
+      <path id="households-maple-300" data-segment="maple-300" data-households="10" d="M702,120h26v18h-26z M742,120h26v18h-26z M782,120h26v18h-26z M822,120h26v18h-26z M862,120h26v18h-26z M702,162h26v18h-26z M742,162h26v18h-26z M782,162h26v18h-26z M822,162h26v18h-26z M862,162h26v18h-26z"/>
+      <path id="households-maple-400" data-segment="maple-400" data-households="12" d="M920,120h22v18h-22z M954,120h22v18h-22z M988,120h22v18h-22z M1022,120h22v18h-22z M1056,120h22v18h-22z M1090,120h22v18h-22z M920,162h22v18h-22z M954,162h22v18h-22z M988,162h22v18h-22z M1022,162h22v18h-22z M1056,162h22v18h-22z M1090,162h22v18h-22z"/>
+      <path id="households-maple-500" data-segment="maple-500" data-households="14" d="M1140,120h19v18h-19z M1169,120h19v18h-19z M1198,120h19v18h-19z M1227,120h19v18h-19z M1256,120h19v18h-19z M1285,120h19v18h-19z M1314,120h19v18h-19z M1140,162h19v18h-19z M1169,162h19v18h-19z M1198,162h19v18h-19z M1227,162h19v18h-19z M1256,162h19v18h-19z M1285,162h19v18h-19z M1314,162h19v18h-19z"/>
+      <path id="households-elm-100" data-segment="elm-100" data-households="9" d="M259,287h15v18h-15z M282,287h15v18h-15z M305,287h15v18h-15z M328,287h15v18h-15z M351,287h15v18h-15z M374,287h15v18h-15z M397,287h15v18h-15z M420,287h15v18h-15z M443,287h15v18h-15z"/>
+      <path id="households-elm-200" data-segment="elm-200" data-households="11" d="M479,287h13v18h-13z M497.5,287h13v18h-13z M516,287h13v18h-13z M534.5,287h13v18h-13z M553,287h13v18h-13z M571.5,287h13v18h-13z M590,287h13v18h-13z M608.5,287h13v18h-13z M627,287h13v18h-13z M645.5,287h13v18h-13z M664,287h13v18h-13z"/>
+      <path id="households-oak-100" data-segment="oak-100" data-households="8" d="M91,502h18v22h-18z M91,535h18v22h-18z M91,568h18v22h-18z M91,601h18v22h-18z M127,502h18v22h-18z M127,535h18v22h-18z M127,568h18v22h-18z M127,601h18v22h-18z"/>
+      <path id="households-oak-200" data-segment="oak-200" data-households="10" d="M91,650h18v20h-18z M91,678h18v20h-18z M91,706h18v20h-18z M91,734h18v20h-18z M91,762h18v20h-18z M127,650h18v20h-18z M127,678h18v20h-18z M127,706h18v20h-18z M127,734h18v20h-18z M127,762h18v20h-18z"/>
+    </g>
+  </g>
+
+  <!-- 9. PERMIT SPACES: ids match lib/data/inventory.ts -->
+  <g id="layer-permit-spaces">
+    <g id="spaces-drawable" data-kind="drawable-area" stroke-width="1.5">
+      <rect id="city-hall-plaza" data-label="City Hall Plaza" data-zone="downtown" data-square-feet="20000" x="260" y="376" width="200" height="100" fill="#ece3d0" stroke="#a8997c"/>
+      <rect id="great-lawn" data-label="Great Lawn" data-zone="great-lawn" data-square-feet="40000" x="22" y="215" width="200" height="200" fill="#a6d694" stroke="#5d9d52"/>
+    </g>
+    <g id="spaces-shelters" data-kind="shelter" data-zone="riverside-park" fill="#cf9a66" stroke="#8d5f33" stroke-width="1.5">
+      <rect id="shelter-1" data-label="Shelter 1, Riverside Park" data-capacity="30" x="640" y="712" width="40" height="30" rx="2"/>
+      <rect id="shelter-2" data-label="Shelter 2, Riverside Park" data-capacity="40" x="705" y="712" width="44" height="30" rx="2"/>
+      <rect id="shelter-3" data-label="Shelter 3, Riverside Park" data-capacity="60" x="774" y="712" width="50" height="32" rx="2"/>
+      <rect id="shelter-4" data-label="Shelter 4, Riverside Park" data-capacity="120" x="846" y="712" width="64" height="36" rx="2"/>
+    </g>
+    <g id="spaces-fields" data-kind="field" data-zone="riverside-park" fill="#8fcb7f" stroke="#5d9d52" stroke-width="1.5">
+      <rect id="field-1" data-label="Field 1, Riverside Park" data-capacity="150" x="965" y="700" width="110" height="64"/>
+      <rect id="field-2" data-label="Field 2, Riverside Park" data-capacity="150" x="1090" y="700" width="110" height="64"/>
+      <rect id="field-3" data-label="Field 3, Riverside Park" data-capacity="150" x="965" y="778" width="110" height="64"/>
+      <rect id="field-4" data-label="Field 4, Riverside Park" data-capacity="150" x="1090" y="778" width="110" height="64"/>
+    </g>
+    <g id="spaces-field-markings" fill="none" stroke="#5d9d52" stroke-width="1">
+      <path id="field-1-infield" d="M965,764 L965,738 A26,26 0 0 1 991,764 Z" fill="#dcc795"/>
+      <path id="field-2-infield" d="M1090,764 L1090,738 A26,26 0 0 1 1116,764 Z" fill="#dcc795"/>
+      <path id="field-3-goals" d="M965,798h12v24h-12 M1075,798h-12v24h12"/>
+      <path id="field-4-goals" d="M1090,798h12v24h-12 M1200,798h-12v24h12"/>
+    </g>
+  </g>
+
+  <!-- 10. AMENITIES AND INFRASTRUCTURE -->
+  <g id="layer-amenities">
+    <g id="amenities-parking" data-kind="parking" fill="#cfd4da" stroke="#9aa2ad" stroke-width="1">
+      <rect id="parking-downtown-west" x="385" y="512" width="65" height="48" rx="2"/>
+      <rect id="parking-downtown-east" x="940" y="585" width="70" height="55" rx="2"/>
+      <rect id="parking-main-north" x="1255" y="335" width="75" height="60" rx="2"/>
+      <rect id="parking-riverside-park" x="1212" y="705" width="44" height="60" rx="2"/>
+      <rect id="parking-medical-center" x="165" y="40" width="60" height="55" rx="2"/>
+    </g>
+    <g id="amenities-restrooms" data-kind="restrooms" fill="#ffffff" stroke="#6b7280" stroke-width="1">
+      <rect id="amenity-restrooms-riverside-park" data-near="shelter-4" x="872" y="772" width="26" height="16" rx="2"/>
+      <rect id="amenity-restrooms-great-lawn" data-near="great-lawn" x="186" y="432" width="26" height="16" rx="2"/>
+    </g>
+    <g id="amenities-power" data-kind="power" fill="#f2b01e" stroke="#7a5a00" stroke-width="1">
+      <path id="amenity-power-city-hall-plaza-1" data-near="city-hall-plaza" d="M322,387l6,6-6,6-6-6z"/>
+      <path id="amenity-power-city-hall-plaza-2" data-near="city-hall-plaza" d="M398,387l6,6-6,6-6-6z"/>
+      <path id="amenity-power-great-lawn" data-near="great-lawn" d="M110,420l6,6-6,6-6-6z"/>
+      <path id="amenity-power-shelter-3" data-near="shelter-3" d="M829,732l4,4-4,4-4-4z"/>
+      <path id="amenity-power-shelter-4" data-near="shelter-4" d="M915,734l4,4-4,4-4-4z"/>
+    </g>
+    <g id="amenities-water" data-kind="water-tap" fill="#2f86c9" stroke="#ffffff" stroke-width="1">
+      <circle id="amenity-water-shelter-2" data-near="shelter-2" cx="754" cy="720" r="3.5"/>
+      <circle id="amenity-water-shelter-3" data-near="shelter-3" cx="829" cy="720" r="3.5"/>
+      <circle id="amenity-water-shelter-4" data-near="shelter-4" cx="915" cy="722" r="3.5"/>
+    </g>
+    <g id="amenities-structures">
+      <rect id="amenity-stage-pad" data-near="city-hall-plaza" x="335" y="382" width="50" height="22" fill="#d6c9ad" stroke="#a8997c" stroke-width="1"/>
+      <path id="amenity-park-gate" data-node="r2" d="M922,674h5v8h-5z M933,674h5v8h-5z" fill="#6b4f2a"/>
+      <path id="amenity-great-lawn-gate" d="M240,306h6v5h-6z M240,319h6v5h-6z" fill="#6b4f2a"/>
+      <circle id="amenity-river-bend-overlook" cx="1330" cy="765" r="6" fill="#ece3d0" stroke="#a8997c" stroke-width="1"/>
+      <path id="landmark-main-street-bridge" d="M1456,481.5 H1542 M1456,498.5 H1542" fill="none" stroke="#7b8794" stroke-width="2"/>
+      <path id="landmark-medical-cross" d="M91,42h8v8h8v8h-8v8h-8v-8h-8v-8h8z" fill="#ffffff"/>
+    </g>
+  </g>
+
+  <!-- 11. ROUTE NODES: where street segments connect (node names from lib/data/streets.ts) -->
+  <g id="layer-route-nodes" fill="#ffffff" stroke="#3d4452" stroke-width="1.5">
+    <circle id="node-m1" cx="250" cy="490" r="3.5"/>
+    <circle id="node-m2" cx="470" cy="490" r="3.5"/>
+    <circle id="node-m3" cx="690" cy="490" r="3.5"/>
+    <circle id="node-m4" cx="910" cy="490" r="3.5"/>
+    <circle id="node-m5" cx="1130" cy="490" r="3.5"/>
+    <circle id="node-m6" cx="1350" cy="490" r="3.5"/>
+    <circle id="node-r1" cx="1270" cy="683" r="3.5"/>
+    <circle id="node-r2" cx="930" cy="665" r="3.5"/>
+    <circle id="node-r3" cx="560" cy="665" r="3.5"/>
+    <circle id="node-p3" cx="690" cy="150" r="3.5"/>
+    <circle id="node-p4" cx="910" cy="150" r="3.5"/>
+    <circle id="node-p5" cx="1130" cy="150" r="3.5"/>
+    <circle id="node-p6" cx="1350" cy="150" r="3.5"/>
+    <circle id="node-e1" cx="250" cy="315" r="3.5"/>
+    <circle id="node-e2" cx="470" cy="315" r="3.5"/>
+    <circle id="node-e3" cx="690" cy="315" r="3.5"/>
+    <circle id="node-o1" cx="118" cy="496" r="3.5"/>
+    <circle id="node-o2" cx="118" cy="640" r="3.5"/>
+    <circle id="node-o3" cx="118" cy="796" r="3.5"/>
+  </g>
+
+  <!-- 12. LABELS -->
+  <g id="layer-labels" font-family="'IBM Plex Sans','Avenir Next','Segoe UI','Helvetica Neue',Helvetica,sans-serif" text-anchor="middle" fill="#2b303b">
+    <g id="labels-streets" font-size="12" font-weight="600">
+      <text x="580" y="494.5" font-size="13" fill="#4a3c0c">Main Street</text>
+      <text x="1020" y="494.5" font-size="13" fill="#4a3c0c">Main Street</text>
+      <text x="745" y="663" fill="#4a3c0c">River Road</text>
+      <text x="1100" y="681" fill="#4a3c0c" transform="rotate(5.5 1100 677)">River Road</text>
+      <text x="250" y="539" font-size="11" fill="#4a3c0c" transform="rotate(-90 250 535)">River Road</text>
+      <text x="1350" y="549" font-size="11" fill="#4a3c0c" transform="rotate(-90 1350 545)">River Road</text>
+      <text x="580" y="154" font-size="11" fill="#5b6270">Maple Street</text>
+      <text x="800" y="319" font-size="11" fill="#5b6270">Elm Street</text>
+    </g>
+    <g id="labels-avenues" font-size="11" font-weight="600" fill="#5b6270">
+      <text x="250" y="236" transform="rotate(-90 250 232)">1st Ave</text>
+      <text x="470" y="236" transform="rotate(-90 470 232)">2nd Ave</text>
+      <text x="690" y="236" transform="rotate(-90 690 232)">3rd Ave</text>
+      <text x="910" y="236" transform="rotate(-90 910 232)">4th Ave</text>
+      <text x="1130" y="236" transform="rotate(-90 1130 232)">5th Ave</text>
+      <text x="1350" y="236" transform="rotate(-90 1350 232)">6th Ave</text>
+    </g>
+    <g id="labels-blocks" font-size="10" font-weight="600" fill="#17524b">
+      <text x="800" y="153.5">300 block</text>
+      <text x="1020" y="153.5">400 block</text>
+      <text x="1240" y="153.5">500 block</text>
+      <text x="360" y="318.5">100 block</text>
+      <text x="580" y="318.5">200 block</text>
+      <text x="118" y="569" transform="rotate(-90 118 565.5)">Oak Avenue · 100 block</text>
+      <text x="118" y="721.5" transform="rotate(-90 118 718)">Oak Avenue · 200 block</text>
+    </g>
+    <g id="labels-spaces" paint-order="stroke" stroke="#ffffff" stroke-width="3" stroke-linejoin="round" stroke-opacity="0.85">
+      <text x="360" y="446" font-size="14" font-weight="700">City Hall Plaza</text>
+      <text x="122" y="320" font-size="16" font-weight="700" fill="#2f5f2a">Great Lawn</text>
+      <text x="760" y="826" font-size="16" font-weight="700" fill="#2f5f2a">Riverside Park</text>
+      <text x="660" y="762" font-size="10" font-weight="600">Shelter 1</text>
+      <text x="727" y="762" font-size="10" font-weight="600">Shelter 2</text>
+      <text x="799" y="762" font-size="10" font-weight="600">Shelter 3</text>
+      <text x="878" y="762" font-size="10" font-weight="600">Shelter 4</text>
+      <text x="1026" y="736" font-size="11" font-weight="600">Field 1</text>
+      <text x="1151" y="736" font-size="11" font-weight="600">Field 2</text>
+      <text x="1020" y="814" font-size="11" font-weight="600">Field 3</text>
+      <text x="1145" y="814" font-size="11" font-weight="600">Field 4</text>
+    </g>
+    <g id="labels-landmarks" font-size="10" font-weight="600" paint-order="stroke" stroke="#ffffff" stroke-width="2.5" stroke-linejoin="round" stroke-opacity="0.8">
+      <text x="360" y="344" font-size="11" font-weight="700">City Hall</text>
+      <text x="360" y="358" font-size="9">Clerk's Office</text>
+      <text x="325" y="538">Police</text>
+      <text x="760" y="538">Fire Station</text>
+      <text x="580" y="436">Library</text>
+      <text x="546" y="536">Transit Center</text>
+      <text x="340" y="74">School</text>
+      <text x="95" y="88">Medical Center</text>
+      <text x="372" y="782">Public Works yard</text>
+      <text x="535" y="719">Boathouse</text>
+      <text x="942" y="692" font-size="9" text-anchor="start">Park gate</text>
+      <text x="1300" y="792">River bend</text>
+      <text x="1498" y="474" font-size="9">Main Street Bridge</text>
+      <text x="1392" y="254" fill="#2f5f2a" transform="rotate(-90 1392 250)">Riverfront greenway</text>
+      <text x="360" y="396.5" font-size="9">Stage</text>
+    </g>
+    <g id="labels-amenities" font-weight="700" fill="#4a5563">
+      <text x="417.5" y="541.5" font-size="16">P</text>
+      <text x="975" y="618" font-size="16">P</text>
+      <text x="1292.5" y="370.5" font-size="16">P</text>
+      <text x="1234" y="740.5" font-size="16">P</text>
+      <text x="195" y="73" font-size="16">P</text>
+      <text x="885" y="783.5" font-size="9">WC</text>
+      <text x="199" y="443.5" font-size="9">WC</text>
+    </g>
+    <g id="labels-districts" font-size="12" font-weight="700" letter-spacing="2">
+      <text x="800" y="405" fill="#a14a3f">DOWNTOWN</text>
+      <text x="1020" y="555" fill="#a14a3f">DOWNTOWN</text>
+      <text x="1020" y="65" fill="#857618">RESIDENTIAL</text>
+      <text x="580" y="235" fill="#857618">RESIDENTIAL</text>
+    </g>
+    <g id="labels-water" font-style="italic" fill="#2d6d9b">
+      <text x="790" y="919" font-size="14" letter-spacing="3">River</text>
+      <text x="1497" y="305" font-size="14" letter-spacing="3" transform="rotate(90 1497 300)">River</text>
+      <text x="538" y="822" font-size="10">Boat basin</text>
+    </g>
+  </g>
+
+  <!-- 13. ANNOTATIONS: title and north arrow -->
+  <g id="layer-annotations" font-family="'IBM Plex Sans','Avenir Next','Segoe UI','Helvetica Neue',Helvetica,sans-serif" fill="#2b303b">
+    <path id="north-arrow" d="M1562,862 l8,22 -8,-5 -8,5 Z"/>
+    <text x="1562" y="856" font-size="11" font-weight="700" text-anchor="middle">N</text>
+    <text id="map-name" x="1585" y="952" font-size="24" font-weight="700" text-anchor="end">Permitopolis</text>
+    <text x="1585" y="972" font-size="11" text-anchor="end" fill="#4a5563">Schematic city map, not to scale</text>
+  </g>
+</svg>

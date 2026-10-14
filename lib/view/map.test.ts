@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { DRAWABLE_AREA_RECT, SEGMENT_PATHS, SPACE_SHAPES } from "@/lib/data/mapGeometry";
+import { DRAWABLE_AREA_RECT, SEGMENT_PATHS, SPACE_SHAPES, VIEWBOX } from "@/lib/data/mapGeometry";
 import { SPACES } from "@/lib/data/inventory";
 import { RIVERFRONT_5K_ROUTE, SEGMENTS } from "@/lib/data/streets";
 import {
@@ -13,6 +13,7 @@ import {
   isConnectedRoute,
   mergeStreetLabel,
   rectToSquareFeet,
+  thumbnailFrame,
   routeMiles,
   toggleInventorySelection,
   toggleStreetSelection,
@@ -224,5 +225,56 @@ describe("toggleStreetSelection", () => {
   it("adds and removes a segment", () => {
     expect(toggleStreetSelection([], "maple-400")).toEqual(["maple-400"]);
     expect(toggleStreetSelection(["maple-400"], "maple-400")).toEqual([]);
+  });
+});
+
+describe("thumbnailFrame", () => {
+  const ASPECT = VIEWBOX.width / VIEWBOX.height;
+  const contains = (outer: { x: number; y: number; w: number; h: number }, inner: { x: number; y: number; w: number; h: number }) =>
+    inner.x >= outer.x && inner.y >= outer.y && inner.x + inner.w <= outer.x + outer.w && inner.y + inner.h <= outer.y + outer.h;
+  const insideMap = (box: { x: number; y: number; w: number; h: number }) =>
+    contains({ x: VIEWBOX.x, y: VIEWBOX.y, w: VIEWBOX.width, h: VIEWBOX.height }, box);
+
+  it("zooms to one shelter, no closer than about a block, with its neighbours' names", () => {
+    const frame = thumbnailFrame(buildInventoryLocation(["shelter-3"]));
+    expect(frame.box.w).toBe(320);
+    expect(frame.box.h).toBe(200);
+    expect(contains(frame.box, SPACE_SHAPES["shelter-3"])).toBe(true);
+    expect(frame.showLabels).toBe(true);
+  });
+
+  it("frames one block of a street with room on both sides", () => {
+    const frame = thumbnailFrame(buildStreetsLocation(["maple-400"]));
+    expect(contains(frame.box, SEGMENT_PATHS["maple-400"].box)).toBe(true);
+    expect(frame.box.w / frame.box.h).toBeCloseTo(ASPECT, 2);
+    expect(frame.showLabels).toBe(true);
+  });
+
+  it("frames a drawn area by its own rectangle, not the whole Plaza", () => {
+    const plaza = DRAWABLE_AREA_RECT["city-hall-plaza"];
+    const drawn = buildAreaLocation("city-hall-plaza", { x: plaza.x + 10, y: plaza.y + 10, w: 50, h: 30 });
+    const frame = thumbnailFrame(drawn);
+    expect(contains(frame.box, drawn.areaRect!)).toBe(true);
+    expect(frame.box.w).toBe(320);
+  });
+
+  it("pulls back for the 5K loop, keeps the map's proportions and drops the names", () => {
+    const frame = thumbnailFrame(buildRouteLocation(RIVERFRONT_5K_ROUTE));
+    for (const id of RIVERFRONT_5K_ROUTE) expect(contains(frame.box, SEGMENT_PATHS[id].box), id).toBe(true);
+    expect(frame.box.w / frame.box.h).toBeCloseTo(ASPECT, 2);
+    expect(insideMap(frame.box)).toBe(true);
+    expect(frame.showLabels).toBe(false);
+  });
+
+  it("stays on the map for a place at its edge", () => {
+    const frame = thumbnailFrame(buildStreetsLocation(["oak-200"]));
+    expect(insideMap(frame.box)).toBe(true);
+    expect(contains(frame.box, SEGMENT_PATHS["oak-200"].box)).toBe(true);
+  });
+
+  it("shows the whole city for a location it cannot place", () => {
+    const frame = thumbnailFrame({ mode: "streets", inventoryIds: [], segmentIds: ["no-such-street"], label: "Nowhere" });
+    expect(frame.box).toEqual({ x: VIEWBOX.x, y: VIEWBOX.y, w: VIEWBOX.width, h: VIEWBOX.height });
+    expect(frame.showLabels).toBe(false);
   });
 });

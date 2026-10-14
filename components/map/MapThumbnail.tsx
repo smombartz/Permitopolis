@@ -1,8 +1,8 @@
 import { cn } from "@/lib/utils";
 import { TIER_LABEL } from "@/lib/types";
 import { TIER_ICON } from "@/components/domain/icons";
-import { VIEWBOX } from "@/lib/data/mapGeometry";
-import { CityBackground } from "./CityBackground";
+import { thumbnailFrame } from "@/lib/view/map";
+import { MapCanvas } from "./MapCanvas";
 import { resolveLocationShapes } from "./geometry";
 import type { MapHighlight } from "./types";
 
@@ -28,49 +28,62 @@ const TIER_DOT: Record<MapHighlight["tier"], string> = {
 };
 
 /**
- * A small, non-interactive map with one location highlighted, for the permit page and
- * the case overview. No onSelect, no legend list: the caption below is the label.
+ * A small, non-interactive map zoomed to one location, for the permit page and the case
+ * overview. No onSelect, no legend list: the caption below is the label.
+ *
+ * Line widths are in screen pixels (`non-scaling-stroke`), so the place reads the same whether
+ * the frame holds one shelter or the whole 5K loop.
  */
 export function MapThumbnail({ highlight, className }: MapThumbnailProps) {
   const shapes = resolveLocationShapes(highlight.location);
+  const frame = thumbnailFrame(highlight.location);
   const TierIcon = TIER_ICON[highlight.tier];
 
   return (
     <figure className={cn("w-full max-w-64", className)}>
-      <svg
-        viewBox={`${VIEWBOX.x} ${VIEWBOX.y} ${VIEWBOX.width} ${VIEWBOX.height}`}
-        role="img"
-        aria-label={`Map showing ${highlight.label}`}
-        className="w-full rounded-panel border border-line-subtle bg-surface-1"
-      >
-        <CityBackground />
+      <MapCanvas frame={frame.box} labels={frame.showLabels} role="img" aria-label={`Map showing ${highlight.label}`}>
+        {/* A light casing first, so the tier color reads on a park, a street or a rooftop alike. */}
+        {shapes.map((shape, index) =>
+          shape.kind === "path" ? (
+            <path
+              key={`casing-${shape.id}-${index}`}
+              d={shape.path.d}
+              vectorEffect="non-scaling-stroke"
+              strokeLinecap="round"
+              className="fill-none stroke-surface-solid"
+              strokeWidth={7}
+            />
+          ) : null,
+        )}
         {/* A route may run one segment several times (laps), so a shape's id alone is not a key. */}
         {shapes.map((shape, index) =>
           shape.kind === "rect" ? (
             <rect
               key={`${shape.id}-${index}`}
+              data-shape={shape.id}
               x={shape.rect.x}
               y={shape.rect.y}
               width={shape.rect.w}
               height={shape.rect.h}
-              rx={4}
+              rx={2}
+              vectorEffect="non-scaling-stroke"
               className={cn(TIER_FILL[highlight.tier], TIER_STROKE[highlight.tier])}
-              strokeWidth={4}
+              fillOpacity={0.8}
+              strokeWidth={2.5}
             />
           ) : (
-            <line
+            <path
               key={`${shape.id}-${index}`}
-              x1={shape.line.x1}
-              y1={shape.line.y1}
-              x2={shape.line.x2}
-              y2={shape.line.y2}
+              data-shape={shape.id}
+              d={shape.path.d}
+              vectorEffect="non-scaling-stroke"
               strokeLinecap="round"
-              className={TIER_STROKE[highlight.tier]}
-              strokeWidth={6}
+              className={cn("fill-none", TIER_STROKE[highlight.tier])}
+              strokeWidth={4}
             />
           ),
         )}
-      </svg>
+      </MapCanvas>
       <figcaption className="mt-1 flex items-center gap-1.5 text-xs text-fg-secondary">
         <span aria-hidden className={cn("size-1.5 shrink-0 rounded-full", TIER_DOT[highlight.tier])} />
         <TierIcon aria-hidden className="size-3 shrink-0" />

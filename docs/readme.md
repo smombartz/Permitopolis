@@ -1740,7 +1740,39 @@ Things a screen builder needs to know that the type signatures do not say.
 
 **Map and calendar (`components/map`, `components/calendar`)**
 
-- One SVG unit is one foot, so a drawn rectangle's area is its square footage.
+- **The city is drawn in `design/map/permitopolis-map.svg`**, 1600 x 1000, in layers
+  (`layer-ground` up to `layer-annotations`). That file is the source. `pnpm map:sync` turns it
+  into `components/map/art/layers.generated.tsx` (one component per layer) and
+  `lib/data/mapGeometry.generated.ts` (each space's rectangle, each street segment's path, its
+  midpoint and its box, each node). Neither generated file is edited by hand.
+  `pnpm map:sync path/to/export.svg` copies a new export over the source first.
+- **What the drawing has to keep:** a top-level `<g id="layer-...">` per layer; in
+  `layer-permit-spaces`, a `<rect id data-label>` for each space id in `lib/data/inventory.ts`;
+  in `layer-permit-streets`, a `<path id data-nodes>` for each segment id in
+  `lib/data/streets.ts`, using capital M, L, H, V, Q and C only; City Hall Plaza and the Great
+  Lawn as plain rectangles of 20,000 and 40,000 square units. `tests/map-sync.test.ts` fails when
+  the generated files are stale, when an id is missing or extra, or when the drawing's
+  `data-capacity`, `data-square-feet`, `data-nodes`, `data-households` or `data-miles` disagree
+  with the data.
+- **The map has its own colors**, in `styles/map.css` (`--map-*`, used as `fill-map-park`,
+  `bg-map-water` and so on). They are for the drawing and its key only; a selection or a booking
+  on top of the map is still Rime & Ink. The sync turns each hex in the SVG into its class, and
+  stops with the shape's name when a color has no entry in `styles/map.css`.
+- **`MapCanvas`** is the one `<svg>` every map uses: the drawing, then the caller's shapes
+  (`children`), then the names, then `above` (a booking's own label). So a highlighted street
+  keeps its name. `frame` shows part of the city, `labels={false}` drops the names, `nodes` adds
+  the dots where segments meet (the Draw a route tab). The drawing never takes a click.
+- **`MapThumbnail` zooms to its place** with `thumbnailFrame()` in `lib/view/map.ts`: the place's
+  box plus 40 units, at least 320 x 200, in the map's 16:10 shape, kept on the map. Names show
+  up to a frame 480 units wide. Its lines are in screen pixels (`non-scaling-stroke`).
+- **`MapKey`** is a closed `<details>` ("Map key") under the picker and under `PermitopolisMap`.
+  It is a `<details>`, not the Accordion, because the Accordion adds a heading.
+- In the picker the drawing shows each shelter, field and block; the shapes on top are clear
+  until chosen (indigo) and take the click. On Draw a route, a segment that cannot be added next
+  is washed out.
+- One SVG unit is one foot, so a drawn rectangle's area is its square footage. A seed script
+  gives an area rectangle in feet from the area's own corner (`areaLocation()` in
+  `lib/state/seed/helpers.ts`), so it does not depend on where the map puts the Plaza or Lawn.
 - `LocationPicker` takes `availabilityOf?: (location) => Availability | undefined`; the wizard
   passes `rules.availability` through it.
 - The area drag uses pointer capture and ends on `pointerup` and `pointercancel`. Its rectangle

@@ -17,7 +17,7 @@ const answers: EventAnswers = {
   eventType: "market_festival",
   name: "Riverside Farmers Market",
   description: "A weekly Saturday farmers market on the Great Lawn.",
-  location: areaLocation("great-lawn", { x: 10, y: 10, w: 60, h: 50 }, 6000),
+  location: areaLocation("great-lawn", { x: 10, y: 10, w: 100, h: 60 }, 6000),
   schedule: weeklySchedule("2027-06-05", "08:00", "13:00", "2027-09-25"),
   attendance: 300,
   addOns: addOns({

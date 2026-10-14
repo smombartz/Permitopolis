@@ -2,12 +2,12 @@
  * Resolves a `Location` to the concrete shapes `lib/data/mapGeometry.ts` has for it, so
  * `PermitopolisMap`, `MapThumbnail` and `LocationPicker` all draw the same way.
  */
-import { segmentPath, spaceShape, type Rect, type SegmentPath } from "@/lib/data/mapGeometry";
+import { segmentPath, spaceShape, type Point, type Rect, type SegmentPath } from "@/lib/data/mapGeometry";
 import type { Location } from "@/lib/types";
 
-export type ResolvedShape = { id: string; kind: "rect"; rect: Rect } | { id: string; kind: "line"; line: SegmentPath };
+export type ResolvedShape = { id: string; kind: "rect"; rect: Rect } | { id: string; kind: "path"; path: SegmentPath };
 
-/** The rect(s) or line(s) a Location draws on the map. Unknown ids are skipped. */
+/** The rect(s) or street path(s) a Location draws on the map. Unknown ids are skipped. */
 export function resolveLocationShapes(location: Location): ResolvedShape[] {
   if (location.mode === "inventory") {
     return location.inventoryIds
@@ -22,8 +22,8 @@ export function resolveLocationShapes(location: Location): ResolvedShape[] {
   // 'streets' and 'route'
   return location.segmentIds
     .map((id) => segmentPath(id))
-    .filter((line): line is SegmentPath => line !== undefined)
-    .map((line) => ({ id: line.id, kind: "line" as const, line }));
+    .filter((path): path is SegmentPath => path !== undefined)
+    .map((path) => ({ id: path.id, kind: "path" as const, path }));
 }
 
 /** The `id`s a Location occupies, used to find overlaps between several highlights. */
@@ -33,10 +33,9 @@ export function occupiedIds(location: Location): string[] {
   return location.segmentIds;
 }
 
-export function rectCenter(rect: Rect): { x: number; y: number } {
-  return { x: rect.x + rect.w / 2, y: rect.y + rect.h / 2 };
-}
-
-export function lineMidpoint(line: SegmentPath): { x: number; y: number } {
-  return { x: (line.x1 + line.x2) / 2, y: (line.y1 + line.y2) / 2 };
+/** Where a shape's label sits: just above a rectangle, or above the middle of a street. */
+export function labelAnchor(shape: ResolvedShape): Point {
+  return shape.kind === "rect"
+    ? { x: shape.rect.x + shape.rect.w / 2, y: shape.rect.y - 10 }
+    : { x: shape.path.mid.x, y: shape.path.mid.y - 18 };
 }

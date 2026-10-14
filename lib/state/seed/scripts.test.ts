@@ -5,6 +5,7 @@
  */
 import { describe, expect, it } from "vitest";
 import { getSpace } from "@/lib/data/inventory";
+import { DRAWABLE_AREA_RECT } from "@/lib/data/mapGeometry";
 import { MAIN_1ST_TO_4TH, RIVERFRONT_5K_ROUTE, getSegment } from "@/lib/data/streets";
 import { PERSONAS } from "@/lib/data/people";
 import { timesOverlap, weekdayOf } from "@/lib/dates";
@@ -74,6 +75,18 @@ describe("every seed script", () => {
       if (!loc) continue;
       for (const id of loc.inventoryIds) expect(getSpace(id), `${s.key}: unknown space ${id}`).toBeDefined();
       for (const id of loc.segmentIds) expect(getSegment(id), `${s.key}: unknown segment ${id}`).toBeDefined();
+    }
+  });
+
+  it("draws every area event inside its Plaza or Lawn, at the size it states", () => {
+    const areas = SEED_SCRIPTS.map((s) => ({ key: s.key, loc: s.answers.location })).filter(({ loc }) => loc?.mode === "area");
+    expect(areas.length).toBeGreaterThan(0);
+    for (const { key, loc } of areas) {
+      const rect = loc!.areaRect!;
+      const area = DRAWABLE_AREA_RECT[loc!.areaId!];
+      expect(rect.x >= area.x && rect.y >= area.y, `${key}: starts outside ${loc!.areaId}`).toBe(true);
+      expect(rect.x + rect.w <= area.x + area.w && rect.y + rect.h <= area.y + area.h, `${key}: runs outside ${loc!.areaId}`).toBe(true);
+      expect(rect.w * rect.h, `${key}: rectangle is not its square feet`).toBe(loc!.squareFeet);
     }
   });
 

@@ -19,7 +19,7 @@ const b05Answers: EventAnswers = {
   eventType: "market_festival",
   name: LONG_NAME,
   description: "A parish-wide heritage festival with craft tables and a potluck.",
-  location: areaLocation("great-lawn", { x: 20, y: 20, w: 50, h: 40 }, 4000),
+  location: areaLocation("great-lawn", { x: 20, y: 20, w: 80, h: 50 }, 4000),
   // Thu, May 13: 10 days from the demo date, and an In review case needs 14 to reach a permit,
   // so the overdue review shows as lead-time risk. A weekday: the Great Lawn is the farmers
   // market's (F2) on Saturday mornings.
@@ -211,7 +211,7 @@ const b09Vendors = vendorNames("Interfaith Food Table", 4);
 const b09Answers: EventAnswers = {
   eventType: "market_festival",
   name: "Interfaith Unity Festival",
-  location: areaLocation("great-lawn", { x: 5, y: 5, w: 45, h: 35 }, 3500),
+  location: areaLocation("great-lawn", { x: 5, y: 5, w: 70, h: 50 }, 3500),
   schedule: singleSchedule("2027-06-02", "10:00", "16:00"),
   attendance: 500,
   addOns: addOns({ foodVending: { vendors: 4, vendorNames: b09Vendors } }),

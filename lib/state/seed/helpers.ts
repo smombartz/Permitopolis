@@ -7,6 +7,7 @@
  */
 import type { CatalogId } from "@/lib/rules/catalog";
 import { bookableSpaces, getSpace } from "@/lib/data/inventory";
+import { DRAWABLE_AREA_RECT } from "@/lib/data/mapGeometry";
 import { getSegment, milesOf } from "@/lib/data/streets";
 import { datesEvery, weekdayOf } from "@/lib/dates";
 import type {
@@ -67,7 +68,11 @@ export function inventoryLocation(ids: string[]): Location {
   return { mode: "inventory", inventoryIds: ids, segmentIds: [], capacity, label };
 }
 
-/** A drawn rectangle on a plaza or open area. Capacity follows the config's sq ft per person. */
+/**
+ * A drawn rectangle on a plaza or open area. `rect.x` and `rect.y` are measured in feet from the
+ * area's top-left corner, so a script does not depend on where the map draws the area; `w` x `h`
+ * is the `squareFeet`. Capacity follows the config's sq ft per person.
+ */
 export function areaLocation(
   areaId: "city-hall-plaza" | "great-lawn",
   rect: { x: number; y: number; w: number; h: number },
@@ -75,11 +80,12 @@ export function areaLocation(
   sqFtPerPerson = 10,
 ): Location {
   const space = getSpace(areaId);
+  const area = DRAWABLE_AREA_RECT[areaId];
   return {
     mode: "area",
     inventoryIds: [],
     areaId,
-    areaRect: rect,
+    areaRect: { x: area.x + rect.x, y: area.y + rect.y, w: rect.w, h: rect.h },
     segmentIds: [],
     squareFeet,
     capacity: Math.floor(squareFeet / sqFtPerPerson),

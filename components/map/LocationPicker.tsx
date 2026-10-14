@@ -23,11 +23,17 @@ import {
   toggleInventorySelection,
   toggleStreetSelection,
 } from "@/lib/view/map";
-import { CityBackground } from "./CityBackground";
+import { MapCanvas } from "./MapCanvas";
+import { MapKey } from "./MapKey";
 import type { Availability, EventType, Location } from "@/lib/types";
 
 export type LocationPickerMode = "inventory" | "area" | "streets" | "route";
 export type AreaId = "city-hall-plaza" | "great-lawn";
+
+/** A chosen street is drawn a little narrower than the road, so the road's own color frames it. */
+const SEGMENT_CHOSEN_WIDTH = 14;
+/** Wider than the widest road in the drawing, so a block is easy to hit. */
+const SEGMENT_HIT_WIDTH = 24;
 
 const FOCUS_RING =
   "outline-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring";
@@ -257,12 +263,8 @@ export function LocationPicker({ value, onChange, eventType, availabilityOf, cla
       {/* ---------- Bookable spaces ---------- */}
       <TabsContent value="inventory" className="mt-3">
         <div className="flex flex-col gap-4 md:flex-row">
-          <svg
-            viewBox={`${VIEWBOX.x} ${VIEWBOX.y} ${VIEWBOX.width} ${VIEWBOX.height}`}
-            aria-hidden="true"
-            className="w-full flex-1 rounded-panel border border-line-subtle bg-surface-1 md:w-2/3"
-          >
-            <CityBackground />
+          <MapCanvas aria-hidden="true" className="flex-1 md:w-2/3">
+            {/* The drawing shows each shelter and field; these sit on top to take the click and show the choice. */}
             {bookableSpaces().map((space) => {
               const shape = spaceShape(space.id);
               if (!shape) return null;
@@ -274,14 +276,17 @@ export function LocationPicker({ value, onChange, eventType, availabilityOf, cla
                   y={shape.y}
                   width={shape.w}
                   height={shape.h}
-                  rx={4}
-                  className={cn("cursor-pointer stroke-line-subtle", selected ? "fill-pill stroke-indigo-650" : "fill-surface-2")}
-                  strokeWidth={selected ? 3 : 1}
+                  rx={2}
+                  className={cn(
+                    "cursor-pointer",
+                    selected ? "fill-indigo-650/25 stroke-indigo-650" : "fill-transparent stroke-transparent hover:stroke-indigo-650/60",
+                  )}
+                  strokeWidth={4}
                   onClick={() => selectInventory(space.id)}
                 />
               );
             })}
-          </svg>
+          </MapCanvas>
           <ul className="flex flex-1 flex-col gap-2 md:w-1/3" aria-label="Bookable spaces">
             {bookableSpaces().map((space) => {
               const selected = inventoryIds.includes(space.id);
@@ -316,13 +321,7 @@ export function LocationPicker({ value, onChange, eventType, availabilityOf, cla
       {/* ---------- Draw an area ---------- */}
       <TabsContent value="area" className="mt-3">
         <div className="flex flex-col gap-4 md:flex-row">
-          <svg
-            ref={svgRef}
-            viewBox={`${VIEWBOX.x} ${VIEWBOX.y} ${VIEWBOX.width} ${VIEWBOX.height}`}
-            aria-hidden="true"
-            className="w-full flex-1 touch-none rounded-panel border border-line-subtle bg-surface-1 md:w-2/3"
-          >
-            <CityBackground />
+          <MapCanvas ref={svgRef} aria-hidden="true" className="flex-1 touch-none md:w-2/3">
             {(["city-hall-plaza", "great-lawn"] as AreaId[]).map((id) => {
               const shape = DRAWABLE_AREA_RECT[id];
               const isActive = id === areaId;
@@ -334,9 +333,11 @@ export function LocationPicker({ value, onChange, eventType, availabilityOf, cla
                   y={shape.y}
                   width={shape.w}
                   height={shape.h}
-                  rx={4}
-                  className={cn("cursor-pointer stroke-line-subtle", isActive ? "fill-surface-2" : "fill-surface-soft")}
-                  strokeWidth={isActive ? 2 : 1}
+                  className={cn(
+                    "fill-transparent",
+                    isActive ? "cursor-crosshair stroke-indigo-650/50" : "cursor-pointer stroke-transparent hover:stroke-indigo-650/50",
+                  )}
+                  strokeWidth={2}
                   onPointerDown={isActive ? handleAreaPointerDown : () => handleAreaIdChange(id)}
                   onPointerMove={isActive ? handleAreaPointerMove : undefined}
                   onPointerUp={isActive ? handleAreaPointerEnd : undefined}
@@ -349,11 +350,11 @@ export function LocationPicker({ value, onChange, eventType, availabilityOf, cla
               y={areaRect.y}
               width={areaRect.w}
               height={areaRect.h}
-              className={cn("pointer-events-none stroke-indigo-650", areaChosen ? "fill-pill" : "fill-none")}
-              strokeWidth={2}
+              className={cn("pointer-events-none stroke-indigo-650", areaChosen ? "fill-indigo-650/25" : "fill-none")}
+              strokeWidth={3}
               strokeDasharray={areaChosen ? undefined : "8 6"}
             />
-          </svg>
+          </MapCanvas>
           <div className="flex flex-1 flex-col gap-3 md:w-1/3">
             <div className="flex flex-col gap-1.5">
               <Label htmlFor={`${fieldId}-area`}>Area</Label>
@@ -404,31 +405,27 @@ export function LocationPicker({ value, onChange, eventType, availabilityOf, cla
       {/* ---------- Street segments ---------- */}
       <TabsContent value="streets" className="mt-3">
         <div className="flex flex-col gap-4 md:flex-row">
-          <svg
-            viewBox={`${VIEWBOX.x} ${VIEWBOX.y} ${VIEWBOX.width} ${VIEWBOX.height}`}
-            aria-hidden="true"
-            className="w-full flex-1 rounded-panel border border-line-subtle bg-surface-1 md:w-2/3"
-          >
-            <CityBackground />
+          <MapCanvas aria-hidden="true" className="flex-1 md:w-2/3">
+            {/* The drawing colors every block that can be closed; these take the click and show the choice. */}
             {SEGMENTS.map((segment) => {
               const path = segmentPath(segment.id);
               if (!path) return null;
               const selected = streetIds.includes(segment.id);
               return (
-                <line
+                <path
                   key={segment.id}
-                  x1={path.x1}
-                  y1={path.y1}
-                  x2={path.x2}
-                  y2={path.y2}
-                  strokeLinecap="round"
-                  className={cn("cursor-pointer", selected ? "stroke-indigo-650" : "stroke-line-magnetic")}
-                  strokeWidth={selected ? 12 : 10}
+                  d={path.d}
+                  strokeLinecap={selected ? "round" : "butt"}
+                  className={cn(
+                    "cursor-pointer fill-none",
+                    selected ? "stroke-indigo-650/75" : "stroke-transparent hover:stroke-indigo-650/30",
+                  )}
+                  strokeWidth={selected ? SEGMENT_CHOSEN_WIDTH : SEGMENT_HIT_WIDTH}
                   onClick={() => selectStreet(segment.id)}
                 />
               );
             })}
-          </svg>
+          </MapCanvas>
           <ul className="flex flex-1 flex-col gap-1.5 md:w-1/3" aria-label="Street segments">
             {SEGMENTS.map((segment) => {
               const selected = streetIds.includes(segment.id);
@@ -461,38 +458,32 @@ export function LocationPicker({ value, onChange, eventType, availabilityOf, cla
       {/* ---------- Draw a route ---------- */}
       <TabsContent value="route" className="mt-3">
         <div className="flex flex-col gap-4 md:flex-row">
-          <svg
-            viewBox={`${VIEWBOX.x} ${VIEWBOX.y} ${VIEWBOX.width} ${VIEWBOX.height}`}
-            aria-hidden="true"
-            className="w-full flex-1 rounded-panel border border-line-subtle bg-surface-1 md:w-2/3"
-          >
-            <CityBackground />
+          <MapCanvas nodes aria-hidden="true" className="flex-1 md:w-2/3">
+            {/* On the route: indigo. Can be added next: left as drawn. Cannot be added yet: washed out. */}
             {SEGMENTS.map((segment) => {
               const path = segmentPath(segment.id);
               if (!path) return null;
               const included = routeIds.includes(segment.id);
               const appendable = !included && canAppendSegment(routeIds, segment.id);
               return (
-                <line
+                <path
                   key={segment.id}
-                  x1={path.x1}
-                  y1={path.y1}
-                  x2={path.x2}
-                  y2={path.y2}
-                  strokeLinecap="round"
+                  d={path.d}
+                  strokeLinecap={included ? "round" : "butt"}
                   className={cn(
+                    "fill-none",
                     included
-                      ? "cursor-pointer stroke-indigo-650"
+                      ? "stroke-indigo-650/75"
                       : appendable
-                        ? "cursor-pointer stroke-line-magnetic"
-                        : "stroke-line-subtle",
+                        ? "cursor-pointer stroke-transparent hover:stroke-indigo-650/30"
+                        : "stroke-surface-solid/70",
                   )}
-                  strokeWidth={included ? 12 : 10}
+                  strokeWidth={included ? SEGMENT_CHOSEN_WIDTH : SEGMENT_HIT_WIDTH}
                   onClick={() => (!included && appendable ? selectRouteSegment(segment.id) : undefined)}
                 />
               );
             })}
-          </svg>
+          </MapCanvas>
           <div className="flex flex-1 flex-col gap-2 md:w-1/3">
             <ul aria-label="Route segments, in order" className="flex flex-col gap-1.5">
               {SEGMENTS.map((segment) => {
@@ -535,6 +526,8 @@ export function LocationPicker({ value, onChange, eventType, availabilityOf, cla
           </div>
         </div>
       </TabsContent>
+
+      <MapKey className="mt-3" />
     </Tabs>
   );
 }

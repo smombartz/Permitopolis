@@ -13,7 +13,7 @@ const answers: EventAnswers = {
   eventType: "picnic_party",
   name: "Movie Night on the Lawn",
   description: "An outdoor movie screening with a projector and folding chairs.",
-  location: areaLocation("great-lawn", { x: 15, y: 15, w: 40, h: 30 }, 2000),
+  location: areaLocation("great-lawn", { x: 15, y: 15, w: 50, h: 40 }, 2000),
   schedule: singleSchedule("2027-06-12", "19:00", "22:30", { setupStart: "17:00" }),
   attendance: 150,
   addOns: addOns({ amplifiedSound: true }),

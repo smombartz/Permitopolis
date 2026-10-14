@@ -1,0 +1,134 @@
+/*
+ * The city map's palette. A map is read by its colors (water is blue, parks are green), so it
+ * keeps a cartographic set of its own, apart from the Rime & Ink tokens in tokens.css.
+ *
+ * These are only for the map's art (components/map/art, generated from
+ * design/map/permitopolis-map.svg) and its key. Everything drawn on top of the map, such as a
+ * selection or a booking, still uses Rime & Ink.
+ *
+ * `pnpm map:sync` reads this file to turn each color in the SVG into a class. A color in the SVG
+ * with no entry here stops the sync, so give it a name here first.
+ */
+
+:root {
+  /* ---- ground and land use ---- */
+  --map-ground: #eceae3;
+  --map-open-land: #dfe6cf;
+  --map-residential: #f7efc0;
+  --map-downtown: #f4cbc3;
+  --map-civic: #d8cdee;
+  --map-public-works: #d3d6da;
+
+  /* ---- parks and water ---- */
+  --map-park: #bfdfae;
+  --map-park-detail: #a5d19c;
+  --map-tree: #8cc487;
+  --map-tree-far: #c3d6ae;
+  --map-water: #9fcdee;
+  --map-river-bank: #e3dfc6;
+
+  /* ---- streets and paths ---- */
+  --map-white: #ffffff;
+  --map-arterial: #f6cf6a;
+  --map-block: #a8dcd4;
+  --map-trail: #9b8560;
+  --map-bridge: #7b8794;
+  --map-node-line: #3d4452;
+
+  /* ---- buildings ---- */
+  --map-landmark: #b5a4dc;
+  --map-landmark-line: #8672c4;
+  --map-works-building: #aeb4bc;
+  --map-works-line: #8b929b;
+  --map-boathouse: #d2b48a;
+  --map-boathouse-line: #9a7b55;
+  --map-dock: #b08d6a;
+  --map-house: #e6d27f;
+  --map-house-line: #b9a34f;
+
+  /* ---- permit spaces ---- */
+  --map-plaza: #ece3d0;
+  --map-plaza-line: #a8997c;
+  --map-lawn: #a6d694;
+  --map-field: #8fcb7f;
+  --map-field-line: #5d9d52;
+  --map-infield: #dcc795;
+  --map-shelter: #cf9a66;
+  --map-shelter-line: #8d5f33;
+
+  /* ---- amenities ---- */
+  --map-parking: #cfd4da;
+  --map-parking-line: #9aa2ad;
+  --map-restroom-line: #6b7280;
+  --map-power: #f2b01e;
+  --map-power-line: #7a5a00;
+  --map-tap: #2f86c9;
+  --map-stage: #d6c9ad;
+  --map-gate: #6b4f2a;
+
+  /* ---- names ---- */
+  --map-ink: #2b303b;
+  --map-ink-muted: #4a5563;
+  --map-ink-street: #5b6270;
+  --map-ink-arterial: #4a3c0c;
+  --map-ink-block: #17524b;
+  --map-ink-park: #2f5f2a;
+  --map-ink-water: #2d6d9b;
+  --map-ink-downtown: #a14a3f;
+  --map-ink-residential: #857618;
+}
+
+@theme inline {
+  --color-map-ground: var(--map-ground);
+  --color-map-open-land: var(--map-open-land);
+  --color-map-residential: var(--map-residential);
+  --color-map-downtown: var(--map-downtown);
+  --color-map-civic: var(--map-civic);
+  --color-map-public-works: var(--map-public-works);
+  --color-map-park: var(--map-park);
+  --color-map-park-detail: var(--map-park-detail);
+  --color-map-tree: var(--map-tree);
+  --color-map-tree-far: var(--map-tree-far);
+  --color-map-water: var(--map-water);
+  --color-map-river-bank: var(--map-river-bank);
+  --color-map-white: var(--map-white);
+  --color-map-arterial: var(--map-arterial);
+  --color-map-block: var(--map-block);
+  --color-map-trail: var(--map-trail);
+  --color-map-bridge: var(--map-bridge);
+  --color-map-node-line: var(--map-node-line);
+  --color-map-landmark: var(--map-landmark);
+  --color-map-landmark-line: var(--map-landmark-line);
+  --color-map-works-building: var(--map-works-building);
+  --color-map-works-line: var(--map-works-line);
+  --color-map-boathouse: var(--map-boathouse);
+  --color-map-boathouse-line: var(--map-boathouse-line);
+  --color-map-dock: var(--map-dock);
+  --color-map-house: var(--map-house);
+  --color-map-house-line: var(--map-house-line);
+  --color-map-plaza: var(--map-plaza);
+  --color-map-plaza-line: var(--map-plaza-line);
+  --color-map-lawn: var(--map-lawn);
+  --color-map-field: var(--map-field);
+  --color-map-field-line: var(--map-field-line);
+  --color-map-infield: var(--map-infield);
+  --color-map-shelter: var(--map-shelter);
+  --color-map-shelter-line: var(--map-shelter-line);
+  --color-map-parking: var(--map-parking);
+  --color-map-parking-line: var(--map-parking-line);
+  --color-map-restroom-line: var(--map-restroom-line);
+  --color-map-power: var(--map-power);
+  --color-map-power-line: var(--map-power-line);
+  --color-map-tap: var(--map-tap);
+  --color-map-stage: var(--map-stage);
+  --color-map-gate: var(--map-gate);
+  --color-map-ink: var(--map-ink);
+  --color-map-ink-muted: var(--map-ink-muted);
+  --color-map-ink-street: var(--map-ink-street);
+  --color-map-ink-arterial: var(--map-ink-arterial);
+  --color-map-ink-block: var(--map-ink-block);
+  --color-map-ink-park: var(--map-ink-park);
+  --color-map-ink-water: var(--map-ink-water);
+  --color-map-ink-downtown: var(--map-ink-downtown);
+  --color-map-ink-residential: var(--map-ink-residential);
+}

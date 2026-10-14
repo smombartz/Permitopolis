@@ -42,6 +42,40 @@
 
 ---
 
+## 2026-10-13 - New city map, drawn from an SVG
+
+**What Changed:**
+- The map is now the drawing in `design/map/permitopolis-map.svg` (1600 x 1000, 13 layers: land use, parks, river, streets, buildings, amenities, names). It replaces 16 straight lines and 12 rectangles in a 1200 x 800 box
+- `pnpm map:sync` (`scripts/sync-map.mjs`) generates `components/map/art/layers.generated.tsx` and `lib/data/mapGeometry.generated.ts` from the drawing; `--check` fails when they are stale
+- `styles/map.css` holds the map's own colors as `--map-*` tokens, imported after `tokens.css`. The sync maps each hex in the SVG to its class and stops on a color with no name
+- `lib/data/mapGeometry.ts` keeps its lookups and re-exports the generated data. A street segment is now a path (`d`, `mid`, `box`), so River Road keeps its curves; `ZONE_OUTLINES` is gone
+- New `MapCanvas` replaces `CityBackground` and six repeated `<svg>` blocks: drawing, then the screen's shapes, then names on top
+- `PermitopolisMap`: highlights have a light casing so tier colors read on any ground; a booking's label is larger, haloed and drawn over the street names
+- `MapThumbnail` zooms to its place (`thumbnailFrame()` in `lib/view/map.ts`)
+- `LocationPicker`: shapes over the drawing are clear until chosen; Draw a route shows the nodes and washes out segments that cannot be added next
+- New `MapKey`, a closed "Map key" under the picker and the display map
+- Seed: `areaLocation()` now takes its rectangle in feet from the area's corner, and four seeded rectangles were resized to match their stated square feet. Square feet and capacity are unchanged. The seed fingerprint changes, so a demo saved in a browser resets once
+- Tests: `tests/map-sync.test.ts` (new), `thumbnailFrame` cases, a seed check on area rectangles, and render tests for layer order, thumbnail zoom and the map key
+
+**Why:**
+- The old map was a few rudimentary lines and did not look like a city. The owner drew a new one and will keep editing it, so the SVG stays the source and the code is generated from it
+- The seeded area rectangles sat in the map's top-left corner, outside the Plaza and Lawn; the new map would have shown that
+
+**Files Modified:**
+- `design/map/permitopolis-map.svg` - new, the drawing
+- `scripts/sync-map.mjs` - new, the generator; `package.json` - `map:sync`
+- `styles/map.css` - new; `app/globals.css` - imports it
+- `components/map/art/layers.generated.tsx`, `lib/data/mapGeometry.generated.ts` - new, generated
+- `lib/data/mapGeometry.ts`, `lib/view/map.ts`, `lib/view/map.test.ts`
+- `components/map/MapCanvas.tsx`, `components/map/MapKey.tsx` - new
+- `components/map/PermitopolisMap.tsx`, `MapThumbnail.tsx`, `LocationPicker.tsx`, `geometry.ts`, `index.ts`
+- `components/map/CityBackground.tsx` - removed
+- `lib/state/seed/helpers.ts`, `scenarios/f2.ts`, `scenarios/f3.ts`, `background/b05-b09.ts`, `scripts.test.ts`
+- `tests/map-sync.test.ts` - new; `tests/render/map.test.tsx`
+- `CLAUDE.md`, `docs/readme.md`, `docs/plans/2026-10-13-new-city-map.md`
+
+---
+
 ## 2026-10-13 - Landing header reduced to one row
 
 **What Changed:**
