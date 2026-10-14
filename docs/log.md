@@ -1,5 +1,20 @@
 # Change log
 
+## 2026-10-13 - Dropped the GitHub Desktop stash
+
+**What Changed:**
+- Dropped the one stash in the repo (`!!GitHub_Desktop<master>`, 57,035 files of `node_modules` and `.next`, no source code) and pruned its objects; `.git` went from 780 MB to 3.1 MB
+- Saved the plan for it to `docs/plans/`
+
+**Why:**
+- GitHub Desktop stashed dependencies and build output when the working tree was briefly switched to `master` before that branch had a `.gitignore`. The stash held nothing worth keeping and made up almost all of the repository's size, which syncs through Dropbox
+
+**Files Modified:**
+- `docs/plans/2026-10-13-drop-github-desktop-stash.md` - new plan
+- `docs/log.md`
+
+---
+
 ## 2026-10-13 - Merged into master and deployed to Vercel
 
 **What Changed:**
